@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import re
 from collections.abc import Mapping
 
@@ -36,17 +37,28 @@ class SonglinkClient:
         await self._client.aclose()
 
     async def lookup_track(self, source_url: str) -> TrackMatch:
-        matches: list[TrackMatch] = []
-        last_lookup_error: SonglinkLookupError | None = None
-
-        for user_country in self._user_countries:
-            try:
-                matches.append(await self._lookup_track_for_country(source_url, user_country))
-            except SonglinkLookupError as exc:
-                last_lookup_error = exc
+        results = await asyncio.gather(
+            *(
+                self._lookup_track_for_country(source_url, user_country)
+                for user_country in self._user_countries
+            ),
+            return_exceptions=True,
+        )
+        matches = [result for result in results if isinstance(result, TrackMatch)]
 
         if not matches:
-            raise last_lookup_error or SonglinkLookupError("Song.link could not resolve the URL.")
+            service_error = next(
+                (result for result in results if isinstance(result, SonglinkError)),
+                None,
+            )
+            if service_error and not isinstance(service_error, SonglinkLookupError):
+                raise service_error
+
+            lookup_error = next(
+                (result for result in results if isinstance(result, SonglinkLookupError)),
+                None,
+            )
+            raise lookup_error or SonglinkLookupError("Song.link could not resolve the URL.")
 
         return self._merge_matches(matches)
 

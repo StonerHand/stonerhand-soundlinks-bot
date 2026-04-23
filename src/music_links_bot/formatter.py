@@ -47,7 +47,7 @@ def format_track_message(track: TrackMatch) -> str:
 def format_collection_message(tracks: list[TrackMatch]) -> str:
     seed = "|".join(f"{track.artist}:{track.title}:{track.kind}" for track in tracks)
     lines = [
-        "сегодня в подборке:",
+        pick_phrase("collection_intro", seed),
         "",
     ]
 

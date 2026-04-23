@@ -10,6 +10,7 @@ from music_links_bot.bot import (
     _build_collection_keyboard,
     _build_platform_order,
     _build_spotify_podcast_fallback,
+    _message_text,
     _shorten_user_note,
 )
 from music_links_bot.models import TrackMatch
@@ -99,6 +100,11 @@ class BotKeyboardTests(unittest.TestCase):
 
         self.assertEqual(len(shortened), MAX_USER_NOTE_LENGTH)
         self.assertTrue(shortened.endswith("…"))
+
+    def test_message_text_falls_back_to_caption(self) -> None:
+        message = type("MessageStub", (), {"text": None, "caption": "caption link"})()
+
+        self.assertEqual(_message_text(message), "caption link")
 
 
 if __name__ == "__main__":

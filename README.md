@@ -10,6 +10,7 @@ It does not just return raw URLs. It formats every link as a small editorial car
 
 - Resolves releases through Song.link / Odesli
 - Accepts Spotify, Apple Music, YouTube / YouTube Music, Deezer, Tidal, Yandex Music, SoundCloud and podcast links
+- Reads links from regular messages and media captions
 - Supports tracks, albums, EPs, singles, podcasts, podcast shows and multi-link collections
 - Uses direct platform buttons for a single release
 - Uses playlist-style posts for multiple links
@@ -213,6 +214,7 @@ src/music_links_bot/
 ## Reliability
 
 - Multiple links are resolved in parallel
+- Multiple Song.link countries are checked in parallel
 - Long user notes are trimmed before posting
 - Large link packs are limited to avoid Telegram limits
 - Stats are written atomically and protected from parallel writes

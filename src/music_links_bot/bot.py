@@ -70,7 +70,7 @@ def build_application(settings: Settings) -> Application:
     application.add_handler(CommandHandler("stats", stats_command))
     application.add_handler(
         MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
+            (filters.TEXT | filters.CAPTION) & ~filters.COMMAND,
             track_lookup_message,
         )
     )
@@ -184,17 +184,18 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
     if message is None:
         return
 
-    source_urls = extract_supported_urls(message.text)[:MAX_LINKS_PER_MESSAGE]
+    message_text = _message_text(message)
+    source_urls = extract_supported_urls(message_text)[:MAX_LINKS_PER_MESSAGE]
     user_prefix = _build_user_prefix(message)
     if not source_urls:
         await _notify_admin(
             context,
-            f"Не распознал ссылку в чате {message.chat_id}: {message.text or ''}",
+            f"Не распознал ссылку в чате {message.chat_id}: {message_text or ''}",
             only_for_channel_message=message,
         )
         if message.chat.type == "channel":
             return
-        no_url_text = pick_phrase("no_url", message.text or str(message.chat_id))
+        no_url_text = pick_phrase("no_url", message_text or str(message.chat_id))
         await message.reply_text(
             f"{no_url_text}\n\n"
             f"Пришлите ссылку из сервисов: {INPUT_PLATFORM_HINT}"
@@ -476,7 +477,7 @@ def _record_matches_safely(tracks: list[TrackMatch], message: Message) -> None:
 
 
 def _build_user_prefix(message: Message) -> str:
-    body_text = _shorten_user_note(strip_supported_urls(message.text))
+    body_text = _shorten_user_note(strip_supported_urls(_message_text(message)))
     if not body_text:
         return ""
 
@@ -486,6 +487,10 @@ def _build_user_prefix(message: Message) -> str:
         author_label = f"@{user.username}" if user.username else user.full_name
 
     return prepend_user_text(body_text, author_label=author_label)
+
+
+def _message_text(message: Message) -> str | None:
+    return message.text or message.caption
 
 
 def _shorten_user_note(text: str) -> str:

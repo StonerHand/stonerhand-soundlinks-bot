@@ -5,7 +5,21 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from music_links_bot.models import TrackMatch
-from music_links_bot.songlink import SonglinkClient
+from music_links_bot.songlink import SonglinkClient, SonglinkError, SonglinkLookupError
+
+
+class FakeSonglinkClient(SonglinkClient):
+    def __init__(self, outcomes: dict[str, TrackMatch | Exception]) -> None:
+        super().__init__(user_countries=tuple(outcomes))
+        self._outcomes = outcomes
+
+    async def _lookup_track_for_country(self, source_url: str, user_country: str) -> TrackMatch:
+        del source_url
+        outcome = self._outcomes[user_country]
+        if isinstance(outcome, Exception):
+            raise outcome
+
+        return outcome
 
 
 class SonglinkClientTests(unittest.TestCase):
@@ -91,6 +105,53 @@ class SonglinkClientTests(unittest.TestCase):
         self.assertEqual(client._normalize_entity_type("podcastEpisode"), "podcast")
         self.assertEqual(client._normalize_entity_type("episode"), "podcast")
         self.assertEqual(client._normalize_entity_type("track"), "song")
+
+
+class SonglinkClientAsyncTests(unittest.IsolatedAsyncioTestCase):
+    async def test_lookup_track_merges_country_results_in_parallel(self) -> None:
+        client = FakeSonglinkClient(
+            {
+                "RU": TrackMatch(
+                    title="Song",
+                    artist="Artist",
+                    links={"yandexMusic": "https://yandex.example"},
+                    kind="song",
+                ),
+                "US": TrackMatch(
+                    title="Song",
+                    artist="Artist",
+                    links={"spotify": "https://spotify.example"},
+                    kind="song",
+                ),
+            }
+        )
+
+        try:
+            track = await client.lookup_track("https://open.spotify.com/track/1")
+        finally:
+            await client.aclose()
+
+        self.assertEqual(
+            track.links,
+            {
+                "yandexMusic": "https://yandex.example",
+                "spotify": "https://spotify.example",
+            },
+        )
+
+    async def test_lookup_track_prefers_service_error_when_all_countries_fail(self) -> None:
+        client = FakeSonglinkClient(
+            {
+                "RU": SonglinkLookupError("not found"),
+                "US": SonglinkError("service down"),
+            }
+        )
+
+        try:
+            with self.assertRaises(SonglinkError):
+                await client.lookup_track("https://open.spotify.com/track/1")
+        finally:
+            await client.aclose()
 
 
 if __name__ == "__main__":
