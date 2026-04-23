@@ -1,2 +1,1 @@
-worker: python -m music_links_bot
-
+worker: PYTHONPATH=src python -m music_links_bot

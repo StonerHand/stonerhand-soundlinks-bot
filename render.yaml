@@ -3,8 +3,8 @@ services:
     name: stonerhand-bot
     runtime: python
     plan: starter
-    buildCommand: pip install -e .
-    startCommand: python -m music_links_bot
+    buildCommand: pip install -r requirements.txt
+    startCommand: PYTHONPATH=src python -m music_links_bot
     envVars:
       - key: PYTHON_VERSION
         value: 3.13.4

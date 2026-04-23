@@ -330,7 +330,7 @@ def _build_collection_keyboard(tracks: list[TrackMatch]) -> InlineKeyboardMarkup
 def _record_matches_safely(tracks: list[TrackMatch]) -> None:
     try:
         record_matches(tracks)
-    except OSError:
+    except Exception:
         LOGGER.exception("Could not update stats")
 
 
