@@ -50,7 +50,7 @@ class SonglinkClientTests(unittest.TestCase):
 
         release_year = client._extract_release_year_from_entities(
             {
-                "spotify:song:1": {"type": "song", "releaseDate": "1993-01-01"},
+                "spotify:song:1": {"type": "track", "releaseDate": "1993-01-01"},
                 "spotify:album:1": {"type": "album", "releaseDate": "1992-01-01"},
             },
             "song",

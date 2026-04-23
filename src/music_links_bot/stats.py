@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from threading import Lock
 from typing import Any
 
 from music_links_bot.models import TrackMatch
 
 STATS_PATH = Path("data/stats.json")
 SUPPORTED_KINDS = ("song", "album", "podcast")
+STATS_LOCK = Lock()
 StatsData = dict[str, Any]
 
 
@@ -41,24 +43,24 @@ def record_matches(
     user: dict[str, object] | None = None,
     chat: dict[str, object] | None = None,
 ) -> StatsData:
-    stats = load_stats(path)
-    stats["posts"] += 1
+    with STATS_LOCK:
+        stats = load_stats(path)
+        stats["posts"] += 1
 
-    if len(matches) > 1:
-        stats["collections"] += 1
+        if len(matches) > 1:
+            stats["collections"] += 1
 
-    for match in matches:
-        stats[match.kind if match.kind in SUPPORTED_KINDS else "song"] += 1
+        for match in matches:
+            stats[match.kind if match.kind in SUPPORTED_KINDS else "song"] += 1
 
-    if user:
-        _record_counter(stats["users"], user)
+        if user:
+            _record_counter(stats["users"], user)
 
-    if chat:
-        _record_counter(stats["chats"], chat)
+        if chat:
+            _record_counter(stats["chats"], chat)
 
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(stats, ensure_ascii=False, indent=2), encoding="utf-8")
-    return stats
+        _write_stats(path, stats)
+        return stats
 
 
 def format_stats_message(stats: StatsData, *, include_private: bool = False) -> str:
@@ -134,6 +136,13 @@ def _record_counter(counter: dict[str, dict[str, object]], entry: dict[str, obje
     current["count"] = int(current.get("count") or 0) + 1
     current["label"] = str(entry.get("label") or current.get("label") or entry_id)
     current["last_seen"] = str(entry.get("last_seen") or current.get("last_seen") or "")
+
+
+def _write_stats(path: Path, stats: StatsData) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = path.with_suffix(f"{path.suffix}.tmp")
+    temp_path.write_text(json.dumps(stats, ensure_ascii=False, indent=2), encoding="utf-8")
+    temp_path.replace(path)
 
 
 def _format_top_entries(title: str, value: object, *, limit: int = 10) -> str:

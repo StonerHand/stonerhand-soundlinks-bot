@@ -62,11 +62,18 @@ class SonglinkClient:
             response = await self._client.get("/links", params=params)
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
+            if exc.response.status_code >= 500:
+                raise SonglinkError("Song.link is unavailable right now.") from exc
+
             raise SonglinkLookupError("Song.link rejected the URL.") from exc
         except httpx.HTTPError as exc:
             raise SonglinkError("Song.link is unavailable right now.") from exc
 
-        payload = response.json()
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise SonglinkLookupError("Song.link returned an invalid response.") from exc
+
         entity_id = payload.get("entityUniqueId")
         entities = payload.get("entitiesByUniqueId")
         links = payload.get("linksByPlatform")
@@ -186,7 +193,7 @@ class SonglinkClient:
             if not isinstance(entity, Mapping):
                 continue
 
-            current_type = str(entity.get("type", "")).lower()
+            current_type = self._normalize_entity_type(entity.get("type"))
             if current_type and current_type != entity_type:
                 continue
 

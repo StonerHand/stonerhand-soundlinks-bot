@@ -6,9 +6,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from music_links_bot.bot import (
     MAX_BUTTON_TEXT_LENGTH,
+    MAX_USER_NOTE_LENGTH,
     _build_collection_keyboard,
     _build_platform_order,
     _build_spotify_podcast_fallback,
+    _shorten_user_note,
 )
 from music_links_bot.models import TrackMatch
 
@@ -89,6 +91,14 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertIsNone(
             _build_spotify_podcast_fallback("https://open.spotify.com/track/abc")
         )
+
+    def test_shorten_user_note_keeps_telegram_posts_safe(self) -> None:
+        text = "x" * (MAX_USER_NOTE_LENGTH + 20)
+
+        shortened = _shorten_user_note(text)
+
+        self.assertEqual(len(shortened), MAX_USER_NOTE_LENGTH)
+        self.assertTrue(shortened.endswith("…"))
 
 
 if __name__ == "__main__":

@@ -33,6 +33,8 @@ from music_links_bot.url_utils import extract_supported_urls, spotify_url_type, 
 LOGGER = logging.getLogger(__name__)
 CHANNEL_URL = "https://t.me/stonerhand"
 MAX_BUTTON_TEXT_LENGTH = 64
+MAX_LINKS_PER_MESSAGE = 12
+MAX_USER_NOTE_LENGTH = 700
 DEFAULT_PLATFORM_ORDER = (
     "spotify",
     "appleMusic",
@@ -182,7 +184,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
     if message is None:
         return
 
-    source_urls = extract_supported_urls(message.text)
+    source_urls = extract_supported_urls(message.text)[:MAX_LINKS_PER_MESSAGE]
     user_prefix = _build_user_prefix(message)
     if not source_urls:
         await _notify_admin(
@@ -474,7 +476,7 @@ def _record_matches_safely(tracks: list[TrackMatch], message: Message) -> None:
 
 
 def _build_user_prefix(message: Message) -> str:
-    body_text = strip_supported_urls(message.text)
+    body_text = _shorten_user_note(strip_supported_urls(message.text))
     if not body_text:
         return ""
 
@@ -484,6 +486,13 @@ def _build_user_prefix(message: Message) -> str:
         author_label = f"@{user.username}" if user.username else user.full_name
 
     return prepend_user_text(body_text, author_label=author_label)
+
+
+def _shorten_user_note(text: str) -> str:
+    if len(text) <= MAX_USER_NOTE_LENGTH:
+        return text
+
+    return text[: MAX_USER_NOTE_LENGTH - 1].rstrip() + "…"
 
 
 def _build_user_stats_entry(message: Message) -> dict[str, object] | None:
