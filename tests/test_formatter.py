@@ -72,6 +72,20 @@ class FormatterTests(unittest.TestCase):
             f"<i>{pick_phrase('album_cta', 'Artist:EP:album')}</i>\n\n#stonerhand #album #ep",
         )
 
+    def test_format_track_message_marks_podcast(self) -> None:
+        track = TrackMatch(
+            title="Episode",
+            artist="Podcast Show",
+            links={"spotify": "https://open.spotify.com/episode/1"},
+            kind="podcast",
+        )
+
+        self.assertEqual(
+            format_track_message(track),
+            "🎙️ · <b>Podcast Show</b> - Episode\n\n"
+            f"<i>{pick_phrase('podcast_cta', 'Podcast Show:Episode:podcast')}</i>\n\n#stonerhand #podcast",
+        )
+
     def test_format_collection_message_lists_tracks(self) -> None:
         tracks = [
             TrackMatch(title="Song", artist="Artist", links={}, release_year="2006"),

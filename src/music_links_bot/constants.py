@@ -23,6 +23,7 @@ SUPPORTED_INPUT_HOSTS = {
 PLATFORM_LABELS = {
     "spotify": "Spotify",
     "appleMusic": "Apple Music",
+    "applePodcasts": "Apple Podcasts",
     "youtubeMusic": "YouTube Music",
     "deezer": "Deezer",
     "tidal": "Tidal",
@@ -32,6 +33,7 @@ PLATFORM_LABELS = {
 PLATFORM_ALIASES = {
     "spotify": ("spotify",),
     "appleMusic": ("appleMusic", "itunes"),
+    "applePodcasts": ("applePodcasts", "itunesPodcast", "podcastApple"),
     "youtubeMusic": ("youtubeMusic", "youtube"),
     "deezer": ("deezer",),
     "tidal": ("tidal",),
@@ -40,5 +42,5 @@ PLATFORM_ALIASES = {
 
 INPUT_PLATFORM_HINT = (
     "Spotify, Apple Music, YouTube / YouTube Music, Deezer, "
-    "Tidal, Yandex Music или SoundCloud"
+    "Tidal, Yandex Music или SoundCloud, а также ссылки на подкасты"
 )

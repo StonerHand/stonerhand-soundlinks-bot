@@ -70,6 +70,21 @@ class SonglinkClientTests(unittest.TestCase):
             "single",
         )
 
+    def test_merge_matches_keeps_podcast_kind(self) -> None:
+        client = SonglinkClient(user_countries=("US",))
+        merged = client._merge_matches(
+            [
+                TrackMatch(
+                    title="Episode",
+                    artist="Podcast Show",
+                    links={"spotify": "https://spotify.example/episode"},
+                    kind="podcast",
+                )
+            ]
+        )
+
+        self.assertEqual(merged.kind, "podcast")
+
 
 if __name__ == "__main__":
     unittest.main()

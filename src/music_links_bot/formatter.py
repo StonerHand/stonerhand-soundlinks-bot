@@ -10,6 +10,9 @@ TRACK_EMOJIS = ("🎵", "🎧", "🎶", "🔊", "📻")
 
 
 def pick_track_emoji(track: TrackMatch) -> str:
+    if track.kind == "podcast":
+        return "🎙️"
+
     if track.kind == "album":
         return "💿"
 
@@ -29,7 +32,10 @@ def format_track_heading(track: TrackMatch) -> str:
 def format_track_message(track: TrackMatch) -> str:
     emoji = pick_track_emoji(track)
     seed = f"{track.artist}:{track.title}:{track.kind}"
-    cta_key = "album_cta" if track.kind == "album" else "track_cta"
+    cta_key = {
+        "album": "album_cta",
+        "podcast": "podcast_cta",
+    }.get(track.kind, "track_cta")
 
     return (
         f"{emoji} · {format_track_heading(track)}\n\n"
@@ -75,6 +81,10 @@ def prepend_user_text(message_text: str, *, author_label: str | None = None) -> 
 def build_auto_hashtags(track: TrackMatch) -> str:
     hashtags = ["#stonerhand"]
 
+    if track.kind == "podcast":
+        hashtags.append("#podcast")
+        return " ".join(hashtags)
+
     if track.kind == "album":
         hashtags.append("#album")
         if track.release_format == "ep":
@@ -100,6 +110,9 @@ def build_collection_hashtags(tracks: list[TrackMatch]) -> str:
 
     if "album" in kinds:
         hashtags.append("#album")
+
+    if "podcast" in kinds:
+        hashtags.append("#podcast")
 
     if "single" in formats:
         hashtags.append("#single")

@@ -39,6 +39,19 @@ class ConfigTests(unittest.TestCase):
 
         self.assertIsNone(settings.admin_chat_id)
 
+    def test_from_env_reads_primary_platform(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "BOT_TOKEN": "token",
+                "PRIMARY_PLATFORM": "yandexMusic",
+            },
+            clear=False,
+        ):
+            settings = Settings.from_env()
+
+        self.assertEqual(settings.primary_platform, "yandexMusic")
+
 
 if __name__ == "__main__":
     unittest.main()

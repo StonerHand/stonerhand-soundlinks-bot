@@ -32,7 +32,15 @@ from music_links_bot.url_utils import extract_supported_urls, strip_supported_ur
 
 LOGGER = logging.getLogger(__name__)
 CHANNEL_URL = "https://t.me/stonerhand"
-RESULT_PLATFORM_ORDER = ("spotify", "appleMusic", "youtubeMusic", "deezer", "tidal", "yandexMusic")
+DEFAULT_PLATFORM_ORDER = (
+    "spotify",
+    "appleMusic",
+    "applePodcasts",
+    "youtubeMusic",
+    "deezer",
+    "tidal",
+    "yandexMusic",
+)
 
 
 def build_application(settings: Settings) -> Application:
@@ -48,6 +56,7 @@ def build_application(settings: Settings) -> Application:
     )
     application.bot_data["songlink_client"] = songlink_client
     application.bot_data["admin_chat_id"] = settings.admin_chat_id
+    application.bot_data["platform_order"] = _build_platform_order(settings.primary_platform)
 
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
@@ -70,7 +79,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     text = (
-        "🎧 Кидай ссылку на трек или альбом, а я найду его на других платформах\n\n"
+        "🎧 Кидай ссылку на трек, альбом или подкаст, а я найду его на других платформах\n\n"
         f"Можно присылать ссылки из: {INPUT_PLATFORM_HINT}\n\n"
         "Если кинешь несколько ссылок одним сообщением, соберу подборку\n\n"
         "В групповых чатах могу удалить оригинальное сообщение и заменить его "
@@ -85,7 +94,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     text = (
         "Как пользоваться:\n\n"
-        "1. Пришли ссылку на трек или альбом\n"
+        "1. Пришли ссылку на трек, альбом или подкаст\n"
         "2. Я найду релиз на других платформах\n"
         "3. Верну пост в стиле StonerHand с кнопками\n\n"
         "Если в сообщении несколько ссылок, соберу подборку\n\n"
@@ -102,7 +111,7 @@ async def guide_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     guide = (
         "StonerHand guide\n\n"
-        "1. Кидай ссылку на трек или альбом\n"
+        "1. Кидай ссылку на трек, альбом или подкаст\n"
         "2. Несколько ссылок одним сообщением станут подборкой\n"
         "3. В канале бот заменит исходный пост красивым постом с кнопками\n"
         "4. Для удаления оригинала нужны права админа на управление сообщениями"
@@ -216,7 +225,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
             return
         await message.reply_text(
             f"{pick_phrase('not_found', ','.join(source_urls))}.\n"
-            "Проверьте, что это ссылка именно на трек или альбом"
+            "Проверьте, что это ссылка именно на трек, альбом или подкаст"
         )
         return
 
@@ -226,8 +235,8 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
             context.bot,
             message,
             f"{user_prefix}{format_track_message(track)}",
-            preview_url=_select_preview_url(track.links),
-            reply_markup=_build_link_keyboard(track.links),
+            preview_url=_select_preview_url(track.links, context),
+            reply_markup=_build_link_keyboard(track.links, context=context),
         )
         _record_matches_safely([track], message)
         return
@@ -236,14 +245,18 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         context.bot,
         message,
         f"{user_prefix}{format_collection_message(tracks)}",
-        preview_url=_select_preview_url(tracks[0].links),
+        preview_url=_select_preview_url(tracks[0].links, context),
         reply_markup=_build_collection_keyboard(tracks),
     )
     _record_matches_safely(tracks, message)
 
 
-def _select_preview_url(links: dict[str, str]) -> str | None:
-    for platform in RESULT_PLATFORM_ORDER:
+def _select_preview_url(
+    links: dict[str, str],
+    context: ContextTypes.DEFAULT_TYPE | None = None,
+) -> str | None:
+    platform_order = _get_platform_order(context)
+    for platform in platform_order:
         url = links.get(platform)
         if url:
             return url
@@ -340,14 +353,29 @@ def _build_link_preview_options(preview_url: str | None) -> LinkPreviewOptions:
     )
 
 
-def _build_link_keyboard(links: dict[str, str], *, prefix: str = "") -> InlineKeyboardMarkup:
+def _build_link_keyboard(
+    links: dict[str, str],
+    *,
+    prefix: str = "",
+    context: ContextTypes.DEFAULT_TYPE | None = None,
+) -> InlineKeyboardMarkup:
+    platform_order = _get_platform_order(context)
+    ordered_platforms = [
+        platform_key
+        for platform_key in platform_order
+        if links.get(platform_key) and platform_key in PLATFORM_LABELS
+    ]
+    remaining_platforms = [
+        platform_key
+        for platform_key in PLATFORM_LABELS
+        if platform_key not in ordered_platforms and links.get(platform_key)
+    ]
     buttons = [
         InlineKeyboardButton(
-            text=f"{prefix}{label}",
+            text=f"{prefix}{PLATFORM_LABELS[platform_key]}",
             url=links[platform_key],
         )
-        for platform_key, label in PLATFORM_LABELS.items()
-        if links.get(platform_key)
+        for platform_key in [*ordered_platforms, *remaining_platforms]
     ]
     rows = [buttons[index : index + 2] for index in range(0, len(buttons), 2)]
     rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
@@ -373,6 +401,28 @@ def _build_collection_keyboard(tracks: list[TrackMatch]) -> InlineKeyboardMarkup
 
     rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
     return InlineKeyboardMarkup(rows)
+
+
+def _build_platform_order(primary_platform: str | None) -> tuple[str, ...]:
+    if not primary_platform:
+        return DEFAULT_PLATFORM_ORDER
+
+    normalized = primary_platform.strip()
+    if normalized not in DEFAULT_PLATFORM_ORDER:
+        return DEFAULT_PLATFORM_ORDER
+
+    return (normalized, *(item for item in DEFAULT_PLATFORM_ORDER if item != normalized))
+
+
+def _get_platform_order(context: ContextTypes.DEFAULT_TYPE | None) -> tuple[str, ...]:
+    if context is None:
+        return DEFAULT_PLATFORM_ORDER
+
+    platform_order = context.application.bot_data.get("platform_order")
+    if isinstance(platform_order, tuple):
+        return platform_order
+
+    return DEFAULT_PLATFORM_ORDER
 
 
 def _record_matches_safely(tracks: list[TrackMatch], message: Message) -> None:

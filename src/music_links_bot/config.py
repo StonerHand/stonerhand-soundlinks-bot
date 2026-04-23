@@ -13,6 +13,7 @@ class Settings:
     songlink_user_countries: tuple[str, ...]
     log_level: str
     admin_chat_id: int | None
+    primary_platform: str | None
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -33,6 +34,7 @@ class Settings:
             songlink_user_countries=songlink_user_countries,
             log_level=log_level,
             admin_chat_id=admin_chat_id,
+            primary_platform=_parse_primary_platform(),
         )
 
 
@@ -59,3 +61,8 @@ def _parse_optional_int(env_name: str) -> int | None:
         return int(raw_value)
     except ValueError:
         return None
+
+
+def _parse_primary_platform() -> str | None:
+    raw_value = os.getenv("PRIMARY_PLATFORM", "").strip()
+    return raw_value or None

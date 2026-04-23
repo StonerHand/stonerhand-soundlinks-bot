@@ -79,8 +79,8 @@ class SonglinkClient:
             raise SonglinkLookupError("Track metadata is missing in Song.link response.")
 
         entity_type = str(entity.get("type", "")).lower() or "song"
-        if entity_type not in {"song", "album"}:
-            raise SonglinkLookupError("The provided link does not point to a track or album.")
+        if entity_type not in {"song", "album", "podcast"}:
+            raise SonglinkLookupError("The provided link does not point to a track, album or podcast.")
 
         title = str(entity.get("title", "")).strip()
         artist = str(

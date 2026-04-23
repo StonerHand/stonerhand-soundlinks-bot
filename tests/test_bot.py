@@ -4,7 +4,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from music_links_bot.bot import _build_collection_keyboard
+from music_links_bot.bot import _build_collection_keyboard, _build_platform_order
 from music_links_bot.models import TrackMatch
 
 
@@ -33,6 +33,12 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[1][0].text, "2. Show Me The Body - Camp Orchestra")
         self.assertEqual(rows[1][0].url, "https://song.link/track-2")
         self.assertEqual(rows[2][0].text, "🪨 Открыть канал")
+
+    def test_build_platform_order_moves_primary_platform_first(self) -> None:
+        order = _build_platform_order("yandexMusic")
+
+        self.assertEqual(order[0], "yandexMusic")
+        self.assertIn("spotify", order)
 
 
 if __name__ == "__main__":

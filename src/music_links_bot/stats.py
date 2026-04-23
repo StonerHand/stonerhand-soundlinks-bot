@@ -24,7 +24,7 @@ def load_stats(path: Path = STATS_PATH) -> StatsData:
         return _empty_stats()
 
     stats = _empty_stats()
-    for key in ("posts", "song", "album", "collections"):
+    for key in ("posts", "song", "album", "podcast", "collections"):
         value = raw_stats.get(key)
         if isinstance(value, int) and value >= 0:
             stats[key] = value
@@ -67,6 +67,7 @@ def format_stats_message(stats: StatsData, *, include_private: bool = False) -> 
         f"постов обработано: {stats.get('posts', 0)}\n"
         f"треков: {stats.get('song', 0)}\n"
         f"альбомов: {stats.get('album', 0)}\n"
+        f"подкастов: {stats.get('podcast', 0)}\n"
         f"подборок: {stats.get('collections', 0)}"
     ]
 
@@ -88,6 +89,7 @@ def _empty_stats() -> StatsData:
         "posts": 0,
         "song": 0,
         "album": 0,
+        "podcast": 0,
         "collections": 0,
         "users": {},
         "chats": {},
