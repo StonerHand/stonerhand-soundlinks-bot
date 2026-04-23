@@ -1,0 +1,2 @@
+"""Music Links Telegram Bot."""
+

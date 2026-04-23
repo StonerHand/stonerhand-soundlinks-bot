@@ -1,0 +1,12 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+
+@dataclass(slots=True)
+class TrackMatch:
+    title: str
+    artist: str
+    links: dict[str, str]
+    release_year: str | None = None
+    kind: str = "song"

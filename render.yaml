@@ -1,0 +1,20 @@
+services:
+  - type: worker
+    name: stonerhand-bot
+    runtime: python
+    plan: starter
+    buildCommand: pip install -e .
+    startCommand: python -m music_links_bot
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.4
+      - key: BOT_TOKEN
+        sync: false
+      - key: SONGLINK_API_KEY
+        sync: false
+      - key: SONGLINK_USER_COUNTRIES
+        value: US
+      - key: LOG_LEVEL
+        value: INFO
+      - key: ADMIN_CHAT_ID
+        sync: false
