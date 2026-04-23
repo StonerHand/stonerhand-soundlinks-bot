@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import logging
 from urllib.parse import quote
 
@@ -150,12 +151,15 @@ async def id_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    del context
     message = update.effective_message
     if not message:
         return
 
-    await message.reply_text(format_stats_message(load_stats()))
+    admin_chat_id: int | None = context.application.bot_data.get("admin_chat_id")
+    include_private = admin_chat_id is not None and message.chat_id == admin_chat_id
+    await message.reply_text(
+        format_stats_message(load_stats(), include_private=include_private)
+    )
 
 
 async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -225,7 +229,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
             preview_url=_select_preview_url(track.links),
             reply_markup=_build_link_keyboard(track.links),
         )
-        _record_matches_safely([track])
+        _record_matches_safely([track], message)
         return
 
     await _send_track_result(
@@ -235,7 +239,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         preview_url=_select_preview_url(tracks[0].links),
         reply_markup=_build_collection_keyboard(tracks),
     )
-    _record_matches_safely(tracks)
+    _record_matches_safely(tracks, message)
 
 
 def _select_preview_url(links: dict[str, str]) -> str | None:
@@ -327,11 +331,45 @@ def _build_collection_keyboard(tracks: list[TrackMatch]) -> InlineKeyboardMarkup
     return InlineKeyboardMarkup(rows)
 
 
-def _record_matches_safely(tracks: list[TrackMatch]) -> None:
+def _record_matches_safely(tracks: list[TrackMatch], message: Message) -> None:
     try:
-        record_matches(tracks)
+        record_matches(
+            tracks,
+            user=_build_user_stats_entry(message),
+            chat=_build_chat_stats_entry(message),
+        )
     except Exception:
         LOGGER.exception("Could not update stats")
+
+
+def _build_user_stats_entry(message: Message) -> dict[str, object] | None:
+    user = message.from_user
+    if user is None:
+        return None
+
+    label = f"@{user.username}" if user.username else user.full_name
+    return {
+        "id": user.id,
+        "label": label,
+        "last_seen": _current_stats_time(),
+    }
+
+
+def _build_chat_stats_entry(message: Message) -> dict[str, object]:
+    chat = message.chat
+    label = chat.title or chat.username or str(chat.id)
+    if chat.username:
+        label = f"@{chat.username}"
+
+    return {
+        "id": chat.id,
+        "label": f"{label} ({chat.type})",
+        "last_seen": _current_stats_time(),
+    }
+
+
+def _current_stats_time() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
 
 def _build_intro_keyboard(bot_username: str | None) -> InlineKeyboardMarkup:

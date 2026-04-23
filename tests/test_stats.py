@@ -20,12 +20,24 @@ class StatsTests(unittest.TestCase):
                     TrackMatch(title="Album", artist="Artist", links={}, kind="album"),
                 ],
                 path=path,
+                user={
+                    "id": 123,
+                    "label": "@listener",
+                    "last_seen": "2026-04-23 16:00 UTC",
+                },
+                chat={
+                    "id": -100,
+                    "label": "StonerHand (channel)",
+                    "last_seen": "2026-04-23 16:00 UTC",
+                },
             )
 
             self.assertEqual(stats["posts"], 1)
             self.assertEqual(stats["song"], 1)
             self.assertEqual(stats["album"], 1)
             self.assertEqual(stats["collections"], 1)
+            self.assertEqual(stats["users"]["123"]["count"], 1)
+            self.assertEqual(stats["chats"]["-100"]["count"], 1)
             self.assertEqual(load_stats(path), stats)
 
     def test_format_stats_message(self) -> None:
@@ -40,6 +52,49 @@ class StatsTests(unittest.TestCase):
 
         self.assertIn("постов обработано: 3", message)
         self.assertIn("альбомов: 1", message)
+
+    def test_format_stats_message_can_include_private_usage(self) -> None:
+        message = format_stats_message(
+            {
+                "posts": 3,
+                "song": 2,
+                "album": 1,
+                "collections": 1,
+                "users": {
+                    "123": {
+                        "count": 2,
+                        "label": "@listener",
+                        "last_seen": "2026-04-23 16:00 UTC",
+                    }
+                },
+                "chats": {
+                    "-100": {
+                        "count": 3,
+                        "label": "StonerHand (channel)",
+                        "last_seen": "2026-04-23 16:00 UTC",
+                    }
+                },
+            },
+            include_private=True,
+        )
+
+        self.assertIn("топ пользователей:", message)
+        self.assertIn("@listener - 2", message)
+        self.assertIn("StonerHand (channel) - 3", message)
+
+    def test_load_stats_migrates_old_shape(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "stats.json"
+            path.write_text(
+                '{"posts": 2, "song": 1, "album": 1, "collections": 0}',
+                encoding="utf-8",
+            )
+
+            stats = load_stats(path)
+
+            self.assertEqual(stats["posts"], 2)
+            self.assertEqual(stats["users"], {})
+            self.assertEqual(stats["chats"], {})
 
 
 if __name__ == "__main__":
