@@ -8,6 +8,7 @@ from music_links_bot.bot import (
     MAX_BUTTON_TEXT_LENGTH,
     _build_collection_keyboard,
     _build_platform_order,
+    _build_spotify_podcast_fallback,
 )
 from music_links_bot.models import TrackMatch
 
@@ -59,6 +60,35 @@ class BotKeyboardTests(unittest.TestCase):
         button_text = keyboard.inline_keyboard[0][0].text
         self.assertLessEqual(len(button_text), MAX_BUTTON_TEXT_LENGTH)
         self.assertTrue(button_text.endswith("…"))
+
+    def test_spotify_episode_fallback_builds_podcast_match(self) -> None:
+        source_url = "https://open.spotify.com/episode/abc?si=123"
+
+        track = _build_spotify_podcast_fallback(source_url)
+
+        self.assertIsNotNone(track)
+        assert track is not None
+        self.assertEqual(track.kind, "podcast")
+        self.assertEqual(track.artist, "Spotify")
+        self.assertEqual(track.title, "Podcast episode")
+        self.assertEqual(track.links, {"spotify": source_url})
+        self.assertEqual(track.page_url, source_url)
+
+    def test_spotify_show_fallback_marks_show_format(self) -> None:
+        source_url = "https://open.spotify.com/show/abc?si=123"
+
+        track = _build_spotify_podcast_fallback(source_url)
+
+        self.assertIsNotNone(track)
+        assert track is not None
+        self.assertEqual(track.kind, "podcast")
+        self.assertEqual(track.release_format, "show")
+        self.assertEqual(track.title, "Podcast show")
+
+    def test_spotify_fallback_ignores_regular_tracks(self) -> None:
+        self.assertIsNone(
+            _build_spotify_podcast_fallback("https://open.spotify.com/track/abc")
+        )
 
 
 if __name__ == "__main__":

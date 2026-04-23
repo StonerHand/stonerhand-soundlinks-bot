@@ -28,7 +28,7 @@ from music_links_bot.models import TrackMatch
 from music_links_bot.phrases import pick_phrase
 from music_links_bot.songlink import SonglinkClient, SonglinkError, SonglinkLookupError
 from music_links_bot.stats import format_stats_message, load_stats, record_matches
-from music_links_bot.url_utils import extract_supported_urls, strip_supported_urls
+from music_links_bot.url_utils import extract_supported_urls, spotify_url_type, strip_supported_urls
 
 LOGGER = logging.getLogger(__name__)
 CHANNEL_URL = "https://t.me/stonerhand"
@@ -283,6 +283,11 @@ async def _lookup_tracks(
             continue
 
         if isinstance(result, SonglinkLookupError):
+            fallback_track = _build_spotify_podcast_fallback(source_url)
+            if fallback_track:
+                tracks.append(fallback_track)
+                continue
+
             LOGGER.info("Song.link could not resolve %s", source_url)
             continue
 
@@ -304,6 +309,30 @@ async def _lookup_tracks(
             unavailable_urls.append(source_url)
 
     return tracks, unavailable_urls
+
+
+def _build_spotify_podcast_fallback(source_url: str) -> TrackMatch | None:
+    spotify_type = spotify_url_type(source_url)
+    if spotify_type == "episode":
+        return TrackMatch(
+            title="Podcast episode",
+            artist="Spotify",
+            links={"spotify": source_url},
+            page_url=source_url,
+            kind="podcast",
+        )
+
+    if spotify_type == "show":
+        return TrackMatch(
+            title="Podcast show",
+            artist="Spotify",
+            links={"spotify": source_url},
+            page_url=source_url,
+            kind="podcast",
+            release_format="show",
+        )
+
+    return None
 
 
 async def _send_track_result(

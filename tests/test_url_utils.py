@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from music_links_bot.url_utils import (
     extract_supported_urls,
     is_supported_music_url,
+    spotify_url_type,
     strip_supported_urls,
 )
 
@@ -58,6 +59,19 @@ class UrlUtilsTests(unittest.TestCase):
             strip_supported_urls(text),
             "мой текст и еще",
         )
+
+    def test_spotify_url_type_detects_episode_and_show(self) -> None:
+        self.assertEqual(
+            spotify_url_type("https://open.spotify.com/episode/abc?si=123"),
+            "episode",
+        )
+        self.assertEqual(
+            spotify_url_type("https://open.spotify.com/show/abc?si=123"),
+            "show",
+        )
+
+    def test_spotify_url_type_ignores_other_hosts(self) -> None:
+        self.assertIsNone(spotify_url_type("https://example.com/show/abc"))
 
 
 if __name__ == "__main__":

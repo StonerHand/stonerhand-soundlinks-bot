@@ -83,6 +83,8 @@ def build_auto_hashtags(track: TrackMatch) -> str:
 
     if track.kind == "podcast":
         hashtags.append("#podcast")
+        if track.release_format == "show":
+            hashtags.append("#show")
         return " ".join(hashtags)
 
     if track.kind == "album":
@@ -113,6 +115,9 @@ def build_collection_hashtags(tracks: list[TrackMatch]) -> str:
 
     if "podcast" in kinds:
         hashtags.append("#podcast")
+
+    if "show" in formats:
+        hashtags.append("#show")
 
     if "single" in formats:
         hashtags.append("#single")

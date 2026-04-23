@@ -27,9 +27,10 @@ Collection:
 - Compact buttons: `Spotify`, `Apple`, `YouTube`, `Deezer`, `Tidal`, `Yandex`
 - Input links from Spotify, Apple Music, YouTube / YouTube Music, Deezer, Tidal, Yandex Music, SoundCloud and Song.link-compatible podcast sources
 - Tracks, albums, EPs, singles, podcasts and collections
+- Spotify podcast episode/show fallback when Song.link has no cross-platform match
 - Platform priority with `PRIMARY_PLATFORM`
 - Parallel lookup for multiple links
-- Smart hashtags: `#track`, `#album`, `#collection`, `#single`, `#ep`, `#podcast`
+- Smart hashtags: `#track`, `#album`, `#collection`, `#single`, `#ep`, `#podcast`, `#show`
 - User note line: `@username: text`
 - Direct compact platform buttons for one release
 - Song.link buttons for collections
@@ -69,6 +70,16 @@ Podcast:
 слушай выпуск там, где удобно
 
 #stonerhand #podcast
+```
+
+Podcast show fallback:
+
+```text
+🎙️ · Spotify - Podcast show
+
+выпуск готов, осталось выбрать площадку
+
+#stonerhand #podcast #show
 ```
 
 Collection:
@@ -203,4 +214,5 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 - If the bot does not answer after deploy, check `BOT_TOKEN` first
 - If Railway and a local bot run at the same time, stop the local process
 - Message replacement in groups/channels requires admin rights to delete messages
+- If Song.link cannot resolve a Spotify podcast episode/show, the bot still returns a Spotify-only podcast post instead of an error
 - Private stats do not store message text or source links; they store counters, ids, labels and last-seen time

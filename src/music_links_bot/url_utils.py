@@ -54,3 +54,15 @@ def strip_supported_urls(text: str | None) -> str:
     stripped = URL_RE.sub("", text)
     stripped = re.sub(r"\s+", " ", stripped)
     return stripped.strip(TRAILING_PUNCTUATION + " \n\t")
+
+
+def spotify_url_type(url: str) -> str | None:
+    parsed = urlparse(url)
+    if normalize_host(parsed.netloc) not in {"open.spotify.com", "spotify.com"}:
+        return None
+
+    parts = [part for part in parsed.path.split("/") if part]
+    if len(parts) < 2:
+        return None
+
+    return parts[0].lower()
