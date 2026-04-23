@@ -17,6 +17,7 @@ class SonglinkClientTests(unittest.TestCase):
                 artist="Artist",
                 links={"spotify": "https://spotify.example", "yandexMusic": "https://yandex.example"},
                 page_url="https://song.link/song",
+                release_format="single",
                 kind="song",
             ),
             TrackMatch(
@@ -42,6 +43,7 @@ class SonglinkClientTests(unittest.TestCase):
         )
         self.assertEqual(merged.release_year, "2006")
         self.assertEqual(merged.page_url, "https://song.link/song")
+        self.assertEqual(merged.release_format, "single")
 
     def test_extract_release_year_from_entities_uses_matching_type(self) -> None:
         client = SonglinkClient(user_countries=("US",))
@@ -55,6 +57,18 @@ class SonglinkClientTests(unittest.TestCase):
         )
 
         self.assertEqual(release_year, "1993")
+
+    def test_extract_release_format_detects_ep_and_single(self) -> None:
+        client = SonglinkClient(user_countries=("US",))
+
+        self.assertEqual(
+            client._extract_release_format({"albumType": "EP"}),
+            "ep",
+        )
+        self.assertEqual(
+            client._extract_release_format({"releaseType": "Single"}),
+            "single",
+        )
 
 
 if __name__ == "__main__":

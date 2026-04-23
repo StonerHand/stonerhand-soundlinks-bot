@@ -99,6 +99,7 @@ class SonglinkClient:
             entities,
             entity_type,
         )
+        release_format = self._extract_release_format(entity)
         return TrackMatch(
             title=title,
             artist=artist,
@@ -106,6 +107,7 @@ class SonglinkClient:
             page_url=page_url,
             release_year=release_year,
             kind=entity_type,
+            release_format=release_format,
         )
 
     def _merge_matches(self, matches: list[TrackMatch]) -> TrackMatch:
@@ -128,6 +130,10 @@ class SonglinkClient:
                 None,
             ),
             kind=primary.kind,
+            release_format=primary.release_format or next(
+                (match.release_format for match in matches if match.release_format),
+                None,
+            ),
         )
 
     def _extract_links(self, links_by_platform: Mapping[str, object]) -> dict[str, str]:
@@ -174,5 +180,31 @@ class SonglinkClient:
             release_year = self._extract_release_year(entity)
             if release_year:
                 return release_year
+
+        return None
+
+    def _extract_release_format(self, entity: Mapping[str, object]) -> str | None:
+        candidates = [
+            entity.get("albumType"),
+            entity.get("releaseType"),
+            entity.get("productType"),
+            entity.get("kind"),
+            entity.get("subtitle"),
+            entity.get("title"),
+        ]
+
+        for candidate in candidates:
+            value = str(candidate or "").strip().lower()
+            if not value:
+                continue
+
+            if re.search(r"\bep\b", value):
+                return "ep"
+
+            if re.search(r"\bsingle\b", value):
+                return "single"
+
+            if re.search(r"\balbum\b", value):
+                return "album"
 
         return None

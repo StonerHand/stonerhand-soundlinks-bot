@@ -73,20 +73,38 @@ def prepend_user_text(message_text: str, *, author_label: str | None = None) -> 
 
 
 def build_auto_hashtags(track: TrackMatch) -> str:
-    if track.kind == "album":
-        return "#stonerhand #album"
+    hashtags = ["#stonerhand"]
 
-    return "#stonerhand #track"
+    if track.kind == "album":
+        hashtags.append("#album")
+        if track.release_format == "ep":
+            hashtags.append("#ep")
+        elif track.release_format == "single":
+            hashtags.append("#single")
+        return " ".join(hashtags)
+
+    hashtags.append("#track")
+    if track.release_format == "single":
+        hashtags.append("#single")
+
+    return " ".join(hashtags)
 
 
 def build_collection_hashtags(tracks: list[TrackMatch]) -> str:
     hashtags = ["#stonerhand", "#collection"]
     kinds = {track.kind for track in tracks}
+    formats = {track.release_format for track in tracks if track.release_format}
 
     if "track" in kinds or "song" in kinds:
         hashtags.append("#track")
 
     if "album" in kinds:
         hashtags.append("#album")
+
+    if "single" in formats:
+        hashtags.append("#single")
+
+    if "ep" in formats:
+        hashtags.append("#ep")
 
     return " ".join(hashtags)

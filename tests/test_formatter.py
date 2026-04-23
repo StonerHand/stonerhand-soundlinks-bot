@@ -57,6 +57,21 @@ class FormatterTests(unittest.TestCase):
             f"<i>{pick_phrase('album_cta', 'Artist:Album:album')}</i>\n\n#stonerhand #album",
         )
 
+    def test_format_track_message_marks_ep(self) -> None:
+        track = TrackMatch(
+            title="EP",
+            artist="Artist",
+            links={"spotify": "https://open.spotify.com/album/1"},
+            kind="album",
+            release_format="ep",
+        )
+
+        self.assertEqual(
+            format_track_message(track),
+            "💿 · <b>Artist</b> - EP\n\n"
+            f"<i>{pick_phrase('album_cta', 'Artist:EP:album')}</i>\n\n#stonerhand #album #ep",
+        )
+
     def test_format_collection_message_lists_tracks(self) -> None:
         tracks = [
             TrackMatch(title="Song", artist="Artist", links={}, release_year="2006"),
@@ -73,6 +88,16 @@ class FormatterTests(unittest.TestCase):
                 "#stonerhand #collection #track #album"
             ),
         )
+
+    def test_format_collection_message_includes_release_format_tags(self) -> None:
+        tracks = [
+            TrackMatch(title="Song", artist="Artist", links={}, release_format="single"),
+            TrackMatch(title="Album", artist="Band", links={}, kind="album", release_format="ep"),
+        ]
+
+        message = format_collection_message(tracks)
+
+        self.assertIn("#stonerhand #collection #track #album #single #ep", message)
 
     def test_prepend_user_text_formats_username_prefix(self) -> None:
         self.assertEqual(
