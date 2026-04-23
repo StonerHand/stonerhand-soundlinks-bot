@@ -77,13 +77,13 @@ class FormatterTests(unittest.TestCase):
     def test_prepend_user_text_formats_username_prefix(self) -> None:
         self.assertEqual(
             prepend_user_text("Твой текст", author_label="@username"),
-            "@username: «Твой текст»\n\n",
+            "@username: Твой текст\n\n",
         )
 
     def test_prepend_user_text_escapes_html(self) -> None:
         self.assertEqual(
             prepend_user_text("<b>text</b>", author_label="@username"),
-            "@username: «&lt;b&gt;text&lt;/b&gt;»\n\n",
+            "@username: &lt;b&gt;text&lt;/b&gt;\n\n",
         )
 
 
