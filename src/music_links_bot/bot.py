@@ -18,12 +18,16 @@ from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandl
 
 from music_links_bot.config import Settings
 from music_links_bot.constants import INPUT_PLATFORM_HINT, PLATFORM_LABELS
-from music_links_bot.formatter import format_collection_message, format_track_message
+from music_links_bot.formatter import (
+    format_collection_message,
+    format_track_message,
+    prepend_user_text,
+)
 from music_links_bot.models import TrackMatch
 from music_links_bot.phrases import pick_phrase
 from music_links_bot.songlink import SonglinkClient, SonglinkError, SonglinkLookupError
 from music_links_bot.stats import format_stats_message, load_stats, record_matches
-from music_links_bot.url_utils import extract_supported_urls
+from music_links_bot.url_utils import extract_supported_urls, strip_supported_urls
 
 LOGGER = logging.getLogger(__name__)
 CHANNEL_URL = "https://t.me/stonerhand"
@@ -168,6 +172,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     source_urls = extract_supported_urls(message.text)
+    user_prefix = _build_user_prefix(message)
     if not source_urls:
         await _notify_admin(
             context,
@@ -225,7 +230,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         await _send_track_result(
             context.bot,
             message,
-            format_track_message(track),
+            f"{user_prefix}{format_track_message(track)}",
             preview_url=_select_preview_url(track.links),
             reply_markup=_build_link_keyboard(track.links),
         )
@@ -235,7 +240,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
     await _send_track_result(
         context.bot,
         message,
-        format_collection_message(tracks),
+        f"{user_prefix}{format_collection_message(tracks)}",
         preview_url=_select_preview_url(tracks[0].links),
         reply_markup=_build_collection_keyboard(tracks),
     )
@@ -340,6 +345,19 @@ def _record_matches_safely(tracks: list[TrackMatch], message: Message) -> None:
         )
     except Exception:
         LOGGER.exception("Could not update stats")
+
+
+def _build_user_prefix(message: Message) -> str:
+    body_text = strip_supported_urls(message.text)
+    if not body_text:
+        return ""
+
+    user = message.from_user
+    author_label = None
+    if user is not None:
+        author_label = f"@{user.username}" if user.username else user.full_name
+
+    return prepend_user_text(body_text, author_label=author_label)
 
 
 def _build_user_stats_entry(message: Message) -> dict[str, object] | None:

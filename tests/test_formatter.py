@@ -4,7 +4,12 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from music_links_bot.formatter import format_collection_message, format_track_message, pick_track_emoji
+from music_links_bot.formatter import (
+    format_collection_message,
+    format_track_message,
+    pick_track_emoji,
+    prepend_user_text,
+)
 from music_links_bot.models import TrackMatch
 from music_links_bot.phrases import pick_phrase
 
@@ -67,6 +72,18 @@ class FormatterTests(unittest.TestCase):
                 f"<i>{pick_phrase('collection_cta', 'Artist:Song:song|Band:Album:album')}</i>\n\n"
                 "#stonerhand #collection #track #album"
             ),
+        )
+
+    def test_prepend_user_text_formats_username_prefix(self) -> None:
+        self.assertEqual(
+            prepend_user_text("Твой текст", author_label="@username"),
+            "@username: Твой текст\n\n",
+        )
+
+    def test_prepend_user_text_escapes_html(self) -> None:
+        self.assertEqual(
+            prepend_user_text("<b>text</b>", author_label="@username"),
+            "@username: &lt;b&gt;text&lt;/b&gt;\n\n",
         )
 
 

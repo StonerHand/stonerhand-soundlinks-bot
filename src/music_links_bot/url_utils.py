@@ -45,3 +45,12 @@ def extract_supported_urls(text: str | None) -> list[str]:
         seen.add(candidate)
 
     return urls
+
+
+def strip_supported_urls(text: str | None) -> str:
+    if not text:
+        return ""
+
+    stripped = URL_RE.sub("", text)
+    stripped = re.sub(r"\s+", " ", stripped)
+    return stripped.strip(TRAILING_PUNCTUATION + " \n\t")

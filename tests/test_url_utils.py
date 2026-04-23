@@ -4,7 +4,11 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from music_links_bot.url_utils import extract_supported_urls, is_supported_music_url
+from music_links_bot.url_utils import (
+    extract_supported_urls,
+    is_supported_music_url,
+    strip_supported_urls,
+)
 
 
 class UrlUtilsTests(unittest.TestCase):
@@ -42,6 +46,17 @@ class UrlUtilsTests(unittest.TestCase):
                 "https://open.spotify.com/track/1",
                 "https://music.apple.com/us/album/test/123?i=456",
             ],
+        )
+
+    def test_strip_supported_urls_keeps_remaining_user_text(self) -> None:
+        text = (
+            "мой текст https://open.spotify.com/track/1 "
+            "и еще https://music.apple.com/us/album/test/123?i=456"
+        )
+
+        self.assertEqual(
+            strip_supported_urls(text),
+            "мой текст и еще",
         )
 
 

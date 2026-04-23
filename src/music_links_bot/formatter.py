@@ -60,6 +60,17 @@ def format_collection_message(tracks: list[TrackMatch]) -> str:
     return "\n".join(lines)
 
 
+def prepend_user_text(message_text: str, *, author_label: str | None = None) -> str:
+    header = message_text.strip()
+    if not header:
+        return ""
+
+    if author_label:
+        return f"{escape(author_label)}: {escape(header)}\n\n"
+
+    return f"{escape(header)}\n\n"
+
+
 def build_auto_hashtags(track: TrackMatch) -> str:
     if track.kind == "album":
         return "#stonerhand #album"
