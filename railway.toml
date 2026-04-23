@@ -1,8 +1,8 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "pip install -e ."
+buildCommand = "pip install -r requirements.txt"
 
 [deploy]
-startCommand = "python -m music_links_bot"
+startCommand = "PYTHONPATH=src python -m music_links_bot"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10

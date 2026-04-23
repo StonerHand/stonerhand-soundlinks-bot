@@ -94,5 +94,5 @@ python -m unittest discover -s tests -v
 
 Если создаете сервис вручную, выбирайте `Background Worker`.
 
-- Build Command: `pip install -e .`
-- Start Command: `python -m music_links_bot`
+- Build Command: `pip install -r requirements.txt`
+- Start Command: `PYTHONPATH=src python -m music_links_bot`
