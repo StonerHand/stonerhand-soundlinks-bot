@@ -20,13 +20,12 @@ class Settings:
 
         bot_token = os.getenv("BOT_TOKEN", "").strip()
         if not bot_token:
-            raise RuntimeError("BOT_TOKEN is not set. Add it to your .env file.")
+            raise RuntimeError("BOT_TOKEN is not set. Add it to environment variables.")
 
         songlink_api_key = os.getenv("SONGLINK_API_KEY", "").strip() or None
         songlink_user_countries = _parse_user_countries()
         log_level = os.getenv("LOG_LEVEL", "INFO").strip().upper() or "INFO"
-        admin_chat_id_raw = os.getenv("ADMIN_CHAT_ID", "").strip()
-        admin_chat_id = int(admin_chat_id_raw) if admin_chat_id_raw else None
+        admin_chat_id = _parse_optional_int("ADMIN_CHAT_ID")
 
         return cls(
             bot_token=bot_token,
@@ -49,3 +48,14 @@ def _parse_user_countries() -> tuple[str, ...]:
     )
 
     return countries or ("US",)
+
+
+def _parse_optional_int(env_name: str) -> int | None:
+    raw_value = os.getenv(env_name, "").strip()
+    if not raw_value:
+        return None
+
+    try:
+        return int(raw_value)
+    except ValueError:
+        return None

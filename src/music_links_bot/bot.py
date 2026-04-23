@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 import logging
 from urllib.parse import quote
@@ -189,26 +190,20 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     client: SonglinkClient = context.application.bot_data["songlink_client"]
-    tracks: list[TrackMatch] = []
+    tracks, unavailable_urls = await _lookup_tracks(client, source_urls)
 
-    for source_url in source_urls:
-        try:
-            tracks.append(await client.lookup_track(source_url))
-        except SonglinkLookupError:
-            LOGGER.info("Song.link could not resolve %s", source_url)
-        except SonglinkError:
-            LOGGER.exception("Song.link request failed for %s", source_url)
-            await _notify_admin(
-                context,
-                f"Song.link недоступен при обработке: {source_url}",
-                only_for_channel_message=message,
-            )
-            if message.chat.type == "channel":
-                return
-            await message.reply_text(
-                pick_phrase("service_unavailable", source_url)
-            )
+    if unavailable_urls and not tracks:
+        await _notify_admin(
+            context,
+            "Song.link недоступен при обработке: " + ", ".join(unavailable_urls),
+            only_for_channel_message=message,
+        )
+        if message.chat.type == "channel":
             return
+        await message.reply_text(
+            pick_phrase("service_unavailable", unavailable_urls[0])
+        )
+        return
 
     tracks = [track for track in tracks if track.links]
     if not tracks:
@@ -256,6 +251,47 @@ def _select_preview_url(links: dict[str, str]) -> str | None:
     return None
 
 
+async def _lookup_tracks(
+    client: SonglinkClient,
+    source_urls: list[str],
+) -> tuple[list[TrackMatch], list[str]]:
+    results = await asyncio.gather(
+        *(client.lookup_track(source_url) for source_url in source_urls),
+        return_exceptions=True,
+    )
+
+    tracks: list[TrackMatch] = []
+    unavailable_urls: list[str] = []
+
+    for source_url, result in zip(source_urls, results, strict=False):
+        if isinstance(result, TrackMatch):
+            tracks.append(result)
+            continue
+
+        if isinstance(result, SonglinkLookupError):
+            LOGGER.info("Song.link could not resolve %s", source_url)
+            continue
+
+        if isinstance(result, SonglinkError):
+            LOGGER.error(
+                "Song.link request failed for %s",
+                source_url,
+                exc_info=(type(result), result, result.__traceback__),
+            )
+            unavailable_urls.append(source_url)
+            continue
+
+        if isinstance(result, Exception):
+            LOGGER.error(
+                "Unexpected error while resolving %s",
+                source_url,
+                exc_info=(type(result), result, result.__traceback__),
+            )
+            unavailable_urls.append(source_url)
+
+    return tracks, unavailable_urls
+
+
 async def _send_track_result(
     bot: Bot,
     message: Message,
@@ -293,6 +329,9 @@ async def _reply_with_track(
 
 
 def _build_link_preview_options(preview_url: str | None) -> LinkPreviewOptions:
+    if not preview_url:
+        return LinkPreviewOptions(is_disabled=True)
+
     return LinkPreviewOptions(
         is_disabled=False,
         url=preview_url,
