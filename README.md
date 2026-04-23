@@ -201,7 +201,7 @@ src/music_links_bot/
 ├── bot.py        Telegram handlers, keyboards, group/channel replacement
 ├── songlink.py   Song.link client and release normalization
 ├── formatter.py  StonerHand post style, hashtags, captions
-├── phrases.py    20 вариантов фраз для разных действий
+├── phrases.py    30 вариантов фраз для разных действий
 ├── stats.py      local stats without message text or source links
 ├── url_utils.py  URL extraction and platform helpers
 ├── config.py     environment variables

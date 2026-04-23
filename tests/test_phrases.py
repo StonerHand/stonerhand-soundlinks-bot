@@ -8,9 +8,9 @@ from music_links_bot.phrases import PHRASES, pick_phrase
 
 
 class PhrasesTests(unittest.TestCase):
-    def test_each_phrase_group_has_twenty_variants(self) -> None:
+    def test_each_phrase_group_has_thirty_variants(self) -> None:
         for phrases in PHRASES.values():
-            self.assertEqual(len(phrases), 20)
+            self.assertEqual(len(phrases), 30)
 
     def test_pick_phrase_is_stable_for_seed(self) -> None:
         self.assertEqual(
