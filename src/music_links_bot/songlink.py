@@ -78,7 +78,7 @@ class SonglinkClient:
         if not isinstance(entity, Mapping):
             raise SonglinkLookupError("Track metadata is missing in Song.link response.")
 
-        entity_type = str(entity.get("type", "")).lower() or "song"
+        entity_type = self._normalize_entity_type(entity.get("type"))
         if entity_type not in {"song", "album", "podcast"}:
             raise SonglinkLookupError("The provided link does not point to a track, album or podcast.")
 
@@ -151,6 +151,19 @@ class SonglinkClient:
                     break
 
         return resolved
+
+    def _normalize_entity_type(self, value: object) -> str:
+        raw_type = str(value or "song").strip().lower()
+        if raw_type in {"song", "track"}:
+            return "song"
+
+        if raw_type in {"album"}:
+            return "album"
+
+        if raw_type in {"podcast", "podcastepisode", "episode"}:
+            return "podcast"
+
+        return raw_type
 
     def _extract_release_year(self, entity: Mapping[str, object]) -> str | None:
         for field in ("releaseYear", "releaseDate", "datePublished"):

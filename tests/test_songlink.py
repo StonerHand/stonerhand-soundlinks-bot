@@ -85,6 +85,13 @@ class SonglinkClientTests(unittest.TestCase):
 
         self.assertEqual(merged.kind, "podcast")
 
+    def test_normalize_entity_type_supports_podcast_episode_aliases(self) -> None:
+        client = SonglinkClient(user_countries=("US",))
+
+        self.assertEqual(client._normalize_entity_type("podcastEpisode"), "podcast")
+        self.assertEqual(client._normalize_entity_type("episode"), "podcast")
+        self.assertEqual(client._normalize_entity_type("track"), "song")
+
 
 if __name__ == "__main__":
     unittest.main()
