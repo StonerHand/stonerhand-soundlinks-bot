@@ -319,17 +319,17 @@ def _build_collection_keyboard(tracks: list[TrackMatch]) -> InlineKeyboardMarkup
     rows: list[list[InlineKeyboardButton]] = []
 
     for index, track in enumerate(tracks, start=1):
-        buttons = [
-            InlineKeyboardButton(
-                text=f"{index} {label}",
-                url=track.links[platform_key],
-            )
-            for platform_key, label in PLATFORM_LABELS.items()
-            if track.links.get(platform_key)
-        ]
-        rows.extend(
-            buttons[button_index : button_index + 2]
-            for button_index in range(0, len(buttons), 2)
+        destination = track.page_url or _select_preview_url(track.links)
+        if not destination:
+            continue
+
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=f"{index}. {track.artist} - {track.title}",
+                    url=destination,
+                )
+            ]
         )
 
     rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])

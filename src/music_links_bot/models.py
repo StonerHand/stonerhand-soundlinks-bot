@@ -8,5 +8,6 @@ class TrackMatch:
     title: str
     artist: str
     links: dict[str, str]
+    page_url: str | None = None
     release_year: str | None = None
     kind: str = "song"

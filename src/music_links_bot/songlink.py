@@ -94,6 +94,7 @@ class SonglinkClient:
             raise SonglinkLookupError("Track title or artist is missing in Song.link response.")
 
         resolved_links = self._extract_links(links)
+        page_url = str(payload.get("pageUrl", "")).strip() or source_url
         release_year = self._extract_release_year(entity) or self._extract_release_year_from_entities(
             entities,
             entity_type,
@@ -102,6 +103,7 @@ class SonglinkClient:
             title=title,
             artist=artist,
             links=resolved_links,
+            page_url=page_url,
             release_year=release_year,
             kind=entity_type,
         )
@@ -117,6 +119,10 @@ class SonglinkClient:
             title=primary.title,
             artist=primary.artist,
             links=merged_links,
+            page_url=primary.page_url or next(
+                (match.page_url for match in matches if match.page_url),
+                None,
+            ),
             release_year=primary.release_year or next(
                 (match.release_year for match in matches if match.release_year),
                 None,

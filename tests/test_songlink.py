@@ -16,12 +16,14 @@ class SonglinkClientTests(unittest.TestCase):
                 title="Song",
                 artist="Artist",
                 links={"spotify": "https://spotify.example", "yandexMusic": "https://yandex.example"},
+                page_url="https://song.link/song",
                 kind="song",
             ),
             TrackMatch(
                 title="Song",
                 artist="Artist",
                 links={"appleMusic": "https://apple.example", "youtubeMusic": "https://youtube.example"},
+                page_url="https://song.link/song-us",
                 release_year="2006",
                 kind="song",
             ),
@@ -39,6 +41,7 @@ class SonglinkClientTests(unittest.TestCase):
             },
         )
         self.assertEqual(merged.release_year, "2006")
+        self.assertEqual(merged.page_url, "https://song.link/song")
 
     def test_extract_release_year_from_entities_uses_matching_type(self) -> None:
         client = SonglinkClient(user_countries=("US",))

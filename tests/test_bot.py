@@ -1,0 +1,39 @@
+import unittest
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from music_links_bot.bot import _build_collection_keyboard
+from music_links_bot.models import TrackMatch
+
+
+class BotKeyboardTests(unittest.TestCase):
+    def test_collection_keyboard_uses_one_songlink_button_per_release(self) -> None:
+        keyboard = _build_collection_keyboard(
+            [
+                TrackMatch(
+                    title="Transitions",
+                    artist="Youth Code",
+                    links={"spotify": "https://open.spotify.com/track/1"},
+                    page_url="https://song.link/track-1",
+                ),
+                TrackMatch(
+                    title="Camp Orchestra",
+                    artist="Show Me The Body",
+                    links={"spotify": "https://open.spotify.com/track/2"},
+                    page_url="https://song.link/track-2",
+                ),
+            ]
+        )
+
+        rows = keyboard.inline_keyboard
+        self.assertEqual(rows[0][0].text, "1. Youth Code - Transitions")
+        self.assertEqual(rows[0][0].url, "https://song.link/track-1")
+        self.assertEqual(rows[1][0].text, "2. Show Me The Body - Camp Orchestra")
+        self.assertEqual(rows[1][0].url, "https://song.link/track-2")
+        self.assertEqual(rows[2][0].text, "🪨 Открыть канал")
+
+
+if __name__ == "__main__":
+    unittest.main()
