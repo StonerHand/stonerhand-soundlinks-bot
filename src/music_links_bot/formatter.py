@@ -29,10 +29,11 @@ def format_track_heading(track: TrackMatch) -> str:
 def format_track_message(track: TrackMatch) -> str:
     emoji = pick_track_emoji(track)
     seed = f"{track.artist}:{track.title}:{track.kind}"
+    cta_key = "album_cta" if track.kind == "album" else "track_cta"
 
     return (
         f"{emoji} · {format_track_heading(track)}\n\n"
-        f"<i>{escape(pick_phrase('listen_cta', seed))}</i>\n\n"
+        f"<i>{escape(pick_phrase(cta_key, seed))}</i>\n\n"
         f"{build_auto_hashtags(track)}"
     )
 
@@ -40,7 +41,7 @@ def format_track_message(track: TrackMatch) -> str:
 def format_collection_message(tracks: list[TrackMatch]) -> str:
     seed = "|".join(f"{track.artist}:{track.title}:{track.kind}" for track in tracks)
     lines = [
-        pick_phrase("collection_title", seed),
+        escape(pick_phrase("collection_intro", seed)),
         "",
     ]
 

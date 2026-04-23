@@ -14,8 +14,8 @@ class PhrasesTests(unittest.TestCase):
 
     def test_pick_phrase_is_stable_for_seed(self) -> None:
         self.assertEqual(
-            pick_phrase("listen_cta", "Artist:Song:song"),
-            pick_phrase("listen_cta", "Artist:Song:song"),
+            pick_phrase("track_cta", "Artist:Song:song"),
+            pick_phrase("track_cta", "Artist:Song:song"),
         )
 
 
