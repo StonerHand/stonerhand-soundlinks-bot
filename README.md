@@ -24,14 +24,14 @@ Collection:
 
 ## Features
 
-- Spotify, Apple Music, Apple Podcasts, YouTube Music, Deezer, Tidal, Yandex Music
+- Compact buttons: `Spotify`, `Apple`, `YouTube`, `Deezer`, `Tidal`, `Yandex`
 - Input links from Spotify, Apple Music, YouTube / YouTube Music, Deezer, Tidal, Yandex Music, SoundCloud and Song.link-compatible podcast sources
 - Tracks, albums, EPs, singles, podcasts and collections
 - Platform priority with `PRIMARY_PLATFORM`
 - Parallel lookup for multiple links
 - Smart hashtags: `#track`, `#album`, `#collection`, `#single`, `#ep`, `#podcast`
 - User note line: `@username: text`
-- Direct buttons for one release
+- Direct compact platform buttons for one release
 - Song.link buttons for collections
 - Channel button: `🪨 Открыть канал`
 - Group/channel message replacement when the bot has admin rights
@@ -93,6 +93,16 @@ Collection buttons:
 1. Youth Code - Transitions
 2. Show Me The Body - Camp Orchestra
 3. The Soft Moon - Criminal
+🪨 Открыть канал
+```
+
+Single-release buttons stay compact:
+
+```text
+Spotify
+Apple
+YouTube
+Yandex
 🪨 Открыть канал
 ```
 

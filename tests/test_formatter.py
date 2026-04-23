@@ -95,7 +95,7 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_collection_message(tracks),
             (
-                f"{pick_phrase('collection_intro', 'Artist:Song:song|Band:Album:album')}\n\n"
+                "сегодня в подборке:\n\n"
                 f"1. {pick_track_emoji(tracks[0])} · <b>Artist</b> - Song\n"
                 "2. 💿 · <b>Band</b> - Album\n\n"
                 f"<i>{pick_phrase('collection_cta', 'Artist:Song:song|Band:Album:album')}</i>\n\n"
