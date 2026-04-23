@@ -18,3 +18,5 @@ services:
         value: INFO
       - key: ADMIN_CHAT_ID
         sync: false
+      - key: PRIMARY_PLATFORM
+        value: spotify

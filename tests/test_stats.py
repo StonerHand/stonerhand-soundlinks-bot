@@ -46,12 +46,33 @@ class StatsTests(unittest.TestCase):
                 "posts": 3,
                 "song": 2,
                 "album": 1,
+                "podcast": 1,
                 "collections": 1,
             }
         )
 
         self.assertIn("постов обработано: 3", message)
         self.assertIn("альбомов: 1", message)
+        self.assertIn("подкастов: 1", message)
+
+    def test_record_matches_counts_podcasts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "stats.json"
+
+            stats = record_matches(
+                [
+                    TrackMatch(
+                        title="Episode",
+                        artist="Podcast",
+                        links={},
+                        kind="podcast",
+                    )
+                ],
+                path=path,
+            )
+
+            self.assertEqual(stats["podcast"], 1)
+            self.assertEqual(stats["song"], 0)
 
     def test_format_stats_message_can_include_private_usage(self) -> None:
         message = format_stats_message(

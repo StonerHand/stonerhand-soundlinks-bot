@@ -1,55 +1,36 @@
 # Music Links Telegram Bot
 
-StonerHand music bot: кинул ссылку на релиз, получил аккуратный Telegram-пост со всеми найденными стримингами.
+StonerHandBot превращает музыкальную ссылку в аккуратный Telegram-пост: релиз, превью, кнопки платформ, подпись автора и фирменные хэштеги.
 
-Бот сделан для канала [@stonerhand](https://t.me/stonerhand), но спокойно работает и в личке, и в группах, и в каналах.
+Проект сделан для [@stonerhand](https://t.me/stonerhand), но спокойно работает в личке, группах и каналах.
 
-## Что умеет
+## Что Это
 
-- Принимает ссылки на треки и альбомы
-- Собирает найденные платформы через Song.link / Odesli API
-- Показывает Spotify, Apple Music, YouTube Music, Deezer, Tidal и Yandex Music
-- Делает inline-кнопки вместо голых URL
-- Поддерживает подборки из нескольких ссылок в одном сообщении
-- Для одиночного релиза показывает прямые кнопки платформ
-- Для подборок делает одну Song.link-кнопку на каждый релиз
-- Поддерживает треки, альбомы и подкасты
-- Добавляет автохэштеги `#stonerhand #track`, `#stonerhand #album`, `#stonerhand #collection`
-- Может добавить `#single`, `#ep` и `#podcast`, если формат удалось определить
-- Использует разный стиль для треков, альбомов и подборок
-- Добавляет редакторскую верхнюю строку вида `@username: текст`, если в сообщении есть подпись
-- Меняет фразы в постах и ошибках, чтобы бот не звучал как скучный автоответчик
-- Добавляет кнопку `🪨 Открыть канал`
-- Может удалить исходную ссылку в группе/канале и заменить ее красивым постом, если у бота есть права админа
-- Ведет локальную статистику через `/stats`
-- Для админа показывает, кто и в каких чатах пользуется ботом
+Пользователь кидает ссылку на трек, альбом, EP, single, подборку ссылок или подкаст. Бот идет в Song.link / Odesli, находит этот же релиз на других платформах и возвращает пост в стиле канала.
 
-## Поддерживаемые ссылки
+Одиночный релиз получает прямые кнопки платформ. Подборка получает одну Song.link-кнопку на каждый релиз, чтобы пост не превращался в стену кнопок.
 
-Входящие ссылки:
+## Возможности
 
-- Spotify
-- Apple Music
-- YouTube / YouTube Music
-- Deezer
-- Tidal
-- Yandex Music
-- SoundCloud
-- Подкаст-ссылки поддерживаются через совместимые с Song.link платформы
+- Треки, альбомы, EP, single и подкасты
+- Spotify, Apple Music, Apple Podcasts, YouTube Music, Deezer, Tidal, Yandex Music
+- Входящие ссылки из Spotify, Apple Music, YouTube / YouTube Music, Deezer, Tidal, Yandex Music, SoundCloud и совместимых podcast-платформ
+- Умный preview по приоритетной платформе
+- Прямые платформенные кнопки для одного релиза
+- Song.link-кнопки для подборок
+- Редакторская строка `@username: текст`, если человек прислал ссылку с подписью
+- Автохэштеги `#track`, `#album`, `#collection`, `#single`, `#ep`, `#podcast`
+- Разные CTA-фразы для треков, альбомов, подкастов и подборок
+- Параллельная обработка нескольких ссылок
+- Автозамена исходного сообщения в группе или канале, если бот админ
+- Локальная статистика и приватная админ-статистика через `/stats`
 
-Исходящие платформы:
+## Как Выглядит Пост
 
-- Spotify
-- Apple Music
-- YouTube Music
-- Deezer
-- Tidal
-- Yandex Music
-
-## Пример поста
+Один трек:
 
 ```text
-@username: «немного тревоги на вечер»
+@username: немного тревоги на вечер
 
 📻 · Youth Code - Transitions
 
@@ -58,49 +39,60 @@ StonerHand music bot: кинул ссылку на релиз, получил а
 #stonerhand #track
 ```
 
-Под постом бот добавляет:
+Альбом или EP:
 
-- для трека или альбома - прямые кнопки платформ и кнопку канала
-- для подкаста - прямые кнопки найденных платформ и кнопку канала
-- для подборки - одну кнопку на каждый релиз с переходом на Song.link и кнопку канала
+```text
+💿 · Artist - Release
+
+альбом на всех выходах
+
+#stonerhand #album #ep
+```
+
+Подборка:
+
+```text
+@username: пять вещей на вечер
+
+сегодня в подборке:
+
+1. 📻 · Youth Code - Transitions
+2. 🎧 · Show Me The Body - Camp Orchestra
+3. 💿 · The Soft Moon - Criminal
+
+выбирай, куда провалиться
+
+#stonerhand #collection #track #album
+```
+
+Под подборкой будут кнопки:
+
+```text
+1. Youth Code - Transitions
+2. Show Me The Body - Camp Orchestra
+3. The Soft Moon - Criminal
+🪨 Открыть канал
+```
 
 ## Команды
 
-- `/start` - запуск и короткое приветствие
-- `/help` - помощь
-- `/guide` - инструкция, которую можно закрепить в группе или канале
-- `/platforms` - список поддерживаемых сервисов
-- `/channel` - ссылка на канал
-- `/id` - показать chat id, нужен для `ADMIN_CHAT_ID`
-- `/stats` - статистика найденных релизов
+- `/start` - короткий старт и кнопки
+- `/help` - как пользоваться ботом
+- `/guide` - инструкция для группы или канала
+- `/platforms` - поддерживаемые платформы
+- `/channel` - открыть канал StonerHand
+- `/id` - показать chat id для `ADMIN_CHAT_ID`
+- `/stats` - статистика релизов
 
-## Локальный запуск
+## Настройки
 
-Создайте окружение:
-
-```bash
-python3 -m venv .venv
-```
-
-Активируйте его:
-
-```bash
-source .venv/bin/activate
-```
-
-Установите зависимости:
-
-```bash
-pip install -r requirements.txt
-```
-
-Скопируйте пример настроек:
+Создайте `.env` из примера:
 
 ```bash
 cp .env.example .env
 ```
 
-Заполните `.env`:
+Минимальный набор:
 
 ```env
 BOT_TOKEN=your-telegram-bot-token
@@ -111,37 +103,27 @@ ADMIN_CHAT_ID=
 PRIMARY_PLATFORM=spotify
 ```
 
-Если заполнить `ADMIN_CHAT_ID` своим chat id, команда `/stats` будет показывать расширенную приватную статистику: топ пользователей, топ чатов и дату последнего использования. Тексты сообщений и ссылки не сохраняются.
+`BOT_TOKEN` обязателен. `SONGLINK_API_KEY` можно оставить пустым. `ADMIN_CHAT_ID` включает приватную статистику для вашего личного чата. `PRIMARY_PLATFORM` управляет preview и порядком кнопок.
 
-Запустите бота:
+Поддерживаемые значения `PRIMARY_PLATFORM`:
+
+- `spotify`
+- `appleMusic`
+- `applePodcasts`
+- `youtubeMusic`
+- `deezer`
+- `tidal`
+- `yandexMusic`
+
+## Локальный Запуск
 
 ```bash
-PYTHONPATH=src python -m music_links_bot
+python3 -m venv .venv
 ```
 
-На Mac остановка локального бота: `Control + C`.
-
-## Railway Deploy
-
-Railway подходит для запуска polling-бота без открытого терминала на компьютере.
-
-1. Загрузите проект в GitHub
-2. В Railway выберите `New Project`
-3. Выберите `Deploy from GitHub repo`
-4. Подключите репозиторий
-5. В `Variables` добавьте переменные окружения
-
-Обязательная переменная:
-
-- `BOT_TOKEN` - токен от BotFather
-
-Рекомендуемые переменные:
-
-- `SONGLINK_USER_COUNTRIES=US`
-- `LOG_LEVEL=INFO`
-- `PYTHON_VERSION=3.13.4`
-
-`railway.toml` уже содержит команды:
+```bash
+source .venv/bin/activate
+```
 
 ```bash
 pip install -r requirements.txt
@@ -151,18 +133,34 @@ pip install -r requirements.txt
 PYTHONPATH=src python -m music_links_bot
 ```
 
-Если в логах есть `Deployment successful`, бот запущен.
+На Mac остановка локального процесса: `Control + C`.
+
+## Railway Deploy
+
+Railway запускает бота как background worker, поэтому Zed и терминал на Mac можно закрывать.
+
+1. Залейте проект в GitHub
+2. В Railway выберите `New Project`
+3. Выберите `Deploy from GitHub repo`
+4. Подключите репозиторий
+5. В `Variables` добавьте `BOT_TOKEN`
+6. При желании добавьте `ADMIN_CHAT_ID` и `PRIMARY_PLATFORM`
+
+`railway.toml` уже содержит команды сборки и запуска:
+
+```bash
+pip install -r requirements.txt
+```
+
+```bash
+PYTHONPATH=src python -m music_links_bot
+```
+
+Зеленый `Deployment successful` означает, что бот запущен.
 
 ## Render Deploy
 
-Для Render нужен `Background Worker`, потому что бот работает через polling и не слушает HTTP-порт.
-
-Render может попросить карту для worker-сервиса. Если карта не подходит, используйте Railway.
-
-Если все же деплоите на Render, `render.yaml` уже готов:
-
-- Build Command: `pip install -r requirements.txt`
-- Start Command: `PYTHONPATH=src python -m music_links_bot`
+Для Render нужен `Background Worker`, потому что бот работает через polling и не слушает HTTP-порт. `render.yaml` уже подготовлен, но Render может попросить карту для worker-сервиса.
 
 ## Тесты
 
@@ -170,12 +168,10 @@ Render может попросить карту для worker-сервиса. Е
 PYTHONPATH=src python -m unittest discover -s tests -v
 ```
 
-## Важные заметки
+## Важные Детали
 
-- Не коммитьте `.env` и токены в GitHub
-- Если бот не отвечает после деплоя, сначала проверьте `BOT_TOKEN` в переменных окружения
-- Для приватной статистики добавьте `ADMIN_CHAT_ID` в переменные окружения
-- `PRIMARY_PLATFORM` позволяет выбрать приоритетную платформу для preview и порядка кнопок, например `spotify`, `appleMusic`, `applePodcasts` или `yandexMusic`
-- Если в одном сообщении несколько ссылок, бот обрабатывает их параллельно и собирает подборку быстрее
-- Если бот запущен одновременно локально и на хостинге, остановите локальный процесс через `Control + C`
-- Для удаления исходных сообщений в канале/группе бот должен быть админом с правом удаления сообщений
+- `.env` и токены не должны попадать в GitHub
+- Если бот не отвечает после деплоя, первым делом проверьте `BOT_TOKEN`
+- Если локальный бот и Railway работают одновременно, остановите локальный процесс
+- Для автозамены сообщений в канале или группе боту нужны права админа на удаление сообщений
+- Тексты сообщений и ссылки не сохраняются в приватной статистике; сохраняются только счетчики, id, label и время последнего использования

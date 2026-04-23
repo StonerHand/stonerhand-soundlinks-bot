@@ -7,7 +7,7 @@ from typing import Any
 from music_links_bot.models import TrackMatch
 
 STATS_PATH = Path("data/stats.json")
-SUPPORTED_KINDS = ("song", "album")
+SUPPORTED_KINDS = ("song", "album", "podcast")
 StatsData = dict[str, Any]
 
 

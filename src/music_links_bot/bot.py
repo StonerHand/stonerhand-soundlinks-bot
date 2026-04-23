@@ -32,6 +32,7 @@ from music_links_bot.url_utils import extract_supported_urls, strip_supported_ur
 
 LOGGER = logging.getLogger(__name__)
 CHANNEL_URL = "https://t.me/stonerhand"
+MAX_BUTTON_TEXT_LENGTH = 64
 DEFAULT_PLATFORM_ORDER = (
     "spotify",
     "appleMusic",
@@ -393,7 +394,7 @@ def _build_collection_keyboard(tracks: list[TrackMatch]) -> InlineKeyboardMarkup
         rows.append(
             [
                 InlineKeyboardButton(
-                    text=f"{index}. {track.artist} - {track.title}",
+                    text=_shorten_button_text(f"{index}. {track.artist} - {track.title}"),
                     url=destination,
                 )
             ]
@@ -412,6 +413,13 @@ def _build_platform_order(primary_platform: str | None) -> tuple[str, ...]:
         return DEFAULT_PLATFORM_ORDER
 
     return (normalized, *(item for item in DEFAULT_PLATFORM_ORDER if item != normalized))
+
+
+def _shorten_button_text(text: str) -> str:
+    if len(text) <= MAX_BUTTON_TEXT_LENGTH:
+        return text
+
+    return text[: MAX_BUTTON_TEXT_LENGTH - 1].rstrip() + "…"
 
 
 def _get_platform_order(context: ContextTypes.DEFAULT_TYPE | None) -> tuple[str, ...]:

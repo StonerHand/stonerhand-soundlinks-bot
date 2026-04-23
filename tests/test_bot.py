@@ -4,7 +4,11 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from music_links_bot.bot import _build_collection_keyboard, _build_platform_order
+from music_links_bot.bot import (
+    MAX_BUTTON_TEXT_LENGTH,
+    _build_collection_keyboard,
+    _build_platform_order,
+)
 from music_links_bot.models import TrackMatch
 
 
@@ -39,6 +43,22 @@ class BotKeyboardTests(unittest.TestCase):
 
         self.assertEqual(order[0], "yandexMusic")
         self.assertIn("spotify", order)
+
+    def test_collection_keyboard_shortens_long_button_text(self) -> None:
+        keyboard = _build_collection_keyboard(
+            [
+                TrackMatch(
+                    title="A Very Long Track Title That Would Make A Telegram Button Too Wide",
+                    artist="A Very Long Artist Name For The Same Reason",
+                    links={"spotify": "https://open.spotify.com/track/1"},
+                    page_url="https://song.link/track-1",
+                )
+            ]
+        )
+
+        button_text = keyboard.inline_keyboard[0][0].text
+        self.assertLessEqual(len(button_text), MAX_BUTTON_TEXT_LENGTH)
+        self.assertTrue(button_text.endswith("…"))
 
 
 if __name__ == "__main__":
