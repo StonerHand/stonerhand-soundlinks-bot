@@ -1,98 +1,161 @@
 # Music Links Telegram Bot
 
-Telegram-бот для StonerHand: принимает ссылку на трек или альбом и возвращает аккуратный пост с кнопками на найденные музыкальные платформы.
+StonerHand music bot: кинул ссылку на релиз, получил аккуратный Telegram-пост со всеми найденными стримингами.
 
-## Возможности
+Бот сделан для канала [@stonerhand](https://t.me/stonerhand), но спокойно работает и в личке, и в группах, и в каналах.
 
-- `/start`, `/help`, `/guide`, `/platforms`, `/channel`, `/id`, `/stats`
-- Поддержка входящих ссылок: Spotify, Apple Music, YouTube / YouTube Music, Deezer, Tidal, Yandex Music, SoundCloud
-- Поиск ссылок через Song.link / Odesli API
-- Inline-кнопки вместо голых ссылок
-- Поддержка подборок из нескольких ссылок в одном сообщении
-- Авто-хэштеги `#stonerhand #track`, `#stonerhand #album`, `#stonerhand #collection`
-- Вариативные фразы для постов и ошибок
-- Кнопка `🪨 Открыть канал`
-- Локальная статистика через `/stats`
-- HTML-ответ в формате:
+## Что умеет
+
+- Принимает ссылки на треки и альбомы
+- Собирает найденные платформы через Song.link / Odesli API
+- Показывает Spotify, Apple Music, YouTube Music, Deezer, Tidal и Yandex Music
+- Делает inline-кнопки вместо голых URL
+- Поддерживает подборки из нескольких ссылок в одном сообщении
+- Добавляет автохэштеги `#stonerhand #track`, `#stonerhand #album`, `#stonerhand #collection`
+- Меняет фразы в постах и ошибках, чтобы бот не звучал как скучный автоответчик
+- Добавляет кнопку `🪨 Открыть канал`
+- Может удалить исходную ссылку в группе/канале и заменить ее красивым постом, если у бота есть права админа
+- Ведет простую локальную статистику через `/stats`
+
+## Поддерживаемые ссылки
+
+Входящие ссылки:
+
+- Spotify
+- Apple Music
+- YouTube / YouTube Music
+- Deezer
+- Tidal
+- Yandex Music
+- SoundCloud
+
+Исходящие платформы:
+
+- Spotify
+- Apple Music
+- YouTube Music
+- Deezer
+- Tidal
+- Yandex Music
+
+## Пример поста
 
 ```text
-🎧 Artist - Track
+📻 · Youth Code - Transitions
 
-выбирай свою платформу
+ссылки готовы, звук ждет
 
 #stonerhand #track
 ```
 
-- Платформы без найденного результата не показываются
-- Понятные ответы на невалидные ссылки и пустой результат
+Под постом бот добавляет кнопки с найденными платформами и кнопку канала.
 
-## Быстрый старт
+## Команды
 
-1. Создайте и активируйте виртуальное окружение.
-2. Установите зависимости:
+- `/start` - запуск и короткое приветствие
+- `/help` - помощь
+- `/guide` - инструкция, которую можно закрепить в группе или канале
+- `/platforms` - список поддерживаемых сервисов
+- `/channel` - ссылка на канал
+- `/id` - показать chat id
+- `/stats` - статистика найденных релизов
+
+## Локальный запуск
+
+Создайте окружение:
 
 ```bash
-pip install -e .
+python3 -m venv .venv
 ```
 
-3. Скопируйте пример окружения:
+Активируйте его:
+
+```bash
+source .venv/bin/activate
+```
+
+Установите зависимости:
+
+```bash
+pip install -r requirements.txt
+```
+
+Скопируйте пример настроек:
 
 ```bash
 cp .env.example .env
 ```
 
-4. Заполните `.env`:
+Заполните `.env`:
 
-- `BOT_TOKEN` — токен Telegram-бота
-- `SONGLINK_API_KEY` — необязательно, повышает лимит Song.link
-- `SONGLINK_USER_COUNTRIES` — коды стран для Song.link, сейчас по умолчанию `US`
-- `ADMIN_CHAT_ID` — необязательно, chat id для уведомлений об ошибках в канале
-
-5. Запустите бота:
-
-```bash
-python -m music_links_bot
+```env
+BOT_TOKEN=your-telegram-bot-token
+SONGLINK_API_KEY=
+SONGLINK_USER_COUNTRIES=US
+LOG_LEVEL=INFO
+ADMIN_CHAT_ID=
 ```
 
-## Поведение
-
-- Бот берет все поддерживаемые ссылки из сообщения.
-- Одна ссылка превращается в один пост с кнопками.
-- Несколько ссылок превращаются в подборку.
-- Если бот добавлен админом в канал или группу и может удалять сообщения, он удалит исходное сообщение со ссылкой и опубликует оформленный пост.
-- Если ссылка ведет не на трек или альбом, бот отвечает понятной ошибкой.
-
-## Принятые допущения
-
-- `/help` включен сразу.
-- Статистика хранится локально в `data/stats.json`.
-- Бот работает и в личных сообщениях, и в группах, если ему видны сообщения с ссылкой.
-
-## Тесты
-
-Для быстрых локальных проверок:
+Запустите бота:
 
 ```bash
-python -m unittest discover -s tests -v
+PYTHONPATH=src python -m music_links_bot
 ```
 
-## Деплой на Render
+На Mac остановка локального бота: `Control + C`.
 
-Для Telegram-бота на polling нужен `Background Worker`, потому что бот постоянно работает в фоне и не слушает HTTP-порт.
+## Railway Deploy
 
-1. Загрузите проект в GitHub.
-2. Откройте Render и создайте новый `Blueprint` из этого репозитория.
-3. Render прочитает `render.yaml` и создаст worker `stonerhand-bot`.
-4. В переменных окружения Render заполните:
+Railway подходит для запуска polling-бота без открытого терминала на компьютере.
+
+1. Загрузите проект в GitHub
+2. В Railway выберите `New Project`
+3. Выберите `Deploy from GitHub repo`
+4. Подключите репозиторий
+5. В `Variables` добавьте переменные окружения
+
+Обязательная переменная:
 
 - `BOT_TOKEN` - токен от BotFather
-- `SONGLINK_API_KEY` - необязательно
-- `SONGLINK_USER_COUNTRIES` - `US`
-- `LOG_LEVEL` - `INFO`
-- `ADMIN_CHAT_ID` - необязательно, ваш chat id для ошибок
-- `PYTHON_VERSION` - `3.13.4`
 
-Если создаете сервис вручную, выбирайте `Background Worker`.
+Рекомендуемые переменные:
+
+- `SONGLINK_USER_COUNTRIES=US`
+- `LOG_LEVEL=INFO`
+- `PYTHON_VERSION=3.13.4`
+
+`railway.toml` уже содержит команды:
+
+```bash
+pip install -r requirements.txt
+```
+
+```bash
+PYTHONPATH=src python -m music_links_bot
+```
+
+Если в логах есть `Deployment successful`, бот запущен.
+
+## Render Deploy
+
+Для Render нужен `Background Worker`, потому что бот работает через polling и не слушает HTTP-порт.
+
+Render может попросить карту для worker-сервиса. Если карта не подходит, используйте Railway.
+
+Если все же деплоите на Render, `render.yaml` уже готов:
 
 - Build Command: `pip install -r requirements.txt`
 - Start Command: `PYTHONPATH=src python -m music_links_bot`
+
+## Тесты
+
+```bash
+PYTHONPATH=src python -m unittest discover -s tests -v
+```
+
+## Важные заметки
+
+- Не коммитьте `.env` и токены в GitHub
+- Если бот не отвечает после деплоя, сначала проверьте `BOT_TOKEN` в переменных окружения
+- Если бот запущен одновременно локально и на хостинге, остановите локальный процесс через `Control + C`
+- Для удаления исходных сообщений в канале/группе бот должен быть админом с правом удаления сообщений
