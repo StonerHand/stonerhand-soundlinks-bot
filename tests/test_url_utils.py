@@ -5,6 +5,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from music_links_bot.url_utils import (
+    apple_podcasts_url_type,
     extract_supported_urls,
     is_supported_music_url,
     spotify_url_type,
@@ -15,6 +16,7 @@ from music_links_bot.url_utils import (
 class UrlUtilsTests(unittest.TestCase):
     def test_is_supported_music_url_accepts_supported_hosts(self) -> None:
         self.assertTrue(is_supported_music_url("https://open.spotify.com/track/123"))
+        self.assertTrue(is_supported_music_url("https://podcasts.apple.com/us/podcast/apple-events/id1473854035"))
         self.assertTrue(is_supported_music_url("https://music.youtube.com/watch?v=abc"))
         self.assertTrue(is_supported_music_url("https://music.yandex.ru/album/1/track/2"))
 
@@ -72,6 +74,21 @@ class UrlUtilsTests(unittest.TestCase):
 
     def test_spotify_url_type_ignores_other_hosts(self) -> None:
         self.assertIsNone(spotify_url_type("https://example.com/show/abc"))
+
+    def test_apple_podcasts_url_type_detects_episode_and_show(self) -> None:
+        self.assertEqual(
+            apple_podcasts_url_type(
+                "https://podcasts.apple.com/us/podcast/apple-events/id1473854035?i=1000479125753"
+            ),
+            "episode",
+        )
+        self.assertEqual(
+            apple_podcasts_url_type("https://podcasts.apple.com/us/podcast/apple-events/id1473854035"),
+            "show",
+        )
+
+    def test_apple_podcasts_url_type_ignores_other_hosts(self) -> None:
+        self.assertIsNone(apple_podcasts_url_type("https://music.apple.com/us/album/abc"))
 
 
 if __name__ == "__main__":

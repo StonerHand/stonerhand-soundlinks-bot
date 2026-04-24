@@ -28,7 +28,12 @@ from music_links_bot.models import TrackMatch
 from music_links_bot.phrases import pick_phrase
 from music_links_bot.songlink import SonglinkClient, SonglinkError, SonglinkLookupError
 from music_links_bot.stats import format_stats_message, load_stats, record_matches
-from music_links_bot.url_utils import extract_supported_urls, spotify_url_type, strip_supported_urls
+from music_links_bot.url_utils import (
+    apple_podcasts_url_type,
+    extract_supported_urls,
+    spotify_url_type,
+    strip_supported_urls,
+)
 
 LOGGER = logging.getLogger(__name__)
 CHANNEL_URL = "https://t.me/stonerhand"
@@ -286,7 +291,7 @@ async def _lookup_tracks(
             continue
 
         if isinstance(result, SonglinkLookupError):
-            fallback_track = _build_spotify_podcast_fallback(source_url)
+            fallback_track = _build_podcast_fallback(source_url)
             if fallback_track:
                 tracks.append(fallback_track)
                 continue
@@ -314,7 +319,7 @@ async def _lookup_tracks(
     return tracks, unavailable_urls
 
 
-def _build_spotify_podcast_fallback(source_url: str) -> TrackMatch | None:
+def _build_podcast_fallback(source_url: str) -> TrackMatch | None:
     spotify_type = spotify_url_type(source_url)
     if spotify_type == "episode":
         return TrackMatch(
@@ -330,6 +335,26 @@ def _build_spotify_podcast_fallback(source_url: str) -> TrackMatch | None:
             title="Podcast show",
             artist="Spotify",
             links={"spotify": source_url},
+            page_url=source_url,
+            kind="podcast",
+            release_format="show",
+        )
+
+    apple_podcast_type = apple_podcasts_url_type(source_url)
+    if apple_podcast_type == "episode":
+        return TrackMatch(
+            title="Podcast episode",
+            artist="Apple Podcasts",
+            links={"applePodcasts": source_url},
+            page_url=source_url,
+            kind="podcast",
+        )
+
+    if apple_podcast_type == "show":
+        return TrackMatch(
+            title="Podcast show",
+            artist="Apple Podcasts",
+            links={"applePodcasts": source_url},
             page_url=source_url,
             kind="podcast",
             release_format="show",

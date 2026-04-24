@@ -4,6 +4,7 @@ SUPPORTED_INPUT_HOSTS = {
     "music.apple.com",
     "itunes.apple.com",
     "geo.music.apple.com",
+    "podcasts.apple.com",
     "youtube.com",
     "www.youtube.com",
     "m.youtube.com",
@@ -41,6 +42,6 @@ PLATFORM_ALIASES = {
 }
 
 INPUT_PLATFORM_HINT = (
-    "Spotify, Apple Music, YouTube / YouTube Music, Deezer, "
+    "Spotify, Apple Music / Apple Podcasts, YouTube / YouTube Music, Deezer, "
     "Tidal, Yandex Music или SoundCloud, а также ссылки на подкасты"
 )

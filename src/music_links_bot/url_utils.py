@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from music_links_bot.constants import SUPPORTED_INPUT_HOSTS
 
@@ -66,3 +66,18 @@ def spotify_url_type(url: str) -> str | None:
         return None
 
     return parts[0].lower()
+
+
+def apple_podcasts_url_type(url: str) -> str | None:
+    parsed = urlparse(url)
+    if normalize_host(parsed.netloc) != "podcasts.apple.com":
+        return None
+
+    parts = [part for part in parsed.path.split("/") if part]
+    if "podcast" not in parts:
+        return None
+
+    if parse_qs(parsed.query).get("i"):
+        return "episode"
+
+    return "show"

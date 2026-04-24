@@ -9,7 +9,7 @@ Telegram-бот для музыкального канала [@stonerhand](https
 ## Что умеет
 
 - Ищет релизы через Song.link / Odesli
-- Принимает Spotify, Apple Music, YouTube / YouTube Music, Deezer, Tidal, Yandex Music, SoundCloud и podcast-ссылки
+- Принимает Spotify, Apple Music, Apple Podcasts, YouTube / YouTube Music, Deezer, Tidal, Yandex Music, SoundCloud и podcast-ссылки
 - Видит ссылки в обычных сообщениях и caption-подписях к медиа
 - Поддерживает треки, альбомы, EP, singles, подкасты, podcast shows и подборки из нескольких ссылок
 - Делает прямые кнопки для одиночного релиза
@@ -218,7 +218,7 @@ src/music_links_bot/
 - Очень длинная авторская подпись аккуратно обрезается
 - Слишком большие пачки ссылок ограничены, чтобы не упереться в лимиты Telegram
 - Статистика пишется атомарно и защищена от параллельной записи
-- Spotify podcast episode/show не падают ошибкой, даже если Song.link не нашел кросс-платформенный матч
+- Spotify и Apple Podcasts episode/show не падают ошибкой, даже если Song.link не нашел кросс-платформенный матч
 - Ошибки Song.link отделены от ситуации “релиз не найден”
 
 ## Важно

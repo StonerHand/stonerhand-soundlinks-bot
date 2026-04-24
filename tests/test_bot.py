@@ -9,7 +9,7 @@ from music_links_bot.bot import (
     MAX_USER_NOTE_LENGTH,
     _build_collection_keyboard,
     _build_platform_order,
-    _build_spotify_podcast_fallback,
+    _build_podcast_fallback,
     _message_text,
     _shorten_user_note,
 )
@@ -67,7 +67,7 @@ class BotKeyboardTests(unittest.TestCase):
     def test_spotify_episode_fallback_builds_podcast_match(self) -> None:
         source_url = "https://open.spotify.com/episode/abc?si=123"
 
-        track = _build_spotify_podcast_fallback(source_url)
+        track = _build_podcast_fallback(source_url)
 
         self.assertIsNotNone(track)
         assert track is not None
@@ -80,7 +80,7 @@ class BotKeyboardTests(unittest.TestCase):
     def test_spotify_show_fallback_marks_show_format(self) -> None:
         source_url = "https://open.spotify.com/show/abc?si=123"
 
-        track = _build_spotify_podcast_fallback(source_url)
+        track = _build_podcast_fallback(source_url)
 
         self.assertIsNotNone(track)
         assert track is not None
@@ -90,8 +90,31 @@ class BotKeyboardTests(unittest.TestCase):
 
     def test_spotify_fallback_ignores_regular_tracks(self) -> None:
         self.assertIsNone(
-            _build_spotify_podcast_fallback("https://open.spotify.com/track/abc")
+            _build_podcast_fallback("https://open.spotify.com/track/abc")
         )
+
+    def test_apple_podcast_episode_fallback_builds_podcast_match(self) -> None:
+        source_url = "https://podcasts.apple.com/us/podcast/apple-events/id1473854035?i=1000479125753"
+
+        track = _build_podcast_fallback(source_url)
+
+        self.assertIsNotNone(track)
+        assert track is not None
+        self.assertEqual(track.kind, "podcast")
+        self.assertEqual(track.artist, "Apple Podcasts")
+        self.assertEqual(track.title, "Podcast episode")
+        self.assertEqual(track.links, {"applePodcasts": source_url})
+
+    def test_apple_podcast_show_fallback_marks_show_format(self) -> None:
+        source_url = "https://podcasts.apple.com/us/podcast/apple-events/id1473854035"
+
+        track = _build_podcast_fallback(source_url)
+
+        self.assertIsNotNone(track)
+        assert track is not None
+        self.assertEqual(track.kind, "podcast")
+        self.assertEqual(track.release_format, "show")
+        self.assertEqual(track.title, "Podcast show")
 
     def test_shorten_user_note_keeps_telegram_posts_safe(self) -> None:
         text = "x" * (MAX_USER_NOTE_LENGTH + 20)
