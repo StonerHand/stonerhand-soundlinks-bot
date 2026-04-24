@@ -10,10 +10,18 @@ from music_links_bot.bot import (
     _build_collection_keyboard,
     _build_platform_order,
     _build_podcast_fallback,
+    _lookup_tracks,
     _message_text,
     _shorten_user_note,
 )
 from music_links_bot.models import TrackMatch
+from music_links_bot.songlink import SonglinkError
+
+
+class FailingLookupClient:
+    async def lookup_track(self, source_url: str) -> TrackMatch:
+        del source_url
+        raise SonglinkError("service down")
 
 
 class BotKeyboardTests(unittest.TestCase):
@@ -128,6 +136,22 @@ class BotKeyboardTests(unittest.TestCase):
         message = type("MessageStub", (), {"text": None, "caption": "caption link"})()
 
         self.assertEqual(_message_text(message), "caption link")
+
+
+class BotLookupTests(unittest.IsolatedAsyncioTestCase):
+    async def test_lookup_tracks_uses_podcast_fallback_when_songlink_is_down(self) -> None:
+        tracks, unavailable_urls = await _lookup_tracks(
+            FailingLookupClient(),
+            ["https://open.spotify.com/episode/abc?si=123"],
+        )
+
+        self.assertEqual(unavailable_urls, [])
+        self.assertEqual(len(tracks), 1)
+        self.assertEqual(tracks[0].kind, "podcast")
+        self.assertEqual(
+            tracks[0].links,
+            {"spotify": "https://open.spotify.com/episode/abc?si=123"},
+        )
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@
 
 Telegram music-link bot built for [@stonerhand](https://t.me/stonerhand). Send a track, album, podcast or a pack of release links, and the bot turns them into a clean Telegram post with streaming buttons.
 
-It does not just return raw URLs. It formats every link as a small editorial card: artist, title, Telegram preview, StonerHand caption, hashtags and platform buttons.
+It does not just return raw URLs. It formats every link as a small editorial card: artist, title, Telegram preview, StonerHand caption, hashtags and platform buttons. The bot copy is intentionally Russian, because it is tuned for the StonerHand channel voice.
 
 ## Features
 
@@ -25,11 +25,11 @@ It does not just return raw URLs. It formats every link as a small editorial car
 Single track:
 
 ```text
-@username: a little tension for tonight
+@username: немного тревоги на вечер
 
 📻 · Youth Code - Transitions
 
-links are ready, the sound is waiting
+ссылки готовы, звук рядом
 
 #stonerhand #track
 ```
@@ -39,7 +39,7 @@ Album or EP:
 ```text
 💿 · Artist - Release
 
-album exits are ready
+альбом везде, где нужно
 
 #stonerhand #album #ep
 ```
@@ -49,7 +49,7 @@ Podcast:
 ```text
 🎙️ · Show Name - Episode Title
 
-listen wherever it feels right
+выпуск на месте, кнопки ниже
 
 #stonerhand #podcast
 ```
@@ -57,15 +57,15 @@ listen wherever it feels right
 Collection:
 
 ```text
-@username: five things for the evening
+@username: пять вещей на вечер
 
-today in the stack:
+сегодня в подборке:
 
 1. 📻 · Youth Code - Transitions
 2. 🎧 · Show Me The Body - Camp Orchestra
 3. 💿 · The Soft Moon - Criminal
 
-choose where to fall in
+выбирай с чего начать
 
 #stonerhand #collection #track #album
 ```
@@ -77,7 +77,7 @@ Spotify
 Apple
 YouTube
 Yandex
-🪨 Open channel
+🪨 Открыть канал
 ```
 
 Collection buttons:
@@ -86,7 +86,7 @@ Collection buttons:
 1. Youth Code - Transitions
 2. Show Me The Body - Camp Orchestra
 3. The Soft Moon - Criminal
-🪨 Open channel
+🪨 Открыть канал
 ```
 
 ## Commands

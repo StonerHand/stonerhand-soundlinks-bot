@@ -290,16 +290,16 @@ async def _lookup_tracks(
             tracks.append(result)
             continue
 
-        if isinstance(result, SonglinkLookupError):
+        if isinstance(result, SonglinkError):
             fallback_track = _build_podcast_fallback(source_url)
             if fallback_track:
                 tracks.append(fallback_track)
                 continue
 
-            LOGGER.info("Song.link could not resolve %s", source_url)
-            continue
+            if isinstance(result, SonglinkLookupError):
+                LOGGER.info("Song.link could not resolve %s", source_url)
+                continue
 
-        if isinstance(result, SonglinkError):
             LOGGER.error(
                 "Song.link request failed for %s",
                 source_url,

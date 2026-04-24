@@ -29,7 +29,7 @@ Telegram-бот для музыкального канала [@stonerhand](https
 
 📻 · Youth Code - Transitions
 
-ссылки готовы, звук ждет
+ссылки готовы, звук рядом
 
 #stonerhand #track
 ```
@@ -39,7 +39,7 @@ Telegram-бот для музыкального канала [@stonerhand](https
 ```text
 💿 · Artist - Release
 
-альбом на всех выходах
+альбом везде, где нужно
 
 #stonerhand #album #ep
 ```
@@ -49,7 +49,7 @@ Telegram-бот для музыкального канала [@stonerhand](https
 ```text
 🎙️ · Show Name - Episode Title
 
-слушай выпуск там, где удобно
+выпуск на месте, кнопки ниже
 
 #stonerhand #podcast
 ```
@@ -65,7 +65,7 @@ Telegram-бот для музыкального канала [@stonerhand](https
 2. 🎧 · Show Me The Body - Camp Orchestra
 3. 💿 · The Soft Moon - Criminal
 
-выбирай, куда провалиться
+выбирай с чего начать
 
 #stonerhand #collection #track #album
 ```
