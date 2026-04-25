@@ -7,6 +7,8 @@ from music_links_bot.constants import SUPPORTED_INPUT_HOSTS
 
 URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
 TRAILING_PUNCTUATION = ".,!?)]}>\"'"
+YOUTUBE_MUSIC_HOST = "music.youtube.com"
+YOUTUBE_VIDEO_HOSTS = {"youtube.com", "m.youtube.com", "youtu.be"}
 
 
 def clean_url_token(token: str) -> str:
@@ -23,6 +25,15 @@ def is_supported_music_url(url: str) -> bool:
         return False
 
     normalized = normalize_host(parsed.netloc)
+
+    if normalized == YOUTUBE_MUSIC_HOST:
+        return True
+
+    if normalized in YOUTUBE_VIDEO_HOSTS:
+        return is_youtube_video_url(url)
+
+    if normalized.endswith(".youtube.com"):
+        return False
 
     if normalized in SUPPORTED_INPUT_HOSTS:
         return True
@@ -59,7 +70,7 @@ def strip_supported_urls(text: str | None) -> str:
 def is_youtube_video_url(url: str) -> bool:
     parsed = urlparse(url)
     normalized_host = normalize_host(parsed.netloc)
-    if normalized_host == "music.youtube.com":
+    if normalized_host == YOUTUBE_MUSIC_HOST:
         return False
 
     if normalized_host == "youtu.be":

@@ -29,7 +29,12 @@ from music_links_bot.formatter import (
 from music_links_bot.models import TrackMatch, VideoMatch
 from music_links_bot.phrases import pick_phrase
 from music_links_bot.songlink import SonglinkClient, SonglinkError, SonglinkLookupError
-from music_links_bot.stats import format_stats_message, load_stats, record_matches, record_videos
+from music_links_bot.stats import (
+    format_stats_message,
+    load_stats,
+    record_matches,
+    record_videos,
+)
 from music_links_bot.url_utils import (
     apple_podcasts_url_type,
     extract_supported_urls,
@@ -210,7 +215,9 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return
 
-    youtube_urls = [source_url for source_url in source_urls if is_youtube_video_url(source_url)]
+    youtube_urls = [
+        source_url for source_url in source_urls if is_youtube_video_url(source_url)
+    ]
     if youtube_urls and len(youtube_urls) == len(source_urls):
         youtube_client: YouTubeClient = context.application.bot_data["youtube_client"]
         videos = await _lookup_youtube_videos(youtube_client, youtube_urls)

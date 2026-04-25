@@ -15,6 +15,7 @@ It does not just return raw URLs. It formats every link as a small editorial car
 - Uses direct platform buttons for a single release
 - Uses playlist-style posts for multiple links
 - Formats regular YouTube links as standalone video posts with a button and preview
+- Treats only real YouTube video URLs as video posts: `watch`, `youtu.be`, `shorts`, `live` and `embed`
 - Keeps `music.youtube.com` in the Song.link music lookup flow
 - Stays silent on regular group/channel posts when there is no supported music link
 - Selects Telegram preview by preferred platform
@@ -235,6 +236,7 @@ src/music_links_bot/
 - Stats are written atomically and protected from parallel writes
 - Regular posts, Instagram/TikTok/Pinterest and other non-music links in groups/channels are ignored without admin spam
 - YouTube video posts need no API key: title and channel are fetched through public oEmbed, with a safe fallback if metadata fails
+- YouTube channel/profile links are ignored, so a regular `youtube.com/@channel` post will not trigger music lookup
 - Spotify and Apple Podcasts episode/show links fall back to a platform-only post if Song.link has no cross-platform match
 - Song.link outages, rate limits and temporary failures are handled separately from “release not found”
 

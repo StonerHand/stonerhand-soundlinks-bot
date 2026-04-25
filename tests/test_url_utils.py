@@ -19,10 +19,14 @@ class UrlUtilsTests(unittest.TestCase):
         self.assertTrue(is_supported_music_url("https://open.spotify.com/track/123"))
         self.assertTrue(is_supported_music_url("https://podcasts.apple.com/us/podcast/apple-events/id1473854035"))
         self.assertTrue(is_supported_music_url("https://music.youtube.com/watch?v=abc"))
+        self.assertTrue(is_supported_music_url("https://www.youtube.com/watch?v=abc"))
+        self.assertTrue(is_supported_music_url("https://youtu.be/abc"))
         self.assertTrue(is_supported_music_url("https://music.yandex.ru/album/1/track/2"))
 
     def test_is_supported_music_url_rejects_other_hosts(self) -> None:
         self.assertFalse(is_supported_music_url("https://example.com/track/123"))
+        self.assertFalse(is_supported_music_url("https://www.youtube.com/@channel"))
+        self.assertFalse(is_supported_music_url("https://www.youtube.com/channel/abc"))
         self.assertFalse(is_supported_music_url("not-a-url"))
 
     def test_extract_supported_urls_skips_unsupported_urls(self) -> None:
