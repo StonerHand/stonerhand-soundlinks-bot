@@ -746,13 +746,13 @@ def _current_stats_time() -> str:
 
 
 def _build_intro_keyboard(bot_username: str | None) -> InlineKeyboardMarkup:
-    rows = [[InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)]]
+    main_row = [InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)]
     if bot_username:
         bot_url = f"https://t.me/{bot_username}"
         share_url = "https://t.me/share/url?url=" + quote(bot_url, safe="")
-        rows.append([InlineKeyboardButton("Поделиться ботом", url=share_url)])
+        main_row.append(InlineKeyboardButton("Поделиться ботом", url=share_url))
 
-    return InlineKeyboardMarkup(rows)
+    return InlineKeyboardMarkup([main_row])
 
 
 async def _notify_admin(

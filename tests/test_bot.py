@@ -9,6 +9,7 @@ from music_links_bot.bot import (
     MAX_BUTTON_TEXT_LENGTH,
     MAX_USER_NOTE_LENGTH,
     _build_collection_keyboard,
+    _build_intro_keyboard,
     _build_link_keyboard,
     _build_platform_order,
     _build_podcast_fallback,
@@ -195,6 +196,14 @@ class BotKeyboardTests(unittest.TestCase):
     def test_channel_button_is_hidden_only_in_stonerhand_channel(self) -> None:
         self.assertFalse(_should_include_channel_button(ChannelMessageStub()))
         self.assertTrue(_should_include_channel_button(GroupMessageStub()))
+
+    def test_intro_keyboard_puts_main_buttons_on_one_row(self) -> None:
+        keyboard = _build_intro_keyboard("StonerHandBot")
+
+        rows = keyboard.inline_keyboard
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0][0].text, "🪨 Открыть канал")
+        self.assertEqual(rows[0][1].text, "Поделиться ботом")
 
     def test_build_platform_order_moves_primary_platform_first(self) -> None:
         order = _build_platform_order("yandexMusic")
