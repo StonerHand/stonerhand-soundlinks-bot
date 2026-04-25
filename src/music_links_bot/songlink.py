@@ -74,7 +74,7 @@ class SonglinkClient:
             response = await self._client.get("/links", params=params)
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
-            if exc.response.status_code >= 500:
+            if _is_transient_status(exc.response.status_code):
                 raise SonglinkError("Song.link is unavailable right now.") from exc
 
             raise SonglinkLookupError("Song.link rejected the URL.") from exc
@@ -240,3 +240,7 @@ class SonglinkClient:
                 return "album"
 
         return None
+
+
+def _is_transient_status(status_code: int) -> bool:
+    return status_code in {408, 429} or status_code >= 500

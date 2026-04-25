@@ -5,7 +5,12 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from music_links_bot.models import TrackMatch
-from music_links_bot.songlink import SonglinkClient, SonglinkError, SonglinkLookupError
+from music_links_bot.songlink import (
+    SonglinkClient,
+    SonglinkError,
+    SonglinkLookupError,
+    _is_transient_status,
+)
 
 
 class FakeSonglinkClient(SonglinkClient):
@@ -105,6 +110,12 @@ class SonglinkClientTests(unittest.TestCase):
         self.assertEqual(client._normalize_entity_type("podcastEpisode"), "podcast")
         self.assertEqual(client._normalize_entity_type("episode"), "podcast")
         self.assertEqual(client._normalize_entity_type("track"), "song")
+
+    def test_transient_status_marks_rate_limit_as_service_error(self) -> None:
+        self.assertTrue(_is_transient_status(408))
+        self.assertTrue(_is_transient_status(429))
+        self.assertTrue(_is_transient_status(500))
+        self.assertFalse(_is_transient_status(404))
 
 
 class SonglinkClientAsyncTests(unittest.IsolatedAsyncioTestCase):

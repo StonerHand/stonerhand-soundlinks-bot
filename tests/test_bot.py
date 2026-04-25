@@ -58,6 +58,17 @@ class ChannelMessageStub:
         self.replies.append(text)
 
 
+class GroupMessageStub(ChannelMessageStub):
+    chat_id = -100123
+    chat = type("ChatStub", (), {"type": "supergroup"})()
+
+
+class PrivateMessageStub(ChannelMessageStub):
+    text = "привет"
+    chat_id = 456
+    chat = type("ChatStub", (), {"type": "private"})()
+
+
 class UpdateStub:
     def __init__(self, message: ChannelMessageStub) -> None:
         self.effective_message = message
@@ -185,6 +196,25 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(message.replies, [])
+        self.assertEqual(context.bot.sent_messages, [])
+
+    async def test_group_messages_without_supported_urls_stay_silent(self) -> None:
+        message = GroupMessageStub()
+        context = ContextStub()
+
+        await track_lookup_message(UpdateStub(message), context)
+
+        self.assertEqual(message.replies, [])
+        self.assertEqual(context.bot.sent_messages, [])
+
+    async def test_private_messages_without_supported_urls_get_hint(self) -> None:
+        message = PrivateMessageStub()
+        context = ContextStub()
+
+        await track_lookup_message(UpdateStub(message), context)
+
+        self.assertEqual(len(message.replies), 1)
+        self.assertIn("Пришлите ссылку из сервисов:", message.replies[0])
         self.assertEqual(context.bot.sent_messages, [])
 
     async def test_lookup_tracks_uses_podcast_fallback_when_songlink_is_down(self) -> None:

@@ -14,7 +14,7 @@ from telegram import (
     Update,
 )
 from telegram.constants import ParseMode
-from telegram.error import BadRequest, Forbidden
+from telegram.error import BadRequest, Forbidden, TelegramError
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 from music_links_bot.config import Settings
@@ -145,7 +145,7 @@ async def platforms_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         "Поддерживаю входящие ссылки из:\n\n"
         f"{INPUT_PLATFORM_HINT}\n\n"
         "А в ответе показываю найденные ссылки на Spotify, Apple Music, "
-        "YouTube Music, Deezer, Tidal и Yandex Music"
+        "Apple Podcasts, YouTube Music, Deezer, Tidal и Yandex Music"
     )
     await update.message.reply_text(text)
 
@@ -193,7 +193,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
     source_urls = extract_supported_urls(message_text)[:MAX_LINKS_PER_MESSAGE]
     user_prefix = _build_user_prefix(message)
     if not source_urls:
-        if message.chat.type == "channel":
+        if message.chat.type != "private":
             return
 
         no_url_text = pick_phrase("no_url", message_text or str(message.chat_id))
@@ -576,14 +576,14 @@ async def _notify_admin(
 
     try:
         await context.bot.send_message(chat_id=admin_chat_id, text=text)
-    except (BadRequest, Forbidden):
+    except TelegramError:
         LOGGER.info("Could not notify admin chat %s", admin_chat_id)
 
 
 async def _try_delete_message(message: Message) -> bool:
     try:
         await message.delete()
-    except (BadRequest, Forbidden):
+    except TelegramError:
         return False
 
     return True

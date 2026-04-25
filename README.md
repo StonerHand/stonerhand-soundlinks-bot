@@ -14,6 +14,7 @@ It does not just return raw URLs. It formats every link as a small editorial car
 - Supports tracks, albums, EPs, singles, podcasts, podcast shows and multi-link collections
 - Uses direct platform buttons for a single release
 - Uses playlist-style posts for multiple links
+- Stays silent on regular group/channel posts when there is no supported music link
 - Selects Telegram preview by preferred platform
 - Replaces source messages in groups/channels when the bot has admin rights
 - Adds smart hashtags: `#track`, `#album`, `#collection`, `#single`, `#ep`, `#podcast`, `#show`
@@ -132,7 +133,7 @@ Important:
 - `BOT_TOKEN` is required
 - `SONGLINK_API_KEY` is optional
 - `SONGLINK_USER_COUNTRIES=US` usually gives broader international coverage
-- `ADMIN_CHAT_ID` enables private stats and admin notifications
+- `ADMIN_CHAT_ID` enables private stats and admin notifications for channel processing errors
 - `PRIMARY_PLATFORM` controls preview selection and button order
 
 Supported `PRIMARY_PLATFORM` values:
@@ -218,8 +219,9 @@ src/music_links_bot/
 - Long user notes are trimmed before posting
 - Large link packs are limited to avoid Telegram limits
 - Stats are written atomically and protected from parallel writes
+- Regular posts, Instagram/TikTok/Pinterest and other non-music links in groups/channels are ignored without admin spam
 - Spotify and Apple Podcasts episode/show links fall back to a platform-only post if Song.link has no cross-platform match
-- Song.link outage errors are handled separately from “release not found”
+- Song.link outages, rate limits and temporary failures are handled separately from “release not found”
 
 ## Safety Notes
 
