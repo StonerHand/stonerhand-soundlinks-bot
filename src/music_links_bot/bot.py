@@ -22,18 +22,22 @@ from music_links_bot.constants import INPUT_PLATFORM_HINT, PLATFORM_LABELS
 from music_links_bot.formatter import (
     format_collection_message,
     format_track_message,
+    format_video_collection_message,
+    format_video_message,
     prepend_user_text,
 )
-from music_links_bot.models import TrackMatch
+from music_links_bot.models import TrackMatch, VideoMatch
 from music_links_bot.phrases import pick_phrase
 from music_links_bot.songlink import SonglinkClient, SonglinkError, SonglinkLookupError
-from music_links_bot.stats import format_stats_message, load_stats, record_matches
+from music_links_bot.stats import format_stats_message, load_stats, record_matches, record_videos
 from music_links_bot.url_utils import (
     apple_podcasts_url_type,
     extract_supported_urls,
+    is_youtube_video_url,
     spotify_url_type,
     strip_supported_urls,
 )
+from music_links_bot.youtube import YouTubeClient, YouTubeLookupError
 
 LOGGER = logging.getLogger(__name__)
 CHANNEL_URL = "https://t.me/stonerhand"
@@ -56,6 +60,7 @@ def build_application(settings: Settings) -> Application:
         user_countries=settings.songlink_user_countries,
         api_key=settings.songlink_api_key,
     )
+    youtube_client = YouTubeClient()
     application = (
         Application.builder()
         .token(settings.bot_token)
@@ -63,6 +68,7 @@ def build_application(settings: Settings) -> Application:
         .build()
     )
     application.bot_data["songlink_client"] = songlink_client
+    application.bot_data["youtube_client"] = youtube_client
     application.bot_data["admin_chat_id"] = settings.admin_chat_id
     application.bot_data["platform_order"] = _build_platform_order(settings.primary_platform)
 
@@ -87,7 +93,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     text = (
-        "🎧 Кидай ссылку на трек, альбом или подкаст, а я найду его на других платформах\n\n"
+        "🎧 Кидай ссылку на трек, альбом, подкаст или YouTube-видео, а я оформлю ее в пост\n\n"
         f"Можно присылать ссылки из: {INPUT_PLATFORM_HINT}\n\n"
         "Если кинешь несколько ссылок одним сообщением, соберу подборку\n\n"
         "В групповых чатах могу удалить оригинальное сообщение и заменить его "
@@ -102,8 +108,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     text = (
         "Как пользоваться:\n\n"
-        "1. Пришли ссылку на трек, альбом или подкаст\n"
-        "2. Я найду релиз на других платформах\n"
+        "1. Пришли ссылку на трек, альбом, подкаст или YouTube-видео\n"
+        "2. Я найду релиз на других платформах или оформлю видео отдельным постом\n"
         "3. Верну пост в стиле StonerHand с кнопками\n\n"
         "Если в сообщении несколько ссылок, соберу подборку\n\n"
         "В группах могу удалить оригинальное сообщение со ссылкой и заменить его "
@@ -119,7 +125,7 @@ async def guide_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     guide = (
         "StonerHand guide\n\n"
-        "1. Кидай ссылку на трек, альбом или подкаст\n"
+        "1. Кидай ссылку на трек, альбом, подкаст или YouTube-видео\n"
         "2. Несколько ссылок одним сообщением станут подборкой\n"
         "3. В канале бот заменит исходный пост красивым постом с кнопками\n"
         "4. Для удаления оригинала нужны права админа на управление сообщениями"
@@ -145,7 +151,8 @@ async def platforms_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         "Поддерживаю входящие ссылки из:\n\n"
         f"{INPUT_PLATFORM_HINT}\n\n"
         "А в ответе показываю найденные ссылки на Spotify, Apple Music, "
-        "Apple Podcasts, YouTube Music, Deezer, Tidal и Yandex Music"
+        "Apple Podcasts, YouTube Music, Deezer, Tidal и Yandex Music\n\n"
+        "Обычные YouTube-ссылки оформляю отдельным видео-постом"
     )
     await update.message.reply_text(text)
 
@@ -201,6 +208,14 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
             f"{no_url_text}\n\n"
             f"Пришлите ссылку из сервисов: {INPUT_PLATFORM_HINT}"
         )
+        return
+
+    youtube_urls = [source_url for source_url in source_urls if is_youtube_video_url(source_url)]
+    if youtube_urls and len(youtube_urls) == len(source_urls):
+        youtube_client: YouTubeClient = context.application.bot_data["youtube_client"]
+        videos = await _lookup_youtube_videos(youtube_client, youtube_urls)
+        await _send_youtube_result(context.bot, message, videos, user_prefix=user_prefix)
+        _record_videos_safely(videos, message)
         return
 
     client: SonglinkClient = context.application.bot_data["songlink_client"]
@@ -267,6 +282,65 @@ def _select_preview_url(
             return url
 
     return None
+
+
+async def _lookup_youtube_videos(
+    client: YouTubeClient,
+    source_urls: list[str],
+) -> list[VideoMatch]:
+    results = await asyncio.gather(
+        *(client.lookup_video(source_url) for source_url in source_urls),
+        return_exceptions=True,
+    )
+
+    videos: list[VideoMatch] = []
+    for source_url, result in zip(source_urls, results, strict=False):
+        if isinstance(result, VideoMatch):
+            videos.append(result)
+            continue
+
+        if isinstance(result, YouTubeLookupError):
+            LOGGER.info("Could not fetch YouTube metadata for %s", source_url)
+        elif isinstance(result, Exception):
+            LOGGER.error(
+                "Unexpected error while fetching YouTube metadata for %s",
+                source_url,
+                exc_info=(type(result), result, result.__traceback__),
+            )
+
+        videos.append(VideoMatch(title="YouTube video", author="YouTube", url=source_url))
+
+    return videos
+
+
+async def _send_youtube_result(
+    bot: Bot,
+    message: Message,
+    videos: list[VideoMatch],
+    *,
+    user_prefix: str,
+) -> None:
+    if not videos:
+        return
+
+    if len(videos) == 1:
+        video = videos[0]
+        await _send_track_result(
+            bot,
+            message,
+            f"{user_prefix}{format_video_message(video)}",
+            preview_url=video.url,
+            reply_markup=_build_youtube_keyboard(video.url),
+        )
+        return
+
+    await _send_track_result(
+        bot,
+        message,
+        f"{user_prefix}{format_video_collection_message(videos)}",
+        preview_url=videos[0].url,
+        reply_markup=_build_youtube_collection_keyboard(videos),
+    )
 
 
 async def _lookup_tracks(
@@ -457,6 +531,31 @@ def _build_collection_keyboard(tracks: list[TrackMatch]) -> InlineKeyboardMarkup
     return InlineKeyboardMarkup(rows)
 
 
+def _build_youtube_keyboard(url: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("▶️ Смотреть на YouTube", url=url)],
+            [InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)],
+        ]
+    )
+
+
+def _build_youtube_collection_keyboard(videos: list[VideoMatch]) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    for index, video in enumerate(videos, start=1):
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=_shorten_button_text(f"{index}. {video.title}"),
+                    url=video.url,
+                )
+            ]
+        )
+
+    rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
+    return InlineKeyboardMarkup(rows)
+
+
 def _build_platform_order(primary_platform: str | None) -> tuple[str, ...]:
     if not primary_platform:
         return DEFAULT_PLATFORM_ORDER
@@ -495,6 +594,20 @@ def _record_matches_safely(tracks: list[TrackMatch], message: Message) -> None:
         )
     except Exception:
         LOGGER.exception("Could not update stats")
+
+
+def _record_videos_safely(videos: list[VideoMatch], message: Message) -> None:
+    if not videos:
+        return
+
+    try:
+        record_videos(
+            videos,
+            user=_build_user_stats_entry(message),
+            chat=_build_chat_stats_entry(message),
+        )
+    except Exception:
+        LOGGER.exception("Could not update video stats")
 
 
 def _build_user_prefix(message: Message) -> str:
@@ -593,3 +706,7 @@ async def _post_shutdown(application: Application) -> None:
     client: SonglinkClient | None = application.bot_data.get("songlink_client")
     if client is not None:
         await client.aclose()
+
+    youtube_client: YouTubeClient | None = application.bot_data.get("youtube_client")
+    if youtube_client is not None:
+        await youtube_client.aclose()

@@ -5,7 +5,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
-from music_links_bot.models import TrackMatch
+from music_links_bot.models import TrackMatch, VideoMatch
 
 STATS_PATH = Path("data/stats.json")
 SUPPORTED_KINDS = ("song", "album", "podcast")
@@ -26,7 +26,7 @@ def load_stats(path: Path = STATS_PATH) -> StatsData:
         return _empty_stats()
 
     stats = _empty_stats()
-    for key in ("posts", "song", "album", "podcast", "collections"):
+    for key in ("posts", "song", "album", "podcast", "videos", "collections"):
         value = raw_stats.get(key)
         if isinstance(value, int) and value >= 0:
             stats[key] = value
@@ -63,6 +63,31 @@ def record_matches(
         return stats
 
 
+def record_videos(
+    videos: list[VideoMatch],
+    path: Path = STATS_PATH,
+    *,
+    user: dict[str, object] | None = None,
+    chat: dict[str, object] | None = None,
+) -> StatsData:
+    with STATS_LOCK:
+        stats = load_stats(path)
+        stats["posts"] += 1
+        stats["videos"] += len(videos)
+
+        if len(videos) > 1:
+            stats["collections"] += 1
+
+        if user:
+            _record_counter(stats["users"], user)
+
+        if chat:
+            _record_counter(stats["chats"], chat)
+
+        _write_stats(path, stats)
+        return stats
+
+
 def format_stats_message(stats: StatsData, *, include_private: bool = False) -> str:
     lines = [
         "StonerHand stats\n\n"
@@ -70,6 +95,7 @@ def format_stats_message(stats: StatsData, *, include_private: bool = False) -> 
         f"треков: {stats.get('song', 0)}\n"
         f"альбомов: {stats.get('album', 0)}\n"
         f"подкастов: {stats.get('podcast', 0)}\n"
+        f"видео: {stats.get('videos', 0)}\n"
         f"подборок: {stats.get('collections', 0)}"
     ]
 
@@ -92,6 +118,7 @@ def _empty_stats() -> StatsData:
         "song": 0,
         "album": 0,
         "podcast": 0,
+        "videos": 0,
         "collections": 0,
         "users": {},
         "chats": {},

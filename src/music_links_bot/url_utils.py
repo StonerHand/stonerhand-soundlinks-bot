@@ -56,6 +56,28 @@ def strip_supported_urls(text: str | None) -> str:
     return stripped.strip(TRAILING_PUNCTUATION + " \n\t")
 
 
+def is_youtube_video_url(url: str) -> bool:
+    parsed = urlparse(url)
+    normalized_host = normalize_host(parsed.netloc)
+    if normalized_host == "music.youtube.com":
+        return False
+
+    if normalized_host == "youtu.be":
+        return bool([part for part in parsed.path.split("/") if part])
+
+    if normalized_host not in {"youtube.com", "m.youtube.com"}:
+        return False
+
+    parts = [part.lower() for part in parsed.path.split("/") if part]
+    if not parts:
+        return False
+
+    if parts[0] == "watch":
+        return bool(parse_qs(parsed.query).get("v"))
+
+    return parts[0] in {"shorts", "live", "embed"} and len(parts) >= 2
+
+
 def spotify_url_type(url: str) -> str | None:
     parsed = urlparse(url)
     if normalize_host(parsed.netloc) not in {"open.spotify.com", "spotify.com"}:

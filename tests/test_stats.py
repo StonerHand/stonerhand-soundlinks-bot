@@ -5,8 +5,13 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from music_links_bot.models import TrackMatch
-from music_links_bot.stats import format_stats_message, load_stats, record_matches
+from music_links_bot.models import TrackMatch, VideoMatch
+from music_links_bot.stats import (
+    format_stats_message,
+    load_stats,
+    record_matches,
+    record_videos,
+)
 
 
 class StatsTests(unittest.TestCase):
@@ -54,6 +59,27 @@ class StatsTests(unittest.TestCase):
         self.assertIn("постов обработано: 3", message)
         self.assertIn("альбомов: 1", message)
         self.assertIn("подкастов: 1", message)
+        self.assertIn("видео: 0", message)
+
+    def test_record_videos_counts_posts_and_video_items(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "stats.json"
+
+            stats = record_videos(
+                [
+                    VideoMatch(title="First", author="One", url="https://youtu.be/1"),
+                    VideoMatch(title="Second", author="Two", url="https://youtu.be/2"),
+                ],
+                path=path,
+                user={"id": 123, "label": "@viewer", "last_seen": "2026-04-23 16:00 UTC"},
+                chat={"id": 456, "label": "private", "last_seen": "2026-04-23 16:00 UTC"},
+            )
+
+            self.assertEqual(stats["posts"], 1)
+            self.assertEqual(stats["videos"], 2)
+            self.assertEqual(stats["collections"], 1)
+            self.assertEqual(stats["users"]["123"]["count"], 1)
+            self.assertEqual(load_stats(path), stats)
 
     def test_record_matches_counts_podcasts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -114,6 +140,7 @@ class StatsTests(unittest.TestCase):
             stats = load_stats(path)
 
             self.assertEqual(stats["posts"], 2)
+            self.assertEqual(stats["videos"], 0)
             self.assertEqual(stats["users"], {})
             self.assertEqual(stats["chats"], {})
 

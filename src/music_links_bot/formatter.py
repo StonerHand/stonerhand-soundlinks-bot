@@ -3,7 +3,7 @@ from __future__ import annotations
 from html import escape
 import hashlib
 
-from music_links_bot.models import TrackMatch
+from music_links_bot.models import TrackMatch, VideoMatch
 from music_links_bot.phrases import pick_phrase
 
 TRACK_EMOJIS = ("🎵", "🎧", "🎶", "🔊", "📻")
@@ -42,6 +42,31 @@ def format_track_message(track: TrackMatch) -> str:
         f"<i>{escape(pick_phrase(cta_key, seed))}</i>\n\n"
         f"{build_auto_hashtags(track)}"
     )
+
+
+def format_video_message(video: VideoMatch) -> str:
+    return (
+        f"📺 · <b>{escape(video.title)}</b>\n"
+        f"канал: {escape(video.author)}\n\n"
+        "<i>видео на месте, можно смотреть</i>\n\n"
+        "#stonerhand #video"
+    )
+
+
+def format_video_collection_message(videos: list[VideoMatch]) -> str:
+    lines = ["сегодня на экране:", ""]
+    for index, video in enumerate(videos, start=1):
+        lines.append(f"{index}. 📺 · <b>{escape(video.title)}</b>")
+
+    lines.extend(
+        [
+            "",
+            "<i>выбирай, что включить первым</i>",
+            "",
+            "#stonerhand #collection #video",
+        ]
+    )
+    return "\n".join(lines)
 
 
 def format_collection_message(tracks: list[TrackMatch]) -> str:

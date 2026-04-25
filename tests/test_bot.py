@@ -1,6 +1,7 @@
 import unittest
 from pathlib import Path
 import sys
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -11,18 +12,35 @@ from music_links_bot.bot import (
     _build_platform_order,
     _build_podcast_fallback,
     _lookup_tracks,
+    _lookup_youtube_videos,
     _message_text,
     _shorten_user_note,
     track_lookup_message,
 )
-from music_links_bot.models import TrackMatch
+from music_links_bot.models import TrackMatch, VideoMatch
 from music_links_bot.songlink import SonglinkError
+from music_links_bot.youtube import YouTubeLookupError
 
 
 class FailingLookupClient:
     async def lookup_track(self, source_url: str) -> TrackMatch:
         del source_url
         raise SonglinkError("service down")
+
+
+class YouTubeClientStub:
+    async def lookup_video(self, source_url: str) -> VideoMatch:
+        return VideoMatch(
+            title="SANSAE Live Session Vol.3 - Melon",
+            author="SANSAE",
+            url=source_url,
+        )
+
+
+class FailingYouTubeClientStub:
+    async def lookup_video(self, source_url: str) -> VideoMatch:
+        del source_url
+        raise YouTubeLookupError("metadata down")
 
 
 class BotStub:
@@ -34,12 +52,17 @@ class BotStub:
 
 
 class ContextStub:
-    def __init__(self) -> None:
+    def __init__(self, *, youtube_client: object | None = None) -> None:
         self.bot = BotStub()
         self.application = type(
             "ApplicationStub",
             (),
-            {"bot_data": {"admin_chat_id": 123}},
+            {
+                "bot_data": {
+                    "admin_chat_id": 123,
+                    "youtube_client": youtube_client or YouTubeClientStub(),
+                }
+            },
         )()
 
 
@@ -48,25 +71,57 @@ class ChannelMessageStub:
     caption = None
     chat_id = -1002903607636
     from_user = None
-    chat = type("ChatStub", (), {"type": "channel"})()
+    chat = type(
+        "ChatStub",
+        (),
+        {
+            "id": -1002903607636,
+            "type": "channel",
+            "title": "StonerHand",
+            "username": "stonerhand",
+        },
+    )()
 
     def __init__(self) -> None:
         self.replies: list[str] = []
+        self.reply_kwargs: list[dict[str, object]] = []
 
     async def reply_text(self, text: str, **kwargs: object) -> None:
-        del kwargs
         self.replies.append(text)
+        self.reply_kwargs.append(kwargs)
 
 
 class GroupMessageStub(ChannelMessageStub):
     chat_id = -100123
-    chat = type("ChatStub", (), {"type": "supergroup"})()
+    chat = type(
+        "ChatStub",
+        (),
+        {
+            "id": -100123,
+            "type": "supergroup",
+            "title": "Music chat",
+            "username": None,
+        },
+    )()
 
 
 class PrivateMessageStub(ChannelMessageStub):
     text = "привет"
     chat_id = 456
-    chat = type("ChatStub", (), {"type": "private"})()
+    chat = type(
+        "ChatStub",
+        (),
+        {
+            "id": 456,
+            "type": "private",
+            "title": None,
+            "username": None,
+        },
+    )()
+
+
+class PrivateYouTubeMessageStub(PrivateMessageStub):
+    text = "https://www.youtube.com/watch?v=abc123"
 
 
 class UpdateStub:
@@ -216,6 +271,31 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 1)
         self.assertIn("Пришлите ссылку из сервисов:", message.replies[0])
         self.assertEqual(context.bot.sent_messages, [])
+
+    async def test_youtube_video_links_use_video_post(self) -> None:
+        message = PrivateYouTubeMessageStub()
+        context = ContextStub()
+
+        with patch("music_links_bot.bot.record_videos") as record_videos:
+            await track_lookup_message(UpdateStub(message), context)
+
+        self.assertEqual(len(message.replies), 1)
+        self.assertIn("📺 · <b>SANSAE Live Session Vol.3 - Melon</b>", message.replies[0])
+        self.assertIn("канал: SANSAE", message.replies[0])
+        keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
+        self.assertEqual(keyboard[0][0].text, "▶️ Смотреть на YouTube")
+        self.assertEqual(keyboard[0][0].url, "https://www.youtube.com/watch?v=abc123")
+        record_videos.assert_called_once()
+
+    async def test_youtube_lookup_uses_fallback_when_metadata_fails(self) -> None:
+        videos = await _lookup_youtube_videos(
+            FailingYouTubeClientStub(),
+            ["https://youtu.be/abc123"],
+        )
+
+        self.assertEqual(len(videos), 1)
+        self.assertEqual(videos[0].title, "YouTube video")
+        self.assertEqual(videos[0].author, "YouTube")
 
     async def test_lookup_tracks_uses_podcast_fallback_when_songlink_is_down(self) -> None:
         tracks, unavailable_urls = await _lookup_tracks(

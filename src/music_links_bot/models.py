@@ -12,3 +12,10 @@ class TrackMatch:
     release_year: str | None = None
     kind: str = "song"
     release_format: str | None = None
+
+
+@dataclass(slots=True)
+class VideoMatch:
+    title: str
+    author: str
+    url: str

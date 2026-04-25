@@ -8,6 +8,7 @@ from music_links_bot.url_utils import (
     apple_podcasts_url_type,
     extract_supported_urls,
     is_supported_music_url,
+    is_youtube_video_url,
     spotify_url_type,
     strip_supported_urls,
 )
@@ -89,6 +90,17 @@ class UrlUtilsTests(unittest.TestCase):
 
     def test_apple_podcasts_url_type_ignores_other_hosts(self) -> None:
         self.assertIsNone(apple_podcasts_url_type("https://music.apple.com/us/album/abc"))
+
+    def test_is_youtube_video_url_detects_regular_video_links(self) -> None:
+        self.assertTrue(is_youtube_video_url("https://www.youtube.com/watch?v=abc"))
+        self.assertTrue(is_youtube_video_url("https://youtu.be/abc"))
+        self.assertTrue(is_youtube_video_url("https://youtube.com/shorts/abc"))
+        self.assertTrue(is_youtube_video_url("https://m.youtube.com/live/abc"))
+
+    def test_is_youtube_video_url_ignores_music_and_non_video_links(self) -> None:
+        self.assertFalse(is_youtube_video_url("https://music.youtube.com/watch?v=abc"))
+        self.assertFalse(is_youtube_video_url("https://www.youtube.com/@channel"))
+        self.assertFalse(is_youtube_video_url("https://example.com/watch?v=abc"))
 
 
 if __name__ == "__main__":

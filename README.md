@@ -2,7 +2,7 @@
 
 [Русская версия](README.ru.md)
 
-Telegram music-link bot built for [@stonerhand](https://t.me/stonerhand). Send a track, album, podcast or a pack of release links, and the bot turns them into a clean Telegram post with streaming buttons.
+Telegram music-link bot built for [@stonerhand](https://t.me/stonerhand). Send a track, album, podcast, YouTube video or a pack of release links, and the bot turns them into a clean Telegram post with buttons.
 
 It does not just return raw URLs. It formats every link as a small editorial card: artist, title, Telegram preview, StonerHand caption, hashtags and platform buttons. The bot copy is intentionally Russian, because it is tuned for the StonerHand channel voice.
 
@@ -14,6 +14,8 @@ It does not just return raw URLs. It formats every link as a small editorial car
 - Supports tracks, albums, EPs, singles, podcasts, podcast shows and multi-link collections
 - Uses direct platform buttons for a single release
 - Uses playlist-style posts for multiple links
+- Formats regular YouTube links as standalone video posts with a button and preview
+- Keeps `music.youtube.com` in the Song.link music lookup flow
 - Stays silent on regular group/channel posts when there is no supported music link
 - Selects Telegram preview by preferred platform
 - Replaces source messages in groups/channels when the bot has admin rights
@@ -53,6 +55,17 @@ Podcast:
 выпуск на месте, кнопки ниже
 
 #stonerhand #podcast
+```
+
+YouTube video:
+
+```text
+📺 · SANSAE Live Session Vol.3 - Melon
+канал: SANSAE
+
+видео на месте, можно смотреть
+
+#stonerhand #video
 ```
 
 Collection:
@@ -209,6 +222,7 @@ src/music_links_bot/
 ├── stats.py      local stats without message text or source links
 ├── url_utils.py  URL extraction and platform helpers
 ├── config.py     environment variables
+├── youtube.py    YouTube oEmbed metadata for video posts
 └── constants.py  platforms and aliases
 ```
 
@@ -220,6 +234,7 @@ src/music_links_bot/
 - Large link packs are limited to avoid Telegram limits
 - Stats are written atomically and protected from parallel writes
 - Regular posts, Instagram/TikTok/Pinterest and other non-music links in groups/channels are ignored without admin spam
+- YouTube video posts need no API key: title and channel are fetched through public oEmbed, with a safe fallback if metadata fails
 - Spotify and Apple Podcasts episode/show links fall back to a platform-only post if Song.link has no cross-platform match
 - Song.link outages, rate limits and temporary failures are handled separately from “release not found”
 

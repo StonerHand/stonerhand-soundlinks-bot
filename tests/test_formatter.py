@@ -7,10 +7,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from music_links_bot.formatter import (
     format_collection_message,
     format_track_message,
+    format_video_collection_message,
+    format_video_message,
     pick_track_emoji,
     prepend_user_text,
 )
-from music_links_bot.models import TrackMatch
+from music_links_bot.models import TrackMatch, VideoMatch
 from music_links_bot.phrases import pick_phrase
 
 
@@ -138,6 +140,36 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             prepend_user_text("<b>text</b>", author_label="@username"),
             "@username: &lt;b&gt;text&lt;/b&gt;\n\n",
+        )
+
+    def test_format_video_message_uses_youtube_style(self) -> None:
+        video = VideoMatch(
+            title="SANSAE Live Session Vol.3 - Melon",
+            author="SANSAE",
+            url="https://www.youtube.com/watch?v=abc",
+        )
+
+        self.assertEqual(
+            format_video_message(video),
+            "📺 · <b>SANSAE Live Session Vol.3 - Melon</b>\n"
+            "канал: SANSAE\n\n"
+            "<i>видео на месте, можно смотреть</i>\n\n"
+            "#stonerhand #video",
+        )
+
+    def test_format_video_collection_message_lists_videos(self) -> None:
+        videos = [
+            VideoMatch(title="First", author="One", url="https://youtu.be/1"),
+            VideoMatch(title="Second", author="Two", url="https://youtu.be/2"),
+        ]
+
+        self.assertEqual(
+            format_video_collection_message(videos),
+            "сегодня на экране:\n\n"
+            "1. 📺 · <b>First</b>\n"
+            "2. 📺 · <b>Second</b>\n\n"
+            "<i>выбирай, что включить первым</i>\n\n"
+            "#stonerhand #collection #video",
         )
 
 
