@@ -45,7 +45,8 @@ from music_links_bot.url_utils import (
 from music_links_bot.youtube import YouTubeClient, YouTubeLookupError
 
 LOGGER = logging.getLogger(__name__)
-CHANNEL_URL = "https://t.me/stonerhand"
+CHANNEL_USERNAME = "stonerhand"
+CHANNEL_URL = f"https://t.me/{CHANNEL_USERNAME}"
 MAX_BUTTON_TEXT_LENGTH = 64
 MAX_LINKS_PER_MESSAGE = 12
 MAX_USER_NOTE_LENGTH = 700
@@ -204,6 +205,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
     message_text = _message_text(message)
     source_urls = extract_supported_urls(message_text)[:MAX_LINKS_PER_MESSAGE]
     user_prefix = _build_user_prefix(message)
+    include_channel_button = _should_include_channel_button(message)
     if not source_urls:
         if message.chat.type != "private":
             return
@@ -221,7 +223,13 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
     if youtube_urls and len(youtube_urls) == len(source_urls):
         youtube_client: YouTubeClient = context.application.bot_data["youtube_client"]
         videos = await _lookup_youtube_videos(youtube_client, youtube_urls)
-        await _send_youtube_result(context.bot, message, videos, user_prefix=user_prefix)
+        await _send_youtube_result(
+            context.bot,
+            message,
+            videos,
+            user_prefix=user_prefix,
+            include_channel_button=include_channel_button,
+        )
         _record_videos_safely(videos, message)
         return
 
@@ -263,7 +271,11 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
             message,
             f"{user_prefix}{format_track_message(track)}",
             preview_url=_select_preview_url(track.links, context),
-            reply_markup=_build_link_keyboard(track.links, context=context),
+            reply_markup=_build_link_keyboard(
+                track.links,
+                context=context,
+                include_channel_button=include_channel_button,
+            ),
         )
         _record_matches_safely([track], message)
         return
@@ -273,7 +285,10 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         message,
         f"{user_prefix}{format_collection_message(tracks)}",
         preview_url=_select_preview_url(tracks[0].links, context),
-        reply_markup=_build_collection_keyboard(tracks),
+        reply_markup=_build_collection_keyboard(
+            tracks,
+            include_channel_button=include_channel_button,
+        ),
     )
     _record_matches_safely(tracks, message)
 
@@ -326,6 +341,7 @@ async def _send_youtube_result(
     videos: list[VideoMatch],
     *,
     user_prefix: str,
+    include_channel_button: bool,
 ) -> None:
     if not videos:
         return
@@ -337,7 +353,10 @@ async def _send_youtube_result(
             message,
             f"{user_prefix}{format_video_message(video)}",
             preview_url=video.url,
-            reply_markup=_build_youtube_keyboard(video.url),
+            reply_markup=_build_youtube_keyboard(
+                video.url,
+                include_channel_button=include_channel_button,
+            ),
             prefer_large_preview=True,
         )
         return
@@ -347,7 +366,10 @@ async def _send_youtube_result(
         message,
         f"{user_prefix}{format_video_collection_message(videos)}",
         preview_url=videos[0].url,
-        reply_markup=_build_youtube_collection_keyboard(videos),
+        reply_markup=_build_youtube_collection_keyboard(
+            videos,
+            include_channel_button=include_channel_button,
+        ),
         prefer_large_preview=True,
     )
 
@@ -518,6 +540,7 @@ def _build_link_keyboard(
     *,
     prefix: str = "",
     context: ContextTypes.DEFAULT_TYPE | None = None,
+    include_channel_button: bool = True,
 ) -> InlineKeyboardMarkup:
     platform_order = _get_platform_order(context)
     ordered_platforms = [
@@ -538,11 +561,17 @@ def _build_link_keyboard(
         for platform_key in [*ordered_platforms, *remaining_platforms]
     ]
     rows = [buttons[index : index + 2] for index in range(0, len(buttons), 2)]
-    rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
+    if include_channel_button:
+        rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
+
     return InlineKeyboardMarkup(rows)
 
 
-def _build_collection_keyboard(tracks: list[TrackMatch]) -> InlineKeyboardMarkup:
+def _build_collection_keyboard(
+    tracks: list[TrackMatch],
+    *,
+    include_channel_button: bool = True,
+) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
 
     for index, track in enumerate(tracks, start=1):
@@ -559,20 +588,29 @@ def _build_collection_keyboard(tracks: list[TrackMatch]) -> InlineKeyboardMarkup
             ]
         )
 
-    rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
+    if include_channel_button:
+        rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
+
     return InlineKeyboardMarkup(rows)
 
 
-def _build_youtube_keyboard(url: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        [
-            [InlineKeyboardButton("▶️ Смотреть на YouTube", url=url)],
-            [InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)],
-        ]
-    )
+def _build_youtube_keyboard(
+    url: str,
+    *,
+    include_channel_button: bool = True,
+) -> InlineKeyboardMarkup:
+    rows = [[InlineKeyboardButton("▶️ Смотреть на YouTube", url=url)]]
+    if include_channel_button:
+        rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
+
+    return InlineKeyboardMarkup(rows)
 
 
-def _build_youtube_collection_keyboard(videos: list[VideoMatch]) -> InlineKeyboardMarkup:
+def _build_youtube_collection_keyboard(
+    videos: list[VideoMatch],
+    *,
+    include_channel_button: bool = True,
+) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     for index, video in enumerate(videos, start=1):
         rows.append(
@@ -584,8 +622,19 @@ def _build_youtube_collection_keyboard(videos: list[VideoMatch]) -> InlineKeyboa
             ]
         )
 
-    rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
+    if include_channel_button:
+        rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
+
     return InlineKeyboardMarkup(rows)
+
+
+def _should_include_channel_button(message: Message) -> bool:
+    username = message.chat.username
+    return not (
+        message.chat.type == "channel"
+        and username is not None
+        and username.casefold() == CHANNEL_USERNAME
+    )
 
 
 def _build_platform_order(primary_platform: str | None) -> tuple[str, ...]:

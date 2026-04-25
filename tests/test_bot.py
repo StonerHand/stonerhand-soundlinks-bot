@@ -9,11 +9,14 @@ from music_links_bot.bot import (
     MAX_BUTTON_TEXT_LENGTH,
     MAX_USER_NOTE_LENGTH,
     _build_collection_keyboard,
+    _build_link_keyboard,
     _build_platform_order,
     _build_podcast_fallback,
+    _build_youtube_keyboard,
     _lookup_tracks,
     _lookup_youtube_videos,
     _message_text,
+    _should_include_channel_button,
     _shorten_user_note,
     track_lookup_message,
 )
@@ -154,6 +157,44 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[1][0].text, "2. Show Me The Body - Camp Orchestra")
         self.assertEqual(rows[1][0].url, "https://song.link/track-2")
         self.assertEqual(rows[2][0].text, "🪨 Открыть канал")
+
+    def test_release_keyboard_can_hide_channel_button(self) -> None:
+        keyboard = _build_link_keyboard(
+            {"spotify": "https://open.spotify.com/track/1"},
+            include_channel_button=False,
+        )
+
+        button_texts = [button.text for row in keyboard.inline_keyboard for button in row]
+        self.assertEqual(button_texts, ["Spotify"])
+
+    def test_collection_keyboard_can_hide_channel_button(self) -> None:
+        keyboard = _build_collection_keyboard(
+            [
+                TrackMatch(
+                    title="Transitions",
+                    artist="Youth Code",
+                    links={"spotify": "https://open.spotify.com/track/1"},
+                    page_url="https://song.link/track-1",
+                )
+            ],
+            include_channel_button=False,
+        )
+
+        button_texts = [button.text for row in keyboard.inline_keyboard for button in row]
+        self.assertEqual(button_texts, ["1. Youth Code - Transitions"])
+
+    def test_youtube_keyboard_can_hide_channel_button(self) -> None:
+        keyboard = _build_youtube_keyboard(
+            "https://www.youtube.com/watch?v=abc",
+            include_channel_button=False,
+        )
+
+        button_texts = [button.text for row in keyboard.inline_keyboard for button in row]
+        self.assertEqual(button_texts, ["▶️ Смотреть на YouTube"])
+
+    def test_channel_button_is_hidden_only_in_stonerhand_channel(self) -> None:
+        self.assertFalse(_should_include_channel_button(ChannelMessageStub()))
+        self.assertTrue(_should_include_channel_button(GroupMessageStub()))
 
     def test_build_platform_order_moves_primary_platform_first(self) -> None:
         order = _build_platform_order("yandexMusic")

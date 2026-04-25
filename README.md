@@ -20,6 +20,7 @@ It does not just return raw URLs. It formats every link as a small editorial car
 - Stays silent on regular group/channel posts when there is no supported music link
 - Selects Telegram preview by preferred platform
 - Replaces source messages in groups/channels when the bot has admin rights
+- Hides the `🪨 Открыть канал` self-link when posting directly inside `@stonerhand`
 - Adds smart hashtags: `#track`, `#album`, `#collection`, `#single`, `#ep`, `#podcast`, `#show`
 - Includes public stats and private admin stats via `/stats`
 - Does not store message text or source links in stats
