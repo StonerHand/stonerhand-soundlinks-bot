@@ -331,6 +331,7 @@ async def _send_youtube_result(
             f"{user_prefix}{format_video_message(video)}",
             preview_url=video.url,
             reply_markup=_build_youtube_keyboard(video.url),
+            prefer_large_preview=True,
         )
         return
 
@@ -340,6 +341,7 @@ async def _send_youtube_result(
         f"{user_prefix}{format_video_collection_message(videos)}",
         preview_url=videos[0].url,
         reply_markup=_build_youtube_collection_keyboard(videos),
+        prefer_large_preview=True,
     )
 
 
@@ -440,18 +442,28 @@ async def _send_track_result(
     *,
     preview_url: str | None,
     reply_markup: InlineKeyboardMarkup | None,
+    prefer_large_preview: bool = False,
 ) -> None:
     if message.chat.type in {"group", "supergroup", "channel"} and await _try_delete_message(message):
         await bot.send_message(
             chat_id=message.chat_id,
             text=text,
             parse_mode=ParseMode.HTML,
-            link_preview_options=_build_link_preview_options(preview_url),
+            link_preview_options=_build_link_preview_options(
+                preview_url,
+                prefer_large_media=prefer_large_preview,
+            ),
             reply_markup=reply_markup,
         )
         return
 
-    await _reply_with_track(message, text, preview_url=preview_url, reply_markup=reply_markup)
+    await _reply_with_track(
+        message,
+        text,
+        preview_url=preview_url,
+        reply_markup=reply_markup,
+        prefer_large_preview=prefer_large_preview,
+    )
 
 
 async def _reply_with_track(
@@ -460,24 +472,37 @@ async def _reply_with_track(
     *,
     preview_url: str | None,
     reply_markup: InlineKeyboardMarkup | None,
+    prefer_large_preview: bool = False,
 ) -> Message:
     return await message.reply_text(
         text=text,
         parse_mode=ParseMode.HTML,
-        link_preview_options=_build_link_preview_options(preview_url),
+        link_preview_options=_build_link_preview_options(
+            preview_url,
+            prefer_large_media=prefer_large_preview,
+        ),
         reply_markup=reply_markup,
     )
 
 
-def _build_link_preview_options(preview_url: str | None) -> LinkPreviewOptions:
+def _build_link_preview_options(
+    preview_url: str | None,
+    *,
+    prefer_large_media: bool = False,
+) -> LinkPreviewOptions:
     if not preview_url:
         return LinkPreviewOptions(is_disabled=True)
 
+    media_preferences = (
+        {"prefer_large_media": True}
+        if prefer_large_media
+        else {"prefer_small_media": True}
+    )
     return LinkPreviewOptions(
         is_disabled=False,
         url=preview_url,
-        prefer_small_media=True,
         show_above_text=False,
+        **media_preferences,
     )
 
 

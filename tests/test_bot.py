@@ -283,8 +283,11 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("📺 · <b>SANSAE Live Session Vol.3 - Melon</b>", message.replies[0])
         self.assertIn("канал: SANSAE", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
+        preview_options = message.reply_kwargs[0]["link_preview_options"]
         self.assertEqual(keyboard[0][0].text, "▶️ Смотреть на YouTube")
         self.assertEqual(keyboard[0][0].url, "https://www.youtube.com/watch?v=abc123")
+        self.assertTrue(preview_options.prefer_large_media)
+        self.assertFalse(preview_options.prefer_small_media)
         record_videos.assert_called_once()
 
     async def test_youtube_lookup_uses_fallback_when_metadata_fails(self) -> None:
