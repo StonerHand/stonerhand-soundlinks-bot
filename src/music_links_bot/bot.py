@@ -193,13 +193,9 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
     source_urls = extract_supported_urls(message_text)[:MAX_LINKS_PER_MESSAGE]
     user_prefix = _build_user_prefix(message)
     if not source_urls:
-        await _notify_admin(
-            context,
-            f"Не распознал ссылку в чате {message.chat_id}: {message_text or ''}",
-            only_for_channel_message=message,
-        )
         if message.chat.type == "channel":
             return
+
         no_url_text = pick_phrase("no_url", message_text or str(message.chat_id))
         await message.reply_text(
             f"{no_url_text}\n\n"

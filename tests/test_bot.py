@@ -13,6 +13,7 @@ from music_links_bot.bot import (
     _lookup_tracks,
     _message_text,
     _shorten_user_note,
+    track_lookup_message,
 )
 from music_links_bot.models import TrackMatch
 from music_links_bot.songlink import SonglinkError
@@ -22,6 +23,44 @@ class FailingLookupClient:
     async def lookup_track(self, source_url: str) -> TrackMatch:
         del source_url
         raise SonglinkError("service down")
+
+
+class BotStub:
+    def __init__(self) -> None:
+        self.sent_messages: list[dict[str, object]] = []
+
+    async def send_message(self, **kwargs: object) -> None:
+        self.sent_messages.append(kwargs)
+
+
+class ContextStub:
+    def __init__(self) -> None:
+        self.bot = BotStub()
+        self.application = type(
+            "ApplicationStub",
+            (),
+            {"bot_data": {"admin_chat_id": 123}},
+        )()
+
+
+class ChannelMessageStub:
+    text = "https://www.instagram.com/sansaetown"
+    caption = None
+    chat_id = -1002903607636
+    from_user = None
+    chat = type("ChatStub", (), {"type": "channel"})()
+
+    def __init__(self) -> None:
+        self.replies: list[str] = []
+
+    async def reply_text(self, text: str, **kwargs: object) -> None:
+        del kwargs
+        self.replies.append(text)
+
+
+class UpdateStub:
+    def __init__(self, message: ChannelMessageStub) -> None:
+        self.effective_message = message
 
 
 class BotKeyboardTests(unittest.TestCase):
@@ -139,6 +178,15 @@ class BotKeyboardTests(unittest.TestCase):
 
 
 class BotLookupTests(unittest.IsolatedAsyncioTestCase):
+    async def test_channel_posts_without_supported_urls_do_not_notify_admin(self) -> None:
+        message = ChannelMessageStub()
+        context = ContextStub()
+
+        await track_lookup_message(UpdateStub(message), context)
+
+        self.assertEqual(message.replies, [])
+        self.assertEqual(context.bot.sent_messages, [])
+
     async def test_lookup_tracks_uses_podcast_fallback_when_songlink_is_down(self) -> None:
         tracks, unavailable_urls = await _lookup_tracks(
             FailingLookupClient(),
