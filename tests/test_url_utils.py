@@ -17,6 +17,7 @@ from music_links_bot.url_utils import (
 class UrlUtilsTests(unittest.TestCase):
     def test_is_supported_music_url_accepts_supported_hosts(self) -> None:
         self.assertTrue(is_supported_music_url("https://open.spotify.com/track/123"))
+        self.assertTrue(is_supported_music_url("https://open.spotify.com:443/track/123"))
         self.assertTrue(is_supported_music_url("https://podcasts.apple.com/us/podcast/apple-events/id1473854035"))
         self.assertTrue(is_supported_music_url("https://music.youtube.com/watch?v=abc"))
         self.assertTrue(is_supported_music_url("https://www.youtube.com/watch?v=abc"))

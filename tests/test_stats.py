@@ -10,6 +10,7 @@ from music_links_bot.stats import (
     format_stats_message,
     load_stats,
     record_matches,
+    record_mixed,
     record_videos,
 )
 
@@ -79,6 +80,22 @@ class StatsTests(unittest.TestCase):
             self.assertEqual(stats["videos"], 2)
             self.assertEqual(stats["collections"], 1)
             self.assertEqual(stats["users"]["123"]["count"], 1)
+            self.assertEqual(load_stats(path), stats)
+
+    def test_record_mixed_counts_one_post_with_music_and_video(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "stats.json"
+
+            stats = record_mixed(
+                [TrackMatch(title="Song", artist="Artist", links={}, kind="song")],
+                [VideoMatch(title="Live", author="Channel", url="https://youtu.be/1")],
+                path=path,
+            )
+
+            self.assertEqual(stats["posts"], 1)
+            self.assertEqual(stats["song"], 1)
+            self.assertEqual(stats["videos"], 1)
+            self.assertEqual(stats["collections"], 1)
             self.assertEqual(load_stats(path), stats)
 
     def test_record_matches_counts_podcasts(self) -> None:

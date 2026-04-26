@@ -69,6 +69,43 @@ def format_video_collection_message(videos: list[VideoMatch]) -> str:
     return "\n".join(lines)
 
 
+def format_mixed_collection_message(
+    tracks: list[TrackMatch],
+    videos: list[VideoMatch],
+) -> str:
+    seed = "|".join(
+        [
+            *(f"{track.artist}:{track.title}:{track.kind}" for track in tracks),
+            *(f"{video.author}:{video.title}:video" for video in videos),
+        ]
+    )
+    lines = [
+        pick_phrase("collection_intro", seed),
+        "",
+    ]
+
+    index = 1
+    for track in tracks:
+        emoji = pick_track_emoji(track)
+        lines.append(f"{index}. {emoji} · {format_track_heading(track)}")
+        index += 1
+
+    for video in videos:
+        lines.append(f"{index}. 📺 · <b>{escape(video.title)}</b>")
+        index += 1
+
+    lines.extend(
+        [
+            "",
+            f"<i>{escape(pick_phrase('collection_cta', seed))}</i>",
+            "",
+            build_mixed_collection_hashtags(tracks),
+        ]
+    )
+
+    return "\n".join(lines)
+
+
 def format_collection_message(tracks: list[TrackMatch]) -> str:
     seed = "|".join(f"{track.artist}:{track.title}:{track.kind}" for track in tracks)
     lines = [
@@ -123,6 +160,14 @@ def build_auto_hashtags(track: TrackMatch) -> str:
     hashtags.append("#track")
     if track.release_format == "single":
         hashtags.append("#single")
+
+    return " ".join(hashtags)
+
+
+def build_mixed_collection_hashtags(tracks: list[TrackMatch]) -> str:
+    hashtags = build_collection_hashtags(tracks).split()
+    if "#video" not in hashtags:
+        hashtags.append("#video")
 
     return " ".join(hashtags)
 

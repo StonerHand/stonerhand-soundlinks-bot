@@ -11,6 +11,7 @@ from music_links_bot.bot import (
     _build_collection_keyboard,
     _build_intro_keyboard,
     _build_link_keyboard,
+    _build_mixed_collection_keyboard,
     _build_platform_order,
     _build_podcast_fallback,
     _build_youtube_keyboard,
@@ -30,6 +31,16 @@ class FailingLookupClient:
     async def lookup_track(self, source_url: str) -> TrackMatch:
         del source_url
         raise SonglinkError("service down")
+
+
+class SuccessfulLookupClient:
+    async def lookup_track(self, source_url: str) -> TrackMatch:
+        return TrackMatch(
+            title="Transitions",
+            artist="Youth Code",
+            links={"spotify": "https://open.spotify.com/track/1"},
+            page_url="https://song.link/transitions",
+        )
 
 
 class YouTubeClientStub:
@@ -56,7 +67,12 @@ class BotStub:
 
 
 class ContextStub:
-    def __init__(self, *, youtube_client: object | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        songlink_client: object | None = None,
+        youtube_client: object | None = None,
+    ) -> None:
         self.bot = BotStub()
         self.application = type(
             "ApplicationStub",
@@ -64,6 +80,7 @@ class ContextStub:
             {
                 "bot_data": {
                     "admin_chat_id": 123,
+                    "songlink_client": songlink_client or SuccessfulLookupClient(),
                     "youtube_client": youtube_client or YouTubeClientStub(),
                 }
             },
@@ -126,6 +143,14 @@ class PrivateMessageStub(ChannelMessageStub):
 
 class PrivateYouTubeMessageStub(PrivateMessageStub):
     text = "https://www.youtube.com/watch?v=abc123"
+
+
+class PrivateMixedMessageStub(PrivateMessageStub):
+    text = (
+        "вечерний набор "
+        "https://open.spotify.com/track/abc "
+        "https://www.youtube.com/watch?v=abc123"
+    )
 
 
 class UpdateStub:
@@ -192,6 +217,25 @@ class BotKeyboardTests(unittest.TestCase):
 
         button_texts = [button.text for row in keyboard.inline_keyboard for button in row]
         self.assertEqual(button_texts, ["▶️ Смотреть на YouTube"])
+
+    def test_mixed_collection_keyboard_lists_music_and_video_buttons(self) -> None:
+        keyboard = _build_mixed_collection_keyboard(
+            [
+                TrackMatch(
+                    title="Transitions",
+                    artist="Youth Code",
+                    links={"spotify": "https://open.spotify.com/track/1"},
+                    page_url="https://song.link/transitions",
+                )
+            ],
+            [VideoMatch(title="Live Session", author="Channel", url="https://youtu.be/1")],
+        )
+
+        rows = keyboard.inline_keyboard
+        self.assertEqual(rows[0][0].text, "1. Youth Code - Transitions")
+        self.assertEqual(rows[0][0].url, "https://song.link/transitions")
+        self.assertEqual(rows[1][0].text, "2. Live Session")
+        self.assertEqual(rows[1][0].url, "https://youtu.be/1")
 
     def test_channel_button_is_hidden_only_in_stonerhand_channel(self) -> None:
         self.assertFalse(_should_include_channel_button(ChannelMessageStub()))
@@ -339,6 +383,22 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(preview_options.prefer_large_media)
         self.assertFalse(preview_options.prefer_small_media)
         record_videos.assert_called_once()
+
+    async def test_mixed_music_and_youtube_links_use_collection_post(self) -> None:
+        message = PrivateMixedMessageStub()
+        context = ContextStub()
+
+        with patch("music_links_bot.bot.record_mixed") as record_mixed:
+            await track_lookup_message(UpdateStub(message), context)
+
+        self.assertEqual(len(message.replies), 1)
+        self.assertTrue(message.replies[0].startswith("вечерний набор\n\n"))
+        self.assertIn("<b>Youth Code</b> - Transitions", message.replies[0])
+        self.assertIn("📺 · <b>SANSAE Live Session Vol.3 - Melon</b>", message.replies[0])
+        keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
+        self.assertEqual(keyboard[0][0].text, "1. Youth Code - Transitions")
+        self.assertEqual(keyboard[1][0].text, "2. SANSAE Live Session Vol.3 - Melon")
+        record_mixed.assert_called_once()
 
     async def test_youtube_lookup_uses_fallback_when_metadata_fails(self) -> None:
         videos = await _lookup_youtube_videos(

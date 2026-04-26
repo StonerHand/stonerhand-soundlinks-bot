@@ -43,24 +43,7 @@ def record_matches(
     user: dict[str, object] | None = None,
     chat: dict[str, object] | None = None,
 ) -> StatsData:
-    with STATS_LOCK:
-        stats = load_stats(path)
-        stats["posts"] += 1
-
-        if len(matches) > 1:
-            stats["collections"] += 1
-
-        for match in matches:
-            stats[match.kind if match.kind in SUPPORTED_KINDS else "song"] += 1
-
-        if user:
-            _record_counter(stats["users"], user)
-
-        if chat:
-            _record_counter(stats["chats"], chat)
-
-        _write_stats(path, stats)
-        return stats
+    return _record_activity(path, matches=matches, video_count=0, user=user, chat=chat)
 
 
 def record_videos(
@@ -70,13 +53,50 @@ def record_videos(
     user: dict[str, object] | None = None,
     chat: dict[str, object] | None = None,
 ) -> StatsData:
+    return _record_activity(
+        path,
+        matches=[],
+        video_count=len(videos),
+        user=user,
+        chat=chat,
+    )
+
+
+def record_mixed(
+    matches: list[TrackMatch],
+    videos: list[VideoMatch],
+    path: Path = STATS_PATH,
+    *,
+    user: dict[str, object] | None = None,
+    chat: dict[str, object] | None = None,
+) -> StatsData:
+    return _record_activity(
+        path,
+        matches=matches,
+        video_count=len(videos),
+        user=user,
+        chat=chat,
+    )
+
+
+def _record_activity(
+    path: Path,
+    *,
+    matches: list[TrackMatch],
+    video_count: int,
+    user: dict[str, object] | None,
+    chat: dict[str, object] | None,
+) -> StatsData:
     with STATS_LOCK:
         stats = load_stats(path)
         stats["posts"] += 1
-        stats["videos"] += len(videos)
+        stats["videos"] += video_count
 
-        if len(videos) > 1:
+        if len(matches) + video_count > 1:
             stats["collections"] += 1
+
+        for match in matches:
+            stats[match.kind if match.kind in SUPPORTED_KINDS else "song"] += 1
 
         if user:
             _record_counter(stats["users"], user)

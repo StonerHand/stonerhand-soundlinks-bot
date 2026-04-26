@@ -15,8 +15,8 @@ def clean_url_token(token: str) -> str:
     return token.rstrip(TRAILING_PUNCTUATION)
 
 
-def normalize_host(host: str) -> str:
-    return host.lower().removeprefix("www.")
+def normalize_host(host: str | None) -> str:
+    return (host or "").lower().removeprefix("www.")
 
 
 def is_supported_music_url(url: str) -> bool:
@@ -24,7 +24,7 @@ def is_supported_music_url(url: str) -> bool:
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         return False
 
-    normalized = normalize_host(parsed.netloc)
+    normalized = normalize_host(parsed.hostname)
 
     if normalized == YOUTUBE_MUSIC_HOST:
         return True
@@ -69,7 +69,7 @@ def strip_supported_urls(text: str | None) -> str:
 
 def is_youtube_video_url(url: str) -> bool:
     parsed = urlparse(url)
-    normalized_host = normalize_host(parsed.netloc)
+    normalized_host = normalize_host(parsed.hostname)
     if normalized_host == YOUTUBE_MUSIC_HOST:
         return False
 
@@ -91,7 +91,7 @@ def is_youtube_video_url(url: str) -> bool:
 
 def spotify_url_type(url: str) -> str | None:
     parsed = urlparse(url)
-    if normalize_host(parsed.netloc) not in {"open.spotify.com", "spotify.com"}:
+    if normalize_host(parsed.hostname) not in {"open.spotify.com", "spotify.com"}:
         return None
 
     parts = [part for part in parsed.path.split("/") if part]
@@ -103,7 +103,7 @@ def spotify_url_type(url: str) -> str | None:
 
 def apple_podcasts_url_type(url: str) -> str | None:
     parsed = urlparse(url)
-    if normalize_host(parsed.netloc) != "podcasts.apple.com":
+    if normalize_host(parsed.hostname) != "podcasts.apple.com":
         return None
 
     parts = [part for part in parsed.path.split("/") if part]

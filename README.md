@@ -11,9 +11,9 @@ It does not just return raw URLs. It formats every link as a small editorial car
 - Resolves releases through Song.link / Odesli
 - Accepts Spotify, Apple Music, Apple Podcasts, YouTube / YouTube Music, Deezer, Tidal, Yandex Music, SoundCloud and podcast links
 - Reads links from regular messages and media captions
-- Supports tracks, albums, EPs, singles, podcasts, podcast shows and multi-link collections
+- Supports tracks, albums, EPs, singles, podcasts, podcast shows, YouTube videos and multi-link collections
 - Uses direct platform buttons for a single release
-- Uses playlist-style posts for multiple links
+- Uses playlist-style posts for multiple music links or mixed music + YouTube links
 - Formats regular YouTube links as standalone video posts with a button and preview
 - Treats only real YouTube video URLs as video posts: `watch`, `youtu.be`, `shorts`, `live` and `embed`
 - Keeps `music.youtube.com` in the Song.link music lookup flow
@@ -86,6 +86,21 @@ Collection:
 #stonerhand #collection #track #album
 ```
 
+Mixed collection:
+
+```text
+@username: вечерний набор
+
+сегодня в подборке:
+
+1. 📻 · Youth Code - Transitions
+2. 📺 · SANSAE Live Session Vol.3 - Melon
+
+выбирай с чего начать
+
+#stonerhand #collection #track #video
+```
+
 Single-release buttons:
 
 ```text
@@ -104,6 +119,8 @@ Collection buttons:
 3. The Soft Moon - Criminal
 🪨 Открыть канал
 ```
+
+Inside `@stonerhand`, the self-link button is hidden automatically.
 
 ## Commands
 
@@ -231,9 +248,11 @@ src/music_links_bot/
 ## Reliability
 
 - Multiple links are resolved in parallel
+- Mixed music + YouTube packs are resolved in parallel and published as one collection post
 - Multiple Song.link countries are checked in parallel
 - Long user notes are trimmed before posting
 - Large link packs are limited to avoid Telegram limits
+- URL hosts are normalized through parsed hostnames, so common variants like explicit ports do not break detection
 - Stats are written atomically and protected from parallel writes
 - Regular posts, Instagram/TikTok/Pinterest and other non-music links in groups/channels are ignored without admin spam
 - YouTube video posts need no API key: title and channel are fetched through public oEmbed, with a safe fallback if metadata fails

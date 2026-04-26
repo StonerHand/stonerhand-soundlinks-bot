@@ -6,6 +6,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from music_links_bot.formatter import (
     format_collection_message,
+    format_mixed_collection_message,
     format_track_message,
     format_video_collection_message,
     format_video_message,
@@ -171,6 +172,20 @@ class FormatterTests(unittest.TestCase):
             "<i>выбирай, что включить первым</i>\n\n"
             "#stonerhand #collection #video",
         )
+
+    def test_format_mixed_collection_message_lists_tracks_and_videos(self) -> None:
+        tracks = [
+            TrackMatch(title="Song", artist="Artist", links={}),
+        ]
+        videos = [
+            VideoMatch(title="Live", author="Channel", url="https://youtu.be/1"),
+        ]
+
+        message = format_mixed_collection_message(tracks, videos)
+
+        self.assertIn(f"1. {pick_track_emoji(tracks[0])} · <b>Artist</b> - Song", message)
+        self.assertIn("2. 📺 · <b>Live</b>", message)
+        self.assertIn("#stonerhand #collection #track #video", message)
 
 
 if __name__ == "__main__":

@@ -21,6 +21,7 @@ from music_links_bot.config import Settings
 from music_links_bot.constants import INPUT_PLATFORM_HINT, PLATFORM_LABELS
 from music_links_bot.formatter import (
     format_collection_message,
+    format_mixed_collection_message,
     format_track_message,
     format_video_collection_message,
     format_video_message,
@@ -33,6 +34,7 @@ from music_links_bot.stats import (
     format_stats_message,
     load_stats,
     record_matches,
+    record_mixed,
     record_videos,
 )
 from music_links_bot.url_utils import (
@@ -217,10 +219,9 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return
 
-    youtube_urls = [
-        source_url for source_url in source_urls if is_youtube_video_url(source_url)
-    ]
-    if youtube_urls and len(youtube_urls) == len(source_urls):
+    youtube_urls, music_urls = _split_source_urls(source_urls)
+
+    if youtube_urls and not music_urls:
         youtube_client: YouTubeClient = context.application.bot_data["youtube_client"]
         videos = await _lookup_youtube_videos(youtube_client, youtube_urls)
         await _send_youtube_result(
@@ -233,8 +234,49 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         _record_videos_safely(videos, message)
         return
 
+    if youtube_urls:
+        client: SonglinkClient = context.application.bot_data["songlink_client"]
+        youtube_client: YouTubeClient = context.application.bot_data["youtube_client"]
+        videos, lookup_result = await asyncio.gather(
+            _lookup_youtube_videos(youtube_client, youtube_urls),
+            _lookup_tracks(client, music_urls),
+        )
+        tracks, unavailable_urls = lookup_result
+        tracks = [track for track in tracks if track.links]
+
+        if unavailable_urls:
+            await _notify_admin(
+                context,
+                "Song.link недоступен при обработке: " + ", ".join(unavailable_urls),
+                only_for_channel_message=message,
+            )
+
+        if tracks and videos:
+            await _send_mixed_result(
+                context.bot,
+                message,
+                tracks,
+                videos,
+                user_prefix=user_prefix,
+                include_channel_button=include_channel_button,
+                context=context,
+            )
+            _record_mixed_safely(tracks, videos, message)
+            return
+
+        if videos:
+            await _send_youtube_result(
+                context.bot,
+                message,
+                videos,
+                user_prefix=user_prefix,
+                include_channel_button=include_channel_button,
+            )
+            _record_videos_safely(videos, message)
+            return
+
     client: SonglinkClient = context.application.bot_data["songlink_client"]
-    tracks, unavailable_urls = await _lookup_tracks(client, source_urls)
+    tracks, unavailable_urls = await _lookup_tracks(client, music_urls)
 
     if unavailable_urls and not tracks:
         await _notify_admin(
@@ -306,6 +348,19 @@ def _select_preview_url(
     return None
 
 
+def _split_source_urls(source_urls: list[str]) -> tuple[list[str], list[str]]:
+    youtube_urls: list[str] = []
+    music_urls: list[str] = []
+
+    for source_url in source_urls:
+        if is_youtube_video_url(source_url):
+            youtube_urls.append(source_url)
+        else:
+            music_urls.append(source_url)
+
+    return youtube_urls, music_urls
+
+
 async def _lookup_youtube_videos(
     client: YouTubeClient,
     source_urls: list[str],
@@ -371,6 +426,30 @@ async def _send_youtube_result(
             include_channel_button=include_channel_button,
         ),
         prefer_large_preview=True,
+    )
+
+
+async def _send_mixed_result(
+    bot: Bot,
+    message: Message,
+    tracks: list[TrackMatch],
+    videos: list[VideoMatch],
+    *,
+    user_prefix: str,
+    include_channel_button: bool,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> None:
+    await _send_track_result(
+        bot,
+        message,
+        f"{user_prefix}{format_mixed_collection_message(tracks, videos)}",
+        preview_url=_select_preview_url(tracks[0].links, context) or videos[0].url,
+        reply_markup=_build_mixed_collection_keyboard(
+            tracks,
+            videos,
+            include_channel_button=include_channel_button,
+        ),
+        prefer_large_preview=False,
     )
 
 
@@ -628,6 +707,47 @@ def _build_youtube_collection_keyboard(
     return InlineKeyboardMarkup(rows)
 
 
+def _build_mixed_collection_keyboard(
+    tracks: list[TrackMatch],
+    videos: list[VideoMatch],
+    *,
+    include_channel_button: bool = True,
+) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    index = 1
+
+    for track in tracks:
+        destination = track.page_url or _select_preview_url(track.links)
+        if not destination:
+            continue
+
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=_shorten_button_text(f"{index}. {track.artist} - {track.title}"),
+                    url=destination,
+                )
+            ]
+        )
+        index += 1
+
+    for video in videos:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=_shorten_button_text(f"{index}. {video.title}"),
+                    url=video.url,
+                )
+            ]
+        )
+        index += 1
+
+    if include_channel_button:
+        rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
+
+    return InlineKeyboardMarkup(rows)
+
+
 def _should_include_channel_button(message: Message) -> bool:
     username = message.chat.username
     return not (
@@ -689,6 +809,22 @@ def _record_videos_safely(videos: list[VideoMatch], message: Message) -> None:
         )
     except Exception:
         LOGGER.exception("Could not update video stats")
+
+
+def _record_mixed_safely(
+    tracks: list[TrackMatch],
+    videos: list[VideoMatch],
+    message: Message,
+) -> None:
+    try:
+        record_mixed(
+            tracks,
+            videos,
+            user=_build_user_stats_entry(message),
+            chat=_build_chat_stats_entry(message),
+        )
+    except Exception:
+        LOGGER.exception("Could not update mixed stats")
 
 
 def _build_user_prefix(message: Message) -> str:
