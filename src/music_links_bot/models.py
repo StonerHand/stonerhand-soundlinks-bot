@@ -19,3 +19,10 @@ class VideoMatch:
     title: str
     author: str
     url: str
+
+
+@dataclass(slots=True)
+class PlaylistMatch:
+    title: str
+    platform: str
+    url: str

@@ -2,7 +2,7 @@
 
 [English version](README.md)
 
-Telegram-бот для музыкального канала [@stonerhand](https://t.me/stonerhand). Кидаешь ссылку на трек, альбом, подкаст, YouTube-видео или несколько релизов сразу, а бот собирает аккуратный пост с кнопками.
+Telegram-бот для музыкального канала [@stonerhand](https://t.me/stonerhand). Кидаешь ссылку на трек, альбом, подкаст, Spotify-плейлист, YouTube-видео или несколько релизов сразу, а бот собирает аккуратный пост с кнопками.
 
 Он не просто возвращает голые URL. Он превращает ссылку в маленькую редакторскую карточку: название, исполнитель, превью, фирменная фраза, хэштеги и кнопки.
 
@@ -11,9 +11,10 @@ Telegram-бот для музыкального канала [@stonerhand](https
 - Ищет релизы через Song.link / Odesli
 - Принимает Spotify, Apple Music, Apple Podcasts, YouTube / YouTube Music, Deezer, Tidal, Yandex Music, SoundCloud и podcast-ссылки
 - Видит ссылки в обычных сообщениях и caption-подписях к медиа
-- Поддерживает треки, альбомы, EP, singles, подкасты, podcast shows, YouTube-видео и подборки из нескольких ссылок
+- Поддерживает треки, альбомы, EP, singles, подкасты, podcast shows, Spotify-плейлисты, YouTube-видео и подборки из нескольких ссылок
 - Делает прямые кнопки для одиночного релиза
-- Делает playlist-style пост для нескольких музыкальных ссылок или смешанных пачек музыка + YouTube
+- Делает пост-подборку для нескольких музыкальных ссылок или смешанных пачек музыка + YouTube
+- Оформляет Spotify-плейлисты отдельным постом с прямой кнопкой `▶️ Открыть плейлист`
 - Оформляет обычные YouTube-ссылки как отдельные видео-посты с кнопкой и preview
 - Обрабатывает как YouTube-видео только реальные видео-ссылки: `watch`, `youtu.be`, `shorts`, `live` и `embed`
 - Оставляет `music.youtube.com` в музыкальном поиске через Song.link
@@ -22,7 +23,7 @@ Telegram-бот для музыкального канала [@stonerhand](https
 - Умеет удалять исходное сообщение в группе/канале и заменять его оформленным постом, если бот админ
 - Скрывает кнопку `🪨 Открыть канал`, когда постит прямо внутри `@stonerhand`
 - Добавляет автохэштеги: `#track`, `#album`, `#collection`, `#single`, `#ep`, `#podcast`, `#show`
-- Показывает статистику через `/stats`
+- Показывает статистику через `/stats`, включая счетчик плейлистов
 - Не хранит тексты сообщений и исходные ссылки в статистике
 
 ## Как выглядит
@@ -70,6 +71,17 @@ YouTube-видео:
 #stonerhand #video
 ```
 
+Spotify-плейлист:
+
+```text
+🎛 · Women of Punk
+платформа: Spotify
+
+плейлист на месте, можно нырять
+
+#stonerhand #playlist
+```
+
 Подборка:
 
 ```text
@@ -108,6 +120,13 @@ Spotify
 Apple
 YouTube
 Yandex
+🪨 Открыть канал
+```
+
+Кнопки у Spotify-плейлиста:
+
+```text
+▶️ Открыть плейлист
 🪨 Открыть канал
 ```
 
@@ -237,6 +256,7 @@ src/music_links_bot/
 ├── bot.py        Telegram handlers, keyboards, group/channel replacement
 ├── songlink.py   Song.link client and release normalization
 ├── formatter.py  StonerHand post style, hashtags, captions
+├── playlist.py   Spotify playlist metadata через oEmbed
 ├── phrases.py    30 вариантов фраз для разных действий
 ├── stats.py      local stats without message text or source links
 ├── url_utils.py  URL extraction and platform helpers
@@ -257,6 +277,7 @@ src/music_links_bot/
 - Обычные посты, Instagram/TikTok/Pinterest и другие не-музыкальные ссылки в группах/каналах игнорируются без админ-спама
 - YouTube-видео не требуют API-ключа: название и канал берутся через публичный oEmbed, а при сбое бот использует безопасный fallback
 - YouTube-каналы и профили игнорируются, поэтому обычный `youtube.com/@channel` не запускает музыкальный поиск
+- Spotify-плейлисты не отправляются в Song.link: бот берет метаданные через Spotify oEmbed и безопасно откатывается к запасному названию
 - Spotify и Apple Podcasts episode/show не падают ошибкой, даже если Song.link не нашел кросс-платформенный матч
 - Ошибки Song.link, rate limit и временная недоступность отделены от ситуации “релиз не найден”
 

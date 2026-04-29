@@ -3,7 +3,7 @@ from __future__ import annotations
 from html import escape
 import hashlib
 
-from music_links_bot.models import TrackMatch, VideoMatch
+from music_links_bot.models import PlaylistMatch, TrackMatch, VideoMatch
 from music_links_bot.phrases import pick_phrase
 
 TRACK_EMOJIS = ("🎵", "🎧", "🎶", "🔊", "📻")
@@ -53,6 +53,31 @@ def format_video_message(video: VideoMatch) -> str:
     )
 
 
+def format_playlist_message(playlist: PlaylistMatch) -> str:
+    return (
+        f"🎛 · <b>{escape(playlist.title)}</b>\n"
+        f"платформа: {escape(playlist.platform)}\n\n"
+        "<i>плейлист на месте, можно нырять</i>\n\n"
+        "#stonerhand #playlist"
+    )
+
+
+def format_playlist_collection_message(playlists: list[PlaylistMatch]) -> str:
+    lines = ["сегодня в плейлистах:", ""]
+    for index, playlist in enumerate(playlists, start=1):
+        lines.append(f"{index}. 🎛 · <b>{escape(playlist.title)}</b>")
+
+    lines.extend(
+        [
+            "",
+            "<i>выбирай, с какой пачки начать</i>",
+            "",
+            "#stonerhand #collection #playlist",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def format_video_collection_message(videos: list[VideoMatch]) -> str:
     lines = ["сегодня на экране:", ""]
     for index, video in enumerate(videos, start=1):
@@ -72,10 +97,13 @@ def format_video_collection_message(videos: list[VideoMatch]) -> str:
 def format_mixed_collection_message(
     tracks: list[TrackMatch],
     videos: list[VideoMatch],
+    playlists: list[PlaylistMatch] | None = None,
 ) -> str:
+    playlists = playlists or []
     seed = "|".join(
         [
             *(f"{track.artist}:{track.title}:{track.kind}" for track in tracks),
+            *(f"{playlist.platform}:{playlist.title}:playlist" for playlist in playlists),
             *(f"{video.author}:{video.title}:video" for video in videos),
         ]
     )
@@ -90,6 +118,10 @@ def format_mixed_collection_message(
         lines.append(f"{index}. {emoji} · {format_track_heading(track)}")
         index += 1
 
+    for playlist in playlists:
+        lines.append(f"{index}. 🎛 · <b>{escape(playlist.title)}</b>")
+        index += 1
+
     for video in videos:
         lines.append(f"{index}. 📺 · <b>{escape(video.title)}</b>")
         index += 1
@@ -99,7 +131,11 @@ def format_mixed_collection_message(
             "",
             f"<i>{escape(pick_phrase('collection_cta', seed))}</i>",
             "",
-            build_mixed_collection_hashtags(tracks),
+            build_mixed_collection_hashtags(
+                tracks,
+                has_playlists=bool(playlists),
+                has_videos=bool(videos),
+            ),
         ]
     )
 
@@ -164,9 +200,17 @@ def build_auto_hashtags(track: TrackMatch) -> str:
     return " ".join(hashtags)
 
 
-def build_mixed_collection_hashtags(tracks: list[TrackMatch]) -> str:
+def build_mixed_collection_hashtags(
+    tracks: list[TrackMatch],
+    *,
+    has_playlists: bool = False,
+    has_videos: bool = True,
+) -> str:
     hashtags = build_collection_hashtags(tracks).split()
-    if "#video" not in hashtags:
+    if has_playlists and "#playlist" not in hashtags:
+        hashtags.append("#playlist")
+
+    if has_videos and "#video" not in hashtags:
         hashtags.append("#video")
 
     return " ".join(hashtags)

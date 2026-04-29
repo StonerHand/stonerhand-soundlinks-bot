@@ -12,17 +12,21 @@ from music_links_bot.bot import (
     _build_intro_keyboard,
     _build_link_keyboard,
     _build_mixed_collection_keyboard,
+    _build_playlist_keyboard,
     _build_platform_order,
     _build_podcast_fallback,
     _build_youtube_keyboard,
+    _lookup_playlists,
     _lookup_tracks,
     _lookup_youtube_videos,
     _message_text,
     _should_include_channel_button,
+    _split_source_urls,
     _shorten_user_note,
     track_lookup_message,
 )
-from music_links_bot.models import TrackMatch, VideoMatch
+from music_links_bot.models import PlaylistMatch, TrackMatch, VideoMatch
+from music_links_bot.playlist import PlaylistLookupError
 from music_links_bot.songlink import SonglinkError
 from music_links_bot.youtube import YouTubeLookupError
 
@@ -58,6 +62,21 @@ class FailingYouTubeClientStub:
         raise YouTubeLookupError("metadata down")
 
 
+class PlaylistClientStub:
+    async def lookup_playlist(self, source_url: str) -> PlaylistMatch:
+        return PlaylistMatch(
+            title="Women of Punk",
+            platform="Spotify",
+            url=source_url,
+        )
+
+
+class FailingPlaylistClientStub:
+    async def lookup_playlist(self, source_url: str) -> PlaylistMatch:
+        del source_url
+        raise PlaylistLookupError("metadata down")
+
+
 class BotStub:
     def __init__(self) -> None:
         self.sent_messages: list[dict[str, object]] = []
@@ -72,6 +91,7 @@ class ContextStub:
         *,
         songlink_client: object | None = None,
         youtube_client: object | None = None,
+        playlist_client: object | None = None,
     ) -> None:
         self.bot = BotStub()
         self.application = type(
@@ -82,6 +102,7 @@ class ContextStub:
                     "admin_chat_id": 123,
                     "songlink_client": songlink_client or SuccessfulLookupClient(),
                     "youtube_client": youtube_client or YouTubeClientStub(),
+                    "playlist_client": playlist_client or PlaylistClientStub(),
                 }
             },
         )()
@@ -145,10 +166,22 @@ class PrivateYouTubeMessageStub(PrivateMessageStub):
     text = "https://www.youtube.com/watch?v=abc123"
 
 
+class PrivateSpotifyPlaylistMessageStub(PrivateMessageStub):
+    text = "https://open.spotify.com/playlist/37i9dQZF1DX51TD2wakW3K?si=123"
+
+
 class PrivateMixedMessageStub(PrivateMessageStub):
     text = (
         "вечерний набор "
         "https://open.spotify.com/track/abc "
+        "https://www.youtube.com/watch?v=abc123"
+    )
+
+
+class PrivateMixedPlaylistMessageStub(PrivateMessageStub):
+    text = (
+        "пачка ссылок "
+        "https://open.spotify.com/playlist/37i9dQZF1DX51TD2wakW3K "
         "https://www.youtube.com/watch?v=abc123"
     )
 
@@ -218,6 +251,15 @@ class BotKeyboardTests(unittest.TestCase):
         button_texts = [button.text for row in keyboard.inline_keyboard for button in row]
         self.assertEqual(button_texts, ["▶️ Смотреть на YouTube"])
 
+    def test_playlist_keyboard_can_hide_channel_button(self) -> None:
+        keyboard = _build_playlist_keyboard(
+            "https://open.spotify.com/playlist/abc",
+            include_channel_button=False,
+        )
+
+        button_texts = [button.text for row in keyboard.inline_keyboard for button in row]
+        self.assertEqual(button_texts, ["▶️ Открыть плейлист"])
+
     def test_mixed_collection_keyboard_lists_music_and_video_buttons(self) -> None:
         keyboard = _build_mixed_collection_keyboard(
             [
@@ -254,6 +296,19 @@ class BotKeyboardTests(unittest.TestCase):
 
         self.assertEqual(order[0], "yandexMusic")
         self.assertIn("spotify", order)
+
+    def test_split_source_urls_separates_playlists_from_music_and_youtube(self) -> None:
+        playlist_urls, youtube_urls, music_urls = _split_source_urls(
+            [
+                "https://open.spotify.com/playlist/abc",
+                "https://youtu.be/video",
+                "https://open.spotify.com/track/123",
+            ]
+        )
+
+        self.assertEqual(playlist_urls, ["https://open.spotify.com/playlist/abc"])
+        self.assertEqual(youtube_urls, ["https://youtu.be/video"])
+        self.assertEqual(music_urls, ["https://open.spotify.com/track/123"])
 
     def test_collection_keyboard_shortens_long_button_text(self) -> None:
         keyboard = _build_collection_keyboard(
@@ -384,6 +439,24 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(preview_options.prefer_small_media)
         record_videos.assert_called_once()
 
+    async def test_spotify_playlist_links_use_playlist_post(self) -> None:
+        message = PrivateSpotifyPlaylistMessageStub()
+        context = ContextStub()
+
+        with patch("music_links_bot.bot.record_playlists") as record_playlists:
+            await track_lookup_message(UpdateStub(message), context)
+
+        self.assertEqual(len(message.replies), 1)
+        self.assertIn("🎛 · <b>Women of Punk</b>", message.replies[0])
+        self.assertIn("#stonerhand #playlist", message.replies[0])
+        keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
+        self.assertEqual(keyboard[0][0].text, "▶️ Открыть плейлист")
+        self.assertEqual(
+            keyboard[0][0].url,
+            "https://open.spotify.com/playlist/37i9dQZF1DX51TD2wakW3K?si=123",
+        )
+        record_playlists.assert_called_once()
+
     async def test_mixed_music_and_youtube_links_use_collection_post(self) -> None:
         message = PrivateMixedMessageStub()
         context = ContextStub()
@@ -400,6 +473,23 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(keyboard[1][0].text, "2. SANSAE Live Session Vol.3 - Melon")
         record_mixed.assert_called_once()
 
+    async def test_mixed_playlist_and_youtube_links_keep_both_items(self) -> None:
+        message = PrivateMixedPlaylistMessageStub()
+        context = ContextStub()
+
+        with patch("music_links_bot.bot.record_mixed") as record_mixed:
+            await track_lookup_message(UpdateStub(message), context)
+
+        self.assertEqual(len(message.replies), 1)
+        self.assertTrue(message.replies[0].startswith("пачка ссылок\n\n"))
+        self.assertIn("🎛 · <b>Women of Punk</b>", message.replies[0])
+        self.assertIn("📺 · <b>SANSAE Live Session Vol.3 - Melon</b>", message.replies[0])
+        self.assertIn("#playlist #video", message.replies[0])
+        keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
+        self.assertEqual(keyboard[0][0].text, "1. Women of Punk")
+        self.assertEqual(keyboard[1][0].text, "2. SANSAE Live Session Vol.3 - Melon")
+        record_mixed.assert_called_once()
+
     async def test_youtube_lookup_uses_fallback_when_metadata_fails(self) -> None:
         videos = await _lookup_youtube_videos(
             FailingYouTubeClientStub(),
@@ -409,6 +499,16 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(videos), 1)
         self.assertEqual(videos[0].title, "YouTube video")
         self.assertEqual(videos[0].author, "YouTube")
+
+    async def test_playlist_lookup_uses_fallback_when_metadata_fails(self) -> None:
+        playlists = await _lookup_playlists(
+            FailingPlaylistClientStub(),
+            ["https://open.spotify.com/playlist/abc"],
+        )
+
+        self.assertEqual(len(playlists), 1)
+        self.assertEqual(playlists[0].title, "Spotify playlist")
+        self.assertEqual(playlists[0].platform, "Spotify")
 
     async def test_lookup_tracks_uses_podcast_fallback_when_songlink_is_down(self) -> None:
         tracks, unavailable_urls = await _lookup_tracks(

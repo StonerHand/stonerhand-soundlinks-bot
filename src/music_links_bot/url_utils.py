@@ -101,6 +101,10 @@ def spotify_url_type(url: str) -> str | None:
     return parts[0].lower()
 
 
+def is_spotify_playlist_url(url: str) -> bool:
+    return spotify_url_type(url) == "playlist"
+
+
 def apple_podcasts_url_type(url: str) -> str | None:
     parsed = urlparse(url)
     if normalize_host(parsed.hostname) != "podcasts.apple.com":

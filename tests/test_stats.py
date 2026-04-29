@@ -5,12 +5,13 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from music_links_bot.models import TrackMatch, VideoMatch
+from music_links_bot.models import PlaylistMatch, TrackMatch, VideoMatch
 from music_links_bot.stats import (
     format_stats_message,
     load_stats,
     record_matches,
     record_mixed,
+    record_playlists,
     record_videos,
 )
 
@@ -61,6 +62,7 @@ class StatsTests(unittest.TestCase):
         self.assertIn("альбомов: 1", message)
         self.assertIn("подкастов: 1", message)
         self.assertIn("видео: 0", message)
+        self.assertIn("плейлистов: 0", message)
 
     def test_record_videos_counts_posts_and_video_items(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -96,6 +98,48 @@ class StatsTests(unittest.TestCase):
             self.assertEqual(stats["song"], 1)
             self.assertEqual(stats["videos"], 1)
             self.assertEqual(stats["collections"], 1)
+            self.assertEqual(load_stats(path), stats)
+
+    def test_record_mixed_counts_playlists_inside_collections(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "stats.json"
+
+            stats = record_mixed(
+                [],
+                [VideoMatch(title="Live", author="Channel", url="https://youtu.be/1")],
+                [
+                    PlaylistMatch(
+                        title="Women of Punk",
+                        platform="Spotify",
+                        url="https://open.spotify.com/playlist/1",
+                    )
+                ],
+                path=path,
+            )
+
+            self.assertEqual(stats["posts"], 1)
+            self.assertEqual(stats["videos"], 1)
+            self.assertEqual(stats["playlists"], 1)
+            self.assertEqual(stats["collections"], 1)
+
+    def test_record_playlists_counts_posts_and_playlist_items(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "stats.json"
+
+            stats = record_playlists(
+                [
+                    PlaylistMatch(
+                        title="Women of Punk",
+                        platform="Spotify",
+                        url="https://open.spotify.com/playlist/1",
+                    )
+                ],
+                path=path,
+            )
+
+            self.assertEqual(stats["posts"], 1)
+            self.assertEqual(stats["playlists"], 1)
+            self.assertEqual(stats["collections"], 0)
             self.assertEqual(load_stats(path), stats)
 
     def test_record_matches_counts_podcasts(self) -> None:
@@ -158,6 +202,7 @@ class StatsTests(unittest.TestCase):
 
             self.assertEqual(stats["posts"], 2)
             self.assertEqual(stats["videos"], 0)
+            self.assertEqual(stats["playlists"], 0)
             self.assertEqual(stats["users"], {})
             self.assertEqual(stats["chats"], {})
 

@@ -2,7 +2,7 @@
 
 [Русская версия](README.ru.md)
 
-Telegram music-link bot built for [@stonerhand](https://t.me/stonerhand). Send a track, album, podcast, YouTube video or a pack of release links, and the bot turns them into a clean Telegram post with buttons.
+Telegram music-link bot built for [@stonerhand](https://t.me/stonerhand). Send a track, album, podcast, Spotify playlist, YouTube video or a pack of release links, and the bot turns them into a clean Telegram post with buttons.
 
 It does not just return raw URLs. It formats every link as a small editorial card: artist, title, Telegram preview, StonerHand caption, hashtags and platform buttons. The bot copy is intentionally Russian, because it is tuned for the StonerHand channel voice.
 
@@ -11,9 +11,10 @@ It does not just return raw URLs. It formats every link as a small editorial car
 - Resolves releases through Song.link / Odesli
 - Accepts Spotify, Apple Music, Apple Podcasts, YouTube / YouTube Music, Deezer, Tidal, Yandex Music, SoundCloud and podcast links
 - Reads links from regular messages and media captions
-- Supports tracks, albums, EPs, singles, podcasts, podcast shows, YouTube videos and multi-link collections
+- Supports tracks, albums, EPs, singles, podcasts, podcast shows, Spotify playlists, YouTube videos and multi-link collections
 - Uses direct platform buttons for a single release
 - Uses playlist-style posts for multiple music links or mixed music + YouTube links
+- Formats Spotify playlists as dedicated playlist posts with a direct `▶️ Открыть плейлист` button
 - Formats regular YouTube links as standalone video posts with a button and preview
 - Treats only real YouTube video URLs as video posts: `watch`, `youtu.be`, `shorts`, `live` and `embed`
 - Keeps `music.youtube.com` in the Song.link music lookup flow
@@ -22,7 +23,7 @@ It does not just return raw URLs. It formats every link as a small editorial car
 - Replaces source messages in groups/channels when the bot has admin rights
 - Hides the `🪨 Открыть канал` self-link when posting directly inside `@stonerhand`
 - Adds smart hashtags: `#track`, `#album`, `#collection`, `#single`, `#ep`, `#podcast`, `#show`
-- Includes public stats and private admin stats via `/stats`
+- Includes public stats and private admin stats via `/stats`, including playlist counts
 - Does not store message text or source links in stats
 
 ## Post Style
@@ -70,6 +71,17 @@ YouTube video:
 #stonerhand #video
 ```
 
+Spotify playlist:
+
+```text
+🎛 · Women of Punk
+платформа: Spotify
+
+плейлист на месте, можно нырять
+
+#stonerhand #playlist
+```
+
 Collection:
 
 ```text
@@ -108,6 +120,13 @@ Spotify
 Apple
 YouTube
 Yandex
+🪨 Открыть канал
+```
+
+Spotify playlist buttons:
+
+```text
+▶️ Открыть плейлист
 🪨 Открыть канал
 ```
 
@@ -237,6 +256,7 @@ src/music_links_bot/
 ├── bot.py        Telegram handlers, keyboards, group/channel replacement
 ├── songlink.py   Song.link client and release normalization
 ├── formatter.py  StonerHand post style, hashtags, captions
+├── playlist.py   Spotify playlist metadata through oEmbed
 ├── phrases.py    30 phrase variants per action
 ├── stats.py      local stats without message text or source links
 ├── url_utils.py  URL extraction and platform helpers
@@ -257,6 +277,7 @@ src/music_links_bot/
 - Regular posts, Instagram/TikTok/Pinterest and other non-music links in groups/channels are ignored without admin spam
 - YouTube video posts need no API key: title and channel are fetched through public oEmbed, with a safe fallback if metadata fails
 - YouTube channel/profile links are ignored, so a regular `youtube.com/@channel` post will not trigger music lookup
+- Spotify playlists do not go through Song.link; they use Spotify oEmbed metadata and fall back to a safe generic playlist title
 - Spotify and Apple Podcasts episode/show links fall back to a platform-only post if Song.link has no cross-platform match
 - Song.link outages, rate limits and temporary failures are handled separately from “release not found”
 

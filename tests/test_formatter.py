@@ -7,13 +7,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from music_links_bot.formatter import (
     format_collection_message,
     format_mixed_collection_message,
+    format_playlist_collection_message,
+    format_playlist_message,
     format_track_message,
     format_video_collection_message,
     format_video_message,
     pick_track_emoji,
     prepend_user_text,
 )
-from music_links_bot.models import TrackMatch, VideoMatch
+from music_links_bot.models import PlaylistMatch, TrackMatch, VideoMatch
 from music_links_bot.phrases import pick_phrase
 
 
@@ -158,6 +160,36 @@ class FormatterTests(unittest.TestCase):
             "#stonerhand #video",
         )
 
+    def test_format_playlist_message_uses_playlist_style(self) -> None:
+        playlist = PlaylistMatch(
+            title="Women of Punk",
+            platform="Spotify",
+            url="https://open.spotify.com/playlist/abc",
+        )
+
+        self.assertEqual(
+            format_playlist_message(playlist),
+            "🎛 · <b>Women of Punk</b>\n"
+            "платформа: Spotify\n\n"
+            "<i>плейлист на месте, можно нырять</i>\n\n"
+            "#stonerhand #playlist",
+        )
+
+    def test_format_playlist_collection_message_lists_playlists(self) -> None:
+        playlists = [
+            PlaylistMatch(title="Women of Punk", platform="Spotify", url="https://open.spotify.com/playlist/1"),
+            PlaylistMatch(title="Dark Wave", platform="Spotify", url="https://open.spotify.com/playlist/2"),
+        ]
+
+        self.assertEqual(
+            format_playlist_collection_message(playlists),
+            "сегодня в плейлистах:\n\n"
+            "1. 🎛 · <b>Women of Punk</b>\n"
+            "2. 🎛 · <b>Dark Wave</b>\n\n"
+            "<i>выбирай, с какой пачки начать</i>\n\n"
+            "#stonerhand #collection #playlist",
+        )
+
     def test_format_video_collection_message_lists_videos(self) -> None:
         videos = [
             VideoMatch(title="First", author="One", url="https://youtu.be/1"),
@@ -186,6 +218,24 @@ class FormatterTests(unittest.TestCase):
         self.assertIn(f"1. {pick_track_emoji(tracks[0])} · <b>Artist</b> - Song", message)
         self.assertIn("2. 📺 · <b>Live</b>", message)
         self.assertIn("#stonerhand #collection #track #video", message)
+
+    def test_format_mixed_collection_message_lists_playlists(self) -> None:
+        playlists = [
+            PlaylistMatch(
+                title="Women of Punk",
+                platform="Spotify",
+                url="https://open.spotify.com/playlist/1",
+            )
+        ]
+        videos = [
+            VideoMatch(title="Live", author="Channel", url="https://youtu.be/1"),
+        ]
+
+        message = format_mixed_collection_message([], videos, playlists)
+
+        self.assertIn("1. 🎛 · <b>Women of Punk</b>", message)
+        self.assertIn("2. 📺 · <b>Live</b>", message)
+        self.assertIn("#stonerhand #collection #playlist #video", message)
 
 
 if __name__ == "__main__":
