@@ -136,13 +136,13 @@ class FormatterTests(unittest.TestCase):
     def test_prepend_user_text_formats_username_prefix(self) -> None:
         self.assertEqual(
             prepend_user_text("Твой текст", author_label="@username"),
-            "@username: Твой текст\n\n",
+            "<blockquote>@username: Твой текст</blockquote>\n\n",
         )
 
     def test_prepend_user_text_escapes_html(self) -> None:
         self.assertEqual(
             prepend_user_text("<b>text</b>", author_label="@username"),
-            "@username: &lt;b&gt;text&lt;/b&gt;\n\n",
+            "<blockquote>@username: &lt;b&gt;text&lt;/b&gt;</blockquote>\n\n",
         )
 
     def test_format_video_message_uses_youtube_style(self) -> None:

@@ -171,9 +171,9 @@ def prepend_user_text(message_text: str, *, author_label: str | None = None) -> 
         return ""
 
     if author_label:
-        return f"{escape(author_label)}: {escape(header)}\n\n"
+        return f"<blockquote>{escape(author_label)}: {escape(header)}</blockquote>\n\n"
 
-    return f"{escape(header)}\n\n"
+    return f"<blockquote>{escape(header)}</blockquote>\n\n"
 
 
 def build_auto_hashtags(track: TrackMatch) -> str:

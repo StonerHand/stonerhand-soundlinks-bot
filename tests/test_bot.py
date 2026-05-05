@@ -465,7 +465,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertTrue(message.replies[0].startswith("вечерний набор\n\n"))
+        self.assertTrue(message.replies[0].startswith("<blockquote>вечерний набор</blockquote>\n\n"))
         self.assertIn("<b>Youth Code</b> - Transitions", message.replies[0])
         self.assertIn("📺 · <b>SANSAE Live Session Vol.3 - Melon</b>", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
@@ -481,7 +481,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertTrue(message.replies[0].startswith("пачка ссылок\n\n"))
+        self.assertTrue(message.replies[0].startswith("<blockquote>пачка ссылок</blockquote>\n\n"))
         self.assertIn("🎛 · <b>Women of Punk</b>", message.replies[0])
         self.assertIn("📺 · <b>SANSAE Live Session Vol.3 - Melon</b>", message.replies[0])
         self.assertIn("#playlist #video", message.replies[0])
