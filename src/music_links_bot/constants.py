@@ -22,13 +22,13 @@ SUPPORTED_INPUT_HOSTS = {
 }
 
 PLATFORM_LABELS = {
-    "spotify": "Spotify",
-    "appleMusic": "Apple Music",
-    "applePodcasts": "Apple Podcasts",
-    "youtubeMusic": "YouTube Music",
-    "deezer": "Deezer",
-    "tidal": "Tidal",
-    "yandexMusic": "Yandex Music",
+    "spotify": "🟢 Spotify",
+    "appleMusic": "🍎 Apple Music",
+    "applePodcasts": "🎙 Podcasts",
+    "youtubeMusic": "▶️ YouTube Music",
+    "deezer": "🟦 Deezer",
+    "tidal": "🌊 Tidal",
+    "yandexMusic": "🟡 Yandex Music",
 }
 
 PLATFORM_ALIASES = {

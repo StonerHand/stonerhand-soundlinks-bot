@@ -30,7 +30,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            f"{pick_track_emoji(track)} · <b>Artist</b> - Song\n\n"
+            f"{pick_track_emoji(track)} · <b>Artist</b>\nSong\n\n"
             f"<i>{pick_phrase('track_cta', 'Artist:Song:song')}</i>\n\n#stonerhand #track",
         )
 
@@ -43,7 +43,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            f"{pick_track_emoji(track)} · <b>Artist</b> - Song\n\n"
+            f"{pick_track_emoji(track)} · <b>Artist</b>\nSong\n\n"
             f"<i>{pick_phrase('track_cta', 'Artist:Song:song')}</i>\n\n#stonerhand #track",
         )
 

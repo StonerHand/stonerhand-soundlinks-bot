@@ -37,7 +37,7 @@ def format_release_heading(track: TrackMatch) -> str:
         label = "шоу" if track.release_format == "show" else "выпуск"
         return f"🎙️ · <b>{escape(track.artist)}</b>\n{label}: {escape(track.title)}"
 
-    return f"{pick_track_emoji(track)} · {format_track_heading(track)}"
+    return f"{pick_track_emoji(track)} · <b>{escape(track.artist)}</b>\n{escape(track.title)}"
 
 
 def format_track_message(track: TrackMatch) -> str:

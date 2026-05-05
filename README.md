@@ -36,7 +36,8 @@ Single track:
 quote:
 @username: немного тревоги на вечер
 
-📻 · Youth Code - Transitions
+📻 · Youth Code
+Transitions
 
 ссылки готовы, звук рядом
 
@@ -123,10 +124,10 @@ quote:
 Single-release buttons:
 
 ```text
-Spotify
-Apple Music
-YouTube Music
-Yandex Music
+🟢 Spotify
+🍎 Apple Music
+▶️ YouTube Music
+🟡 Yandex Music
 🪨 Открыть канал
 ```
 

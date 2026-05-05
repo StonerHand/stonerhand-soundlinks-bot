@@ -225,7 +225,7 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         button_texts = [button.text for row in keyboard.inline_keyboard for button in row]
-        self.assertEqual(button_texts, ["Spotify"])
+        self.assertEqual(button_texts, ["🟢 Spotify"])
 
     def test_collection_keyboard_can_hide_channel_button(self) -> None:
         keyboard = _build_collection_keyboard(

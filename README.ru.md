@@ -36,7 +36,8 @@ Telegram-бот для музыкального канала [@stonerhand](https
 цитата:
 @username: немного тревоги на вечер
 
-📻 · Youth Code - Transitions
+📻 · Youth Code
+Transitions
 
 ссылки готовы, звук рядом
 
@@ -123,10 +124,10 @@ Spotify-плейлист:
 Кнопки у одиночного релиза:
 
 ```text
-Spotify
-Apple Music
-YouTube Music
-Yandex Music
+🟢 Spotify
+🍎 Apple Music
+▶️ YouTube Music
+🟡 Yandex Music
 🪨 Открыть канал
 ```
 
