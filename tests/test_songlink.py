@@ -17,9 +17,11 @@ class FakeSonglinkClient(SonglinkClient):
     def __init__(self, outcomes: dict[str, TrackMatch | Exception]) -> None:
         super().__init__(user_countries=tuple(outcomes))
         self._outcomes = outcomes
+        self.calls = 0
 
     async def _lookup_track_for_country(self, source_url: str, user_country: str) -> TrackMatch:
         del source_url
+        self.calls += 1
         outcome = self._outcomes[user_country]
         if isinstance(outcome, Exception):
             raise outcome
@@ -149,6 +151,27 @@ class SonglinkClientAsyncTests(unittest.IsolatedAsyncioTestCase):
                 "spotify": "https://spotify.example",
             },
         )
+
+    async def test_lookup_track_reuses_cached_result(self) -> None:
+        client = FakeSonglinkClient(
+            {
+                "US": TrackMatch(
+                    title="Song",
+                    artist="Artist",
+                    links={"spotify": "https://spotify.example"},
+                    kind="song",
+                ),
+            }
+        )
+
+        try:
+            first = await client.lookup_track("https://open.spotify.com/track/1")
+            second = await client.lookup_track("https://open.spotify.com/track/1")
+        finally:
+            await client.aclose()
+
+        self.assertIs(first, second)
+        self.assertEqual(client.calls, 1)
 
     async def test_lookup_track_prefers_service_error_when_all_countries_fail(self) -> None:
         client = FakeSonglinkClient(

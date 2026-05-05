@@ -283,7 +283,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
                 return
             await message.reply_text(
                 f"{pick_phrase('not_found', ','.join(source_urls))}.\n"
-                "Проверьте, что это ссылка именно на трек, альбом или подкаст"
+                "Проверьте, что это ссылка именно на трек, альбом, подкаст или плейлист"
             )
             return
 
@@ -366,7 +366,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
             return
         await message.reply_text(
             f"{pick_phrase('not_found', ','.join(source_urls))}.\n"
-            "Проверьте, что это ссылка именно на трек, альбом или подкаст"
+            "Проверьте, что это ссылка именно на трек, альбом, подкаст или плейлист"
         )
         return
 

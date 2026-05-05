@@ -11,6 +11,7 @@ It does not just return raw URLs. It formats every link as a small editorial car
 - Resolves releases through Song.link / Odesli
 - Accepts Spotify, Apple Music, Apple Podcasts, YouTube / YouTube Music, Deezer, Tidal, Yandex Music, SoundCloud and podcast links
 - Reads links from regular messages and media captions
+- Turns user-written notes above a link into Telegram quote blocks
 - Supports tracks, albums, EPs, singles, podcasts, podcast shows, Spotify playlists, YouTube videos and multi-link collections
 - Uses direct platform buttons for a single release
 - Uses playlist-style posts for multiple music links or mixed music + YouTube links
@@ -31,6 +32,7 @@ It does not just return raw URLs. It formats every link as a small editorial car
 Single track:
 
 ```text
+quote:
 @username: немного тревоги на вечер
 
 📻 · Youth Code - Transitions
@@ -85,6 +87,7 @@ Spotify playlist:
 Collection:
 
 ```text
+quote:
 @username: пять вещей на вечер
 
 сегодня в подборке:
@@ -101,6 +104,7 @@ Collection:
 Mixed collection:
 
 ```text
+quote:
 @username: вечерний набор
 
 сегодня в подборке:
@@ -254,6 +258,7 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 ```text
 src/music_links_bot/
 ├── bot.py        Telegram handlers, keyboards, group/channel replacement
+├── cache.py      small TTL cache for repeated external lookups
 ├── songlink.py   Song.link client and release normalization
 ├── formatter.py  StonerHand post style, hashtags, captions
 ├── playlist.py   Spotify playlist metadata through oEmbed
@@ -270,6 +275,7 @@ src/music_links_bot/
 - Multiple links are resolved in parallel
 - Mixed music + YouTube packs are resolved in parallel and published as one collection post
 - Multiple Song.link countries are checked in parallel
+- Repeated Song.link, YouTube oEmbed and Spotify playlist lookups are cached in memory
 - Long user notes are trimmed before posting
 - Large link packs are limited to avoid Telegram limits
 - URL hosts are normalized through parsed hostnames, so common variants like explicit ports do not break detection

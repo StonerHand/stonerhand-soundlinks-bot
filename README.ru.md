@@ -11,6 +11,7 @@ Telegram-бот для музыкального канала [@stonerhand](https
 - Ищет релизы через Song.link / Odesli
 - Принимает Spotify, Apple Music, Apple Podcasts, YouTube / YouTube Music, Deezer, Tidal, Yandex Music, SoundCloud и podcast-ссылки
 - Видит ссылки в обычных сообщениях и caption-подписях к медиа
+- Превращает авторскую подводку над ссылкой в Telegram-цитату
 - Поддерживает треки, альбомы, EP, singles, подкасты, podcast shows, Spotify-плейлисты, YouTube-видео и подборки из нескольких ссылок
 - Делает прямые кнопки для одиночного релиза
 - Делает пост-подборку для нескольких музыкальных ссылок или смешанных пачек музыка + YouTube
@@ -31,6 +32,7 @@ Telegram-бот для музыкального канала [@stonerhand](https
 Одиночный трек:
 
 ```text
+цитата:
 @username: немного тревоги на вечер
 
 📻 · Youth Code - Transitions
@@ -85,6 +87,7 @@ Spotify-плейлист:
 Подборка:
 
 ```text
+цитата:
 @username: пять вещей на вечер
 
 сегодня в подборке:
@@ -101,6 +104,7 @@ Spotify-плейлист:
 Смешанная подборка:
 
 ```text
+цитата:
 @username: вечерний набор
 
 сегодня в подборке:
@@ -254,6 +258,7 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 ```text
 src/music_links_bot/
 ├── bot.py        Telegram handlers, keyboards, group/channel replacement
+├── cache.py      TTL-кеш для повторных внешних запросов
 ├── songlink.py   Song.link client and release normalization
 ├── formatter.py  StonerHand post style, hashtags, captions
 ├── playlist.py   Spotify playlist metadata через oEmbed
@@ -270,6 +275,7 @@ src/music_links_bot/
 - Несколько ссылок обрабатываются параллельно
 - Смешанные пачки музыка + YouTube обрабатываются параллельно и публикуются одним постом-подборкой
 - Несколько Song.link-регионов проверяются параллельно
+- Повторные запросы к Song.link, YouTube oEmbed и Spotify playlist metadata кешируются в памяти процесса
 - Очень длинная авторская подпись аккуратно обрезается
 - Слишком большие пачки ссылок ограничены, чтобы не упереться в лимиты Telegram
 - Хосты URL нормализуются через parsed hostname, поэтому обычные варианты вроде явного порта не ломают распознавание

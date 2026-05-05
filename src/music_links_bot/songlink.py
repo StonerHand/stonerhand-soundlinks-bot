@@ -6,6 +6,7 @@ from collections.abc import Mapping
 
 import httpx
 
+from music_links_bot.cache import TTLCache
 from music_links_bot.constants import PLATFORM_ALIASES
 from music_links_bot.models import TrackMatch
 
@@ -32,11 +33,16 @@ class SonglinkClient:
             base_url="https://api.song.link/v1-alpha.1",
             timeout=timeout,
         )
+        self._cache: TTLCache[TrackMatch] = TTLCache()
 
     async def aclose(self) -> None:
         await self._client.aclose()
 
     async def lookup_track(self, source_url: str) -> TrackMatch:
+        cached_match = self._cache.get(source_url)
+        if cached_match is not None:
+            return cached_match
+
         results = await asyncio.gather(
             *(
                 self._lookup_track_for_country(source_url, user_country)
@@ -60,7 +66,9 @@ class SonglinkClient:
             )
             raise lookup_error or SonglinkLookupError("Song.link could not resolve the URL.")
 
-        return self._merge_matches(matches)
+        match = self._merge_matches(matches)
+        self._cache.set(source_url, match)
+        return match
 
     async def _lookup_track_for_country(self, source_url: str, user_country: str) -> TrackMatch:
         params = {
