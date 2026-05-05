@@ -282,8 +282,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
             if message.chat.type == "channel":
                 return
             await message.reply_text(
-                f"{pick_phrase('not_found', ','.join(source_urls))}.\n"
-                "Проверьте, что это ссылка именно на трек, альбом, подкаст или плейлист"
+                _format_not_found_message(source_urls)
             )
             return
 
@@ -365,8 +364,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         if message.chat.type == "channel":
             return
         await message.reply_text(
-            f"{pick_phrase('not_found', ','.join(source_urls))}.\n"
-            "Проверьте, что это ссылка именно на трек, альбом, подкаст или плейлист"
+            _format_not_found_message(source_urls)
         )
         return
 
@@ -426,6 +424,14 @@ def _split_source_urls(source_urls: list[str]) -> tuple[list[str], list[str], li
             music_urls.append(source_url)
 
     return playlist_urls, youtube_urls, music_urls
+
+
+def _format_not_found_message(source_urls: list[str]) -> str:
+    seed = ",".join(source_urls)
+    return (
+        f"{pick_phrase('not_found', seed)}\n\n"
+        "похоже, ссылка не на трек, альбом, подкаст или плейлист"
+    )
 
 
 async def _lookup_playlists(

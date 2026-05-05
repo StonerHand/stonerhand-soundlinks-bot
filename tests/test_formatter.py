@@ -58,7 +58,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "💿 · <b>Artist</b> - Album\n\n"
+            "💿 · <b>Artist</b>\nAlbum\n\n"
             f"<i>{pick_phrase('album_cta', 'Artist:Album:album')}</i>\n\n#stonerhand #album",
         )
 
@@ -73,7 +73,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "💿 · <b>Artist</b> - EP\n\n"
+            "💿 · <b>Artist</b>\nEP\n\n"
             f"<i>{pick_phrase('album_cta', 'Artist:EP:album')}</i>\n\n#stonerhand #album #ep",
         )
 
@@ -87,7 +87,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "🎙️ · <b>Podcast Show</b> - Episode\n\n"
+            "🎙️ · <b>Podcast Show</b>\nвыпуск: Episode\n\n"
             f"<i>{pick_phrase('podcast_cta', 'Podcast Show:Episode:podcast')}</i>\n\n#stonerhand #podcast",
         )
 
@@ -102,7 +102,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "🎙️ · <b>Spotify</b> - Podcast show\n\n"
+            "🎙️ · <b>Spotify</b>\nшоу: Podcast show\n\n"
             f"<i>{pick_phrase('podcast_cta', 'Spotify:Podcast show:podcast')}</i>\n\n#stonerhand #podcast #show",
         )
 

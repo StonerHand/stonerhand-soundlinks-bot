@@ -13,6 +13,7 @@ It does not just return raw URLs. It formats every link as a small editorial car
 - Reads links from regular messages and media captions
 - Turns user-written notes above a link into Telegram quote blocks
 - Supports tracks, albums, EPs, singles, podcasts, podcast shows, Spotify playlists, YouTube videos and multi-link collections
+- Gives tracks, albums, podcasts, playlists and YouTube videos distinct editorial layouts
 - Uses direct platform buttons for a single release
 - Uses playlist-style posts for multiple music links or mixed music + YouTube links
 - Formats Spotify playlists as dedicated playlist posts with a direct `▶️ Открыть плейлист` button
@@ -45,7 +46,8 @@ quote:
 Album or EP:
 
 ```text
-💿 · Artist - Release
+💿 · Artist
+Release
 
 альбом везде, где нужно
 
@@ -55,7 +57,8 @@ Album or EP:
 Podcast:
 
 ```text
-🎙️ · Show Name - Episode Title
+🎙️ · Show Name
+выпуск: Episode Title
 
 выпуск на месте, кнопки ниже
 
@@ -121,9 +124,9 @@ Single-release buttons:
 
 ```text
 Spotify
-Apple
-YouTube
-Yandex
+Apple Music
+YouTube Music
+Yandex Music
 🪨 Открыть канал
 ```
 

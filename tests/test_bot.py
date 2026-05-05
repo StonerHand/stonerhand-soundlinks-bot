@@ -16,6 +16,7 @@ from music_links_bot.bot import (
     _build_platform_order,
     _build_podcast_fallback,
     _build_youtube_keyboard,
+    _format_not_found_message,
     _lookup_playlists,
     _lookup_tracks,
     _lookup_youtube_videos,
@@ -390,6 +391,15 @@ class BotKeyboardTests(unittest.TestCase):
         message = type("MessageStub", (), {"text": None, "caption": "caption link"})()
 
         self.assertEqual(_message_text(message), "caption link")
+
+    def test_not_found_message_uses_editorial_copy(self) -> None:
+        message = _format_not_found_message(["https://example.com/release"])
+
+        self.assertIn(
+            "похоже, ссылка не на трек, альбом, подкаст или плейлист",
+            message,
+        )
+        self.assertNotIn("Проверьте", message)
 
 
 class BotLookupTests(unittest.IsolatedAsyncioTestCase):

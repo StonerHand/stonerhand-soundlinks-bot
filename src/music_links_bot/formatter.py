@@ -29,8 +29,18 @@ def format_track_heading(track: TrackMatch) -> str:
     return f"<b>{escape(track.artist)}</b> - {escape(track.title)}"
 
 
+def format_release_heading(track: TrackMatch) -> str:
+    if track.kind == "album":
+        return f"💿 · <b>{escape(track.artist)}</b>\n{escape(track.title)}"
+
+    if track.kind == "podcast":
+        label = "шоу" if track.release_format == "show" else "выпуск"
+        return f"🎙️ · <b>{escape(track.artist)}</b>\n{label}: {escape(track.title)}"
+
+    return f"{pick_track_emoji(track)} · {format_track_heading(track)}"
+
+
 def format_track_message(track: TrackMatch) -> str:
-    emoji = pick_track_emoji(track)
     seed = f"{track.artist}:{track.title}:{track.kind}"
     cta_key = {
         "album": "album_cta",
@@ -38,7 +48,7 @@ def format_track_message(track: TrackMatch) -> str:
     }.get(track.kind, "track_cta")
 
     return (
-        f"{emoji} · {format_track_heading(track)}\n\n"
+        f"{format_release_heading(track)}\n\n"
         f"<i>{escape(pick_phrase(cta_key, seed))}</i>\n\n"
         f"{build_auto_hashtags(track)}"
     )
