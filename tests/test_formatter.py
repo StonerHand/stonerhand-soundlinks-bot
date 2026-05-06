@@ -30,10 +30,8 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "<b>трек найден</b>\n"
             f"{pick_track_emoji(track)} · <b>Artist</b>\n"
             "Song\n\n"
-            "слушать:\n"
             f"<i>{pick_phrase('track_cta', 'Artist:Song:song')}</i>\n\n"
             "#stonerhand #track",
         )
@@ -47,15 +45,13 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "<b>трек найден</b>\n"
             f"{pick_track_emoji(track)} · <b>Artist</b>\n"
             "Song\n\n"
-            "слушать:\n"
             f"<i>{pick_phrase('track_cta', 'Artist:Song:song')}</i>\n\n"
             "#stonerhand #track",
         )
 
-    def test_format_track_message_can_show_platform_count_without_hashtags(self) -> None:
+    def test_format_track_message_can_hide_hashtags(self) -> None:
         track = TrackMatch(
             title="Song",
             artist="Artist",
@@ -63,12 +59,9 @@ class FormatterTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            format_track_message(track, platform_count=1, include_hashtags=False),
-            "<b>трек найден</b>\n"
+            format_track_message(track, include_hashtags=False),
             f"{pick_track_emoji(track)} · <b>Artist</b>\n"
             "Song\n\n"
-            "найдено: 1 площадка\n\n"
-            "слушать:\n"
             f"<i>{pick_phrase('track_cta', 'Artist:Song:song')}</i>",
         )
 
@@ -83,9 +76,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "<b>альбом найден</b>\n"
             "💿 · <b>Artist</b>\nAlbum\n\n"
-            "слушать:\n"
             f"<i>{pick_phrase('album_cta', 'Artist:Album:album')}</i>\n\n"
             "#stonerhand #album",
         )
@@ -101,9 +92,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "<b>альбом найден</b>\n"
             "💿 · <b>Artist</b>\nEP\n\n"
-            "слушать:\n"
             f"<i>{pick_phrase('album_cta', 'Artist:EP:album')}</i>\n\n"
             "#stonerhand #album #ep",
         )
@@ -118,9 +107,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "<b>подкаст найден</b>\n"
             "🎙️ · <b>Podcast Show</b>\nвыпуск: Episode\n\n"
-            "слушать:\n"
             f"<i>{pick_phrase('podcast_cta', 'Podcast Show:Episode:podcast')}</i>\n\n"
             "#stonerhand #podcast",
         )
@@ -136,9 +123,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "<b>подкаст найден</b>\n"
             "🎙️ · <b>Spotify</b>\nшоу: Podcast show\n\n"
-            "слушать:\n"
             f"<i>{pick_phrase('podcast_cta', 'Spotify:Podcast show:podcast')}</i>\n\n"
             "#stonerhand #podcast #show",
         )
@@ -152,12 +137,9 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_collection_message(tracks),
             (
-                "<b>подборка найдена</b>\n"
-                "пунктов: 2\n\n"
                 f"{pick_phrase('collection_intro', 'Artist:Song:song|Band:Album:album')}\n\n"
                 f"1. {pick_track_emoji(tracks[0])} · <b>Artist</b> - Song\n"
                 "2. 💿 · <b>Band</b> - Album\n\n"
-                "выбирать:\n"
                 f"<i>{pick_phrase('collection_cta', 'Artist:Song:song|Band:Album:album')}</i>\n\n"
                 "#stonerhand #collection #track #album"
             ),
@@ -194,10 +176,8 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_video_message(video),
-            "<b>видео найдено</b>\n"
             "📺 · <b>SANSAE Live Session Vol.3 - Melon</b>\n"
             "канал: SANSAE\n\n"
-            "смотреть:\n"
             "<i>видео на месте, можно смотреть</i>\n\n"
             "#stonerhand #video",
         )
@@ -211,10 +191,8 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_playlist_message(playlist),
-            "<b>плейлист найден</b>\n"
             "🎛 · <b>Women of Punk</b>\n"
             "платформа: Spotify\n\n"
-            "открывать:\n"
             "<i>плейлист на месте, можно нырять</i>\n\n"
             "#stonerhand #playlist",
         )
@@ -227,12 +205,9 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_playlist_collection_message(playlists),
-            "<b>подборка плейлистов</b>\n"
-            "пунктов: 2\n\n"
             "сегодня в плейлистах:\n\n"
             "1. 🎛 · <b>Women of Punk</b>\n"
             "2. 🎛 · <b>Dark Wave</b>\n\n"
-            "выбирать:\n"
             "<i>выбирай, с какой пачки начать</i>\n\n"
             "#stonerhand #collection #playlist",
         )
@@ -245,12 +220,9 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_video_collection_message(videos),
-            "<b>видео-подборка</b>\n"
-            "пунктов: 2\n\n"
             "сегодня на экране:\n\n"
             "1. 📺 · <b>First</b>\n"
             "2. 📺 · <b>Second</b>\n\n"
-            "смотреть:\n"
             "<i>выбирай, что включить первым</i>\n\n"
             "#stonerhand #collection #video",
         )

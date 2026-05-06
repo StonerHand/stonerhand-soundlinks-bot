@@ -228,7 +228,7 @@ class BotKeyboardTests(unittest.TestCase):
         button_texts = [button.text for row in keyboard.inline_keyboard for button in row]
         self.assertEqual(button_texts, ["🟢 Spotify"])
 
-    def test_release_keyboard_makes_first_platform_primary(self) -> None:
+    def test_release_keyboard_uses_two_columns(self) -> None:
         keyboard = _build_link_keyboard(
             {
                 "spotify": "https://open.spotify.com/track/1",
@@ -240,9 +240,8 @@ class BotKeyboardTests(unittest.TestCase):
 
         rows = keyboard.inline_keyboard
         self.assertEqual(rows[0][0].text, "🟢 Spotify")
-        self.assertEqual(len(rows[0]), 1)
-        self.assertEqual(rows[1][0].text, "🟦 Deezer")
-        self.assertEqual(rows[1][1].text, "🌊 Tidal")
+        self.assertEqual(rows[0][1].text, "🟦 Deezer")
+        self.assertEqual(rows[1][0].text, "🌊 Tidal")
 
     def test_collection_keyboard_can_hide_channel_button(self) -> None:
         keyboard = _build_collection_keyboard(

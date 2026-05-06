@@ -297,7 +297,6 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
                 user_prefix
                 + format_track_message(
                     track,
-                    platform_count=len(track.links),
                     include_hashtags=include_hashtags,
                 ),
                 preview_url=_select_preview_url(track.links, context),
@@ -387,7 +386,6 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
             user_prefix
             + format_track_message(
                 track,
-                platform_count=len(track.links),
                 include_hashtags=include_hashtags,
             ),
             preview_url=_select_preview_url(track.links, context),
@@ -848,7 +846,7 @@ def _build_link_keyboard(
         )
         for platform_key in [*ordered_platforms, *remaining_platforms]
     ]
-    rows = [[buttons[0]], *_button_rows(buttons[1:])] if buttons else []
+    rows = _button_rows(buttons)
     if include_channel_button:
         rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
 
