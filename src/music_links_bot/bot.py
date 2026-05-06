@@ -215,6 +215,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
     source_urls = extract_supported_urls(message_text)[:MAX_LINKS_PER_MESSAGE]
     user_prefix = _build_user_prefix(message)
     include_channel_button = _should_include_channel_button(message)
+    include_hashtags = _should_include_hashtags(message)
     if not source_urls:
         if message.chat.type != "private":
             return
@@ -237,6 +238,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
             playlists,
             user_prefix=user_prefix,
             include_channel_button=include_channel_button,
+            include_hashtags=include_hashtags,
         )
         _record_playlists_safely(playlists, message)
         return
@@ -250,6 +252,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
             videos,
             user_prefix=user_prefix,
             include_channel_button=include_channel_button,
+            include_hashtags=include_hashtags,
         )
         _record_videos_safely(videos, message)
         return
@@ -291,7 +294,12 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
             await _send_track_result(
                 context.bot,
                 message,
-                f"{user_prefix}{format_track_message(track)}",
+                user_prefix
+                + format_track_message(
+                    track,
+                    platform_count=len(track.links),
+                    include_hashtags=include_hashtags,
+                ),
                 preview_url=_select_preview_url(track.links, context),
                 reply_markup=_build_link_keyboard(
                     track.links,
@@ -309,6 +317,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
                 videos,
                 user_prefix=user_prefix,
                 include_channel_button=include_channel_button,
+                include_hashtags=include_hashtags,
             )
             _record_videos_safely(videos, message)
             return
@@ -320,6 +329,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
                 playlists,
                 user_prefix=user_prefix,
                 include_channel_button=include_channel_button,
+                include_hashtags=include_hashtags,
             )
             _record_playlists_safely(playlists, message)
             return
@@ -333,6 +343,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
                 playlists,
                 user_prefix=user_prefix,
                 include_channel_button=include_channel_button,
+                include_hashtags=include_hashtags,
                 context=context,
             )
             _record_mixed_safely(tracks, videos, playlists, message)
@@ -373,7 +384,12 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         await _send_track_result(
             context.bot,
             message,
-            f"{user_prefix}{format_track_message(track)}",
+            user_prefix
+            + format_track_message(
+                track,
+                platform_count=len(track.links),
+                include_hashtags=include_hashtags,
+            ),
             preview_url=_select_preview_url(track.links, context),
             reply_markup=_build_link_keyboard(
                 track.links,
@@ -387,7 +403,11 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
     await _send_track_result(
         context.bot,
         message,
-        f"{user_prefix}{format_collection_message(tracks)}",
+        user_prefix
+        + format_collection_message(
+            tracks,
+            include_hashtags=include_hashtags,
+        ),
         preview_url=_select_preview_url(tracks[0].links, context),
         reply_markup=_build_collection_keyboard(
             tracks,
@@ -513,6 +533,7 @@ async def _send_youtube_result(
     *,
     user_prefix: str,
     include_channel_button: bool,
+    include_hashtags: bool,
 ) -> None:
     if not videos:
         return
@@ -522,7 +543,7 @@ async def _send_youtube_result(
         await _send_track_result(
             bot,
             message,
-            f"{user_prefix}{format_video_message(video)}",
+            user_prefix + format_video_message(video, include_hashtags=include_hashtags),
             preview_url=video.url,
             reply_markup=_build_youtube_keyboard(
                 video.url,
@@ -535,7 +556,8 @@ async def _send_youtube_result(
     await _send_track_result(
         bot,
         message,
-        f"{user_prefix}{format_video_collection_message(videos)}",
+        user_prefix
+        + format_video_collection_message(videos, include_hashtags=include_hashtags),
         preview_url=videos[0].url,
         reply_markup=_build_youtube_collection_keyboard(
             videos,
@@ -552,6 +574,7 @@ async def _send_playlist_result(
     *,
     user_prefix: str,
     include_channel_button: bool,
+    include_hashtags: bool,
 ) -> None:
     if not playlists:
         return
@@ -561,7 +584,8 @@ async def _send_playlist_result(
         await _send_track_result(
             bot,
             message,
-            f"{user_prefix}{format_playlist_message(playlist)}",
+            user_prefix
+            + format_playlist_message(playlist, include_hashtags=include_hashtags),
             preview_url=playlist.url,
             reply_markup=_build_playlist_keyboard(
                 playlist.url,
@@ -573,7 +597,11 @@ async def _send_playlist_result(
     await _send_track_result(
         bot,
         message,
-        f"{user_prefix}{format_playlist_collection_message(playlists)}",
+        user_prefix
+        + format_playlist_collection_message(
+            playlists,
+            include_hashtags=include_hashtags,
+        ),
         preview_url=playlists[0].url,
         reply_markup=_build_playlist_collection_keyboard(
             playlists,
@@ -591,13 +619,20 @@ async def _send_mixed_result(
     *,
     user_prefix: str,
     include_channel_button: bool,
+    include_hashtags: bool,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
     preview_url = _select_mixed_preview_url(tracks, playlists, videos, context)
     await _send_track_result(
         bot,
         message,
-        f"{user_prefix}{format_mixed_collection_message(tracks, videos, playlists)}",
+        user_prefix
+        + format_mixed_collection_message(
+            tracks,
+            videos,
+            playlists,
+            include_hashtags=include_hashtags,
+        ),
         preview_url=preview_url,
         reply_markup=_build_mixed_collection_keyboard(
             tracks,
@@ -813,7 +848,7 @@ def _build_link_keyboard(
         )
         for platform_key in [*ordered_platforms, *remaining_platforms]
     ]
-    rows = [buttons[index : index + 2] for index in range(0, len(buttons), 2)]
+    rows = [[buttons[0]], *_button_rows(buttons[1:])] if buttons else []
     if include_channel_button:
         rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
 
@@ -825,22 +860,21 @@ def _build_collection_keyboard(
     *,
     include_channel_button: bool = True,
 ) -> InlineKeyboardMarkup:
-    rows: list[list[InlineKeyboardButton]] = []
+    buttons: list[InlineKeyboardButton] = []
 
     for index, track in enumerate(tracks, start=1):
         destination = track.page_url or _select_preview_url(track.links)
         if not destination:
             continue
 
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    text=_shorten_button_text(f"{index}. {track.artist} - {track.title}"),
-                    url=destination,
-                )
-            ]
+        buttons.append(
+            InlineKeyboardButton(
+                text=_shorten_button_text(f"{index}. {track.artist} - {track.title}"),
+                url=destination,
+            )
         )
 
+    rows = _button_rows(buttons)
     if include_channel_button:
         rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
 
@@ -876,17 +910,16 @@ def _build_youtube_collection_keyboard(
     *,
     include_channel_button: bool = True,
 ) -> InlineKeyboardMarkup:
-    rows: list[list[InlineKeyboardButton]] = []
+    buttons: list[InlineKeyboardButton] = []
     for index, video in enumerate(videos, start=1):
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    text=_shorten_button_text(f"{index}. {video.title}"),
-                    url=video.url,
-                )
-            ]
+        buttons.append(
+            InlineKeyboardButton(
+                text=_shorten_button_text(f"{index}. {video.title}"),
+                url=video.url,
+            )
         )
 
+    rows = _button_rows(buttons)
     if include_channel_button:
         rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
 
@@ -898,17 +931,16 @@ def _build_playlist_collection_keyboard(
     *,
     include_channel_button: bool = True,
 ) -> InlineKeyboardMarkup:
-    rows: list[list[InlineKeyboardButton]] = []
+    buttons: list[InlineKeyboardButton] = []
     for index, playlist in enumerate(playlists, start=1):
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    text=_shorten_button_text(f"{index}. {playlist.title}"),
-                    url=playlist.url,
-                )
-            ]
+        buttons.append(
+            InlineKeyboardButton(
+                text=_shorten_button_text(f"{index}. {playlist.title}"),
+                url=playlist.url,
+            )
         )
 
+    rows = _button_rows(buttons)
     if include_channel_button:
         rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
 
@@ -923,7 +955,7 @@ def _build_mixed_collection_keyboard(
     include_channel_button: bool = True,
 ) -> InlineKeyboardMarkup:
     playlists = playlists or []
-    rows: list[list[InlineKeyboardButton]] = []
+    buttons: list[InlineKeyboardButton] = []
     index = 1
 
     for track in tracks:
@@ -931,38 +963,33 @@ def _build_mixed_collection_keyboard(
         if not destination:
             continue
 
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    text=_shorten_button_text(f"{index}. {track.artist} - {track.title}"),
-                    url=destination,
-                )
-            ]
+        buttons.append(
+            InlineKeyboardButton(
+                text=_shorten_button_text(f"{index}. {track.artist} - {track.title}"),
+                url=destination,
+            )
         )
         index += 1
 
     for playlist in playlists:
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    text=_shorten_button_text(f"{index}. {playlist.title}"),
-                    url=playlist.url,
-                )
-            ]
+        buttons.append(
+            InlineKeyboardButton(
+                text=_shorten_button_text(f"{index}. {playlist.title}"),
+                url=playlist.url,
+            )
         )
         index += 1
 
     for video in videos:
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    text=_shorten_button_text(f"{index}. {video.title}"),
-                    url=video.url,
-                )
-            ]
+        buttons.append(
+            InlineKeyboardButton(
+                text=_shorten_button_text(f"{index}. {video.title}"),
+                url=video.url,
+            )
         )
         index += 1
 
+    rows = _button_rows(buttons)
     if include_channel_button:
         rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
 
@@ -976,6 +1003,10 @@ def _should_include_channel_button(message: Message) -> bool:
         and username is not None
         and username.casefold() == CHANNEL_USERNAME
     )
+
+
+def _should_include_hashtags(message: Message) -> bool:
+    return message.chat.type != "private"
 
 
 def _build_platform_order(primary_platform: str | None) -> tuple[str, ...]:
@@ -994,6 +1025,10 @@ def _shorten_button_text(text: str) -> str:
         return text
 
     return text[: MAX_BUTTON_TEXT_LENGTH - 1].rstrip() + "…"
+
+
+def _button_rows(buttons: list[InlineKeyboardButton]) -> list[list[InlineKeyboardButton]]:
+    return [buttons[index : index + 2] for index in range(0, len(buttons), 2)]
 
 
 def _get_platform_order(context: ContextTypes.DEFAULT_TYPE | None) -> tuple[str, ...]:

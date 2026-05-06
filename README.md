@@ -14,7 +14,9 @@ It does not just return raw URLs. It formats every link as a small editorial car
 - Turns user-written notes above a link into Telegram quote blocks
 - Supports tracks, albums, EPs, singles, podcasts, podcast shows, Spotify playlists, YouTube videos and multi-link collections
 - Gives tracks, albums, podcasts, playlists and YouTube videos distinct editorial layouts
+- Shows a small release-type badge, platform count and action line before the CTA
 - Uses direct platform buttons for a single release
+- Makes the first platform button primary and keeps the rest compact
 - Uses playlist-style posts for multiple music links or mixed music + YouTube links
 - Formats Spotify playlists as dedicated playlist posts with a direct `▶️ Открыть плейлист` button
 - Formats regular YouTube links as standalone video posts with a button and preview
@@ -25,6 +27,7 @@ It does not just return raw URLs. It formats every link as a small editorial car
 - Replaces source messages in groups/channels when the bot has admin rights
 - Hides the `🪨 Открыть канал` self-link when posting directly inside `@stonerhand`
 - Adds smart hashtags: `#track`, `#album`, `#collection`, `#single`, `#ep`, `#podcast`, `#show`
+- Keeps hashtags in groups and channels, but hides them in private chats
 - Includes public stats and private admin stats via `/stats`, including playlist counts
 - Does not store message text or source links in stats
 
@@ -36,9 +39,13 @@ Single track:
 quote:
 @username: немного тревоги на вечер
 
+трек найден
 📻 · Youth Code
 Transitions
 
+найдено: 4 площадки
+
+слушать:
 ссылки готовы, звук рядом
 
 #stonerhand #track
@@ -47,9 +54,13 @@ Transitions
 Album or EP:
 
 ```text
+альбом найден
 💿 · Artist
 Release
 
+найдено: 5 площадок
+
+слушать:
 альбом везде, где нужно
 
 #stonerhand #album #ep
@@ -58,9 +69,13 @@ Release
 Podcast:
 
 ```text
+подкаст найден
 🎙️ · Show Name
 выпуск: Episode Title
 
+найдено: 2 площадки
+
+слушать:
 выпуск на месте, кнопки ниже
 
 #stonerhand #podcast
@@ -69,9 +84,11 @@ Podcast:
 YouTube video:
 
 ```text
+видео найдено
 📺 · SANSAE Live Session Vol.3 - Melon
 канал: SANSAE
 
+смотреть:
 видео на месте, можно смотреть
 
 #stonerhand #video
@@ -80,9 +97,11 @@ YouTube video:
 Spotify playlist:
 
 ```text
+плейлист найден
 🎛 · Women of Punk
 платформа: Spotify
 
+открывать:
 плейлист на месте, можно нырять
 
 #stonerhand #playlist
@@ -94,12 +113,16 @@ Collection:
 quote:
 @username: пять вещей на вечер
 
+подборка найдена
+пунктов: 3
+
 сегодня в подборке:
 
 1. 📻 · Youth Code - Transitions
 2. 🎧 · Show Me The Body - Camp Orchestra
 3. 💿 · The Soft Moon - Criminal
 
+выбирать:
 выбирай с чего начать
 
 #stonerhand #collection #track #album
@@ -111,11 +134,15 @@ Mixed collection:
 quote:
 @username: вечерний набор
 
+подборка найдена
+пунктов: 2
+
 сегодня в подборке:
 
 1. 📻 · Youth Code - Transitions
 2. 📺 · SANSAE Live Session Vol.3 - Melon
 
+выбирать:
 выбирай с чего начать
 
 #stonerhand #collection #track #video
@@ -141,8 +168,7 @@ Spotify playlist buttons:
 Collection buttons:
 
 ```text
-1. Youth Code - Transitions
-2. Show Me The Body - Camp Orchestra
+1. Youth Code - Transitions | 2. Show Me The Body - Camp Orchestra
 3. The Soft Moon - Criminal
 🪨 Открыть канал
 ```

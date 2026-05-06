@@ -29,6 +29,16 @@ def format_track_heading(track: TrackMatch) -> str:
     return f"<b>{escape(track.artist)}</b> - {escape(track.title)}"
 
 
+def format_release_badge(track: TrackMatch) -> str:
+    if track.kind == "album":
+        return "<b>альбом найден</b>"
+
+    if track.kind == "podcast":
+        return "<b>подкаст найден</b>"
+
+    return "<b>трек найден</b>"
+
+
 def format_release_heading(track: TrackMatch) -> str:
     if track.kind == "album":
         return f"💿 · <b>{escape(track.artist)}</b>\n{escape(track.title)}"
@@ -40,74 +50,107 @@ def format_release_heading(track: TrackMatch) -> str:
     return f"{pick_track_emoji(track)} · <b>{escape(track.artist)}</b>\n{escape(track.title)}"
 
 
-def format_track_message(track: TrackMatch) -> str:
+def format_track_message(
+    track: TrackMatch,
+    *,
+    platform_count: int | None = None,
+    include_hashtags: bool = True,
+) -> str:
     seed = f"{track.artist}:{track.title}:{track.kind}"
     cta_key = {
         "album": "album_cta",
         "podcast": "podcast_cta",
     }.get(track.kind, "track_cta")
 
-    return (
-        f"{format_release_heading(track)}\n\n"
-        f"<i>{escape(pick_phrase(cta_key, seed))}</i>\n\n"
-        f"{build_auto_hashtags(track)}"
+    lines = [
+        format_release_badge(track),
+        format_release_heading(track),
+        "",
+    ]
+    if platform_count is not None:
+        lines.extend([format_found_platforms(platform_count), ""])
+
+    lines.extend(
+        [
+            "слушать:",
+            f"<i>{escape(pick_phrase(cta_key, seed))}</i>",
+        ]
     )
+    return _with_hashtags(lines, build_auto_hashtags(track), include_hashtags=include_hashtags)
 
 
-def format_video_message(video: VideoMatch) -> str:
-    return (
-        f"📺 · <b>{escape(video.title)}</b>\n"
-        f"канал: {escape(video.author)}\n\n"
-        "<i>видео на месте, можно смотреть</i>\n\n"
-        "#stonerhand #video"
-    )
+def format_video_message(video: VideoMatch, *, include_hashtags: bool = True) -> str:
+    lines = [
+        "<b>видео найдено</b>",
+        f"📺 · <b>{escape(video.title)}</b>",
+        f"канал: {escape(video.author)}",
+        "",
+        "смотреть:",
+        "<i>видео на месте, можно смотреть</i>",
+    ]
+    return _with_hashtags(lines, "#stonerhand #video", include_hashtags=include_hashtags)
 
 
-def format_playlist_message(playlist: PlaylistMatch) -> str:
-    return (
-        f"🎛 · <b>{escape(playlist.title)}</b>\n"
-        f"платформа: {escape(playlist.platform)}\n\n"
-        "<i>плейлист на месте, можно нырять</i>\n\n"
-        "#stonerhand #playlist"
-    )
+def format_playlist_message(
+    playlist: PlaylistMatch,
+    *,
+    include_hashtags: bool = True,
+) -> str:
+    lines = [
+        "<b>плейлист найден</b>",
+        f"🎛 · <b>{escape(playlist.title)}</b>",
+        f"платформа: {escape(playlist.platform)}",
+        "",
+        "открывать:",
+        "<i>плейлист на месте, можно нырять</i>",
+    ]
+    return _with_hashtags(lines, "#stonerhand #playlist", include_hashtags=include_hashtags)
 
 
-def format_playlist_collection_message(playlists: list[PlaylistMatch]) -> str:
-    lines = ["сегодня в плейлистах:", ""]
+def format_playlist_collection_message(
+    playlists: list[PlaylistMatch],
+    *,
+    include_hashtags: bool = True,
+) -> str:
+    lines = ["<b>подборка плейлистов</b>", f"пунктов: {len(playlists)}", "", "сегодня в плейлистах:", ""]
     for index, playlist in enumerate(playlists, start=1):
         lines.append(f"{index}. 🎛 · <b>{escape(playlist.title)}</b>")
 
     lines.extend(
         [
             "",
+            "выбирать:",
             "<i>выбирай, с какой пачки начать</i>",
-            "",
-            "#stonerhand #collection #playlist",
         ]
     )
-    return "\n".join(lines)
+    return _with_hashtags(lines, "#stonerhand #collection #playlist", include_hashtags=include_hashtags)
 
 
-def format_video_collection_message(videos: list[VideoMatch]) -> str:
-    lines = ["сегодня на экране:", ""]
+def format_video_collection_message(
+    videos: list[VideoMatch],
+    *,
+    include_hashtags: bool = True,
+) -> str:
+    lines = ["<b>видео-подборка</b>", f"пунктов: {len(videos)}", "", "сегодня на экране:", ""]
     for index, video in enumerate(videos, start=1):
         lines.append(f"{index}. 📺 · <b>{escape(video.title)}</b>")
 
     lines.extend(
         [
             "",
+            "смотреть:",
             "<i>выбирай, что включить первым</i>",
-            "",
-            "#stonerhand #collection #video",
         ]
     )
-    return "\n".join(lines)
+    return _with_hashtags(lines, "#stonerhand #collection #video", include_hashtags=include_hashtags)
 
 
 def format_mixed_collection_message(
     tracks: list[TrackMatch],
     videos: list[VideoMatch],
     playlists: list[PlaylistMatch] | None = None,
+    *,
+    include_hashtags: bool = True,
 ) -> str:
     playlists = playlists or []
     seed = "|".join(
@@ -118,6 +161,9 @@ def format_mixed_collection_message(
         ]
     )
     lines = [
+        "<b>подборка найдена</b>",
+        f"пунктов: {len(tracks) + len(playlists) + len(videos)}",
+        "",
         pick_phrase("collection_intro", seed),
         "",
     ]
@@ -139,22 +185,32 @@ def format_mixed_collection_message(
     lines.extend(
         [
             "",
+            "выбирать:",
             f"<i>{escape(pick_phrase('collection_cta', seed))}</i>",
-            "",
-            build_mixed_collection_hashtags(
-                tracks,
-                has_playlists=bool(playlists),
-                has_videos=bool(videos),
-            ),
         ]
     )
 
-    return "\n".join(lines)
+    return _with_hashtags(
+        lines,
+        build_mixed_collection_hashtags(
+            tracks,
+            has_playlists=bool(playlists),
+            has_videos=bool(videos),
+        ),
+        include_hashtags=include_hashtags,
+    )
 
 
-def format_collection_message(tracks: list[TrackMatch]) -> str:
+def format_collection_message(
+    tracks: list[TrackMatch],
+    *,
+    include_hashtags: bool = True,
+) -> str:
     seed = "|".join(f"{track.artist}:{track.title}:{track.kind}" for track in tracks)
     lines = [
+        "<b>подборка найдена</b>",
+        f"пунктов: {len(tracks)}",
+        "",
         pick_phrase("collection_intro", seed),
         "",
     ]
@@ -166,13 +222,12 @@ def format_collection_message(tracks: list[TrackMatch]) -> str:
     lines.extend(
         [
             "",
+            "выбирать:",
             f"<i>{escape(pick_phrase('collection_cta', seed))}</i>",
-            "",
-            build_collection_hashtags(tracks),
         ]
     )
 
-    return "\n".join(lines)
+    return _with_hashtags(lines, build_collection_hashtags(tracks), include_hashtags=include_hashtags)
 
 
 def prepend_user_text(message_text: str, *, author_label: str | None = None) -> str:
@@ -208,6 +263,30 @@ def build_auto_hashtags(track: TrackMatch) -> str:
         hashtags.append("#single")
 
     return " ".join(hashtags)
+
+
+def format_found_platforms(count: int) -> str:
+    return f"найдено: {count} {_plural_ru(count, 'площадка', 'площадки', 'площадок')}"
+
+
+def _plural_ru(count: int, one: str, few: str, many: str) -> str:
+    last_two_digits = count % 100
+    if 11 <= last_two_digits <= 14:
+        return many
+
+    last_digit = count % 10
+    if last_digit == 1:
+        return one
+    if 2 <= last_digit <= 4:
+        return few
+    return many
+
+
+def _with_hashtags(lines: list[str], hashtags: str, *, include_hashtags: bool) -> str:
+    if include_hashtags:
+        lines.extend(["", hashtags])
+
+    return "\n".join(lines)
 
 
 def build_mixed_collection_hashtags(
