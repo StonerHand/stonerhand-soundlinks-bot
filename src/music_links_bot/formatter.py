@@ -7,6 +7,30 @@ from music_links_bot.models import PlaylistMatch, TrackMatch, VideoMatch
 from music_links_bot.phrases import pick_phrase
 
 TRACK_EMOJIS = ("🎵", "🎧", "🎶", "🔊", "📻")
+VIDEO_SIGNATURES = (
+    "видео на месте, можно смотреть",
+    "экран готов, жми смотреть",
+    "включай, пока не остыло",
+    "картинка поймана, звук рядом",
+    "смотреть можно отсюда",
+)
+PLAYLIST_SIGNATURES = (
+    "плейлист на месте, можно нырять",
+    "пачка собрана, вход открыт",
+    "выбирай трек и проваливайся",
+    "готово, можно запускать по кругу",
+    "сохранил маршрут, осталось открыть",
+)
+PLAYLIST_COLLECTION_SIGNATURES = (
+    "выбирай, с какой пачки начать",
+    "несколько маршрутов, один пост",
+    "плейлисты рядом, дальше твой ход",
+)
+VIDEO_COLLECTION_SIGNATURES = (
+    "выбирай, что включить первым",
+    "экранная пачка готова",
+    "можно смотреть по порядку, можно наугад",
+)
 
 
 def pick_track_emoji(track: TrackMatch) -> str:
@@ -60,11 +84,15 @@ def format_track_message(
 
 
 def format_video_message(video: VideoMatch, *, include_hashtags: bool = True) -> str:
+    signature = _pick_signature(
+        VIDEO_SIGNATURES,
+        f"{video.author}:{video.title}:{video.url}",
+    )
     lines = [
         f"📺 · <b>{escape(video.title)}</b>",
         f"канал: {escape(video.author)}",
         "",
-        "<i>видео на месте, можно смотреть</i>",
+        f"<i>{escape(signature)}</i>",
     ]
     return _with_hashtags(lines, "#stonerhand #video", include_hashtags=include_hashtags)
 
@@ -74,11 +102,15 @@ def format_playlist_message(
     *,
     include_hashtags: bool = True,
 ) -> str:
+    signature = _pick_signature(
+        PLAYLIST_SIGNATURES,
+        f"{playlist.platform}:{playlist.title}:{playlist.url}",
+    )
     lines = [
         f"🎛 · <b>{escape(playlist.title)}</b>",
         f"платформа: {escape(playlist.platform)}",
         "",
-        "<i>плейлист на месте, можно нырять</i>",
+        f"<i>{escape(signature)}</i>",
     ]
     return _with_hashtags(lines, "#stonerhand #playlist", include_hashtags=include_hashtags)
 
@@ -88,6 +120,10 @@ def format_playlist_collection_message(
     *,
     include_hashtags: bool = True,
 ) -> str:
+    signature = _pick_signature(
+        PLAYLIST_COLLECTION_SIGNATURES,
+        "|".join(playlist.url for playlist in playlists),
+    )
     lines = ["сегодня в плейлистах:", ""]
     for index, playlist in enumerate(playlists, start=1):
         lines.append(f"{index}. 🎛 · <b>{escape(playlist.title)}</b>")
@@ -95,7 +131,7 @@ def format_playlist_collection_message(
     lines.extend(
         [
             "",
-            "<i>выбирай, с какой пачки начать</i>",
+            f"<i>{escape(signature)}</i>",
         ]
     )
     return _with_hashtags(lines, "#stonerhand #collection #playlist", include_hashtags=include_hashtags)
@@ -106,6 +142,10 @@ def format_video_collection_message(
     *,
     include_hashtags: bool = True,
 ) -> str:
+    signature = _pick_signature(
+        VIDEO_COLLECTION_SIGNATURES,
+        "|".join(video.url for video in videos),
+    )
     lines = ["сегодня на экране:", ""]
     for index, video in enumerate(videos, start=1):
         lines.append(f"{index}. 📺 · <b>{escape(video.title)}</b>")
@@ -113,7 +153,7 @@ def format_video_collection_message(
     lines.extend(
         [
             "",
-            "<i>выбирай, что включить первым</i>",
+            f"<i>{escape(signature)}</i>",
         ]
     )
     return _with_hashtags(lines, "#stonerhand #collection #video", include_hashtags=include_hashtags)
@@ -236,6 +276,11 @@ def _with_hashtags(lines: list[str], hashtags: str, *, include_hashtags: bool) -
         lines.extend(["", hashtags])
 
     return "\n".join(lines)
+
+
+def _pick_signature(options: tuple[str, ...], seed: str) -> str:
+    index = int(hashlib.sha256(seed.encode("utf-8")).hexdigest(), 16) % len(options)
+    return options[index]
 
 
 def build_mixed_collection_hashtags(

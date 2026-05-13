@@ -14,9 +14,9 @@ It does not just return raw URLs. It formats every link as a small editorial car
 - Turns user-written notes above a link into Telegram quote blocks
 - Supports tracks, albums, EPs, singles, podcasts, podcast shows, Spotify playlists, YouTube videos and multi-link collections
 - Gives tracks, albums, podcasts, playlists and YouTube videos distinct editorial layouts
-- Keeps posts lean: heading, human CTA, hashtags, preview and buttons
+- Keeps posts lean: release-cover heading, human CTA, hashtags, preview and buttons
 - Uses direct platform buttons for a single release
-- Places platform buttons two per row, with the channel button on its own row
+- Places short platform buttons two per row, with the channel button on its own row
 - Uses playlist-style posts for multiple music links or mixed music + YouTube links
 - Formats Spotify playlists as dedicated playlist posts with a direct `▶️ Открыть плейлист` button
 - Formats regular YouTube links as standalone video posts with a button and preview
@@ -75,7 +75,7 @@ YouTube video:
 📺 · SANSAE Live Session Vol.3 - Melon
 канал: SANSAE
 
-видео на месте, можно смотреть
+экран готов, жми смотреть
 
 #stonerhand #video
 ```
@@ -86,7 +86,7 @@ Spotify playlist:
 🎛 · Women of Punk
 платформа: Spotify
 
-плейлист на месте, можно нырять
+пачка собрана, вход открыт
 
 #stonerhand #playlist
 ```
@@ -127,8 +127,8 @@ quote:
 Single-release buttons:
 
 ```text
-🟢 Spotify | 🍎 Apple Music
-▶️ YouTube Music | 🟡 Yandex Music
+🟢 Spotify | 🍎 Apple
+▶️ YouTube | 🟡 Yandex
 🪨 Открыть канал
 ```
 

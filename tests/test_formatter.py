@@ -5,6 +5,11 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from music_links_bot.formatter import (
+    PLAYLIST_COLLECTION_SIGNATURES,
+    PLAYLIST_SIGNATURES,
+    VIDEO_COLLECTION_SIGNATURES,
+    VIDEO_SIGNATURES,
+    _pick_signature,
     format_collection_message,
     format_mixed_collection_message,
     format_playlist_collection_message,
@@ -173,12 +178,16 @@ class FormatterTests(unittest.TestCase):
             author="SANSAE",
             url="https://www.youtube.com/watch?v=abc",
         )
+        signature = _pick_signature(
+            VIDEO_SIGNATURES,
+            "SANSAE:SANSAE Live Session Vol.3 - Melon:https://www.youtube.com/watch?v=abc",
+        )
 
         self.assertEqual(
             format_video_message(video),
             "📺 · <b>SANSAE Live Session Vol.3 - Melon</b>\n"
             "канал: SANSAE\n\n"
-            "<i>видео на месте, можно смотреть</i>\n\n"
+            f"<i>{signature}</i>\n\n"
             "#stonerhand #video",
         )
 
@@ -188,12 +197,16 @@ class FormatterTests(unittest.TestCase):
             platform="Spotify",
             url="https://open.spotify.com/playlist/abc",
         )
+        signature = _pick_signature(
+            PLAYLIST_SIGNATURES,
+            "Spotify:Women of Punk:https://open.spotify.com/playlist/abc",
+        )
 
         self.assertEqual(
             format_playlist_message(playlist),
             "🎛 · <b>Women of Punk</b>\n"
             "платформа: Spotify\n\n"
-            "<i>плейлист на месте, можно нырять</i>\n\n"
+            f"<i>{signature}</i>\n\n"
             "#stonerhand #playlist",
         )
 
@@ -202,13 +215,17 @@ class FormatterTests(unittest.TestCase):
             PlaylistMatch(title="Women of Punk", platform="Spotify", url="https://open.spotify.com/playlist/1"),
             PlaylistMatch(title="Dark Wave", platform="Spotify", url="https://open.spotify.com/playlist/2"),
         ]
+        signature = _pick_signature(
+            PLAYLIST_COLLECTION_SIGNATURES,
+            "https://open.spotify.com/playlist/1|https://open.spotify.com/playlist/2",
+        )
 
         self.assertEqual(
             format_playlist_collection_message(playlists),
             "сегодня в плейлистах:\n\n"
             "1. 🎛 · <b>Women of Punk</b>\n"
             "2. 🎛 · <b>Dark Wave</b>\n\n"
-            "<i>выбирай, с какой пачки начать</i>\n\n"
+            f"<i>{signature}</i>\n\n"
             "#stonerhand #collection #playlist",
         )
 
@@ -217,13 +234,17 @@ class FormatterTests(unittest.TestCase):
             VideoMatch(title="First", author="One", url="https://youtu.be/1"),
             VideoMatch(title="Second", author="Two", url="https://youtu.be/2"),
         ]
+        signature = _pick_signature(
+            VIDEO_COLLECTION_SIGNATURES,
+            "https://youtu.be/1|https://youtu.be/2",
+        )
 
         self.assertEqual(
             format_video_collection_message(videos),
             "сегодня на экране:\n\n"
             "1. 📺 · <b>First</b>\n"
             "2. 📺 · <b>Second</b>\n\n"
-            "<i>выбирай, что включить первым</i>\n\n"
+            f"<i>{signature}</i>\n\n"
             "#stonerhand #collection #video",
         )
 
