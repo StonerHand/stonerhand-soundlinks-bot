@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from music_links_bot.bot import (
     MAX_BUTTON_TEXT_LENGTH,
     MAX_USER_NOTE_LENGTH,
+    PUBLIC_BOT_COMMANDS,
     _build_collection_keyboard,
     _build_intro_keyboard,
     _build_link_keyboard,
@@ -194,6 +195,18 @@ class UpdateStub:
 
 
 class BotKeyboardTests(unittest.TestCase):
+    def test_public_command_menu_stays_curated(self) -> None:
+        self.assertEqual(
+            [(command.command, command.description) for command in PUBLIC_BOT_COMMANDS],
+            [
+                ("start", "войти в звук"),
+                ("help", "как кидать ссылки"),
+                ("platforms", "что умею открыть"),
+                ("channel", "канал StonerHand"),
+                ("stats", "сколько звука поймано"),
+            ],
+        )
+
     def test_collection_keyboard_uses_one_songlink_button_per_release(self) -> None:
         keyboard = _build_collection_keyboard(
             [

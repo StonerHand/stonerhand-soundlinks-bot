@@ -151,13 +151,14 @@ Inside `@stonerhand`, the self-link button is hidden automatically.
 
 ## Commands
 
-- `/start` - intro and main buttons
-- `/help` - usage help
-- `/guide` - short guide for a group or channel
-- `/platforms` - supported platforms
-- `/channel` - open StonerHand
-- `/id` - show chat id for `ADMIN_CHAT_ID`
-- `/stats` - release stats
+- `/start` - войти в звук
+- `/help` - как кидать ссылки
+- `/platforms` - что умею открыть
+- `/channel` - канал StonerHand
+- `/stats` - сколько звука поймано
+
+The public command menu is synced automatically on startup. Hidden utility command:
+`/id` shows the current chat id for `ADMIN_CHAT_ID` setup.
 
 ## Environment
 

@@ -7,6 +7,7 @@ from urllib.parse import quote
 
 from telegram import (
     Bot,
+    BotCommand,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     LinkPreviewOptions,
@@ -66,6 +67,13 @@ DEFAULT_PLATFORM_ORDER = (
     "tidal",
     "yandexMusic",
 )
+PUBLIC_BOT_COMMANDS = (
+    BotCommand("start", "войти в звук"),
+    BotCommand("help", "как кидать ссылки"),
+    BotCommand("platforms", "что умею открыть"),
+    BotCommand("channel", "канал StonerHand"),
+    BotCommand("stats", "сколько звука поймано"),
+)
 
 
 def build_application(settings: Settings) -> Application:
@@ -78,6 +86,7 @@ def build_application(settings: Settings) -> Application:
     application = (
         Application.builder()
         .token(settings.bot_token)
+        .post_init(_post_init)
         .post_shutdown(_post_shutdown)
         .build()
     )
@@ -108,11 +117,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     text = (
-        "🎧 Кидай ссылку на трек, альбом, плейлист, подкаст или YouTube-видео, а я оформлю ее в пост\n\n"
-        f"Можно присылать ссылки из: {INPUT_PLATFORM_HINT}\n\n"
-        "Если кинешь несколько ссылок одним сообщением, соберу подборку\n\n"
-        "В групповых чатах могу удалить оригинальное сообщение и заменить его "
-        "постом со всеми линками, если у меня есть права админа"
+        "🎧 Кидай ссылку на трек, альбом, плейлист, подкаст или YouTube-видео\n"
+        "Я соберу это в аккуратный пост с кнопками\n\n"
+        f"Живу рядом с: {INPUT_PLATFORM_HINT}\n\n"
+        "Несколько ссылок одним сообщением превращу в подборку\n\n"
+        "В группах и каналах могу заменить исходную ссылку постом, если у меня есть права админа"
     )
     await update.message.reply_text(text, reply_markup=_build_intro_keyboard(context.bot.username))
 
@@ -122,13 +131,12 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
 
     text = (
-        "Как пользоваться:\n\n"
-        "1. Пришли ссылку на трек, альбом, плейлист, подкаст или YouTube-видео\n"
-        "2. Я найду релиз на других платформах или оформлю видео отдельным постом\n"
-        "3. Верну пост в стиле StonerHand с кнопками\n\n"
-        "Если в сообщении несколько ссылок, соберу подборку\n\n"
-        "В группах могу удалить оригинальное сообщение со ссылкой и заменить его "
-        "постом со всеми линками, если у меня есть права админа"
+        "Как это работает:\n\n"
+        "1. Кидаешь ссылку на релиз, плейлист, подкаст или YouTube-видео\n"
+        "2. Я подтягиваю площадки, preview и нужный тип поста\n"
+        "3. Возвращаю карточку StonerHand с кнопками\n\n"
+        "Кинешь несколько ссылок - соберу подборку\n\n"
+        "В группе или канале могу удалить исходное сообщение и поставить чистый пост вместо него"
     )
     await update.message.reply_text(text, reply_markup=_build_intro_keyboard(context.bot.username))
 
@@ -140,10 +148,10 @@ async def guide_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     guide = (
         "StonerHand guide\n\n"
-        "1. Кидай ссылку на трек, альбом, плейлист, подкаст или YouTube-видео\n"
-        "2. Несколько ссылок одним сообщением станут подборкой\n"
-        "3. В канале бот заменит исходный пост красивым постом с кнопками\n"
-        "4. Для удаления оригинала нужны права админа на управление сообщениями"
+        "1. Ссылка на релиз становится постом с кнопками\n"
+        "2. Несколько ссылок становятся подборкой\n"
+        "3. YouTube живет отдельной видео-карточкой\n"
+        "4. Для автозамены в чате нужны права админа на управление сообщениями"
     )
     sent_message = await message.reply_text(
         guide,
@@ -163,11 +171,10 @@ async def platforms_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         return
 
     text = (
-        "Поддерживаю входящие ссылки из:\n\n"
+        "Открываю ссылки из:\n\n"
         f"{INPUT_PLATFORM_HINT}\n\n"
-        "А в ответе показываю найденные ссылки на Spotify, Apple Music, "
-        "Apple Podcasts, YouTube Music, Deezer, Tidal и Yandex Music\n\n"
-        "Обычные YouTube-ссылки оформляю отдельным видео-постом"
+        "В ответ собираю Spotify, Apple, Podcasts, YouTube, Deezer, Tidal и Yandex, если они нашлись\n\n"
+        "Обычный YouTube оформляю как отдельный видео-пост"
     )
     await update.message.reply_text(text)
 
@@ -178,7 +185,7 @@ async def channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     await update.message.reply_text(
-        "Канал StonerHand",
+        "StonerHand рядом",
         reply_markup=InlineKeyboardMarkup(
             [[InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)]]
         ),
@@ -1187,6 +1194,13 @@ async def _try_delete_message(message: Message) -> bool:
         return False
 
     return True
+
+
+async def _post_init(application: Application) -> None:
+    try:
+        await application.bot.set_my_commands(PUBLIC_BOT_COMMANDS)
+    except TelegramError:
+        LOGGER.info("Could not sync bot command menu")
 
 
 async def _post_shutdown(application: Application) -> None:
