@@ -199,11 +199,11 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(
             [(command.command, command.description) for command in PUBLIC_BOT_COMMANDS],
             [
-                ("start", "войти в звук"),
+                ("start", "начать"),
                 ("help", "как кидать ссылки"),
                 ("platforms", "что умею открыть"),
                 ("channel", "канал StonerHand"),
-                ("stats", "сколько звука поймано"),
+                ("stats", "статистика бота"),
             ],
         )
 

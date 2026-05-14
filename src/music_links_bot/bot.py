@@ -68,11 +68,11 @@ DEFAULT_PLATFORM_ORDER = (
     "yandexMusic",
 )
 PUBLIC_BOT_COMMANDS = (
-    BotCommand("start", "войти в звук"),
+    BotCommand("start", "начать"),
     BotCommand("help", "как кидать ссылки"),
     BotCommand("platforms", "что умею открыть"),
     BotCommand("channel", "канал StonerHand"),
-    BotCommand("stats", "сколько звука поймано"),
+    BotCommand("stats", "статистика бота"),
 )
 
 
