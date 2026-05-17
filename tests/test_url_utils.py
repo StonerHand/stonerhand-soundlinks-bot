@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from music_links_bot.url_utils import (
     apple_podcasts_url_type,
     extract_supported_urls,
+    is_spotify_artist_url,
     is_spotify_playlist_url,
     is_supported_music_url,
     is_youtube_video_url,
@@ -19,6 +20,7 @@ class UrlUtilsTests(unittest.TestCase):
     def test_is_supported_music_url_accepts_supported_hosts(self) -> None:
         self.assertTrue(is_supported_music_url("https://open.spotify.com/track/123"))
         self.assertTrue(is_supported_music_url("https://open.spotify.com/playlist/abc"))
+        self.assertTrue(is_supported_music_url("https://open.spotify.com/artist/abc"))
         self.assertTrue(is_supported_music_url("https://open.spotify.com:443/track/123"))
         self.assertTrue(is_supported_music_url("https://podcasts.apple.com/us/podcast/apple-events/id1473854035"))
         self.assertTrue(is_supported_music_url("https://music.youtube.com/watch?v=abc"))
@@ -85,6 +87,12 @@ class UrlUtilsTests(unittest.TestCase):
             is_spotify_playlist_url("https://open.spotify.com/playlist/abc?si=123")
         )
         self.assertFalse(is_spotify_playlist_url("https://open.spotify.com/track/abc"))
+
+    def test_is_spotify_artist_url_detects_artists(self) -> None:
+        self.assertTrue(
+            is_spotify_artist_url("https://open.spotify.com/artist/abc?si=123")
+        )
+        self.assertFalse(is_spotify_artist_url("https://open.spotify.com/playlist/abc"))
 
     def test_spotify_url_type_ignores_other_hosts(self) -> None:
         self.assertIsNone(spotify_url_type("https://example.com/show/abc"))

@@ -2,7 +2,7 @@
 
 [Русская версия](README.ru.md)
 
-Telegram music-link bot built for [@stonerhand](https://t.me/stonerhand). Send a track, album, podcast, Spotify playlist, YouTube video or a pack of release links, and the bot turns them into a clean Telegram post with buttons.
+Telegram music-link bot built for [@stonerhand](https://t.me/stonerhand). Send a track, album, podcast, Spotify playlist, Spotify artist, YouTube video or a pack of links, and the bot turns them into a clean Telegram post with buttons.
 
 It does not just return raw URLs. It formats every link as a small editorial card: artist, title, Telegram preview, StonerHand caption, hashtags and platform buttons. The bot copy is intentionally Russian, because it is tuned for the StonerHand channel voice.
 
@@ -12,13 +12,14 @@ It does not just return raw URLs. It formats every link as a small editorial car
 - Accepts Spotify, Apple Music, Apple Podcasts, YouTube / YouTube Music, Deezer, Tidal, Yandex Music, SoundCloud and podcast links
 - Reads links from regular messages and media captions
 - Turns user-written notes above a link into Telegram quote blocks
-- Supports tracks, albums, EPs, singles, podcasts, podcast shows, Spotify playlists, YouTube videos and multi-link collections
-- Gives tracks, albums, podcasts, playlists and YouTube videos distinct editorial layouts
+- Supports tracks, albums, EPs, singles, podcasts, podcast shows, Spotify playlists, Spotify artists, YouTube videos and multi-link collections
+- Gives tracks, albums, podcasts, playlists, artists and YouTube videos distinct editorial layouts
 - Keeps posts lean: release-cover heading, human CTA, hashtags, preview and buttons
 - Uses direct platform buttons for a single release
 - Places short platform buttons two per row, with the channel button on its own row
 - Uses playlist-style posts for multiple music links or mixed music + YouTube links
 - Formats Spotify playlists as dedicated playlist posts with a direct `▶️ Открыть плейлист` button
+- Formats Spotify artist links as dedicated artist cards with a direct `🧬 Открыть артиста` button
 - Formats regular YouTube links as standalone video posts with a button and preview
 - Treats only real YouTube video URLs as video posts: `watch`, `youtu.be`, `shorts`, `live` and `embed`
 - Keeps `music.youtube.com` in the Song.link music lookup flow
@@ -26,9 +27,9 @@ It does not just return raw URLs. It formats every link as a small editorial car
 - Selects Telegram preview by preferred platform
 - Replaces source messages in groups/channels when the bot has admin rights
 - Hides the `🪨 Открыть канал` self-link when posting directly inside `@stonerhand`
-- Adds smart hashtags: `#track`, `#album`, `#collection`, `#single`, `#ep`, `#podcast`, `#show`
+- Adds smart hashtags: `#track`, `#album`, `#collection`, `#single`, `#ep`, `#podcast`, `#show`, `#playlist`, `#artist`
 - Keeps hashtags in groups and channels, but hides them in private chats
-- Includes public stats and private admin stats via `/stats`, including playlist counts
+- Includes public stats and private admin stats via `/stats`, including playlist and artist counts
 - Does not store message text or source links in stats
 
 ## Post Style
@@ -91,6 +92,17 @@ Spotify playlist:
 #stonerhand #playlist
 ```
 
+Spotify artist:
+
+```text
+🧬 · 1.Kla$
+артист: Spotify
+
+профиль открыт, можно копать глубже
+
+#stonerhand #artist
+```
+
 Collection:
 
 ```text
@@ -136,6 +148,13 @@ Spotify playlist buttons:
 
 ```text
 ▶️ Открыть плейлист
+🪨 Открыть канал
+```
+
+Spotify artist buttons:
+
+```text
+🧬 Открыть артиста
 🪨 Открыть канал
 ```
 

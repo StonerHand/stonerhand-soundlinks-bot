@@ -26,3 +26,10 @@ class PlaylistMatch:
     title: str
     platform: str
     url: str
+
+
+@dataclass(slots=True)
+class ArtistMatch:
+    title: str
+    platform: str
+    url: str

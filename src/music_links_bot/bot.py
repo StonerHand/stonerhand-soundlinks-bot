@@ -18,9 +18,12 @@ from telegram.constants import ParseMode
 from telegram.error import BadRequest, Forbidden, TelegramError
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
+from music_links_bot.artist import ArtistClient, ArtistLookupError
 from music_links_bot.config import Settings
 from music_links_bot.constants import INPUT_PLATFORM_HINT, PLATFORM_LABELS
 from music_links_bot.formatter import (
+    format_artist_collection_message,
+    format_artist_message,
     format_collection_message,
     format_mixed_collection_message,
     format_playlist_collection_message,
@@ -30,13 +33,14 @@ from music_links_bot.formatter import (
     format_video_message,
     prepend_user_text,
 )
-from music_links_bot.models import PlaylistMatch, TrackMatch, VideoMatch
+from music_links_bot.models import ArtistMatch, PlaylistMatch, TrackMatch, VideoMatch
 from music_links_bot.phrases import pick_phrase
 from music_links_bot.playlist import PlaylistClient, PlaylistLookupError
 from music_links_bot.songlink import SonglinkClient, SonglinkError, SonglinkLookupError
 from music_links_bot.stats import (
     format_stats_message,
     load_stats,
+    record_artists,
     record_matches,
     record_mixed,
     record_playlists,
@@ -45,6 +49,7 @@ from music_links_bot.stats import (
 from music_links_bot.url_utils import (
     apple_podcasts_url_type,
     extract_supported_urls,
+    is_spotify_artist_url,
     is_spotify_playlist_url,
     is_youtube_video_url,
     spotify_url_type,
@@ -83,6 +88,7 @@ def build_application(settings: Settings) -> Application:
     )
     youtube_client = YouTubeClient()
     playlist_client = PlaylistClient()
+    artist_client = ArtistClient()
     application = (
         Application.builder()
         .token(settings.bot_token)
@@ -93,6 +99,7 @@ def build_application(settings: Settings) -> Application:
     application.bot_data["songlink_client"] = songlink_client
     application.bot_data["youtube_client"] = youtube_client
     application.bot_data["playlist_client"] = playlist_client
+    application.bot_data["artist_client"] = artist_client
     application.bot_data["admin_chat_id"] = settings.admin_chat_id
     application.bot_data["platform_order"] = _build_platform_order(settings.primary_platform)
 
@@ -117,7 +124,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     text = (
-        "🎧 Кидай ссылку на трек, альбом, плейлист, подкаст или YouTube-видео\n"
+        "🎧 Кидай ссылку на трек, альбом, плейлист, артиста, подкаст или YouTube-видео\n"
         "Я соберу это в аккуратный пост с кнопками\n\n"
         f"Живу рядом с: {INPUT_PLATFORM_HINT}\n\n"
         "Несколько ссылок одним сообщением превращу в подборку\n\n"
@@ -132,7 +139,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     text = (
         "Как это работает:\n\n"
-        "1. Кидаешь ссылку на релиз, плейлист, подкаст или YouTube-видео\n"
+        "1. Кидаешь ссылку на релиз, плейлист, артиста, подкаст или YouTube-видео\n"
         "2. Я подтягиваю площадки, preview и нужный тип поста\n"
         "3. Возвращаю карточку StonerHand с кнопками\n\n"
         "Кинешь несколько ссылок - соберу подборку\n\n"
@@ -148,7 +155,7 @@ async def guide_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     guide = (
         "StonerHand guide\n\n"
-        "1. Ссылка на релиз становится постом с кнопками\n"
+        "1. Ссылка на релиз, артиста или видео становится постом с кнопками\n"
         "2. Несколько ссылок становятся подборкой\n"
         "3. YouTube живет отдельной видео-карточкой\n"
         "4. Для автозамены в чате нужны права админа на управление сообщениями"
@@ -174,7 +181,7 @@ async def platforms_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         "Открываю ссылки из:\n\n"
         f"{INPUT_PLATFORM_HINT}\n\n"
         "В ответ собираю Spotify, Apple, Podcasts, YouTube, Deezer, Tidal и Yandex, если они нашлись\n\n"
-        "Обычный YouTube оформляю как отдельный видео-пост"
+        "Обычный YouTube оформляю как видео-пост, а Spotify artist - как карточку артиста"
     )
     await update.message.reply_text(text)
 
@@ -234,9 +241,23 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return
 
-    playlist_urls, youtube_urls, music_urls = _split_source_urls(source_urls)
+    artist_urls, playlist_urls, youtube_urls, music_urls = _split_source_urls(source_urls)
 
-    if playlist_urls and not youtube_urls and not music_urls:
+    if artist_urls and not playlist_urls and not youtube_urls and not music_urls:
+        artist_client: ArtistClient = context.application.bot_data["artist_client"]
+        artists = await _lookup_artists(artist_client, artist_urls)
+        await _send_artist_result(
+            context.bot,
+            message,
+            artists,
+            user_prefix=user_prefix,
+            include_channel_button=include_channel_button,
+            include_hashtags=include_hashtags,
+        )
+        _record_artists_safely(artists, message)
+        return
+
+    if playlist_urls and not artist_urls and not youtube_urls and not music_urls:
         playlist_client: PlaylistClient = context.application.bot_data["playlist_client"]
         playlists = await _lookup_playlists(playlist_client, playlist_urls)
         await _send_playlist_result(
@@ -250,7 +271,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         _record_playlists_safely(playlists, message)
         return
 
-    if youtube_urls and not playlist_urls and not music_urls:
+    if youtube_urls and not artist_urls and not playlist_urls and not music_urls:
         youtube_client: YouTubeClient = context.application.bot_data["youtube_client"]
         videos = await _lookup_youtube_videos(youtube_client, youtube_urls)
         await _send_youtube_result(
@@ -264,11 +285,12 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         _record_videos_safely(videos, message)
         return
 
-    if youtube_urls or playlist_urls:
+    if youtube_urls or playlist_urls or artist_urls:
         client: SonglinkClient = context.application.bot_data["songlink_client"]
         youtube_client: YouTubeClient = context.application.bot_data["youtube_client"]
         playlist_client: PlaylistClient = context.application.bot_data["playlist_client"]
-        lookup_result, videos, playlists = await asyncio.gather(
+        artist_client: ArtistClient = context.application.bot_data["artist_client"]
+        lookup_result, videos, playlists, artists = await asyncio.gather(
             _lookup_tracks(client, music_urls) if music_urls else _empty_track_lookup(),
             _lookup_youtube_videos(youtube_client, youtube_urls)
             if youtube_urls
@@ -276,6 +298,9 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
             _lookup_playlists(playlist_client, playlist_urls)
             if playlist_urls
             else _empty_playlist_lookup(),
+            _lookup_artists(artist_client, artist_urls)
+            if artist_urls
+            else _empty_artist_lookup(),
         )
         tracks, unavailable_urls = lookup_result
         tracks = [track for track in tracks if track.links]
@@ -287,7 +312,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
                 only_for_channel_message=message,
             )
 
-        item_count = len(tracks) + len(videos) + len(playlists)
+        item_count = len(tracks) + len(videos) + len(playlists) + len(artists)
         if item_count == 0:
             if message.chat.type == "channel":
                 return
@@ -340,6 +365,18 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
             _record_playlists_safely(playlists, message)
             return
 
+        if item_count == 1 and artists:
+            await _send_artist_result(
+                context.bot,
+                message,
+                artists,
+                user_prefix=user_prefix,
+                include_channel_button=include_channel_button,
+                include_hashtags=include_hashtags,
+            )
+            _record_artists_safely(artists, message)
+            return
+
         if item_count > 1:
             await _send_mixed_result(
                 context.bot,
@@ -347,12 +384,13 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
                 tracks,
                 videos,
                 playlists,
+                artists,
                 user_prefix=user_prefix,
                 include_channel_button=include_channel_button,
                 include_hashtags=include_hashtags,
                 context=context,
             )
-            _record_mixed_safely(tracks, videos, playlists, message)
+            _record_mixed_safely(tracks, videos, playlists, artists, message)
             return
 
     client: SonglinkClient = context.application.bot_data["songlink_client"]
@@ -435,27 +473,32 @@ def _select_preview_url(
     return None
 
 
-def _split_source_urls(source_urls: list[str]) -> tuple[list[str], list[str], list[str]]:
+def _split_source_urls(
+    source_urls: list[str],
+) -> tuple[list[str], list[str], list[str], list[str]]:
+    artist_urls: list[str] = []
     playlist_urls: list[str] = []
     youtube_urls: list[str] = []
     music_urls: list[str] = []
 
     for source_url in source_urls:
-        if is_spotify_playlist_url(source_url):
+        if is_spotify_artist_url(source_url):
+            artist_urls.append(source_url)
+        elif is_spotify_playlist_url(source_url):
             playlist_urls.append(source_url)
         elif is_youtube_video_url(source_url):
             youtube_urls.append(source_url)
         else:
             music_urls.append(source_url)
 
-    return playlist_urls, youtube_urls, music_urls
+    return artist_urls, playlist_urls, youtube_urls, music_urls
 
 
 def _format_not_found_message(source_urls: list[str]) -> str:
     seed = ",".join(source_urls)
     return (
         f"{pick_phrase('not_found', seed)}\n\n"
-        "похоже, ссылка не на трек, альбом, подкаст или плейлист"
+        "похоже, ссылка не на трек, альбом, подкаст, плейлист или артиста"
     )
 
 
@@ -490,6 +533,37 @@ async def _lookup_playlists(
     return playlists
 
 
+async def _lookup_artists(
+    client: ArtistClient,
+    source_urls: list[str],
+) -> list[ArtistMatch]:
+    results = await asyncio.gather(
+        *(client.lookup_artist(source_url) for source_url in source_urls),
+        return_exceptions=True,
+    )
+
+    artists: list[ArtistMatch] = []
+    for source_url, result in zip(source_urls, results, strict=False):
+        if isinstance(result, ArtistMatch):
+            artists.append(result)
+            continue
+
+        if isinstance(result, ArtistLookupError):
+            LOGGER.info("Could not fetch artist metadata for %s", source_url)
+        elif isinstance(result, Exception):
+            LOGGER.error(
+                "Unexpected error while fetching artist metadata for %s",
+                source_url,
+                exc_info=(type(result), result, result.__traceback__),
+            )
+
+        artists.append(
+            ArtistMatch(title="Spotify artist", platform="Spotify", url=source_url)
+        )
+
+    return artists
+
+
 async def _empty_track_lookup() -> tuple[list[TrackMatch], list[str]]:
     return [], []
 
@@ -499,6 +573,10 @@ async def _empty_video_lookup() -> list[VideoMatch]:
 
 
 async def _empty_playlist_lookup() -> list[PlaylistMatch]:
+    return []
+
+
+async def _empty_artist_lookup() -> list[ArtistMatch]:
     return []
 
 
@@ -615,19 +693,62 @@ async def _send_playlist_result(
     )
 
 
+async def _send_artist_result(
+    bot: Bot,
+    message: Message,
+    artists: list[ArtistMatch],
+    *,
+    user_prefix: str,
+    include_channel_button: bool,
+    include_hashtags: bool,
+) -> None:
+    if not artists:
+        return
+
+    if len(artists) == 1:
+        artist = artists[0]
+        await _send_track_result(
+            bot,
+            message,
+            user_prefix + format_artist_message(artist, include_hashtags=include_hashtags),
+            preview_url=artist.url,
+            reply_markup=_build_artist_keyboard(
+                artist.url,
+                include_channel_button=include_channel_button,
+            ),
+        )
+        return
+
+    await _send_track_result(
+        bot,
+        message,
+        user_prefix
+        + format_artist_collection_message(
+            artists,
+            include_hashtags=include_hashtags,
+        ),
+        preview_url=artists[0].url,
+        reply_markup=_build_artist_collection_keyboard(
+            artists,
+            include_channel_button=include_channel_button,
+        ),
+    )
+
+
 async def _send_mixed_result(
     bot: Bot,
     message: Message,
     tracks: list[TrackMatch],
     videos: list[VideoMatch],
     playlists: list[PlaylistMatch],
+    artists: list[ArtistMatch],
     *,
     user_prefix: str,
     include_channel_button: bool,
     include_hashtags: bool,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
-    preview_url = _select_mixed_preview_url(tracks, playlists, videos, context)
+    preview_url = _select_mixed_preview_url(tracks, playlists, artists, videos, context)
     await _send_track_result(
         bot,
         message,
@@ -636,6 +757,7 @@ async def _send_mixed_result(
             tracks,
             videos,
             playlists,
+            artists,
             include_hashtags=include_hashtags,
         ),
         preview_url=preview_url,
@@ -643,6 +765,7 @@ async def _send_mixed_result(
             tracks,
             videos,
             playlists,
+            artists,
             include_channel_button=include_channel_button,
         ),
         prefer_large_preview=False,
@@ -652,6 +775,7 @@ async def _send_mixed_result(
 def _select_mixed_preview_url(
     tracks: list[TrackMatch],
     playlists: list[PlaylistMatch],
+    artists: list[ArtistMatch],
     videos: list[VideoMatch],
     context: ContextTypes.DEFAULT_TYPE,
 ) -> str | None:
@@ -660,6 +784,9 @@ def _select_mixed_preview_url(
 
     if playlists:
         return playlists[0].url
+
+    if artists:
+        return artists[0].url
 
     if videos:
         return videos[0].url
@@ -910,6 +1037,18 @@ def _build_playlist_keyboard(
     return InlineKeyboardMarkup(rows)
 
 
+def _build_artist_keyboard(
+    url: str,
+    *,
+    include_channel_button: bool = True,
+) -> InlineKeyboardMarkup:
+    rows = [[InlineKeyboardButton("🧬 Открыть артиста", url=url)]]
+    if include_channel_button:
+        rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
+
+    return InlineKeyboardMarkup(rows)
+
+
 def _build_youtube_collection_keyboard(
     videos: list[VideoMatch],
     *,
@@ -952,14 +1091,37 @@ def _build_playlist_collection_keyboard(
     return InlineKeyboardMarkup(rows)
 
 
+def _build_artist_collection_keyboard(
+    artists: list[ArtistMatch],
+    *,
+    include_channel_button: bool = True,
+) -> InlineKeyboardMarkup:
+    buttons: list[InlineKeyboardButton] = []
+    for index, artist in enumerate(artists, start=1):
+        buttons.append(
+            InlineKeyboardButton(
+                text=_shorten_button_text(f"{index}. {artist.title}"),
+                url=artist.url,
+            )
+        )
+
+    rows = _button_rows(buttons)
+    if include_channel_button:
+        rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
+
+    return InlineKeyboardMarkup(rows)
+
+
 def _build_mixed_collection_keyboard(
     tracks: list[TrackMatch],
     videos: list[VideoMatch],
     playlists: list[PlaylistMatch] | None = None,
+    artists: list[ArtistMatch] | None = None,
     *,
     include_channel_button: bool = True,
 ) -> InlineKeyboardMarkup:
     playlists = playlists or []
+    artists = artists or []
     buttons: list[InlineKeyboardButton] = []
     index = 1
 
@@ -981,6 +1143,15 @@ def _build_mixed_collection_keyboard(
             InlineKeyboardButton(
                 text=_shorten_button_text(f"{index}. {playlist.title}"),
                 url=playlist.url,
+            )
+        )
+        index += 1
+
+    for artist in artists:
+        buttons.append(
+            InlineKeyboardButton(
+                text=_shorten_button_text(f"{index}. {artist.title}"),
+                url=artist.url,
             )
         )
         index += 1
@@ -1086,10 +1257,25 @@ def _record_playlists_safely(playlists: list[PlaylistMatch], message: Message) -
         LOGGER.exception("Could not update playlist stats")
 
 
+def _record_artists_safely(artists: list[ArtistMatch], message: Message) -> None:
+    if not artists:
+        return
+
+    try:
+        record_artists(
+            artists,
+            user=_build_user_stats_entry(message),
+            chat=_build_chat_stats_entry(message),
+        )
+    except Exception:
+        LOGGER.exception("Could not update artist stats")
+
+
 def _record_mixed_safely(
     tracks: list[TrackMatch],
     videos: list[VideoMatch],
     playlists: list[PlaylistMatch],
+    artists: list[ArtistMatch],
     message: Message,
 ) -> None:
     try:
@@ -1097,6 +1283,7 @@ def _record_mixed_safely(
             tracks,
             videos,
             playlists,
+            artists=artists,
             user=_build_user_stats_entry(message),
             chat=_build_chat_stats_entry(message),
         )
@@ -1215,3 +1402,7 @@ async def _post_shutdown(application: Application) -> None:
     playlist_client: PlaylistClient | None = application.bot_data.get("playlist_client")
     if playlist_client is not None:
         await playlist_client.aclose()
+
+    artist_client: ArtistClient | None = application.bot_data.get("artist_client")
+    if artist_client is not None:
+        await artist_client.aclose()

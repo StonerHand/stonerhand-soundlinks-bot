@@ -3,7 +3,7 @@ from __future__ import annotations
 from html import escape
 import hashlib
 
-from music_links_bot.models import PlaylistMatch, TrackMatch, VideoMatch
+from music_links_bot.models import ArtistMatch, PlaylistMatch, TrackMatch, VideoMatch
 from music_links_bot.phrases import pick_phrase
 
 TRACK_EMOJIS = ("🎵", "🎧", "🎶", "🔊", "📻")
@@ -30,6 +30,18 @@ VIDEO_COLLECTION_SIGNATURES = (
     "выбирай, что включить первым",
     "экранная пачка готова",
     "можно смотреть по порядку, можно наугад",
+)
+ARTIST_SIGNATURES = (
+    "точка входа в артиста",
+    "дальше уже дискография",
+    "если зацепило - ныряй в каталог",
+    "профиль открыт, можно копать глубже",
+    "сначала артист, потом все остальное",
+)
+ARTIST_COLLECTION_SIGNATURES = (
+    "артисты рядом, выбирай с кого начать",
+    "несколько входов в разные каталоги",
+    "витрина артистов готова",
 )
 
 
@@ -115,6 +127,41 @@ def format_playlist_message(
     return _with_hashtags(lines, "#stonerhand #playlist", include_hashtags=include_hashtags)
 
 
+def format_artist_message(
+    artist: ArtistMatch,
+    *,
+    include_hashtags: bool = True,
+) -> str:
+    signature = _pick_signature(
+        ARTIST_SIGNATURES,
+        f"{artist.platform}:{artist.title}:{artist.url}",
+    )
+    lines = [
+        f"🧬 · <b>{escape(artist.title)}</b>",
+        f"артист: {escape(artist.platform)}",
+        "",
+        f"<i>{escape(signature)}</i>",
+    ]
+    return _with_hashtags(lines, "#stonerhand #artist", include_hashtags=include_hashtags)
+
+
+def format_artist_collection_message(
+    artists: list[ArtistMatch],
+    *,
+    include_hashtags: bool = True,
+) -> str:
+    signature = _pick_signature(
+        ARTIST_COLLECTION_SIGNATURES,
+        "|".join(artist.url for artist in artists),
+    )
+    lines = ["сегодня по артистам:", ""]
+    for index, artist in enumerate(artists, start=1):
+        lines.append(f"{index}. 🧬 · <b>{escape(artist.title)}</b>")
+
+    lines.extend(["", f"<i>{escape(signature)}</i>"])
+    return _with_hashtags(lines, "#stonerhand #collection #artist", include_hashtags=include_hashtags)
+
+
 def format_playlist_collection_message(
     playlists: list[PlaylistMatch],
     *,
@@ -163,14 +210,17 @@ def format_mixed_collection_message(
     tracks: list[TrackMatch],
     videos: list[VideoMatch],
     playlists: list[PlaylistMatch] | None = None,
+    artists: list[ArtistMatch] | None = None,
     *,
     include_hashtags: bool = True,
 ) -> str:
     playlists = playlists or []
+    artists = artists or []
     seed = "|".join(
         [
             *(f"{track.artist}:{track.title}:{track.kind}" for track in tracks),
             *(f"{playlist.platform}:{playlist.title}:playlist" for playlist in playlists),
+            *(f"{artist.platform}:{artist.title}:artist" for artist in artists),
             *(f"{video.author}:{video.title}:video" for video in videos),
         ]
     )
@@ -189,6 +239,10 @@ def format_mixed_collection_message(
         lines.append(f"{index}. 🎛 · <b>{escape(playlist.title)}</b>")
         index += 1
 
+    for artist in artists:
+        lines.append(f"{index}. 🧬 · <b>{escape(artist.title)}</b>")
+        index += 1
+
     for video in videos:
         lines.append(f"{index}. 📺 · <b>{escape(video.title)}</b>")
         index += 1
@@ -205,6 +259,7 @@ def format_mixed_collection_message(
         build_mixed_collection_hashtags(
             tracks,
             has_playlists=bool(playlists),
+            has_artists=bool(artists),
             has_videos=bool(videos),
         ),
         include_hashtags=include_hashtags,
@@ -287,11 +342,15 @@ def build_mixed_collection_hashtags(
     tracks: list[TrackMatch],
     *,
     has_playlists: bool = False,
+    has_artists: bool = False,
     has_videos: bool = True,
 ) -> str:
     hashtags = build_collection_hashtags(tracks).split()
     if has_playlists and "#playlist" not in hashtags:
         hashtags.append("#playlist")
+
+    if has_artists and "#artist" not in hashtags:
+        hashtags.append("#artist")
 
     if has_videos and "#video" not in hashtags:
         hashtags.append("#video")

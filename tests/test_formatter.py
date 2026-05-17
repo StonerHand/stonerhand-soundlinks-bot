@@ -5,12 +5,16 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from music_links_bot.formatter import (
+    ARTIST_COLLECTION_SIGNATURES,
+    ARTIST_SIGNATURES,
     PLAYLIST_COLLECTION_SIGNATURES,
     PLAYLIST_SIGNATURES,
     VIDEO_COLLECTION_SIGNATURES,
     VIDEO_SIGNATURES,
     _pick_signature,
     format_collection_message,
+    format_artist_collection_message,
+    format_artist_message,
     format_mixed_collection_message,
     format_playlist_collection_message,
     format_playlist_message,
@@ -20,7 +24,7 @@ from music_links_bot.formatter import (
     pick_track_emoji,
     prepend_user_text,
 )
-from music_links_bot.models import PlaylistMatch, TrackMatch, VideoMatch
+from music_links_bot.models import ArtistMatch, PlaylistMatch, TrackMatch, VideoMatch
 from music_links_bot.phrases import pick_phrase
 
 
@@ -210,6 +214,25 @@ class FormatterTests(unittest.TestCase):
             "#stonerhand #playlist",
         )
 
+    def test_format_artist_message_uses_artist_style(self) -> None:
+        artist = ArtistMatch(
+            title="1.Kla$",
+            platform="Spotify",
+            url="https://open.spotify.com/artist/abc",
+        )
+        signature = _pick_signature(
+            ARTIST_SIGNATURES,
+            "Spotify:1.Kla$:https://open.spotify.com/artist/abc",
+        )
+
+        self.assertEqual(
+            format_artist_message(artist),
+            "🧬 · <b>1.Kla$</b>\n"
+            "артист: Spotify\n\n"
+            f"<i>{signature}</i>\n\n"
+            "#stonerhand #artist",
+        )
+
     def test_format_playlist_collection_message_lists_playlists(self) -> None:
         playlists = [
             PlaylistMatch(title="Women of Punk", platform="Spotify", url="https://open.spotify.com/playlist/1"),
@@ -227,6 +250,25 @@ class FormatterTests(unittest.TestCase):
             "2. 🎛 · <b>Dark Wave</b>\n\n"
             f"<i>{signature}</i>\n\n"
             "#stonerhand #collection #playlist",
+        )
+
+    def test_format_artist_collection_message_lists_artists(self) -> None:
+        artists = [
+            ArtistMatch(title="1.Kla$", platform="Spotify", url="https://open.spotify.com/artist/1"),
+            ArtistMatch(title="Hotbox", platform="Spotify", url="https://open.spotify.com/artist/2"),
+        ]
+        signature = _pick_signature(
+            ARTIST_COLLECTION_SIGNATURES,
+            "https://open.spotify.com/artist/1|https://open.spotify.com/artist/2",
+        )
+
+        self.assertEqual(
+            format_artist_collection_message(artists),
+            "сегодня по артистам:\n\n"
+            "1. 🧬 · <b>1.Kla$</b>\n"
+            "2. 🧬 · <b>Hotbox</b>\n\n"
+            f"<i>{signature}</i>\n\n"
+            "#stonerhand #collection #artist",
         )
 
     def test_format_video_collection_message_lists_videos(self) -> None:
@@ -279,6 +321,24 @@ class FormatterTests(unittest.TestCase):
         self.assertIn("1. 🎛 · <b>Women of Punk</b>", message)
         self.assertIn("2. 📺 · <b>Live</b>", message)
         self.assertIn("#stonerhand #collection #playlist #video", message)
+
+    def test_format_mixed_collection_message_lists_artists(self) -> None:
+        artists = [
+            ArtistMatch(
+                title="1.Kla$",
+                platform="Spotify",
+                url="https://open.spotify.com/artist/1",
+            )
+        ]
+        videos = [
+            VideoMatch(title="Live", author="Channel", url="https://youtu.be/1"),
+        ]
+
+        message = format_mixed_collection_message([], videos, artists=artists)
+
+        self.assertIn("1. 🧬 · <b>1.Kla$</b>", message)
+        self.assertIn("2. 📺 · <b>Live</b>", message)
+        self.assertIn("#stonerhand #collection #artist #video", message)
 
 
 if __name__ == "__main__":

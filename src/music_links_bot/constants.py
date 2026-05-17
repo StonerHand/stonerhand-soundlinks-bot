@@ -42,6 +42,6 @@ PLATFORM_ALIASES = {
 }
 
 INPUT_PLATFORM_HINT = (
-    "Spotify (треки, альбомы, плейлисты), Apple Music / Apple Podcasts, "
+    "Spotify (треки, альбомы, плейлисты, артисты), Apple Music / Apple Podcasts, "
     "YouTube / YouTube Music, Deezer, Tidal, Yandex Music или SoundCloud"
 )
