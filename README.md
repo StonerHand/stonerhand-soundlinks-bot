@@ -18,7 +18,7 @@ It does not just return raw URLs. It formats every link as a small editorial car
 - Uses direct platform buttons for a single release
 - Places short platform buttons two per row, with the channel button on its own row
 - Uses playlist-style posts for multiple music links or mixed music + YouTube links
-- Formats Spotify playlists as dedicated playlist posts with a direct `▶️ Открыть плейлист` button
+- Formats Spotify playlists as dedicated playlist posts with a direct `🎛 Открыть плейлист` button
 - Formats Spotify artist links as dedicated artist cards with a direct `🧬 Открыть артиста` button
 - Formats regular YouTube links as standalone video posts with a button and preview
 - Treats only real YouTube video URLs as video posts: `watch`, `youtu.be`, `shorts`, `live` and `embed`
@@ -147,7 +147,7 @@ Single-release buttons:
 Spotify playlist buttons:
 
 ```text
-▶️ Открыть плейлист
+🎛 Открыть плейлист
 🪨 Открыть канал
 ```
 
@@ -161,8 +161,8 @@ Spotify artist buttons:
 Collection buttons:
 
 ```text
-1. Youth Code - Transitions | 2. Show Me The Body - Camp Orchestra
-3. The Soft Moon - Criminal
+🎧 1. Youth Code - Transitions | 🎧 2. Show Me The Body - Camp Orchestra
+💿 3. The Soft Moon - Criminal | 📺 4. Live Session
 🪨 Открыть канал
 ```
 

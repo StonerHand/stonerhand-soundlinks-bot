@@ -237,7 +237,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         no_url_text = pick_phrase("no_url", message_text or str(message.chat_id))
         await message.reply_text(
             f"{no_url_text}\n\n"
-            f"Пришлите ссылку из сервисов: {INPUT_PLATFORM_HINT}"
+            f"кинь ссылку из: {INPUT_PLATFORM_HINT}"
         )
         return
 
@@ -498,7 +498,7 @@ def _format_not_found_message(source_urls: list[str]) -> str:
     seed = ",".join(source_urls)
     return (
         f"{pick_phrase('not_found', seed)}\n\n"
-        "похоже, ссылка не на трек, альбом, подкаст, плейлист или артиста"
+        "проверь, что это ссылка на трек, альбом, подкаст, плейлист или артиста"
     )
 
 
@@ -1001,7 +1001,9 @@ def _build_collection_keyboard(
 
         buttons.append(
             InlineKeyboardButton(
-                text=_shorten_button_text(f"{index}. {track.artist} - {track.title}"),
+                text=_shorten_button_text(
+                    f"{_track_button_icon(track)} {index}. {track.artist} - {track.title}"
+                ),
                 url=destination,
             )
         )
@@ -1018,7 +1020,7 @@ def _build_youtube_keyboard(
     *,
     include_channel_button: bool = True,
 ) -> InlineKeyboardMarkup:
-    rows = [[InlineKeyboardButton("▶️ Смотреть на YouTube", url=url)]]
+    rows = [[InlineKeyboardButton("📺 Смотреть на YouTube", url=url)]]
     if include_channel_button:
         rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
 
@@ -1030,7 +1032,7 @@ def _build_playlist_keyboard(
     *,
     include_channel_button: bool = True,
 ) -> InlineKeyboardMarkup:
-    rows = [[InlineKeyboardButton("▶️ Открыть плейлист", url=url)]]
+    rows = [[InlineKeyboardButton("🎛 Открыть плейлист", url=url)]]
     if include_channel_button:
         rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
 
@@ -1058,7 +1060,7 @@ def _build_youtube_collection_keyboard(
     for index, video in enumerate(videos, start=1):
         buttons.append(
             InlineKeyboardButton(
-                text=_shorten_button_text(f"{index}. {video.title}"),
+                text=_shorten_button_text(f"📺 {index}. {video.title}"),
                 url=video.url,
             )
         )
@@ -1079,7 +1081,7 @@ def _build_playlist_collection_keyboard(
     for index, playlist in enumerate(playlists, start=1):
         buttons.append(
             InlineKeyboardButton(
-                text=_shorten_button_text(f"{index}. {playlist.title}"),
+                text=_shorten_button_text(f"🎛 {index}. {playlist.title}"),
                 url=playlist.url,
             )
         )
@@ -1100,7 +1102,7 @@ def _build_artist_collection_keyboard(
     for index, artist in enumerate(artists, start=1):
         buttons.append(
             InlineKeyboardButton(
-                text=_shorten_button_text(f"{index}. {artist.title}"),
+                text=_shorten_button_text(f"🧬 {index}. {artist.title}"),
                 url=artist.url,
             )
         )
@@ -1132,7 +1134,9 @@ def _build_mixed_collection_keyboard(
 
         buttons.append(
             InlineKeyboardButton(
-                text=_shorten_button_text(f"{index}. {track.artist} - {track.title}"),
+                text=_shorten_button_text(
+                    f"{_track_button_icon(track)} {index}. {track.artist} - {track.title}"
+                ),
                 url=destination,
             )
         )
@@ -1141,7 +1145,7 @@ def _build_mixed_collection_keyboard(
     for playlist in playlists:
         buttons.append(
             InlineKeyboardButton(
-                text=_shorten_button_text(f"{index}. {playlist.title}"),
+                text=_shorten_button_text(f"🎛 {index}. {playlist.title}"),
                 url=playlist.url,
             )
         )
@@ -1150,7 +1154,7 @@ def _build_mixed_collection_keyboard(
     for artist in artists:
         buttons.append(
             InlineKeyboardButton(
-                text=_shorten_button_text(f"{index}. {artist.title}"),
+                text=_shorten_button_text(f"🧬 {index}. {artist.title}"),
                 url=artist.url,
             )
         )
@@ -1159,7 +1163,7 @@ def _build_mixed_collection_keyboard(
     for video in videos:
         buttons.append(
             InlineKeyboardButton(
-                text=_shorten_button_text(f"{index}. {video.title}"),
+                text=_shorten_button_text(f"📺 {index}. {video.title}"),
                 url=video.url,
             )
         )
@@ -1201,6 +1205,16 @@ def _shorten_button_text(text: str) -> str:
         return text
 
     return text[: MAX_BUTTON_TEXT_LENGTH - 1].rstrip() + "…"
+
+
+def _track_button_icon(track: TrackMatch) -> str:
+    if track.kind == "album":
+        return "💿"
+
+    if track.kind == "podcast":
+        return "🎙️"
+
+    return "🎧"
 
 
 def _button_rows(buttons: list[InlineKeyboardButton]) -> list[list[InlineKeyboardButton]]:
