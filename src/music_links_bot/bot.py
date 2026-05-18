@@ -336,6 +336,9 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
                     track.links,
                     context=context,
                     include_channel_button=include_channel_button,
+                    release_page_url=track.page_url,
+                    release_kind=track.kind,
+                    release_format=track.release_format,
                 ),
                 prefer_large_preview=True,
             )
@@ -439,6 +442,9 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
                 track.links,
                 context=context,
                 include_channel_button=include_channel_button,
+                release_page_url=track.page_url,
+                release_kind=track.kind,
+                release_format=track.release_format,
             ),
             prefer_large_preview=True,
         )
@@ -968,6 +974,9 @@ def _build_link_keyboard(
     prefix: str = "",
     context: ContextTypes.DEFAULT_TYPE | None = None,
     include_channel_button: bool = True,
+    release_page_url: str | None = None,
+    release_kind: str = "song",
+    release_format: str | None = None,
 ) -> InlineKeyboardMarkup:
     platform_order = _get_platform_order(context)
     ordered_platforms = [
@@ -987,7 +996,18 @@ def _build_link_keyboard(
         )
         for platform_key in [*ordered_platforms, *remaining_platforms]
     ]
-    rows = _button_rows(buttons)
+    rows: list[list[InlineKeyboardButton]] = []
+    if release_page_url:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    _release_hub_button_label(release_kind, release_format),
+                    url=release_page_url,
+                )
+            ]
+        )
+
+    rows.extend(_button_rows(buttons))
     if include_channel_button:
         rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
 
@@ -1222,6 +1242,19 @@ def _track_button_icon(track: TrackMatch) -> str:
         return "🎙️"
 
     return "🎧"
+
+
+def _release_hub_button_label(release_kind: str, release_format: str | None) -> str:
+    if release_kind == "album":
+        if release_format == "ep":
+            return "💿 Весь EP"
+
+        return "💿 Весь релиз"
+
+    if release_kind == "podcast":
+        return "🎙 Все площадки"
+
+    return "🪩 Все платформы"
 
 
 def _button_rows(buttons: list[InlineKeyboardButton]) -> list[list[InlineKeyboardButton]]:

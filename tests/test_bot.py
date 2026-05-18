@@ -286,6 +286,42 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[1][0].text, "🟦 Deezer")
         self.assertEqual(rows[1][1].text, "🌊 Tidal")
 
+    def test_release_keyboard_adds_songlink_hub_button(self) -> None:
+        keyboard = _build_link_keyboard(
+            {
+                "spotify": "https://open.spotify.com/track/1",
+                "appleMusic": "https://music.apple.com/song/1",
+            },
+            include_channel_button=False,
+            release_page_url="https://song.link/transitions",
+        )
+
+        rows = keyboard.inline_keyboard
+        self.assertEqual(rows[0][0].text, "🪩 Все платформы")
+        self.assertEqual(rows[0][0].url, "https://song.link/transitions")
+        self.assertEqual(rows[1][0].text, "🟢 Spotify")
+        self.assertEqual(rows[1][1].text, "🍎 Apple")
+
+    def test_album_release_keyboard_uses_release_hub_label(self) -> None:
+        keyboard = _build_link_keyboard(
+            {"spotify": "https://open.spotify.com/album/1"},
+            include_channel_button=False,
+            release_page_url="https://album.link/release",
+            release_kind="album",
+        )
+
+        self.assertEqual(keyboard.inline_keyboard[0][0].text, "💿 Весь релиз")
+
+    def test_podcast_release_keyboard_uses_podcast_hub_label(self) -> None:
+        keyboard = _build_link_keyboard(
+            {"applePodcasts": "https://podcasts.apple.com/show/1"},
+            include_channel_button=False,
+            release_page_url="https://podcasts.apple.com/show/1",
+            release_kind="podcast",
+        )
+
+        self.assertEqual(keyboard.inline_keyboard[0][0].text, "🎙 Все площадки")
+
     def test_collection_keyboard_can_hide_channel_button(self) -> None:
         keyboard = _build_collection_keyboard(
             [
@@ -533,6 +569,10 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(message.replies), 1)
         self.assertIn("<b>Youth Code</b>\nTransitions", message.replies[0])
+        keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
+        self.assertEqual(keyboard[0][0].text, "🪩 Все платформы")
+        self.assertEqual(keyboard[0][0].url, "https://song.link/transitions")
+        self.assertEqual(keyboard[1][0].text, "🟢 Spotify")
         preview_options = message.reply_kwargs[0]["link_preview_options"]
         self.assertTrue(preview_options.prefer_large_media)
         self.assertFalse(preview_options.prefer_small_media)
