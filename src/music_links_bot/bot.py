@@ -337,6 +337,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
                     context=context,
                     include_channel_button=include_channel_button,
                 ),
+                prefer_large_preview=True,
             )
             _record_matches_safely([track], message)
             return
@@ -439,6 +440,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
                 context=context,
                 include_channel_button=include_channel_button,
             ),
+            prefer_large_preview=True,
         )
         _record_matches_safely([track], message)
         return
@@ -456,6 +458,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
             tracks,
             include_channel_button=include_channel_button,
         ),
+        prefer_large_preview=True,
     )
     _record_matches_safely(tracks, message)
 
@@ -674,6 +677,7 @@ async def _send_playlist_result(
                 playlist.url,
                 include_channel_button=include_channel_button,
             ),
+            prefer_large_preview=True,
         )
         return
 
@@ -690,6 +694,7 @@ async def _send_playlist_result(
             playlists,
             include_channel_button=include_channel_button,
         ),
+        prefer_large_preview=True,
     )
 
 
@@ -716,6 +721,7 @@ async def _send_artist_result(
                 artist.url,
                 include_channel_button=include_channel_button,
             ),
+            prefer_large_preview=True,
         )
         return
 
@@ -732,6 +738,7 @@ async def _send_artist_result(
             artists,
             include_channel_button=include_channel_button,
         ),
+        prefer_large_preview=True,
     )
 
 
@@ -768,7 +775,7 @@ async def _send_mixed_result(
             artists,
             include_channel_button=include_channel_button,
         ),
-        prefer_large_preview=False,
+        prefer_large_preview=True,
     )
 
 
