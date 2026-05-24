@@ -1,0 +1,23 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "builds": [
+    {
+      "src": "api/telegram.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "api/set_webhook.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/telegram",
+      "dest": "api/telegram.py"
+    },
+    {
+      "src": "/api/set_webhook",
+      "dest": "api/set_webhook.py"
+    }
+  ]
+}
