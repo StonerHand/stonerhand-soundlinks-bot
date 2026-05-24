@@ -245,6 +245,43 @@ PYTHONPATH=src python -m music_links_bot
 
 On macOS, stop the local process with `Control + C`.
 
+## Vercel Deploy
+
+Vercel runs the bot through a Telegram webhook. It is a serverless setup: your Mac and Zed can be closed, and Telegram will call the bot URL whenever a new update arrives.
+
+1. Import `StonerHand/TG_bot_SH` into Vercel
+2. Keep `Application Preset` as `Python`
+3. Keep `Root Directory` as `./`
+4. Add environment variables:
+
+```env
+BOT_TOKEN=your-telegram-bot-token
+SONGLINK_USER_COUNTRIES=US
+LOG_LEVEL=INFO
+PRIMARY_PLATFORM=spotify
+```
+
+5. Optionally add:
+
+```env
+ADMIN_CHAT_ID=your-telegram-chat-id
+SONGLINK_API_KEY=
+```
+
+6. Click `Deploy`
+7. After a successful deployment, open:
+
+```text
+https://your-vercel-domain.vercel.app/api/set_webhook
+```
+
+If Telegram returns `"ok": true`, the webhook is connected. After that, the bot answers through Vercel and the old Railway worker can be stopped.
+
+Endpoints:
+
+- `/api/telegram` - Telegram webhook
+- `/api/set_webhook` - one-click webhook setup for the current Vercel domain
+
 ## Railway Deploy
 
 Railway runs the bot as a background worker. After deploy, your Mac and Zed can be closed, and the bot stays online.
@@ -280,6 +317,10 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 ## Architecture
 
 ```text
+api/
+├── telegram.py    Vercel webhook endpoint
+└── set_webhook.py one-click Telegram webhook setup
+
 src/music_links_bot/
 ├── bot.py        Telegram handlers, keyboards, group/channel replacement
 ├── cache.py      small TTL cache for repeated external lookups
@@ -314,7 +355,8 @@ src/music_links_bot/
 ## Safety Notes
 
 - Never commit `.env` or bot tokens
-- If the bot does not answer after deploy, check `BOT_TOKEN` in Railway Variables first
-- If the bot runs locally and on Railway at the same time, polling conflicts may happen
+- If the bot does not answer after deploy, check `BOT_TOKEN` in hosting environment variables first
+- If you move to Vercel, stop Railway/local polling and open `/api/set_webhook`
+- If the bot runs locally through polling and on another polling host at the same time, polling conflicts may happen
 - Channel/group post replacement requires admin rights to delete messages
 - `/stats` stores counters, ids, labels and last seen, but not message text or source links

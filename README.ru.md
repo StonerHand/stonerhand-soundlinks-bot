@@ -245,6 +245,43 @@ PYTHONPATH=src python -m music_links_bot
 
 На Mac остановить локального бота можно через `Control + C`.
 
+## Vercel deploy
+
+Vercel запускает бота через Telegram webhook. Это бесплатный serverless-режим: Mac и Zed можно закрывать, а Telegram будет дергать URL бота при каждом сообщении.
+
+1. Импортируй репозиторий `StonerHand/TG_bot_SH` в Vercel
+2. `Application Preset` оставь `Python`
+3. `Root Directory` оставь `./`
+4. В `Environment Variables` добавь:
+
+```env
+BOT_TOKEN=your-telegram-bot-token
+SONGLINK_USER_COUNTRIES=US
+LOG_LEVEL=INFO
+PRIMARY_PLATFORM=spotify
+```
+
+5. При желании добавь:
+
+```env
+ADMIN_CHAT_ID=your-telegram-chat-id
+SONGLINK_API_KEY=
+```
+
+6. Нажми `Deploy`
+7. После успешного деплоя открой в браузере:
+
+```text
+https://your-vercel-domain.vercel.app/api/set_webhook
+```
+
+Если Telegram вернул `"ok": true`, webhook подключен. После этого бот отвечает через Vercel, а Railway можно остановить.
+
+Основные endpoint'ы:
+
+- `/api/telegram` - Telegram webhook
+- `/api/set_webhook` - одноразовая установка webhook на текущий Vercel-домен
+
 ## Railway deploy
 
 Railway запускает бота как background worker. После деплоя Mac и Zed можно закрывать, бот останется онлайн.
@@ -280,6 +317,10 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 ## Архитектура
 
 ```text
+api/
+├── telegram.py   Vercel webhook endpoint
+└── set_webhook.py one-click Telegram webhook setup
+
 src/music_links_bot/
 ├── bot.py        Telegram handlers, keyboards, group/channel replacement
 ├── cache.py      TTL-кеш для повторных внешних запросов
@@ -315,7 +356,8 @@ src/music_links_bot/
 ## Важно
 
 - Никогда не коммить `.env` и токен бота
-- Если бот не отвечает после деплоя, первым делом проверь `BOT_TOKEN` в Railway Variables
-- Если бот запущен локально и на Railway одновременно, могут быть конфликты polling
+- Если бот не отвечает после деплоя, первым делом проверь `BOT_TOKEN` в переменных окружения хостинга
+- Если переходишь на Vercel, останови Railway/local polling и открой `/api/set_webhook`
+- Если бот запущен локально через polling и на другом polling-хостинге одновременно, могут быть конфликты
 - Для автозамены постов в канале нужны права админа на удаление сообщений
 - `/stats` хранит только счетчики, ids, labels и last seen, без текстов переписок и без исходных ссылок

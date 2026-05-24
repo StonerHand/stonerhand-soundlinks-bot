@@ -119,6 +119,31 @@ def build_application(settings: Settings) -> Application:
     return application
 
 
+async def sync_application_commands(application: Application) -> None:
+    try:
+        await application.bot.set_my_commands(PUBLIC_BOT_COMMANDS)
+    except TelegramError:
+        LOGGER.info("Could not sync bot command menu")
+
+
+async def close_application_resources(application: Application) -> None:
+    client: SonglinkClient | None = application.bot_data.get("songlink_client")
+    if client is not None:
+        await client.aclose()
+
+    youtube_client: YouTubeClient | None = application.bot_data.get("youtube_client")
+    if youtube_client is not None:
+        await youtube_client.aclose()
+
+    playlist_client: PlaylistClient | None = application.bot_data.get("playlist_client")
+    if playlist_client is not None:
+        await playlist_client.aclose()
+
+    artist_client: ArtistClient | None = application.bot_data.get("artist_client")
+    if artist_client is not None:
+        await artist_client.aclose()
+
+
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message:
         return
@@ -1438,25 +1463,8 @@ async def _try_delete_message(message: Message) -> bool:
 
 
 async def _post_init(application: Application) -> None:
-    try:
-        await application.bot.set_my_commands(PUBLIC_BOT_COMMANDS)
-    except TelegramError:
-        LOGGER.info("Could not sync bot command menu")
+    await sync_application_commands(application)
 
 
 async def _post_shutdown(application: Application) -> None:
-    client: SonglinkClient | None = application.bot_data.get("songlink_client")
-    if client is not None:
-        await client.aclose()
-
-    youtube_client: YouTubeClient | None = application.bot_data.get("youtube_client")
-    if youtube_client is not None:
-        await youtube_client.aclose()
-
-    playlist_client: PlaylistClient | None = application.bot_data.get("playlist_client")
-    if playlist_client is not None:
-        await playlist_client.aclose()
-
-    artist_client: ArtistClient | None = application.bot_data.get("artist_client")
-    if artist_client is not None:
-        await artist_client.aclose()
+    await close_application_resources(application)
