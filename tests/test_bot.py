@@ -558,9 +558,10 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(keyboard[0][0].url, "https://www.youtube.com/watch?v=abc123")
         self.assertTrue(preview_options.prefer_large_media)
         self.assertFalse(preview_options.prefer_small_media)
+        self.assertTrue(preview_options.show_above_text)
         record_videos.assert_called_once()
 
-    async def test_spotify_track_links_use_compact_preview(self) -> None:
+    async def test_spotify_track_links_request_large_preview_above_text(self) -> None:
         message = PrivateSpotifyTrackMessageStub()
         context = ContextStub()
 
@@ -574,8 +575,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(keyboard[0][0].url, "https://song.link/transitions")
         self.assertEqual(keyboard[1][0].text, "🟢 Spotify")
         preview_options = message.reply_kwargs[0]["link_preview_options"]
-        self.assertFalse(preview_options.prefer_large_media)
-        self.assertTrue(preview_options.prefer_small_media)
+        self.assertTrue(preview_options.prefer_large_media)
+        self.assertFalse(preview_options.prefer_small_media)
+        self.assertTrue(preview_options.show_above_text)
         record_matches.assert_called_once()
 
     async def test_spotify_playlist_links_use_playlist_post(self) -> None:
@@ -595,8 +597,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             "https://open.spotify.com/playlist/37i9dQZF1DX51TD2wakW3K?si=123",
         )
         preview_options = message.reply_kwargs[0]["link_preview_options"]
-        self.assertFalse(preview_options.prefer_large_media)
-        self.assertTrue(preview_options.prefer_small_media)
+        self.assertTrue(preview_options.prefer_large_media)
+        self.assertFalse(preview_options.prefer_small_media)
+        self.assertTrue(preview_options.show_above_text)
         record_playlists.assert_called_once()
 
     async def test_spotify_artist_links_use_artist_post(self) -> None:
@@ -617,8 +620,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             "https://open.spotify.com/artist/2KbKmQQgFN6MabWViBVlO6?si=123",
         )
         preview_options = message.reply_kwargs[0]["link_preview_options"]
-        self.assertFalse(preview_options.prefer_large_media)
-        self.assertTrue(preview_options.prefer_small_media)
+        self.assertTrue(preview_options.prefer_large_media)
+        self.assertFalse(preview_options.prefer_small_media)
+        self.assertTrue(preview_options.show_above_text)
         record_artists.assert_called_once()
 
     async def test_mixed_music_and_youtube_links_use_collection_post(self) -> None:
@@ -637,8 +641,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         preview_options = message.reply_kwargs[0]["link_preview_options"]
         self.assertEqual(keyboard[0][0].text, "🎧 1. Youth Code - Transitions")
         self.assertEqual(keyboard[0][1].text, "📺 2. SANSAE Live Session Vol.3 - Melon")
-        self.assertFalse(preview_options.prefer_large_media)
-        self.assertTrue(preview_options.prefer_small_media)
+        self.assertTrue(preview_options.prefer_large_media)
+        self.assertFalse(preview_options.prefer_small_media)
+        self.assertTrue(preview_options.show_above_text)
         record_mixed.assert_called_once()
 
     async def test_mixed_playlist_and_youtube_links_keep_both_items(self) -> None:
