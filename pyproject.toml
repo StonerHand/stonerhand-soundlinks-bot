@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "music-links-telegram-bot"
+name = "stonerhand-soundlinks-bot"
 version = "0.1.0"
-description = "Telegram bot that resolves music track links across streaming platforms."
+description = "Telegram bot that turns music, podcast and YouTube links into editorial Telegram posts."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

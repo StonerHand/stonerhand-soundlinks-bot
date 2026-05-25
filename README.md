@@ -1,8 +1,8 @@
 <div align="center">
 
-# StonerHandBot
+# StonerHand Soundlinks Bot
 
-**A Telegram-first music link formatter for channels, groups and private chats**
+**Open-source Telegram bot for turning music links into clean editorial posts**
 
 [Русская версия](README.ru.md)
 
@@ -10,8 +10,9 @@
 ![Telegram](https://img.shields.io/badge/Telegram-Bot-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-Webhook-000000?style=for-the-badge&logo=vercel&logoColor=white)
 ![Song.link](https://img.shields.io/badge/Song.link-Odesli-FF6B6B?style=for-the-badge)
+![GitHub](https://img.shields.io/badge/GitHub-stonerhand--soundlinks--bot-181717?style=for-the-badge&logo=github&logoColor=white)
 
-`music links -> editorial posts -> clean inline buttons`
+`streaming URL -> normalized release -> Telegram-ready post`
 
 </div>
 
@@ -19,9 +20,9 @@
 
 ## What It Does
 
-StonerHandBot turns messy music URLs into compact Telegram posts with a consistent editorial style. Send a track, album, podcast, Spotify playlist, Spotify artist, YouTube video or several links at once, and the bot builds a clean card with title, preview, hashtags and platform buttons.
+StonerHand Soundlinks Bot turns messy music URLs into compact Telegram posts with a consistent editorial style. Send a track, album, podcast, Spotify playlist, Spotify artist, YouTube video or several links at once, and the bot builds a clean card with title, preview, hashtags and platform buttons.
 
-It is tuned for [@stonerhand](https://t.me/stonerhand), but the architecture is generic enough to be reused for other music channels.
+The default copy is tuned for [@stonerhand](https://t.me/stonerhand), but the architecture is intentionally reusable: swap the channel handle, phrase bank, button labels and platform priority, and it becomes a solid base for another music channel.
 
 ```text
 input
@@ -73,6 +74,17 @@ Track
 | Deployment | Vercel webhook or Railway worker |
 | Configuration | Environment variables and optional `.env` |
 | Testing | `unittest` plus compile checks |
+
+## Why It Is Public-Ready
+
+| Area | Status |
+| --- | --- |
+| Secrets | No real tokens are committed; use `.env` locally and hosting environment variables in production |
+| Local files | `.env`, `.venv`, stats files, caches and generated egg-info are ignored |
+| Deployment | Vercel webhook and Railway worker setups are documented |
+| Branding | StonerHand-specific copy lives in formatters, constants and phrase banks |
+| Forkability | The core flow is separated into URL parsing, metadata clients, formatting, keyboards and transport |
+| Safety | Webhook setup can be protected with `SET_WEBHOOK_SECRET` |
 
 ## Visual Language
 
@@ -286,7 +298,7 @@ On macOS, stop the local bot with `Control + C`.
 
 Vercel is the recommended serverless deployment path for this bot. Telegram sends updates to `/api/telegram`, so your Mac and editor can be closed.
 
-1. Import `StonerHand/TG_bot_SH` into Vercel
+1. Import `StonerHand/stonerhand-soundlinks-bot` into Vercel
 2. Keep `Application Preset` as `Python`
 3. Keep `Root Directory` as `./`
 4. Add production environment variables
@@ -347,12 +359,25 @@ python -m compileall -q src tests api
 - `ADMIN_CHAT_ID` is configured if private stats or admin notifications are needed
 - `SET_WEBHOOK_SECRET` is configured for a safer setup endpoint
 - Tokens are never committed to git
+- Tokens are rotated if they were ever pasted into a public place
 
 ## Privacy
 
 The bot processes URLs to build Telegram posts. It does not ask for passwords, payment data or personal files. Local stats are intentionally minimal: counters, chat ids, labels and last-seen timestamps. Message text and original source links are not stored in stats.
 
 On Vercel, file-based stats are temporary unless `STATS_PATH` points to persistent storage. For serious analytics, connect a database later.
+
+## Customization
+
+For another channel, start with these files:
+
+| File | What to change |
+| --- | --- |
+| `src/music_links_bot/constants.py` | Channel URL, platform labels, platform priority |
+| `src/music_links_bot/phrases.py` | CTA and error phrase banks |
+| `src/music_links_bot/formatter.py` | Post layout, hashtags, title style |
+| `src/music_links_bot/bot.py` | Command copy, intro text, admin behavior |
+| `.env.example` | Deployment defaults for your environment |
 
 ## Troubleshooting
 
@@ -367,4 +392,4 @@ On Vercel, file-based stats are temporary unless `STATS_PATH` points to persiste
 
 ## License
 
-Private project for StonerHand experiments. Reuse the architecture if it helps, but keep tokens, channel identity and deployment secrets private.
+No license file is included yet. If you want people to freely fork, modify and reuse the project, add an explicit license such as MIT or Apache-2.0.

@@ -1,8 +1,8 @@
 <div align="center">
 
-# StonerHandBot
+# StonerHand Soundlinks Bot
 
-**Telegram-бот, который превращает музыкальные ссылки в аккуратные посты**
+**Открытый Telegram-бот, который превращает музыкальные ссылки в аккуратные посты**
 
 [English version](README.md)
 
@@ -10,8 +10,9 @@
 ![Telegram](https://img.shields.io/badge/Telegram-Bot-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-Webhook-000000?style=for-the-badge&logo=vercel&logoColor=white)
 ![Song.link](https://img.shields.io/badge/Song.link-Odesli-FF6B6B?style=for-the-badge)
+![GitHub](https://img.shields.io/badge/GitHub-stonerhand--soundlinks--bot-181717?style=for-the-badge&logo=github&logoColor=white)
 
-`ссылка -> карточка -> preview -> кнопки`
+`стриминговая ссылка -> релиз -> готовый Telegram-пост`
 
 </div>
 
@@ -19,9 +20,9 @@
 
 ## Обзор
 
-StonerHandBot собирает музыкальные ссылки в чистые Telegram-посты. Можно отправить трек, альбом, подкаст, Spotify-плейлист, Spotify-артиста, YouTube-видео или несколько ссылок сразу, а бот вернет короткую карточку с названием, preview, хэштегами и кнопками платформ.
+StonerHand Soundlinks Bot собирает музыкальные ссылки в чистые Telegram-посты. Можно отправить трек, альбом, подкаст, Spotify-плейлист, Spotify-артиста, YouTube-видео или несколько ссылок сразу, а бот вернет короткую карточку с названием, preview, хэштегами и кнопками платформ.
 
-Бот сделан под голос канала [@stonerhand](https://t.me/stonerhand), но архитектурно его можно адаптировать под любой музыкальный канал.
+Дефолтный стиль сделан под голос канала [@stonerhand](https://t.me/stonerhand), но архитектура специально оставлена переиспользуемой: можно заменить канал, фразы, подписи кнопок и приоритет платформ, чтобы собрать свою версию.
 
 ```text
 вход
@@ -73,6 +74,17 @@ Track
 | Деплой | Vercel webhook или Railway worker |
 | Конфигурация | Environment variables и опциональный `.env` |
 | Тестирование | `unittest` и compile checks |
+
+## Почему Можно Открывать Публично
+
+| Зона | Статус |
+| --- | --- |
+| Секреты | Реальные токены не коммитятся; локально используется `.env`, в проде - env variables хостинга |
+| Локальные файлы | `.env`, `.venv`, stats-файлы, кеши и generated egg-info игнорируются |
+| Деплой | Описаны Vercel webhook и Railway worker |
+| Брендинг | StonerHand-специфика лежит в formatter/constants/phrase bank |
+| Форки | Поток разделен на URL parsing, metadata clients, formatting, keyboards и transport |
+| Безопасность | Setup endpoint можно закрыть через `SET_WEBHOOK_SECRET` |
 
 ## Визуальный Стиль
 
@@ -286,7 +298,7 @@ PYTHONPATH=src python -m music_links_bot
 
 Vercel - основной serverless-вариант. Telegram отправляет updates на `/api/telegram`, поэтому Mac и Zed можно закрывать.
 
-1. Импортируй `StonerHand/TG_bot_SH` в Vercel
+1. Импортируй `StonerHand/stonerhand-soundlinks-bot` в Vercel
 2. `Application Preset` оставь `Python`
 3. `Root Directory` оставь `./`
 4. Добавь production-переменные окружения
@@ -347,12 +359,25 @@ python -m compileall -q src tests api
 - `ADMIN_CHAT_ID` настроен, если нужны приватная статистика и админ-уведомления
 - `SET_WEBHOOK_SECRET` задан для более безопасного setup endpoint
 - Токены не попадают в git
+- Токены перевыпущены, если они когда-либо попадали в публичное место
 
 ## Приватность
 
 Бот обрабатывает ссылки, чтобы собрать музыкальный пост. Он не запрашивает пароли, платежные данные или личные файлы. Статистика минимальная: счетчики, chat ids, labels и last-seen timestamp. Тексты сообщений и исходные ссылки в статистике не хранятся.
 
 На Vercel файловая статистика временная, если `STATS_PATH` не ведет в постоянное хранилище. Для серьезной аналитики позже лучше подключить базу данных.
+
+## Кастомизация
+
+Если кто-то хочет адаптировать бота под свой канал, начинать лучше отсюда:
+
+| Файл | Что менять |
+| --- | --- |
+| `src/music_links_bot/constants.py` | Ссылка на канал, названия платформ, приоритет платформ |
+| `src/music_links_bot/phrases.py` | Фразы CTA и ошибок |
+| `src/music_links_bot/formatter.py` | Макет поста, хэштеги, стиль заголовков |
+| `src/music_links_bot/bot.py` | Тексты команд, intro, поведение админа |
+| `.env.example` | Дефолтные переменные для своего деплоя |
 
 ## Troubleshooting
 
@@ -367,4 +392,4 @@ python -m compileall -q src tests api
 
 ## Лицензия
 
-Private project for StonerHand experiments. Архитектуру можно переиспользовать, но токены, идентичность канала и deployment secrets держи приватными.
+Файл лицензии пока не добавлен. Если хочешь, чтобы люди свободно форкали, меняли и переиспользовали проект, лучше явно добавить MIT или Apache-2.0.
