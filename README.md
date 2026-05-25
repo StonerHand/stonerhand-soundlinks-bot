@@ -31,6 +31,8 @@ It does not just return raw URLs. It formats every link as a small editorial car
 - Keeps hashtags in groups and channels, but hides them in private chats
 - Includes public stats and private admin stats via `/stats`, including playlist and artist counts
 - Does not store message text or source links in stats
+- Cleans tracking query params for cache/deduplication, so repeated `si` / `utm` links do not waste lookups
+- Supports Vercel webhook deployment with a small setup endpoint and optional secret protection
 
 ## Post Style
 
@@ -170,14 +172,13 @@ Inside `@stonerhand`, the self-link button is hidden automatically.
 
 ## Commands
 
-- `/start` - начать
-- `/help` - как кидать ссылки
-- `/platforms` - что умею открыть
-- `/channel` - канал StonerHand
-- `/stats` - статистика бота
+- `/start` - что умеет бот
+- `/help` - короткая инструкция
+- `/platforms` - поддерживаемые сервисы
+- `/channel` - открыть StonerHand
+- `/stats` - статистика
 
-The public command menu is synced automatically on startup. Hidden utility command:
-`/id` shows the current chat id for `ADMIN_CHAT_ID` setup.
+The public command menu is synced on local/Railway startup and by the Vercel `/api/set_webhook` endpoint. Hidden utility command: `/id` shows the current chat id for `ADMIN_CHAT_ID` setup.
 
 ## Environment
 
@@ -194,6 +195,8 @@ BOT_TOKEN=your-telegram-bot-token
 SONGLINK_USER_COUNTRIES=US
 LOG_LEVEL=INFO
 PRIMARY_PLATFORM=spotify
+SET_WEBHOOK_SECRET=
+STATS_PATH=
 ```
 
 Full setup:
@@ -205,6 +208,8 @@ SONGLINK_USER_COUNTRIES=US
 LOG_LEVEL=INFO
 ADMIN_CHAT_ID=
 PRIMARY_PLATFORM=spotify
+SET_WEBHOOK_SECRET=
+STATS_PATH=
 ```
 
 Important:
@@ -214,6 +219,8 @@ Important:
 - `SONGLINK_USER_COUNTRIES=US` usually gives broader international coverage
 - `ADMIN_CHAT_ID` enables private stats and admin notifications for channel processing errors
 - `PRIMARY_PLATFORM` controls preview selection and button order
+- `SET_WEBHOOK_SECRET` optionally protects `/api/set_webhook`
+- `STATS_PATH` optionally changes where local counters are stored
 
 Supported `PRIMARY_PLATFORM` values:
 
@@ -259,6 +266,7 @@ BOT_TOKEN=your-telegram-bot-token
 SONGLINK_USER_COUNTRIES=US
 LOG_LEVEL=INFO
 PRIMARY_PLATFORM=spotify
+SET_WEBHOOK_SECRET=any-long-random-text
 ```
 
 5. Optionally add:
@@ -272,10 +280,10 @@ SONGLINK_API_KEY=
 7. After a successful deployment, open:
 
 ```text
-https://your-vercel-domain.vercel.app/api/set_webhook
+https://your-vercel-domain.vercel.app/api/set_webhook?secret=any-long-random-text
 ```
 
-If Telegram returns `"ok": true`, the webhook is connected. After that, the bot answers through Vercel and the old Railway worker can be stopped.
+If Telegram returns `"ok": true`, the webhook and command menu are connected. After that, the bot answers through Vercel and the old Railway worker can be stopped.
 
 Endpoints:
 
@@ -341,6 +349,7 @@ src/music_links_bot/
 - Mixed music + YouTube packs are resolved in parallel and published as one collection post
 - Multiple Song.link countries are checked in parallel
 - Repeated Song.link, YouTube oEmbed and Spotify playlist lookups are cached in memory
+- Tracking query params are ignored for cache keys, so the same Spotify/YouTube URL with different share params is treated as one lookup
 - Long user notes are trimmed before posting
 - Large link packs are limited to avoid Telegram limits
 - URL hosts are normalized through parsed hostnames, so common variants like explicit ports do not break detection
@@ -351,12 +360,16 @@ src/music_links_bot/
 - Spotify playlists do not go through Song.link; they use Spotify oEmbed metadata and fall back to a safe generic playlist title
 - Spotify and Apple Podcasts episode/show links fall back to a platform-only post if Song.link has no cross-platform match
 - Song.link outages, rate limits and temporary failures are handled separately from “release not found”
+- Vercel webhook payloads are size-checked before processing
+- `/api/set_webhook` can be protected with `SET_WEBHOOK_SECRET`
 
 ## Safety Notes
 
 - Never commit `.env` or bot tokens
 - If the bot does not answer after deploy, check `BOT_TOKEN` in hosting environment variables first
 - If you move to Vercel, stop Railway/local polling and open `/api/set_webhook`
+- If `SET_WEBHOOK_SECRET` is set, open `/api/set_webhook?secret=your-secret`
 - If the bot runs locally through polling and on another polling host at the same time, polling conflicts may happen
 - Channel/group post replacement requires admin rights to delete messages
 - `/stats` stores counters, ids, labels and last seen, but not message text or source links
+- On Vercel, local stats are temporary unless `STATS_PATH` points to persistent storage. For serious analytics, connect an external database later

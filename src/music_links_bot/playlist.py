@@ -5,8 +5,11 @@ from collections.abc import Mapping
 import httpx
 
 from music_links_bot.cache import TTLCache
+from music_links_bot.constants import HTTP_USER_AGENT
 from music_links_bot.models import PlaylistMatch
-from music_links_bot.url_utils import is_spotify_playlist_url
+from music_links_bot.url_utils import cache_key_for_url, is_spotify_playlist_url
+
+HTTP_HEADERS = {"User-Agent": HTTP_USER_AGENT}
 
 
 class PlaylistLookupError(RuntimeError):
@@ -14,11 +17,13 @@ class PlaylistLookupError(RuntimeError):
 
 
 class PlaylistClient:
-    def __init__(self, *, timeout: float = 8.0) -> None:
+    def __init__(self, *, timeout: float = 5.0) -> None:
         self._client = httpx.AsyncClient(
             base_url="https://open.spotify.com",
-            timeout=timeout,
             follow_redirects=True,
+            headers=HTTP_HEADERS,
+            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
+            timeout=httpx.Timeout(timeout, connect=3.0),
         )
         self._cache: TTLCache[PlaylistMatch] = TTLCache()
 
@@ -29,7 +34,8 @@ class PlaylistClient:
         if not is_spotify_playlist_url(source_url):
             raise PlaylistLookupError("Unsupported playlist URL.")
 
-        cached_playlist = self._cache.get(source_url)
+        cache_key = cache_key_for_url(source_url)
+        cached_playlist = self._cache.get(cache_key)
         if cached_playlist is not None:
             return cached_playlist
 
@@ -49,5 +55,5 @@ class PlaylistClient:
             platform="Spotify",
             url=source_url,
         )
-        self._cache.set(source_url, playlist)
+        self._cache.set(cache_key, playlist)
         return playlist

@@ -19,6 +19,7 @@ from music_links_bot.bot import build_application, close_application_resources
 from music_links_bot.config import Settings
 
 LOGGER = logging.getLogger(__name__)
+MAX_UPDATE_BYTES = 1024 * 1024
 
 
 class handler(BaseHTTPRequestHandler):
@@ -26,15 +27,29 @@ class handler(BaseHTTPRequestHandler):
         self._send_json({"ok": True, "service": "StonerHandBot webhook"})
 
     def do_POST(self) -> None:
-        content_length = int(self.headers.get("content-length", "0"))
+        content_length = _read_content_length(self.headers.get("content-length"))
+        if content_length is None:
+            self._send_json(
+                {"ok": False, "error": "invalid content length"},
+                HTTPStatus.BAD_REQUEST,
+            )
+            return
+
         if content_length <= 0:
             self._send_json({"ok": False, "error": "empty body"}, HTTPStatus.BAD_REQUEST)
+            return
+
+        if content_length > MAX_UPDATE_BYTES:
+            self._send_json(
+                {"ok": False, "error": "payload too large"},
+                HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+            )
             return
 
         try:
             payload = self.rfile.read(content_length)
             asyncio.run(_process_telegram_update(payload))
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, ValueError):
             LOGGER.exception("Invalid Telegram update payload")
             self._send_json({"ok": False, "error": "invalid json"}, HTTPStatus.BAD_REQUEST)
             return
@@ -50,7 +65,7 @@ class handler(BaseHTTPRequestHandler):
         payload: dict[str, object],
         status: HTTPStatus = HTTPStatus.OK,
     ) -> None:
-        body = json.dumps(payload).encode("utf-8")
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("content-type", "application/json; charset=utf-8")
         self.send_header("content-length", str(len(body)))
@@ -68,8 +83,19 @@ async def _process_telegram_update(payload: bytes) -> None:
     application = build_application(settings)
     try:
         await application.initialize()
-        update = Update.de_json(json.loads(payload), application.bot)
+        update_payload = json.loads(payload)
+        if not isinstance(update_payload, dict):
+            raise ValueError("Telegram update payload must be a JSON object.")
+
+        update = Update.de_json(update_payload, application.bot)
         await application.process_update(update)
     finally:
         await application.shutdown()
         await close_application_resources(application)
+
+
+def _read_content_length(raw_value: str | None) -> int | None:
+    try:
+        return int(raw_value or "0")
+    except ValueError:
+        return None

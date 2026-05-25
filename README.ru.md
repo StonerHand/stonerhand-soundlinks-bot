@@ -31,6 +31,8 @@ Telegram-бот для музыкального канала [@stonerhand](https
 - Оставляет хэштеги в группах и каналах, но скрывает их в личных сообщениях
 - Показывает статистику через `/stats`, включая счетчики плейлистов и артистов
 - Не хранит тексты сообщений и исходные ссылки в статистике
+- Чистит tracking-параметры для кеша и дедупликации, поэтому одинаковые ссылки с разными `si` / `utm` не гоняют лишние запросы
+- Поддерживает Vercel webhook deploy через setup endpoint с опциональной защитой секретом
 
 ## Как выглядит
 
@@ -170,14 +172,13 @@ Spotify-артист:
 
 ## Команды
 
-- `/start` - начать
-- `/help` - как кидать ссылки
-- `/platforms` - что умею открыть
-- `/channel` - канал StonerHand
-- `/stats` - статистика бота
+- `/start` - что умеет бот
+- `/help` - короткая инструкция
+- `/platforms` - поддерживаемые сервисы
+- `/channel` - открыть StonerHand
+- `/stats` - статистика
 
-Публичное меню команд синхронизируется автоматически при запуске бота. Скрытая техническая команда:
-`/id` показывает chat id для настройки `ADMIN_CHAT_ID`.
+Публичное меню команд синхронизируется при локальном/Railway запуске и через Vercel endpoint `/api/set_webhook`. Скрытая техническая команда: `/id` показывает chat id для настройки `ADMIN_CHAT_ID`.
 
 ## Переменные окружения
 
@@ -194,6 +195,8 @@ BOT_TOKEN=your-telegram-bot-token
 SONGLINK_USER_COUNTRIES=US
 LOG_LEVEL=INFO
 PRIMARY_PLATFORM=spotify
+SET_WEBHOOK_SECRET=
+STATS_PATH=
 ```
 
 Расширенная настройка:
@@ -205,6 +208,8 @@ SONGLINK_USER_COUNTRIES=US
 LOG_LEVEL=INFO
 ADMIN_CHAT_ID=
 PRIMARY_PLATFORM=spotify
+SET_WEBHOOK_SECRET=
+STATS_PATH=
 ```
 
 Что важно:
@@ -214,6 +219,8 @@ PRIMARY_PLATFORM=spotify
 - `SONGLINK_USER_COUNTRIES=US` обычно дает больше международных ссылок
 - `ADMIN_CHAT_ID` включает приватную статистику и админ-уведомления по ошибкам обработки в канале
 - `PRIMARY_PLATFORM` управляет preview и порядком кнопок
+- `SET_WEBHOOK_SECRET` может защитить `/api/set_webhook`
+- `STATS_PATH` меняет путь, куда пишутся локальные счетчики
 
 Поддерживаемые значения `PRIMARY_PLATFORM`:
 
@@ -259,6 +266,7 @@ BOT_TOKEN=your-telegram-bot-token
 SONGLINK_USER_COUNTRIES=US
 LOG_LEVEL=INFO
 PRIMARY_PLATFORM=spotify
+SET_WEBHOOK_SECRET=any-long-random-text
 ```
 
 5. При желании добавь:
@@ -272,10 +280,10 @@ SONGLINK_API_KEY=
 7. После успешного деплоя открой в браузере:
 
 ```text
-https://your-vercel-domain.vercel.app/api/set_webhook
+https://your-vercel-domain.vercel.app/api/set_webhook?secret=any-long-random-text
 ```
 
-Если Telegram вернул `"ok": true`, webhook подключен. После этого бот отвечает через Vercel, а Railway можно остановить.
+Если Telegram вернул `"ok": true`, webhook и меню команд подключены. После этого бот отвечает через Vercel, а Railway можно остановить.
 
 Основные endpoint'ы:
 
@@ -342,6 +350,7 @@ src/music_links_bot/
 - Смешанные пачки музыка + YouTube обрабатываются параллельно и публикуются одним постом-подборкой
 - Несколько Song.link-регионов проверяются параллельно
 - Повторные запросы к Song.link, YouTube oEmbed и Spotify playlist metadata кешируются в памяти процесса
+- Tracking-параметры не участвуют в cache key, поэтому одна и та же ссылка с разными `si` / `utm` считается одним запросом
 - Очень длинная авторская подпись аккуратно обрезается
 - Слишком большие пачки ссылок ограничены, чтобы не упереться в лимиты Telegram
 - Хосты URL нормализуются через parsed hostname, поэтому обычные варианты вроде явного порта не ломают распознавание
@@ -352,12 +361,16 @@ src/music_links_bot/
 - Spotify-плейлисты и artist-ссылки не отправляются в Song.link: бот берет метаданные через Spotify oEmbed и безопасно откатывается к запасному названию
 - Spotify и Apple Podcasts episode/show не падают ошибкой, даже если Song.link не нашел кросс-платформенный матч
 - Ошибки Song.link, rate limit и временная недоступность отделены от ситуации “релиз не найден”
+- Vercel webhook проверяет размер payload до обработки
+- `/api/set_webhook` можно закрыть через `SET_WEBHOOK_SECRET`
 
 ## Важно
 
 - Никогда не коммить `.env` и токен бота
 - Если бот не отвечает после деплоя, первым делом проверь `BOT_TOKEN` в переменных окружения хостинга
 - Если переходишь на Vercel, останови Railway/local polling и открой `/api/set_webhook`
+- Если задан `SET_WEBHOOK_SECRET`, открывай `/api/set_webhook?secret=your-secret`
 - Если бот запущен локально через polling и на другом polling-хостинге одновременно, могут быть конфликты
 - Для автозамены постов в канале нужны права админа на удаление сообщений
 - `/stats` хранит только счетчики, ids, labels и last seen, без текстов переписок и без исходных ссылок
+- На Vercel локальная статистика временная, если `STATS_PATH` не ведет в постоянное хранилище. Для серьезной аналитики лучше подключить внешнюю базу позже

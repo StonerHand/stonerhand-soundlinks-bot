@@ -6,6 +6,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from music_links_bot.url_utils import (
     apple_podcasts_url_type,
+    cache_key_for_url,
     extract_supported_urls,
     is_spotify_artist_url,
     is_spotify_playlist_url,
@@ -59,6 +60,25 @@ class UrlUtilsTests(unittest.TestCase):
                 "https://open.spotify.com/track/1",
                 "https://music.apple.com/us/album/test/123?i=456",
             ],
+        )
+
+    def test_extract_supported_urls_deduplicates_tracking_variants(self) -> None:
+        text = (
+            "https://open.spotify.com/track/1?si=aaa "
+            "https://open.spotify.com/track/1?si=bbb&utm_source=share"
+        )
+
+        self.assertEqual(
+            extract_supported_urls(text),
+            ["https://open.spotify.com/track/1?si=aaa"],
+        )
+
+    def test_cache_key_for_url_strips_tracking_query_values(self) -> None:
+        self.assertEqual(
+            cache_key_for_url(
+                "https://open.spotify.com/track/1?si=aaa&utm_source=share&foo=bar#frag"
+            ),
+            "https://open.spotify.com/track/1?foo=bar",
         )
 
     def test_strip_supported_urls_keeps_remaining_user_text(self) -> None:

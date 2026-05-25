@@ -7,8 +7,11 @@ from collections.abc import Mapping
 import httpx
 
 from music_links_bot.cache import TTLCache
-from music_links_bot.constants import PLATFORM_ALIASES
+from music_links_bot.constants import HTTP_USER_AGENT, PLATFORM_ALIASES
 from music_links_bot.models import TrackMatch
+from music_links_bot.url_utils import cache_key_for_url
+
+HTTP_HEADERS = {"User-Agent": HTTP_USER_AGENT}
 
 
 class SonglinkError(RuntimeError):
@@ -25,13 +28,15 @@ class SonglinkClient:
         *,
         user_countries: tuple[str, ...],
         api_key: str | None = None,
-        timeout: float = 15.0,
+        timeout: float = 8.0,
     ) -> None:
         self._user_countries = user_countries
         self._api_key = api_key
         self._client = httpx.AsyncClient(
             base_url="https://api.song.link/v1-alpha.1",
-            timeout=timeout,
+            headers=HTTP_HEADERS,
+            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+            timeout=httpx.Timeout(timeout, connect=3.0),
         )
         self._cache: TTLCache[TrackMatch] = TTLCache()
 
@@ -39,7 +44,8 @@ class SonglinkClient:
         await self._client.aclose()
 
     async def lookup_track(self, source_url: str) -> TrackMatch:
-        cached_match = self._cache.get(source_url)
+        cache_key = cache_key_for_url(source_url)
+        cached_match = self._cache.get(cache_key)
         if cached_match is not None:
             return cached_match
 
@@ -54,10 +60,15 @@ class SonglinkClient:
 
         if not matches:
             service_error = next(
-                (result for result in results if isinstance(result, SonglinkError)),
+                (
+                    result
+                    for result in results
+                    if isinstance(result, SonglinkError)
+                    and not isinstance(result, SonglinkLookupError)
+                ),
                 None,
             )
-            if service_error and not isinstance(service_error, SonglinkLookupError):
+            if service_error:
                 raise service_error
 
             lookup_error = next(
@@ -67,7 +78,7 @@ class SonglinkClient:
             raise lookup_error or SonglinkLookupError("Song.link could not resolve the URL.")
 
         match = self._merge_matches(matches)
-        self._cache.set(source_url, match)
+        self._cache.set(cache_key, match)
         return match
 
     async def _lookup_track_for_country(self, source_url: str, user_country: str) -> TrackMatch:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, parse_qsl, urlencode, urlparse, urlunparse
 
 from music_links_bot.constants import SUPPORTED_INPUT_HOSTS
 
@@ -9,6 +9,19 @@ URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
 TRAILING_PUNCTUATION = ".,!?)]}>\"'"
 YOUTUBE_MUSIC_HOST = "music.youtube.com"
 YOUTUBE_VIDEO_HOSTS = {"youtube.com", "m.youtube.com", "youtu.be"}
+TRACKING_QUERY_KEYS = {
+    "fbclid",
+    "feature",
+    "gclid",
+    "igsh",
+    "igshid",
+    "si",
+    "utm_campaign",
+    "utm_content",
+    "utm_medium",
+    "utm_source",
+    "utm_term",
+}
 
 
 def clean_url_token(token: str) -> str:
@@ -49,13 +62,32 @@ def extract_supported_urls(text: str | None) -> list[str]:
     seen: set[str] = set()
     for match in URL_RE.finditer(text):
         candidate = clean_url_token(match.group(0))
-        if candidate in seen or not is_supported_music_url(candidate):
+        dedupe_key = cache_key_for_url(candidate)
+        if dedupe_key in seen or not is_supported_music_url(candidate):
             continue
 
         urls.append(candidate)
-        seen.add(candidate)
+        seen.add(dedupe_key)
 
     return urls
+
+
+def cache_key_for_url(url: str) -> str:
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return url
+
+    query_items = [
+        (key, value)
+        for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+        if key.lower() not in TRACKING_QUERY_KEYS
+    ]
+    return urlunparse(
+        parsed._replace(
+            query=urlencode(query_items),
+            fragment="",
+        )
+    )
 
 
 def strip_supported_urls(text: str | None) -> str:

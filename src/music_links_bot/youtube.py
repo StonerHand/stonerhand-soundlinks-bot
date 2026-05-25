@@ -5,7 +5,11 @@ from collections.abc import Mapping
 import httpx
 
 from music_links_bot.cache import TTLCache
+from music_links_bot.constants import HTTP_USER_AGENT
 from music_links_bot.models import VideoMatch
+from music_links_bot.url_utils import cache_key_for_url
+
+HTTP_HEADERS = {"User-Agent": HTTP_USER_AGENT}
 
 
 class YouTubeLookupError(RuntimeError):
@@ -13,10 +17,12 @@ class YouTubeLookupError(RuntimeError):
 
 
 class YouTubeClient:
-    def __init__(self, *, timeout: float = 8.0) -> None:
+    def __init__(self, *, timeout: float = 5.0) -> None:
         self._client = httpx.AsyncClient(
             base_url="https://www.youtube.com",
-            timeout=timeout,
+            headers=HTTP_HEADERS,
+            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
+            timeout=httpx.Timeout(timeout, connect=3.0),
         )
         self._cache: TTLCache[VideoMatch] = TTLCache()
 
@@ -24,7 +30,8 @@ class YouTubeClient:
         await self._client.aclose()
 
     async def lookup_video(self, source_url: str) -> VideoMatch:
-        cached_video = self._cache.get(source_url)
+        cache_key = cache_key_for_url(source_url)
+        cached_video = self._cache.get(cache_key)
         if cached_video is not None:
             return cached_video
 
@@ -55,5 +62,5 @@ class YouTubeClient:
             author=author or "YouTube",
             url=source_url,
         )
-        self._cache.set(source_url, video)
+        self._cache.set(cache_key, video)
         return video

@@ -173,6 +173,27 @@ class SonglinkClientAsyncTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(first, second)
         self.assertEqual(client.calls, 1)
 
+    async def test_lookup_track_reuses_cache_across_tracking_query_variants(self) -> None:
+        client = FakeSonglinkClient(
+            {
+                "US": TrackMatch(
+                    title="Song",
+                    artist="Artist",
+                    links={"spotify": "https://spotify.example"},
+                    kind="song",
+                ),
+            }
+        )
+
+        try:
+            first = await client.lookup_track("https://open.spotify.com/track/1?si=one")
+            second = await client.lookup_track("https://open.spotify.com/track/1?si=two")
+        finally:
+            await client.aclose()
+
+        self.assertIs(first, second)
+        self.assertEqual(client.calls, 1)
+
     async def test_lookup_track_prefers_service_error_when_all_countries_fail(self) -> None:
         client = FakeSonglinkClient(
             {
@@ -182,10 +203,12 @@ class SonglinkClientAsyncTests(unittest.IsolatedAsyncioTestCase):
         )
 
         try:
-            with self.assertRaises(SonglinkError):
+            with self.assertRaisesRegex(SonglinkError, "service down") as context:
                 await client.lookup_track("https://open.spotify.com/track/1")
         finally:
             await client.aclose()
+
+        self.assertNotIsInstance(context.exception, SonglinkLookupError)
 
 
 if __name__ == "__main__":

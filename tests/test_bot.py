@@ -227,11 +227,11 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(
             [(command.command, command.description) for command in PUBLIC_BOT_COMMANDS],
             [
-                ("start", "начать"),
-                ("help", "как кидать ссылки"),
-                ("platforms", "что умею открыть"),
-                ("channel", "канал StonerHand"),
-                ("stats", "статистика бота"),
+                ("start", "что умеет бот"),
+                ("help", "короткая инструкция"),
+                ("platforms", "поддерживаемые сервисы"),
+                ("channel", "открыть StonerHand"),
+                ("stats", "статистика"),
             ],
         )
 
@@ -506,7 +506,7 @@ class BotKeyboardTests(unittest.TestCase):
         message = _format_not_found_message(["https://example.com/release"])
 
         self.assertIn(
-            "проверь, что это ссылка на трек, альбом, подкаст, плейлист или артиста",
+            "проверь, что это ссылка на трек, альбом, плейлист, артиста, подкаст или YouTube-видео",
             message,
         )
         self.assertNotIn("Проверьте", message)
@@ -538,7 +538,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertIn("кинь ссылку из:", message.replies[0])
+        self.assertIn("пришли ссылку на трек, альбом, плейлист", message.replies[0])
         self.assertEqual(context.bot.sent_messages, [])
 
     async def test_youtube_video_links_use_video_post(self) -> None:

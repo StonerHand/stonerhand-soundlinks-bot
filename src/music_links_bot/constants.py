@@ -21,6 +21,8 @@ SUPPORTED_INPUT_HOSTS = {
     "on.soundcloud.com",
 }
 
+HTTP_USER_AGENT = "StonerHandBot/0.1 (+https://t.me/stonerhand)"
+
 PLATFORM_LABELS = {
     "spotify": "🟢 Spotify",
     "appleMusic": "🍎 Apple",

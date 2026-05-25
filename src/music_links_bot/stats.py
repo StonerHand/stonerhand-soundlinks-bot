@@ -1,13 +1,25 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from threading import Lock
 from typing import Any
 
 from music_links_bot.models import ArtistMatch, PlaylistMatch, TrackMatch, VideoMatch
 
-STATS_PATH = Path("data/stats.json")
+def _default_stats_path() -> Path:
+    configured_path = os.getenv("STATS_PATH", "").strip()
+    if configured_path:
+        return Path(configured_path)
+
+    if os.getenv("VERCEL"):
+        return Path("/tmp/stonerhand_stats.json")
+
+    return Path("data/stats.json")
+
+
+STATS_PATH = _default_stats_path()
 SUPPORTED_KINDS = ("song", "album", "podcast")
 STATS_LOCK = Lock()
 StatsData = dict[str, Any]

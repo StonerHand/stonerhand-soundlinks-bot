@@ -73,11 +73,11 @@ DEFAULT_PLATFORM_ORDER = (
     "yandexMusic",
 )
 PUBLIC_BOT_COMMANDS = (
-    BotCommand("start", "начать"),
-    BotCommand("help", "как кидать ссылки"),
-    BotCommand("platforms", "что умею открыть"),
-    BotCommand("channel", "канал StonerHand"),
-    BotCommand("stats", "статистика бота"),
+    BotCommand("start", "что умеет бот"),
+    BotCommand("help", "короткая инструкция"),
+    BotCommand("platforms", "поддерживаемые сервисы"),
+    BotCommand("channel", "открыть StonerHand"),
+    BotCommand("stats", "статистика"),
 )
 
 
@@ -149,11 +149,10 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     text = (
-        "🎧 Кидай ссылку на трек, альбом, плейлист, артиста, подкаст или YouTube-видео\n"
-        "Я соберу это в аккуратный пост с кнопками\n\n"
-        f"Живу рядом с: {INPUT_PLATFORM_HINT}\n\n"
-        "Несколько ссылок одним сообщением превращу в подборку\n\n"
-        "В группах и каналах могу заменить исходную ссылку постом, если у меня есть права админа"
+        "🎧 Кидай ссылку на музыку или YouTube\n\n"
+        "Я соберу аккуратный пост: название, preview и кнопки площадок\n\n"
+        "Можно отправить трек, альбом, плейлист, артиста, подкаст или несколько ссылок сразу\n\n"
+        "В группах и каналах могу заменить исходную ссылку готовым постом, если у меня есть права админа"
     )
     await update.message.reply_text(text, reply_markup=_build_intro_keyboard(context.bot.username))
 
@@ -163,12 +162,11 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
 
     text = (
-        "Как это работает:\n\n"
-        "1. Кидаешь ссылку на релиз, плейлист, артиста, подкаст или YouTube-видео\n"
-        "2. Я подтягиваю площадки, preview и нужный тип поста\n"
-        "3. Возвращаю карточку StonerHand с кнопками\n\n"
-        "Кинешь несколько ссылок - соберу подборку\n\n"
-        "В группе или канале могу удалить исходное сообщение и поставить чистый пост вместо него"
+        "Как пользоваться:\n\n"
+        "1. Пришли ссылку на трек, альбом, плейлист, артиста, подкаст или YouTube-видео\n"
+        "2. Добавь свой текст над ссылкой, если нужна подводка\n"
+        "3. Получи чистую карточку с preview, хэштегами и кнопками\n\n"
+        "Несколько ссылок одним сообщением станут подборкой"
     )
     await update.message.reply_text(text, reply_markup=_build_intro_keyboard(context.bot.username))
 
@@ -180,10 +178,10 @@ async def guide_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     guide = (
         "StonerHand guide\n\n"
-        "1. Ссылка на релиз, артиста или видео становится постом с кнопками\n"
+        "1. Одна ссылка становится чистым постом с кнопками\n"
         "2. Несколько ссылок становятся подборкой\n"
-        "3. YouTube живет отдельной видео-карточкой\n"
-        "4. Для автозамены в чате нужны права админа на управление сообщениями"
+        "3. Текст над ссылкой превращается в цитату\n"
+        "4. Для автозамены в чате нужны права админа на удаление сообщений"
     )
     sent_message = await message.reply_text(
         guide,
@@ -203,10 +201,11 @@ async def platforms_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         return
 
     text = (
-        "Открываю ссылки из:\n\n"
+        "Что можно кидать:\n\n"
         f"{INPUT_PLATFORM_HINT}\n\n"
-        "В ответ собираю Spotify, Apple, Podcasts, YouTube, Deezer, Tidal и Yandex, если они нашлись\n\n"
-        "Обычный YouTube оформляю как видео-пост, а Spotify artist - как карточку артиста"
+        "Что вернется:\n"
+        "Spotify, Apple Music, Apple Podcasts, YouTube Music, Deezer, Tidal, Yandex Music и Song.link, если площадки нашлись\n\n"
+        "YouTube оформляю как видео-пост, Spotify playlist - как плейлист, Spotify artist - как карточку артиста"
     )
     await update.message.reply_text(text)
 
@@ -262,7 +261,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         no_url_text = pick_phrase("no_url", message_text or str(message.chat_id))
         await message.reply_text(
             f"{no_url_text}\n\n"
-            f"кинь ссылку из: {INPUT_PLATFORM_HINT}"
+            "пришли ссылку на трек, альбом, плейлист, артиста, подкаст или YouTube-видео"
         )
         return
 
@@ -532,7 +531,7 @@ def _format_not_found_message(source_urls: list[str]) -> str:
     seed = ",".join(source_urls)
     return (
         f"{pick_phrase('not_found', seed)}\n\n"
-        "проверь, что это ссылка на трек, альбом, подкаст, плейлист или артиста"
+        "проверь, что это ссылка на трек, альбом, плейлист, артиста, подкаст или YouTube-видео"
     )
 
 
