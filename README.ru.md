@@ -1,89 +1,122 @@
+<div align="center">
+
 # StonerHandBot
+
+**Telegram-бот, который превращает музыкальные ссылки в аккуратные посты**
 
 [English version](README.md)
 
-Telegram-бот для музыкального канала [@stonerhand](https://t.me/stonerhand). Кидаешь ссылку на трек, альбом, подкаст, Spotify-плейлист, Spotify-артиста, YouTube-видео или несколько ссылок сразу, а бот собирает аккуратный пост с кнопками.
+![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Telegram](https://img.shields.io/badge/Telegram-Bot-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-Webhook-000000?style=for-the-badge&logo=vercel&logoColor=white)
+![Song.link](https://img.shields.io/badge/Song.link-Odesli-FF6B6B?style=for-the-badge)
 
-Он не просто возвращает голые URL. Он превращает ссылку в маленькую редакторскую карточку: название, исполнитель, превью, фирменная фраза, хэштеги и кнопки.
+`ссылка -> карточка -> preview -> кнопки`
 
-## Что умеет
+</div>
 
-- Ищет релизы через Song.link / Odesli
-- Принимает Spotify, Apple Music, Apple Podcasts, YouTube / YouTube Music, Deezer, Tidal, Yandex Music, SoundCloud и podcast-ссылки
-- Видит ссылки в обычных сообщениях и caption-подписях к медиа
-- Превращает авторскую подводку над ссылкой в Telegram-цитату
-- Поддерживает треки, альбомы, EP, singles, подкасты, podcast shows, Spotify-плейлисты, Spotify-артистов, YouTube-видео и подборки из нескольких ссылок
-- Дает трекам, альбомам, подкастам, плейлистам, артистам и YouTube-видео отдельные редакторские форматы
-- Держит пост чистым: заголовок-обложка, живая фраза, хэштеги, preview и кнопки
-- Делает прямые кнопки для одиночного релиза
-- Раскладывает короткие кнопки платформ по две в строку, а кнопку канала оставляет отдельной строкой
-- Делает пост-подборку для нескольких музыкальных ссылок или смешанных пачек музыка + YouTube
-- Оформляет Spotify-плейлисты отдельным постом с прямой кнопкой `🎛 Открыть плейлист`
-- Оформляет Spotify artist-ссылки отдельной карточкой с прямой кнопкой `🧬 Открыть артиста`
-- Оформляет обычные YouTube-ссылки как отдельные видео-посты с кнопкой и preview
-- Обрабатывает как YouTube-видео только реальные видео-ссылки: `watch`, `youtu.be`, `shorts`, `live` и `embed`
-- Оставляет `music.youtube.com` в музыкальном поиске через Song.link
-- Молчит на обычных постах в группах и каналах, если там нет поддерживаемой музыкальной ссылки
-- Подтягивает Telegram preview с приоритетной платформы
-- Умеет удалять исходное сообщение в группе/канале и заменять его оформленным постом, если бот админ
-- Скрывает кнопку `🪨 Открыть канал`, когда постит прямо внутри `@stonerhand`
-- Добавляет автохэштеги: `#track`, `#album`, `#collection`, `#single`, `#ep`, `#podcast`, `#show`, `#playlist`, `#artist`
-- Оставляет хэштеги в группах и каналах, но скрывает их в личных сообщениях
-- Показывает статистику через `/stats`, включая счетчики плейлистов и артистов
-- Не хранит тексты сообщений и исходные ссылки в статистике
-- Чистит tracking-параметры для кеша и дедупликации, поэтому одинаковые ссылки с разными `si` / `utm` не гоняют лишние запросы
-- Поддерживает Vercel webhook deploy через setup endpoint с опциональной защитой секретом
+---
 
-## Как выглядит
+## Обзор
 
-Одиночный трек:
+StonerHandBot собирает музыкальные ссылки в чистые Telegram-посты. Можно отправить трек, альбом, подкаст, Spotify-плейлист, Spotify-артиста, YouTube-видео или несколько ссылок сразу, а бот вернет короткую карточку с названием, preview, хэштегами и кнопками платформ.
+
+Бот сделан под голос канала [@stonerhand](https://t.me/stonerhand), но архитектурно его можно адаптировать под любой музыкальный канал.
 
 ```text
-цитата:
-@username: немного тревоги на вечер
+вход
+https://open.spotify.com/track/...
 
-📻 · Youth Code
-Transitions
+выход
+📻 · Artist
+Track
 
-ссылки готовы, звук рядом
+кнопки ниже, трек ждет
 
 #stonerhand #track
+
+[🟢 Spotify] [🌊 Tidal]
+[🟦 Deezer]  [🟡 Yandex]
 ```
 
-Альбом или EP:
+## Пользовательские Сценарии
+
+| Поверхность | Поведение |
+| --- | --- |
+| Личный чат | Отвечает карточкой с кнопками |
+| Группа | Может удалить исходную ссылку и заменить ее красивым постом, если есть права админа |
+| Канал | Может превращать сырые ссылки в посты и молчать на обычный контент |
+| Несколько ссылок | Собирает пост-подборку |
+| Текст над ссылкой | Превращает текст в Telegram-цитату |
+
+## Поддерживаемый Контент
+
+| Тип | Источники | Как оформляется |
+| --- | --- | --- |
+| Трек | Spotify, Apple Music, YouTube Music, Deezer, Tidal, Yandex Music, SoundCloud | Музыкальная карточка с кнопками платформ |
+| Альбом / EP / Single | Spotify, Apple Music, Deezer, Tidal, Yandex Music | Карточка релиза с автохэштегами |
+| Подкаст / выпуск / шоу | Spotify, Apple Podcasts и podcast-ссылки, которые понимает Song.link | Podcast-карточка или fallback на одну платформу |
+| Spotify playlist | Spotify playlist URL | Отдельная карточка плейлиста |
+| Spotify artist | Spotify artist URL | Отдельная карточка артиста |
+| YouTube-видео | `youtube.com/watch`, `youtu.be`, `shorts`, `live`, `embed`, `m.youtube.com` | Видео-карточка с кнопкой YouTube |
+| Подборка | Несколько ссылок в одном сообщении | Нумерованный пост-плейлист |
+
+## Технический Стек
+
+| Слой | Решение |
+| --- | --- |
+| Runtime | Python 3.10+ |
+| Telegram SDK | `python-telegram-bot` 21.x |
+| HTTP client | `httpx` с connection limits и явными таймаутами |
+| Музыкальный поиск | Song.link / Odesli API |
+| Легкие метаданные | Spotify oEmbed и YouTube oEmbed |
+| Деплой | Vercel webhook или Railway worker |
+| Конфигурация | Environment variables и опциональный `.env` |
+| Тестирование | `unittest` и compile checks |
+
+## Визуальный Стиль
+
+Главная идея: меньше шума, больше пользы. Пост должен нормально читаться на телефоне, не ломаться на desktop и не превращаться в простыню.
+
+### Одиночный Релиз
 
 ```text
+цитата от @username:
+Альбом, который стоит включить целиком
+
 💿 · Artist
 Release
 
-альбом везде, где нужно
+альбом собран, уходи слушать
 
-#stonerhand #album #ep
+#stonerhand #album
+
+[🟢 Spotify] [🌊 Tidal]
+[🟦 Deezer]  [🟡 Yandex]
 ```
 
-Подкаст:
+### Подборка
 
 ```text
-🎙️ · Show Name
-выпуск: Episode Title
+цитата от @username:
+пять ссылок на вечер
 
-выпуск на месте, кнопки ниже
+сегодня в подборке:
 
-#stonerhand #podcast
+1. 📻 · Youth Code - Transitions
+2. 🎧 · Show Me The Body - Camp Orchestra
+3. 💿 · The Soft Moon - Criminal
+4. 📺 · SANSAE Live Session Vol.3 - Melon
+
+выбирай с чего начать
+
+#stonerhand #collection #track #album #video
+
+[🎧 1. Youth Code] [🎧 2. Show Me The Body]
+[💿 3. The Soft Moon] [📺 4. Live Session]
 ```
 
-YouTube-видео:
-
-```text
-📺 · SANSAE Live Session Vol.3 - Melon
-канал: SANSAE
-
-экран готов, жми смотреть
-
-#stonerhand #video
-```
-
-Spotify-плейлист:
+### Отдельные Карточки
 
 ```text
 🎛 · Women of Punk
@@ -92,9 +125,9 @@ Spotify-плейлист:
 пачка собрана, вход открыт
 
 #stonerhand #playlist
-```
 
-Spotify-артист:
+[🎛 Открыть плейлист]
+```
 
 ```text
 🧬 · 1.Kla$
@@ -103,103 +136,97 @@ Spotify-артист:
 профиль открыт, можно копать глубже
 
 #stonerhand #artist
+
+[🧬 Открыть артиста]
 ```
 
-Подборка:
+## Архитектура
+
+```mermaid
+flowchart LR
+    U["Пользователь, группа или канал"] --> T["Telegram"]
+    T -->|"Webhook / Polling"| H["Вход бота"]
+    H --> R["Router"]
+    R -->|"Музыкальные ссылки"| S["Song.link / Odesli"]
+    R -->|"Spotify playlist / artist"| O1["Spotify oEmbed"]
+    R -->|"YouTube video"| O2["YouTube oEmbed"]
+    S --> N["Нормализованный релиз"]
+    O1 --> N
+    O2 --> N
+    N --> F["Formatter"]
+    F --> K["Inline Keyboard"]
+    K --> T
+    R --> ST["Local Stats"]
+```
+
+## Карта Кода
 
 ```text
-цитата:
-@username: пять вещей на вечер
+api/
+├── telegram.py       Vercel webhook endpoint
+└── set_webhook.py    установка webhook и синхронизация команд
 
-сегодня в подборке:
-
-1. 📻 · Youth Code - Transitions
-2. 🎧 · Show Me The Body - Camp Orchestra
-3. 💿 · The Soft Moon - Criminal
-
-выбирай с чего начать
-
-#stonerhand #collection #track #album
+src/music_links_bot/
+├── bot.py            Telegram handlers, routing, keyboards, замена сообщений
+├── songlink.py       Song.link client, fallback по регионам, нормализация релиза
+├── formatter.py      макет поста, подписи, хэштеги, выбор preview
+├── playlist.py       Spotify playlist metadata через oEmbed
+├── artist.py         Spotify artist metadata через oEmbed
+├── youtube.py        YouTube video metadata через oEmbed
+├── url_utils.py      поиск URL, нормализация, чистка tracking-параметров
+├── cache.py          in-memory TTL-кеш внешних запросов
+├── stats.py          privacy-safe счетчики
+├── phrases.py        живые фразы для CTA и ошибок
+├── constants.py      платформы, алиасы и порядок кнопок
+└── config.py         настройки из переменных окружения
 ```
 
-Смешанная подборка:
+## Надежность И Скорость
 
-```text
-цитата:
-@username: вечерний набор
-
-сегодня в подборке:
-
-1. 📻 · Youth Code - Transitions
-2. 📺 · SANSAE Live Session Vol.3 - Melon
-
-выбирай с чего начать
-
-#stonerhand #collection #track #video
-```
-
-Кнопки у одиночного релиза:
-
-```text
-🟢 Spotify | 🍎 Apple
-▶️ YouTube | 🟡 Yandex
-🪨 Открыть канал
-```
-
-Кнопки у Spotify-плейлиста:
-
-```text
-🎛 Открыть плейлист
-🪨 Открыть канал
-```
-
-Кнопки у Spotify-артиста:
-
-```text
-🧬 Открыть артиста
-🪨 Открыть канал
-```
-
-Кнопки у подборки:
-
-```text
-🎧 1. Youth Code - Transitions | 🎧 2. Show Me The Body - Camp Orchestra
-💿 3. The Soft Moon - Criminal | 📺 4. Live Session
-🪨 Открыть канал
-```
-
-Внутри `@stonerhand` кнопка на сам канал скрывается автоматически.
+| Зона | Как решено |
+| --- | --- |
+| Скорость | Параллельная обработка ссылок, connection pooling, короткие таймауты внешних API |
+| Стабильность | Раздельная обработка not found, service unavailable и неправильного ввода |
+| Дедупликация | `si`, `utm_*`, `fbclid` и похожие параметры не участвуют в cache key |
+| Лимиты Telegram | Длинные подводки и большие пачки ссылок обрезаются до безопасного размера |
+| Чистота каналов | Обычные посты, Instagram/TikTok/Pinterest и нерелевантные ссылки игнорируются в группах и каналах |
+| Preview | Приоритетная платформа управляет preview и порядком кнопок |
+| Приватность | Статистика хранит счетчики и ids, но не тексты сообщений и не исходные ссылки |
+| Serverless | Vercel webhook проверяет размер payload до JSON-парсинга |
+| Безопасность админки | Замена сообщений происходит только если Telegram реально дал нужные права |
 
 ## Команды
 
-- `/start` - что умеет бот
-- `/help` - короткая инструкция
-- `/platforms` - поддерживаемые сервисы
-- `/channel` - открыть StonerHand
-- `/stats` - статистика
+| Команда | Что делает |
+| --- | --- |
+| `/start` | что умеет бот |
+| `/help` | короткая инструкция |
+| `/guide` | инструкция для каналов и групп |
+| `/platforms` | поддерживаемые сервисы |
+| `/channel` | открыть StonerHand |
+| `/stats` | публичная статистика и приватная статистика для админа |
+| `/id` | скрытая команда для получения `ADMIN_CHAT_ID` |
 
-Публичное меню команд синхронизируется при локальном/Railway запуске и через Vercel endpoint `/api/set_webhook`. Скрытая техническая команда: `/id` показывает chat id для настройки `ADMIN_CHAT_ID`.
+Публичное меню команд синхронизируется при локальном/Railway запуске и через Vercel endpoint `/api/set_webhook`.
 
-## Переменные окружения
+## Переменные Окружения
 
-Создай `.env` из примера:
+Создай локальный `.env`:
 
 ```bash
 cp .env.example .env
 ```
 
-Минимальная настройка:
+Минимальная production-настройка:
 
 ```env
 BOT_TOKEN=your-telegram-bot-token
 SONGLINK_USER_COUNTRIES=US
 LOG_LEVEL=INFO
 PRIMARY_PLATFORM=spotify
-SET_WEBHOOK_SECRET=
-STATS_PATH=
 ```
 
-Расширенная настройка:
+Полная настройка:
 
 ```env
 BOT_TOKEN=your-telegram-bot-token
@@ -212,27 +239,30 @@ SET_WEBHOOK_SECRET=
 STATS_PATH=
 ```
 
-Что важно:
-
-- `BOT_TOKEN` обязателен
-- `SONGLINK_API_KEY` можно оставить пустым
-- `SONGLINK_USER_COUNTRIES=US` обычно дает больше международных ссылок
-- `ADMIN_CHAT_ID` включает приватную статистику и админ-уведомления по ошибкам обработки в канале
-- `PRIMARY_PLATFORM` управляет preview и порядком кнопок
-- `SET_WEBHOOK_SECRET` может защитить `/api/set_webhook`
-- `STATS_PATH` меняет путь, куда пишутся локальные счетчики
+| Переменная | Обязательна | Зачем нужна |
+| --- | --- | --- |
+| `BOT_TOKEN` | да | Telegram Bot API token |
+| `SONGLINK_API_KEY` | нет | Опциональный ключ Song.link |
+| `SONGLINK_USER_COUNTRIES` | нет | Список регионов для fallback, `US` хороший дефолт |
+| `LOG_LEVEL` | нет | `INFO`, `DEBUG`, `WARNING`, `ERROR` |
+| `ADMIN_CHAT_ID` | нет | Приватная статистика и админ-уведомления |
+| `PRIMARY_PLATFORM` | нет | Приоритет preview и порядка кнопок |
+| `SET_WEBHOOK_SECRET` | нет | Защита `/api/set_webhook` |
+| `STATS_PATH` | нет | Путь к локальному файлу статистики |
 
 Поддерживаемые значения `PRIMARY_PLATFORM`:
 
-- `spotify`
-- `appleMusic`
-- `applePodcasts`
-- `youtubeMusic`
-- `deezer`
-- `tidal`
-- `yandexMusic`
+```text
+spotify
+appleMusic
+applePodcasts
+youtubeMusic
+deezer
+tidal
+yandexMusic
+```
 
-## Локальный запуск
+## Локальный Запуск
 
 ```bash
 python3 -m venv .venv
@@ -252,57 +282,39 @@ PYTHONPATH=src python -m music_links_bot
 
 На Mac остановить локального бота можно через `Control + C`.
 
-## Vercel deploy
+## Деплой На Vercel
 
-Vercel запускает бота через Telegram webhook. Это бесплатный serverless-режим: Mac и Zed можно закрывать, а Telegram будет дергать URL бота при каждом сообщении.
+Vercel - основной serverless-вариант. Telegram отправляет updates на `/api/telegram`, поэтому Mac и Zed можно закрывать.
 
-1. Импортируй репозиторий `StonerHand/TG_bot_SH` в Vercel
+1. Импортируй `StonerHand/TG_bot_SH` в Vercel
 2. `Application Preset` оставь `Python`
 3. `Root Directory` оставь `./`
-4. В `Environment Variables` добавь:
-
-```env
-BOT_TOKEN=your-telegram-bot-token
-SONGLINK_USER_COUNTRIES=US
-LOG_LEVEL=INFO
-PRIMARY_PLATFORM=spotify
-SET_WEBHOOK_SECRET=any-long-random-text
-```
-
-5. При желании добавь:
-
-```env
-ADMIN_CHAT_ID=your-telegram-chat-id
-SONGLINK_API_KEY=
-```
-
-6. Нажми `Deploy`
-7. После успешного деплоя открой в браузере:
+4. Добавь production-переменные окружения
+5. Нажми `Deploy`
+6. После деплоя один раз открой endpoint настройки:
 
 ```text
-https://your-vercel-domain.vercel.app/api/set_webhook?secret=any-long-random-text
+https://your-vercel-domain.vercel.app/api/set_webhook
 ```
 
-Если Telegram вернул `"ok": true`, webhook и меню команд подключены. После этого бот отвечает через Vercel, а Railway можно остановить.
+Если задан `SET_WEBHOOK_SECRET`, открывай так:
 
-Основные endpoint'ы:
+```text
+https://your-vercel-domain.vercel.app/api/set_webhook?secret=your-secret
+```
 
-- `/api/telegram` - Telegram webhook
-- `/api/set_webhook` - одноразовая установка webhook на текущий Vercel-домен
+Если Telegram вернул `"ok": true`, webhook и меню команд подключены.
 
-## Railway deploy
+### Vercel Endpoint'ы
 
-Railway запускает бота как background worker. После деплоя Mac и Zed можно закрывать, бот останется онлайн.
+| Endpoint | Method | Зачем |
+| --- | --- | --- |
+| `/api/telegram` | `POST` | Telegram webhook receiver |
+| `/api/set_webhook` | `GET` | Установка webhook и синхронизация команд |
 
-1. Запушь код в GitHub
-2. Создай Railway project из репозитория
-3. Открой сервис `worker`
-4. Добавь переменную `BOT_TOKEN`
-5. Добавь `SONGLINK_USER_COUNTRIES=US`
-6. При желании добавь `ADMIN_CHAT_ID` и `PRIMARY_PLATFORM`
-7. Дождись `Deployment successful`
+## Деплой На Railway
 
-`railway.toml` уже настроен:
+Railway запускает бота как background worker через long polling.
 
 ```bash
 pip install -r requirements.txt
@@ -312,9 +324,7 @@ pip install -r requirements.txt
 PYTHONPATH=src python -m music_links_bot
 ```
 
-## Render deploy
-
-Render тоже возможен, но нужен `Background Worker`. На некоторых аккаунтах Render просит карту даже для бесплатных сценариев, поэтому для этого проекта Railway проще.
+В репозитории уже есть `railway.toml`. Если включен Vercel webhook, Railway/local polling лучше остановить, чтобы не было дублей.
 
 ## Тесты
 
@@ -322,55 +332,39 @@ Render тоже возможен, но нужен `Background Worker`. На не
 PYTHONPATH=src python -m unittest discover -s tests -v
 ```
 
-## Архитектура
+Проверка компиляции:
 
-```text
-api/
-├── telegram.py   Vercel webhook endpoint
-└── set_webhook.py one-click Telegram webhook setup
-
-src/music_links_bot/
-├── bot.py        Telegram handlers, keyboards, group/channel replacement
-├── cache.py      TTL-кеш для повторных внешних запросов
-├── songlink.py   Song.link client and release normalization
-├── formatter.py  StonerHand post style, hashtags, captions
-├── playlist.py   Spotify playlist metadata через oEmbed
-├── artist.py     Spotify artist metadata через oEmbed
-├── phrases.py    30 вариантов фраз для разных действий
-├── stats.py      local stats without message text or source links
-├── url_utils.py  URL extraction and platform helpers
-├── config.py     environment variables
-├── youtube.py    YouTube oEmbed metadata for video posts
-└── constants.py  platforms and aliases
+```bash
+python -m compileall -q src tests api
 ```
 
-## Надежность
+## Production Checklist
 
-- Несколько ссылок обрабатываются параллельно
-- Смешанные пачки музыка + YouTube обрабатываются параллельно и публикуются одним постом-подборкой
-- Несколько Song.link-регионов проверяются параллельно
-- Повторные запросы к Song.link, YouTube oEmbed и Spotify playlist metadata кешируются в памяти процесса
-- Tracking-параметры не участвуют в cache key, поэтому одна и та же ссылка с разными `si` / `utm` считается одним запросом
-- Очень длинная авторская подпись аккуратно обрезается
-- Слишком большие пачки ссылок ограничены, чтобы не упереться в лимиты Telegram
-- Хосты URL нормализуются через parsed hostname, поэтому обычные варианты вроде явного порта не ломают распознавание
-- Статистика пишется атомарно и защищена от параллельной записи
-- Обычные посты, Instagram/TikTok/Pinterest и другие не-музыкальные ссылки в группах/каналах игнорируются без админ-спама
-- YouTube-видео не требуют API-ключа: название и канал берутся через публичный oEmbed, а при сбое бот использует безопасный fallback
-- YouTube-каналы и профили игнорируются, поэтому обычный `youtube.com/@channel` не запускает музыкальный поиск
-- Spotify-плейлисты и artist-ссылки не отправляются в Song.link: бот берет метаданные через Spotify oEmbed и безопасно откатывается к запасному названию
-- Spotify и Apple Podcasts episode/show не падают ошибкой, даже если Song.link не нашел кросс-платформенный матч
-- Ошибки Song.link, rate limit и временная недоступность отделены от ситуации “релиз не найден”
-- Vercel webhook проверяет размер payload до обработки
-- `/api/set_webhook` можно закрыть через `SET_WEBHOOK_SECRET`
+- `BOT_TOKEN` добавлен в переменные окружения хостинга
+- Активен только один режим: Vercel webhook или Railway/local polling
+- После деплоя открыт `/api/set_webhook`
+- У бота есть право `Delete messages` там, где нужна автозамена постов
+- `ADMIN_CHAT_ID` настроен, если нужны приватная статистика и админ-уведомления
+- `SET_WEBHOOK_SECRET` задан для более безопасного setup endpoint
+- Токены не попадают в git
 
-## Важно
+## Приватность
 
-- Никогда не коммить `.env` и токен бота
-- Если бот не отвечает после деплоя, первым делом проверь `BOT_TOKEN` в переменных окружения хостинга
-- Если переходишь на Vercel, останови Railway/local polling и открой `/api/set_webhook`
-- Если задан `SET_WEBHOOK_SECRET`, открывай `/api/set_webhook?secret=your-secret`
-- Если бот запущен локально через polling и на другом polling-хостинге одновременно, могут быть конфликты
-- Для автозамены постов в канале нужны права админа на удаление сообщений
-- `/stats` хранит только счетчики, ids, labels и last seen, без текстов переписок и без исходных ссылок
-- На Vercel локальная статистика временная, если `STATS_PATH` не ведет в постоянное хранилище. Для серьезной аналитики лучше подключить внешнюю базу позже
+Бот обрабатывает ссылки, чтобы собрать музыкальный пост. Он не запрашивает пароли, платежные данные или личные файлы. Статистика минимальная: счетчики, chat ids, labels и last-seen timestamp. Тексты сообщений и исходные ссылки в статистике не хранятся.
+
+На Vercel файловая статистика временная, если `STATS_PATH` не ведет в постоянное хранилище. Для серьезной аналитики позже лучше подключить базу данных.
+
+## Troubleshooting
+
+| Симптом | Вероятная причина | Что сделать |
+| --- | --- | --- |
+| Бот не отвечает | Нет или неверный `BOT_TOKEN` | Проверить env variables на хостинге |
+| На корневой странице Vercel `404` | Это нормально для webhook-бота | Использовать `/api/telegram` и `/api/set_webhook` |
+| Telegram ходит на старый хост | Webhook не обновлен | Открыть `/api/set_webhook` на новом домене |
+| Посты дублируются | Одновременно активны polling и webhook | Остановить Railway/local polling |
+| В канале ссылка не заменяется | Нет прав админа | Выдать право удалять сообщения |
+| Не хватает платформы | Song.link не вернул ее для региона | Попробовать другую исходную ссылку или поменять регион fallback |
+
+## Лицензия
+
+Private project for StonerHand experiments. Архитектуру можно переиспользовать, но токены, идентичность канала и deployment secrets держи приватными.
