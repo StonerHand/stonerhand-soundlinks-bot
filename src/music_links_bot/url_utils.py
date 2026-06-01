@@ -9,6 +9,7 @@ URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
 TRAILING_PUNCTUATION = ".,!?)]}>\"'"
 YOUTUBE_MUSIC_HOST = "music.youtube.com"
 YOUTUBE_VIDEO_HOSTS = {"youtube.com", "m.youtube.com", "youtu.be"}
+SOUNDCLOUD_HOSTS = {"soundcloud.com", "m.soundcloud.com", "on.soundcloud.com"}
 TRACKING_QUERY_KEYS = {
     "fbclid",
     "feature",
@@ -119,6 +120,17 @@ def is_youtube_video_url(url: str) -> bool:
         return bool(parse_qs(parsed.query).get("v"))
 
     return parts[0] in {"shorts", "live", "embed"} and len(parts) >= 2
+
+
+def is_soundcloud_url(url: str) -> bool:
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return False
+
+    normalized_host = normalize_host(parsed.hostname)
+    return normalized_host in SOUNDCLOUD_HOSTS or normalized_host.endswith(
+        ".soundcloud.com"
+    )
 
 
 def spotify_url_type(url: str) -> str | None:

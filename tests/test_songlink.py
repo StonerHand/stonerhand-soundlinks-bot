@@ -106,6 +106,24 @@ class SonglinkClientTests(unittest.TestCase):
 
         self.assertEqual(merged.kind, "podcast")
 
+    def test_extract_links_keeps_soundcloud_platform(self) -> None:
+        client = SonglinkClient(user_countries=("US",))
+
+        links = client._extract_links(
+            {
+                "soundcloud": {"url": "https://soundcloud.com/artist/track"},
+                "spotify": {"url": "https://open.spotify.com/track/1"},
+            }
+        )
+
+        self.assertEqual(
+            links,
+            {
+                "spotify": "https://open.spotify.com/track/1",
+                "soundcloud": "https://soundcloud.com/artist/track",
+            },
+        )
+
     def test_normalize_entity_type_supports_podcast_episode_aliases(self) -> None:
         client = SonglinkClient(user_countries=("US",))
 

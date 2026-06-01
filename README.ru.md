@@ -55,7 +55,7 @@ Track
 | Тип | Источники | Как оформляется |
 | --- | --- | --- |
 | Трек | Spotify, Apple Music, YouTube Music, Deezer, Tidal, Yandex Music, SoundCloud | Музыкальная карточка с кнопками платформ |
-| Альбом / EP / Single | Spotify, Apple Music, Deezer, Tidal, Yandex Music | Карточка релиза с автохэштегами |
+| Альбом / EP / Single | Spotify, Apple Music, Deezer, Tidal, Yandex Music, SoundCloud sets | Карточка релиза с автохэштегами |
 | Подкаст / выпуск / шоу | Spotify, Apple Podcasts и podcast-ссылки, которые понимает Song.link | Podcast-карточка или fallback на одну платформу |
 | Spotify playlist | Spotify playlist URL | Отдельная карточка плейлиста |
 | Spotify artist | Spotify artist URL | Отдельная карточка артиста |
@@ -70,7 +70,7 @@ Track
 | Telegram SDK | `python-telegram-bot` 21.x |
 | HTTP client | `httpx` с connection limits и явными таймаутами |
 | Музыкальный поиск | Song.link / Odesli API |
-| Легкие метаданные | Spotify oEmbed и YouTube oEmbed |
+| Легкие метаданные | Spotify, YouTube и SoundCloud oEmbed |
 | Деплой | Vercel webhook или Railway worker |
 | Конфигурация | Environment variables и опциональный `.env` |
 | Тестирование | `unittest` и compile checks |
@@ -162,9 +162,11 @@ flowchart LR
     R -->|"Музыкальные ссылки"| S["Song.link / Odesli"]
     R -->|"Spotify playlist / artist"| O1["Spotify oEmbed"]
     R -->|"YouTube video"| O2["YouTube oEmbed"]
+    R -->|"SoundCloud fallback"| O3["SoundCloud oEmbed"]
     S --> N["Нормализованный релиз"]
     O1 --> N
     O2 --> N
+    O3 --> N
     N --> F["Formatter"]
     F --> K["Inline Keyboard"]
     K --> T
@@ -185,6 +187,7 @@ src/music_links_bot/
 ├── playlist.py       Spotify playlist metadata через oEmbed
 ├── artist.py         Spotify artist metadata через oEmbed
 ├── youtube.py        YouTube video metadata через oEmbed
+├── soundcloud.py     SoundCloud metadata fallback через oEmbed
 ├── url_utils.py      поиск URL, нормализация, чистка tracking-параметров
 ├── cache.py          in-memory TTL-кеш внешних запросов
 ├── stats.py          privacy-safe счетчики
@@ -203,6 +206,7 @@ src/music_links_bot/
 | Лимиты Telegram | Длинные подводки и большие пачки ссылок обрезаются до безопасного размера |
 | Чистота каналов | Обычные посты, Instagram/TikTok/Pinterest и нерелевантные ссылки игнорируются в группах и каналах |
 | Preview | Приоритетная платформа управляет preview и порядком кнопок |
+| SoundCloud | Если Song.link не нашел кроссплатформенные ссылки, прямая SoundCloud-ссылка оформляется через SoundCloud oEmbed |
 | Приватность | Статистика хранит счетчики и ids, но не тексты сообщений и не исходные ссылки |
 | Serverless | Vercel webhook проверяет размер payload до JSON-парсинга |
 | Безопасность админки | Замена сообщений происходит только если Telegram реально дал нужные права |
@@ -269,6 +273,7 @@ spotify
 appleMusic
 applePodcasts
 youtubeMusic
+soundcloud
 deezer
 tidal
 yandexMusic
@@ -389,6 +394,7 @@ python -m compileall -q src tests api
 | Посты дублируются | Одновременно активны polling и webhook | Остановить Railway/local polling |
 | В канале ссылка не заменяется | Нет прав админа | Выдать право удалять сообщения |
 | Не хватает платформы | Song.link не вернул ее для региона | Попробовать другую исходную ссылку или поменять регион fallback |
+| SoundCloud показывает только SoundCloud | Song.link не нашел совпадения на других платформах | Это нормальный fallback: ссылка все равно превращается в чистую карточку |
 
 ## Лицензия
 

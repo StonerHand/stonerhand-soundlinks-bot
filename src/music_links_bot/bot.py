@@ -37,6 +37,11 @@ from music_links_bot.models import ArtistMatch, PlaylistMatch, TrackMatch, Video
 from music_links_bot.phrases import pick_phrase
 from music_links_bot.playlist import PlaylistClient, PlaylistLookupError
 from music_links_bot.songlink import SonglinkClient, SonglinkError, SonglinkLookupError
+from music_links_bot.soundcloud import (
+    SoundCloudClient,
+    SoundCloudLookupError,
+    build_soundcloud_fallback,
+)
 from music_links_bot.stats import (
     format_stats_message,
     load_stats,
@@ -68,6 +73,7 @@ DEFAULT_PLATFORM_ORDER = (
     "appleMusic",
     "applePodcasts",
     "youtubeMusic",
+    "soundcloud",
     "deezer",
     "tidal",
     "yandexMusic",
@@ -87,6 +93,7 @@ def build_application(settings: Settings) -> Application:
         api_key=settings.songlink_api_key,
     )
     youtube_client = YouTubeClient()
+    soundcloud_client = SoundCloudClient()
     playlist_client = PlaylistClient()
     artist_client = ArtistClient()
     application = (
@@ -98,6 +105,7 @@ def build_application(settings: Settings) -> Application:
     )
     application.bot_data["songlink_client"] = songlink_client
     application.bot_data["youtube_client"] = youtube_client
+    application.bot_data["soundcloud_client"] = soundcloud_client
     application.bot_data["playlist_client"] = playlist_client
     application.bot_data["artist_client"] = artist_client
     application.bot_data["admin_chat_id"] = settings.admin_chat_id
@@ -134,6 +142,12 @@ async def close_application_resources(application: Application) -> None:
     youtube_client: YouTubeClient | None = application.bot_data.get("youtube_client")
     if youtube_client is not None:
         await youtube_client.aclose()
+
+    soundcloud_client: SoundCloudClient | None = application.bot_data.get(
+        "soundcloud_client"
+    )
+    if soundcloud_client is not None:
+        await soundcloud_client.aclose()
 
     playlist_client: PlaylistClient | None = application.bot_data.get("playlist_client")
     if playlist_client is not None:
@@ -204,8 +218,10 @@ async def platforms_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         "Что можно кидать:\n\n"
         f"{INPUT_PLATFORM_HINT}\n\n"
         "Что вернется:\n"
-        "Spotify, Apple Music, Apple Podcasts, YouTube Music, Deezer, Tidal, Yandex Music и Song.link, если площадки нашлись\n\n"
-        "YouTube оформляю как видео-пост, Spotify playlist - как плейлист, Spotify artist - как карточку артиста"
+        "Spotify, Apple Music, Apple Podcasts, YouTube Music, SoundCloud, Deezer, "
+        "Tidal, Yandex Music и Song.link, если площадки нашлись\n\n"
+        "YouTube оформляю как видео-пост, SoundCloud - как музыкальный пост, "
+        "Spotify playlist - как плейлист, Spotify artist - как карточку артиста"
     )
     await update.message.reply_text(text)
 
@@ -312,10 +328,19 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
     if youtube_urls or playlist_urls or artist_urls:
         client: SonglinkClient = context.application.bot_data["songlink_client"]
         youtube_client: YouTubeClient = context.application.bot_data["youtube_client"]
+        soundcloud_client: SoundCloudClient = context.application.bot_data[
+            "soundcloud_client"
+        ]
         playlist_client: PlaylistClient = context.application.bot_data["playlist_client"]
         artist_client: ArtistClient = context.application.bot_data["artist_client"]
         lookup_result, videos, playlists, artists = await asyncio.gather(
-            _lookup_tracks(client, music_urls) if music_urls else _empty_track_lookup(),
+            _lookup_tracks(
+                client,
+                music_urls,
+                soundcloud_client=soundcloud_client,
+            )
+            if music_urls
+            else _empty_track_lookup(),
             _lookup_youtube_videos(youtube_client, youtube_urls)
             if youtube_urls
             else _empty_video_lookup(),
@@ -422,7 +447,14 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
             return
 
     client: SonglinkClient = context.application.bot_data["songlink_client"]
-    tracks, unavailable_urls = await _lookup_tracks(client, music_urls)
+    soundcloud_client: SoundCloudClient = context.application.bot_data[
+        "soundcloud_client"
+    ]
+    tracks, unavailable_urls = await _lookup_tracks(
+        client,
+        music_urls,
+        soundcloud_client=soundcloud_client,
+    )
 
     if unavailable_urls and not tracks:
         await _notify_admin(
@@ -834,6 +866,8 @@ def _select_mixed_preview_url(
 async def _lookup_tracks(
     client: SonglinkClient,
     source_urls: list[str],
+    *,
+    soundcloud_client: SoundCloudClient | None = None,
 ) -> tuple[list[TrackMatch], list[str]]:
     results = await asyncio.gather(
         *(client.lookup_track(source_url) for source_url in source_urls),
@@ -849,7 +883,10 @@ async def _lookup_tracks(
             continue
 
         if isinstance(result, SonglinkError):
-            fallback_track = _build_podcast_fallback(source_url)
+            fallback_track = await _build_lookup_fallback(
+                source_url,
+                soundcloud_client=soundcloud_client,
+            )
             if fallback_track:
                 tracks.append(fallback_track)
                 continue
@@ -875,6 +912,35 @@ async def _lookup_tracks(
             unavailable_urls.append(source_url)
 
     return tracks, unavailable_urls
+
+
+async def _build_lookup_fallback(
+    source_url: str,
+    *,
+    soundcloud_client: SoundCloudClient | None,
+) -> TrackMatch | None:
+    podcast_fallback = _build_podcast_fallback(source_url)
+    if podcast_fallback:
+        return podcast_fallback
+
+    generic_soundcloud_fallback = build_soundcloud_fallback(source_url)
+    if generic_soundcloud_fallback is None:
+        return None
+
+    if soundcloud_client is None:
+        return generic_soundcloud_fallback
+
+    try:
+        return await soundcloud_client.lookup_track(source_url)
+    except SoundCloudLookupError:
+        LOGGER.info("Could not fetch SoundCloud metadata for %s", source_url)
+    except Exception:
+        LOGGER.exception(
+            "Unexpected error while fetching SoundCloud metadata for %s",
+            source_url,
+        )
+
+    return generic_soundcloud_fallback
 
 
 def _build_podcast_fallback(source_url: str) -> TrackMatch | None:

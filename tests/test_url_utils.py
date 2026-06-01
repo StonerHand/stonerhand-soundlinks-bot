@@ -10,6 +10,7 @@ from music_links_bot.url_utils import (
     extract_supported_urls,
     is_spotify_artist_url,
     is_spotify_playlist_url,
+    is_soundcloud_url,
     is_supported_music_url,
     is_youtube_video_url,
     spotify_url_type,
@@ -28,6 +29,9 @@ class UrlUtilsTests(unittest.TestCase):
         self.assertTrue(is_supported_music_url("https://www.youtube.com/watch?v=abc"))
         self.assertTrue(is_supported_music_url("https://youtu.be/abc"))
         self.assertTrue(is_supported_music_url("https://music.yandex.ru/album/1/track/2"))
+        self.assertTrue(is_supported_music_url("https://soundcloud.com/artist/track"))
+        self.assertTrue(is_supported_music_url("https://m.soundcloud.com/artist/track"))
+        self.assertTrue(is_supported_music_url("https://on.soundcloud.com/abc123"))
 
     def test_is_supported_music_url_rejects_other_hosts(self) -> None:
         self.assertFalse(is_supported_music_url("https://example.com/track/123"))
@@ -142,6 +146,12 @@ class UrlUtilsTests(unittest.TestCase):
         self.assertFalse(is_youtube_video_url("https://music.youtube.com/watch?v=abc"))
         self.assertFalse(is_youtube_video_url("https://www.youtube.com/@channel"))
         self.assertFalse(is_youtube_video_url("https://example.com/watch?v=abc"))
+
+    def test_is_soundcloud_url_detects_soundcloud_variants(self) -> None:
+        self.assertTrue(is_soundcloud_url("https://soundcloud.com/artist/track"))
+        self.assertTrue(is_soundcloud_url("https://m.soundcloud.com/artist/track"))
+        self.assertTrue(is_soundcloud_url("https://on.soundcloud.com/abc123"))
+        self.assertFalse(is_soundcloud_url("https://example.com/artist/track"))
 
 
 if __name__ == "__main__":

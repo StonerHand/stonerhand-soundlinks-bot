@@ -34,6 +34,7 @@ from music_links_bot.artist import ArtistLookupError
 from music_links_bot.models import ArtistMatch, PlaylistMatch, TrackMatch, VideoMatch
 from music_links_bot.playlist import PlaylistLookupError
 from music_links_bot.songlink import SonglinkError
+from music_links_bot.soundcloud import SoundCloudLookupError
 from music_links_bot.youtube import YouTubeLookupError
 
 
@@ -41,6 +42,22 @@ class FailingLookupClient:
     async def lookup_track(self, source_url: str) -> TrackMatch:
         del source_url
         raise SonglinkError("service down")
+
+
+class SoundCloudClientStub:
+    async def lookup_track(self, source_url: str) -> TrackMatch:
+        return TrackMatch(
+            title="Star Signs",
+            artist="Bondage Fairies",
+            links={"soundcloud": source_url},
+            page_url=source_url,
+        )
+
+
+class FailingSoundCloudClientStub:
+    async def lookup_track(self, source_url: str) -> TrackMatch:
+        del source_url
+        raise SoundCloudLookupError("metadata down")
 
 
 class SuccessfulLookupClient:
@@ -112,6 +129,7 @@ class ContextStub:
         *,
         songlink_client: object | None = None,
         youtube_client: object | None = None,
+        soundcloud_client: object | None = None,
         playlist_client: object | None = None,
         artist_client: object | None = None,
     ) -> None:
@@ -124,6 +142,7 @@ class ContextStub:
                     "admin_chat_id": 123,
                     "songlink_client": songlink_client or SuccessfulLookupClient(),
                     "youtube_client": youtube_client or YouTubeClientStub(),
+                    "soundcloud_client": soundcloud_client or SoundCloudClientStub(),
                     "playlist_client": playlist_client or PlaylistClientStub(),
                     "artist_client": artist_client or ArtistClientStub(),
                 }
@@ -191,6 +210,10 @@ class PrivateYouTubeMessageStub(PrivateMessageStub):
 
 class PrivateSpotifyTrackMessageStub(PrivateMessageStub):
     text = "https://open.spotify.com/track/abc"
+
+
+class PrivateSoundCloudMessageStub(PrivateMessageStub):
+    text = "https://soundcloud.com/bondage-fairies/star-signs"
 
 
 class PrivateSpotifyPlaylistMessageStub(PrivateMessageStub):
@@ -274,6 +297,7 @@ class BotKeyboardTests(unittest.TestCase):
             {
                 "spotify": "https://open.spotify.com/track/1",
                 "appleMusic": "https://music.apple.com/song/1",
+                "soundcloud": "https://soundcloud.com/artist/track",
                 "deezer": "https://deezer.example/track/1",
                 "tidal": "https://tidal.example/track/1",
             },
@@ -283,8 +307,9 @@ class BotKeyboardTests(unittest.TestCase):
         rows = keyboard.inline_keyboard
         self.assertEqual(rows[0][0].text, "🟢 Spotify")
         self.assertEqual(rows[0][1].text, "🍎 Apple")
-        self.assertEqual(rows[1][0].text, "🟦 Deezer")
-        self.assertEqual(rows[1][1].text, "🌊 Tidal")
+        self.assertEqual(rows[1][0].text, "🟠 SoundCloud")
+        self.assertEqual(rows[1][1].text, "🟦 Deezer")
+        self.assertEqual(rows[2][0].text, "🌊 Tidal")
 
     def test_release_keyboard_adds_songlink_hub_button(self) -> None:
         keyboard = _build_link_keyboard(
@@ -404,6 +429,12 @@ class BotKeyboardTests(unittest.TestCase):
         order = _build_platform_order("yandexMusic")
 
         self.assertEqual(order[0], "yandexMusic")
+        self.assertIn("spotify", order)
+
+    def test_build_platform_order_accepts_soundcloud_as_primary(self) -> None:
+        order = _build_platform_order("soundcloud")
+
+        self.assertEqual(order[0], "soundcloud")
         self.assertIn("spotify", order)
 
     def test_split_source_urls_separates_playlists_from_music_and_youtube(self) -> None:
@@ -580,6 +611,25 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(preview_options.show_above_text)
         record_matches.assert_called_once()
 
+    async def test_soundcloud_links_use_soundcloud_fallback_post(self) -> None:
+        message = PrivateSoundCloudMessageStub()
+        context = ContextStub(songlink_client=FailingLookupClient())
+
+        with patch("music_links_bot.bot.record_matches") as record_matches:
+            await track_lookup_message(UpdateStub(message), context)
+
+        self.assertEqual(len(message.replies), 1)
+        self.assertIn("<b>Bondage Fairies</b>\nStar Signs", message.replies[0])
+        keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
+        self.assertEqual(keyboard[0][0].text, "🪩 Все платформы")
+        self.assertEqual(keyboard[0][0].url, "https://soundcloud.com/bondage-fairies/star-signs")
+        self.assertEqual(keyboard[1][0].text, "🟠 SoundCloud")
+        self.assertEqual(keyboard[1][0].url, "https://soundcloud.com/bondage-fairies/star-signs")
+        preview_options = message.reply_kwargs[0]["link_preview_options"]
+        self.assertTrue(preview_options.prefer_large_media)
+        self.assertTrue(preview_options.show_above_text)
+        record_matches.assert_called_once()
+
     async def test_spotify_playlist_links_use_playlist_post(self) -> None:
         message = PrivateSpotifyPlaylistMessageStub()
         context = ContextStub()
@@ -705,6 +755,38 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             tracks[0].links,
             {"spotify": "https://open.spotify.com/episode/abc?si=123"},
+        )
+
+    async def test_lookup_tracks_uses_soundcloud_metadata_fallback(self) -> None:
+        tracks, unavailable_urls = await _lookup_tracks(
+            FailingLookupClient(),
+            ["https://soundcloud.com/bondage-fairies/star-signs"],
+            soundcloud_client=SoundCloudClientStub(),
+        )
+
+        self.assertEqual(unavailable_urls, [])
+        self.assertEqual(len(tracks), 1)
+        self.assertEqual(tracks[0].artist, "Bondage Fairies")
+        self.assertEqual(tracks[0].title, "Star Signs")
+        self.assertEqual(
+            tracks[0].links,
+            {"soundcloud": "https://soundcloud.com/bondage-fairies/star-signs"},
+        )
+
+    async def test_lookup_tracks_keeps_generic_soundcloud_fallback_when_metadata_fails(self) -> None:
+        tracks, unavailable_urls = await _lookup_tracks(
+            FailingLookupClient(),
+            ["https://soundcloud.com/bondage-fairies/star-signs"],
+            soundcloud_client=FailingSoundCloudClientStub(),
+        )
+
+        self.assertEqual(unavailable_urls, [])
+        self.assertEqual(len(tracks), 1)
+        self.assertEqual(tracks[0].artist, "SoundCloud")
+        self.assertEqual(tracks[0].title, "SoundCloud")
+        self.assertEqual(
+            tracks[0].links,
+            {"soundcloud": "https://soundcloud.com/bondage-fairies/star-signs"},
         )
 
 
