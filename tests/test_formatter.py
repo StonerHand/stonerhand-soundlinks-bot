@@ -9,6 +9,8 @@ from music_links_bot.formatter import (
     ARTIST_SIGNATURES,
     PLAYLIST_COLLECTION_SIGNATURES,
     PLAYLIST_SIGNATURES,
+    RADIO_COLLECTION_SIGNATURES,
+    RADIO_SIGNATURES,
     VIDEO_COLLECTION_SIGNATURES,
     VIDEO_SIGNATURES,
     _pick_signature,
@@ -18,13 +20,21 @@ from music_links_bot.formatter import (
     format_mixed_collection_message,
     format_playlist_collection_message,
     format_playlist_message,
+    format_radio_collection_message,
+    format_radio_message,
     format_track_message,
     format_video_collection_message,
     format_video_message,
     pick_track_emoji,
     prepend_user_text,
 )
-from music_links_bot.models import ArtistMatch, PlaylistMatch, TrackMatch, VideoMatch
+from music_links_bot.models import (
+    ArtistMatch,
+    PlaylistMatch,
+    RadioMatch,
+    TrackMatch,
+    VideoMatch,
+)
 from music_links_bot.phrases import pick_phrase
 
 
@@ -195,6 +205,25 @@ class FormatterTests(unittest.TestCase):
             "#stonerhand #video",
         )
 
+    def test_format_radio_message_uses_nts_style(self) -> None:
+        radio = RadioMatch(
+            title="Dark Energy w/ Guest",
+            station="NTS Radio",
+            url="https://www.nts.live/shows/example",
+        )
+        signature = _pick_signature(
+            RADIO_SIGNATURES,
+            "NTS Radio:Dark Energy w/ Guest:https://www.nts.live/shows/example",
+        )
+
+        self.assertEqual(
+            format_radio_message(radio),
+            "📡 · <b>Dark Energy w/ Guest</b>\n"
+            "станция: NTS Radio\n\n"
+            f"<i>{signature}</i>\n\n"
+            "#stonerhand #radio",
+        )
+
     def test_format_playlist_message_uses_playlist_style(self) -> None:
         playlist = PlaylistMatch(
             title="Women of Punk",
@@ -290,6 +319,25 @@ class FormatterTests(unittest.TestCase):
             "#stonerhand #collection #video",
         )
 
+    def test_format_radio_collection_message_lists_radios(self) -> None:
+        radios = [
+            RadioMatch(title="First", station="NTS Radio", url="https://nts.live/1"),
+            RadioMatch(title="Second", station="NTS Radio", url="https://nts.live/2"),
+        ]
+        signature = _pick_signature(
+            RADIO_COLLECTION_SIGNATURES,
+            "https://nts.live/1|https://nts.live/2",
+        )
+
+        self.assertEqual(
+            format_radio_collection_message(radios),
+            "сегодня на NTS:\n\n"
+            "1. 📡 · <b>First</b>\n"
+            "2. 📡 · <b>Second</b>\n\n"
+            f"<i>{signature}</i>\n\n"
+            "#stonerhand #collection #radio",
+        )
+
     def test_format_mixed_collection_message_lists_tracks_and_videos(self) -> None:
         tracks = [
             TrackMatch(title="Song", artist="Artist", links={}),
@@ -339,6 +387,24 @@ class FormatterTests(unittest.TestCase):
         self.assertIn("1. 🧬 · <b>1.Kla$</b>", message)
         self.assertIn("2. 📺 · <b>Live</b>", message)
         self.assertIn("#stonerhand #collection #artist #video", message)
+
+    def test_format_mixed_collection_message_lists_radios(self) -> None:
+        radios = [
+            RadioMatch(
+                title="Dark Energy",
+                station="NTS Radio",
+                url="https://nts.live/1",
+            )
+        ]
+        videos = [
+            VideoMatch(title="Live", author="Channel", url="https://youtu.be/1"),
+        ]
+
+        message = format_mixed_collection_message([], videos, radios=radios)
+
+        self.assertIn("1. 📡 · <b>Dark Energy</b>", message)
+        self.assertIn("2. 📺 · <b>Live</b>", message)
+        self.assertIn("#stonerhand #collection #radio #video", message)
 
 
 if __name__ == "__main__":

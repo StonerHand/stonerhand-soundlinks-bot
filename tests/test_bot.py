@@ -14,11 +14,13 @@ from music_links_bot.bot import (
     _build_intro_keyboard,
     _build_link_keyboard,
     _build_mixed_collection_keyboard,
+    _build_nts_keyboard,
     _build_playlist_keyboard,
     _build_platform_order,
     _build_podcast_fallback,
     _build_youtube_keyboard,
     _format_not_found_message,
+    _lookup_nts_radios,
     _lookup_playlists,
     _lookup_artists,
     _lookup_tracks,
@@ -31,7 +33,14 @@ from music_links_bot.bot import (
     track_lookup_message,
 )
 from music_links_bot.artist import ArtistLookupError
-from music_links_bot.models import ArtistMatch, PlaylistMatch, TrackMatch, VideoMatch
+from music_links_bot.models import (
+    ArtistMatch,
+    PlaylistMatch,
+    RadioMatch,
+    TrackMatch,
+    VideoMatch,
+)
+from music_links_bot.nts import NTSLookupError
 from music_links_bot.playlist import PlaylistLookupError
 from music_links_bot.songlink import SonglinkError
 from music_links_bot.soundcloud import SoundCloudLookupError
@@ -85,6 +94,21 @@ class FailingYouTubeClientStub:
         raise YouTubeLookupError("metadata down")
 
 
+class NTSClientStub:
+    async def lookup_radio(self, source_url: str) -> RadioMatch:
+        return RadioMatch(
+            title="Dark Energy w/ Guest",
+            station="NTS Radio",
+            url=source_url,
+        )
+
+
+class FailingNTSClientStub:
+    async def lookup_radio(self, source_url: str) -> RadioMatch:
+        del source_url
+        raise NTSLookupError("metadata down")
+
+
 class PlaylistClientStub:
     async def lookup_playlist(self, source_url: str) -> PlaylistMatch:
         return PlaylistMatch(
@@ -129,6 +153,7 @@ class ContextStub:
         *,
         songlink_client: object | None = None,
         youtube_client: object | None = None,
+        nts_client: object | None = None,
         soundcloud_client: object | None = None,
         playlist_client: object | None = None,
         artist_client: object | None = None,
@@ -142,6 +167,7 @@ class ContextStub:
                     "admin_chat_id": 123,
                     "songlink_client": songlink_client or SuccessfulLookupClient(),
                     "youtube_client": youtube_client or YouTubeClientStub(),
+                    "nts_client": nts_client or NTSClientStub(),
                     "soundcloud_client": soundcloud_client or SoundCloudClientStub(),
                     "playlist_client": playlist_client or PlaylistClientStub(),
                     "artist_client": artist_client or ArtistClientStub(),
@@ -208,6 +234,10 @@ class PrivateYouTubeMessageStub(PrivateMessageStub):
     text = "https://www.youtube.com/watch?v=abc123"
 
 
+class PrivateNTSMessageStub(PrivateMessageStub):
+    text = "https://www.nts.live/shows/example"
+
+
 class PrivateSpotifyTrackMessageStub(PrivateMessageStub):
     text = "https://open.spotify.com/track/abc"
 
@@ -228,6 +258,14 @@ class PrivateMixedMessageStub(PrivateMessageStub):
     text = (
         "вечерний набор "
         "https://open.spotify.com/track/abc "
+        "https://www.youtube.com/watch?v=abc123"
+    )
+
+
+class PrivateMixedNTSMessageStub(PrivateMessageStub):
+    text = (
+        "радио и видео "
+        "https://www.nts.live/shows/example "
         "https://www.youtube.com/watch?v=abc123"
     )
 
@@ -372,6 +410,15 @@ class BotKeyboardTests(unittest.TestCase):
         button_texts = [button.text for row in keyboard.inline_keyboard for button in row]
         self.assertEqual(button_texts, ["📺 Смотреть на YouTube"])
 
+    def test_nts_keyboard_can_hide_channel_button(self) -> None:
+        keyboard = _build_nts_keyboard(
+            "https://www.nts.live/shows/example",
+            include_channel_button=False,
+        )
+
+        button_texts = [button.text for row in keyboard.inline_keyboard for button in row]
+        self.assertEqual(button_texts, ["📡 Открыть на NTS"])
+
     def test_playlist_keyboard_can_hide_channel_button(self) -> None:
         keyboard = _build_playlist_keyboard(
             "https://open.spotify.com/playlist/abc",
@@ -409,6 +456,25 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[0][1].text, "📺 2. Live Session")
         self.assertEqual(rows[0][1].url, "https://youtu.be/1")
 
+    def test_mixed_collection_keyboard_lists_radio_buttons(self) -> None:
+        keyboard = _build_mixed_collection_keyboard(
+            [],
+            [VideoMatch(title="Live Session", author="Channel", url="https://youtu.be/1")],
+            radios=[
+                RadioMatch(
+                    title="Dark Energy",
+                    station="NTS Radio",
+                    url="https://www.nts.live/shows/example",
+                )
+            ],
+            include_channel_button=False,
+        )
+
+        rows = keyboard.inline_keyboard
+        self.assertEqual(rows[0][0].text, "📡 1. Dark Energy")
+        self.assertEqual(rows[0][0].url, "https://www.nts.live/shows/example")
+        self.assertEqual(rows[0][1].text, "📺 2. Live Session")
+
     def test_channel_button_is_hidden_only_in_stonerhand_channel(self) -> None:
         self.assertFalse(_should_include_channel_button(ChannelMessageStub()))
         self.assertTrue(_should_include_channel_button(GroupMessageStub()))
@@ -437,12 +503,19 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(order[0], "soundcloud")
         self.assertIn("spotify", order)
 
-    def test_split_source_urls_separates_playlists_from_music_and_youtube(self) -> None:
-        artist_urls, playlist_urls, youtube_urls, music_urls = _split_source_urls(
+    def test_split_source_urls_separates_special_links_from_music(self) -> None:
+        (
+            artist_urls,
+            playlist_urls,
+            youtube_urls,
+            nts_urls,
+            music_urls,
+        ) = _split_source_urls(
             [
                 "https://open.spotify.com/artist/abc",
                 "https://open.spotify.com/playlist/abc",
                 "https://youtu.be/video",
+                "https://www.nts.live/shows/example",
                 "https://open.spotify.com/track/123",
             ]
         )
@@ -450,6 +523,7 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(artist_urls, ["https://open.spotify.com/artist/abc"])
         self.assertEqual(playlist_urls, ["https://open.spotify.com/playlist/abc"])
         self.assertEqual(youtube_urls, ["https://youtu.be/video"])
+        self.assertEqual(nts_urls, ["https://www.nts.live/shows/example"])
         self.assertEqual(music_urls, ["https://open.spotify.com/track/123"])
 
     def test_collection_keyboard_shortens_long_button_text(self) -> None:
@@ -537,7 +611,8 @@ class BotKeyboardTests(unittest.TestCase):
         message = _format_not_found_message(["https://example.com/release"])
 
         self.assertIn(
-            "проверь, что это ссылка на трек, альбом, плейлист, артиста, подкаст или YouTube-видео",
+            "проверь, что это ссылка на трек, альбом, плейлист, артиста, "
+            "подкаст, YouTube-видео или NTS Radio",
             message,
         )
         self.assertNotIn("Проверьте", message)
@@ -591,6 +666,26 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(preview_options.prefer_small_media)
         self.assertTrue(preview_options.show_above_text)
         record_videos.assert_called_once()
+
+    async def test_nts_links_use_radio_post(self) -> None:
+        message = PrivateNTSMessageStub()
+        context = ContextStub()
+
+        with patch("music_links_bot.bot.record_radios") as record_radios:
+            await track_lookup_message(UpdateStub(message), context)
+
+        self.assertEqual(len(message.replies), 1)
+        self.assertIn("📡 · <b>Dark Energy w/ Guest</b>", message.replies[0])
+        self.assertIn("станция: NTS Radio", message.replies[0])
+        self.assertNotIn("#stonerhand", message.replies[0])
+        keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
+        preview_options = message.reply_kwargs[0]["link_preview_options"]
+        self.assertEqual(keyboard[0][0].text, "📡 Открыть на NTS")
+        self.assertEqual(keyboard[0][0].url, "https://www.nts.live/shows/example")
+        self.assertTrue(preview_options.prefer_large_media)
+        self.assertFalse(preview_options.prefer_small_media)
+        self.assertTrue(preview_options.show_above_text)
+        record_radios.assert_called_once()
 
     async def test_spotify_track_links_request_large_preview_above_text(self) -> None:
         message = PrivateSpotifyTrackMessageStub()
@@ -713,6 +808,23 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(keyboard[0][1].text, "📺 2. SANSAE Live Session Vol.3 - Melon")
         record_mixed.assert_called_once()
 
+    async def test_mixed_nts_and_youtube_links_keep_both_items(self) -> None:
+        message = PrivateMixedNTSMessageStub()
+        context = ContextStub()
+
+        with patch("music_links_bot.bot.record_mixed") as record_mixed:
+            await track_lookup_message(UpdateStub(message), context)
+
+        self.assertEqual(len(message.replies), 1)
+        self.assertTrue(message.replies[0].startswith("<blockquote>радио и видео</blockquote>\n\n"))
+        self.assertIn("📡 · <b>Dark Energy w/ Guest</b>", message.replies[0])
+        self.assertIn("📺 · <b>SANSAE Live Session Vol.3 - Melon</b>", message.replies[0])
+        self.assertNotIn("#radio #video", message.replies[0])
+        keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
+        self.assertEqual(keyboard[0][0].text, "📡 1. Dark Energy w/ Guest")
+        self.assertEqual(keyboard[0][1].text, "📺 2. SANSAE Live Session Vol.3 - Melon")
+        record_mixed.assert_called_once()
+
     async def test_youtube_lookup_uses_fallback_when_metadata_fails(self) -> None:
         videos = await _lookup_youtube_videos(
             FailingYouTubeClientStub(),
@@ -722,6 +834,16 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(videos), 1)
         self.assertEqual(videos[0].title, "YouTube video")
         self.assertEqual(videos[0].author, "YouTube")
+
+    async def test_nts_lookup_uses_fallback_when_metadata_fails(self) -> None:
+        radios = await _lookup_nts_radios(
+            FailingNTSClientStub(),
+            ["https://www.nts.live/shows/example"],
+        )
+
+        self.assertEqual(len(radios), 1)
+        self.assertEqual(radios[0].title, "NTS Radio")
+        self.assertEqual(radios[0].station, "NTS Radio")
 
     async def test_playlist_lookup_uses_fallback_when_metadata_fails(self) -> None:
         playlists = await _lookup_playlists(

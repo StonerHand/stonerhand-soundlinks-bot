@@ -10,6 +10,7 @@ TRAILING_PUNCTUATION = ".,!?)]}>\"'"
 YOUTUBE_MUSIC_HOST = "music.youtube.com"
 YOUTUBE_VIDEO_HOSTS = {"youtube.com", "m.youtube.com", "youtu.be"}
 SOUNDCLOUD_HOSTS = {"soundcloud.com", "m.soundcloud.com", "on.soundcloud.com"}
+NTS_HOSTS = {"nts.live", "www.nts.live"}
 TRACKING_QUERY_KEYS = {
     "fbclid",
     "feature",
@@ -131,6 +132,15 @@ def is_soundcloud_url(url: str) -> bool:
     return normalized_host in SOUNDCLOUD_HOSTS or normalized_host.endswith(
         ".soundcloud.com"
     )
+
+
+def is_nts_url(url: str) -> bool:
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return False
+
+    normalized_host = normalize_host(parsed.hostname)
+    return normalized_host in NTS_HOSTS or normalized_host.endswith(".nts.live")
 
 
 def spotify_url_type(url: str) -> str | None:

@@ -28,12 +28,21 @@ from music_links_bot.formatter import (
     format_mixed_collection_message,
     format_playlist_collection_message,
     format_playlist_message,
+    format_radio_collection_message,
+    format_radio_message,
     format_track_message,
     format_video_collection_message,
     format_video_message,
     prepend_user_text,
 )
-from music_links_bot.models import ArtistMatch, PlaylistMatch, TrackMatch, VideoMatch
+from music_links_bot.models import (
+    ArtistMatch,
+    PlaylistMatch,
+    RadioMatch,
+    TrackMatch,
+    VideoMatch,
+)
+from music_links_bot.nts import NTSClient, NTSLookupError, build_nts_fallback
 from music_links_bot.phrases import pick_phrase
 from music_links_bot.playlist import PlaylistClient, PlaylistLookupError
 from music_links_bot.songlink import SonglinkClient, SonglinkError, SonglinkLookupError
@@ -49,11 +58,13 @@ from music_links_bot.stats import (
     record_matches,
     record_mixed,
     record_playlists,
+    record_radios,
     record_videos,
 )
 from music_links_bot.url_utils import (
     apple_podcasts_url_type,
     extract_supported_urls,
+    is_nts_url,
     is_spotify_artist_url,
     is_spotify_playlist_url,
     is_youtube_video_url,
@@ -93,6 +104,7 @@ def build_application(settings: Settings) -> Application:
         api_key=settings.songlink_api_key,
     )
     youtube_client = YouTubeClient()
+    nts_client = NTSClient()
     soundcloud_client = SoundCloudClient()
     playlist_client = PlaylistClient()
     artist_client = ArtistClient()
@@ -105,6 +117,7 @@ def build_application(settings: Settings) -> Application:
     )
     application.bot_data["songlink_client"] = songlink_client
     application.bot_data["youtube_client"] = youtube_client
+    application.bot_data["nts_client"] = nts_client
     application.bot_data["soundcloud_client"] = soundcloud_client
     application.bot_data["playlist_client"] = playlist_client
     application.bot_data["artist_client"] = artist_client
@@ -143,6 +156,10 @@ async def close_application_resources(application: Application) -> None:
     if youtube_client is not None:
         await youtube_client.aclose()
 
+    nts_client: NTSClient | None = application.bot_data.get("nts_client")
+    if nts_client is not None:
+        await nts_client.aclose()
+
     soundcloud_client: SoundCloudClient | None = application.bot_data.get(
         "soundcloud_client"
     )
@@ -163,9 +180,10 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     text = (
-        "🎧 Кидай ссылку на музыку или YouTube\n\n"
+        "🎧 Кидай ссылку на музыку, YouTube или NTS Radio\n\n"
         "Я соберу аккуратный пост: название, preview и кнопки площадок\n\n"
-        "Можно отправить трек, альбом, плейлист, артиста, подкаст или несколько ссылок сразу\n\n"
+        "Можно отправить трек, альбом, плейлист, артиста, подкаст, "
+        "NTS-эфир или несколько ссылок сразу\n\n"
         "В группах и каналах могу заменить исходную ссылку готовым постом, если у меня есть права админа"
     )
     await update.message.reply_text(text, reply_markup=_build_intro_keyboard(context.bot.username))
@@ -177,7 +195,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     text = (
         "Как пользоваться:\n\n"
-        "1. Пришли ссылку на трек, альбом, плейлист, артиста, подкаст или YouTube-видео\n"
+        "1. Пришли ссылку на трек, альбом, плейлист, артиста, подкаст, "
+        "NTS-эфир или YouTube-видео\n"
         "2. Добавь свой текст над ссылкой, если нужна подводка\n"
         "3. Получи чистую карточку с preview, хэштегами и кнопками\n\n"
         "Несколько ссылок одним сообщением станут подборкой"
@@ -220,8 +239,9 @@ async def platforms_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         "Что вернется:\n"
         "Spotify, Apple Music, Apple Podcasts, YouTube Music, SoundCloud, Deezer, "
         "Tidal, Yandex Music и Song.link, если площадки нашлись\n\n"
-        "YouTube оформляю как видео-пост, SoundCloud - как музыкальный пост, "
-        "Spotify playlist - как плейлист, Spotify artist - как карточку артиста"
+        "YouTube оформляю как видео-пост, NTS Radio - как радио-пост, "
+        "SoundCloud - как музыкальный пост, Spotify playlist - как плейлист, "
+        "Spotify artist - как карточку артиста"
     )
     await update.message.reply_text(text)
 
@@ -277,13 +297,26 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         no_url_text = pick_phrase("no_url", message_text or str(message.chat_id))
         await message.reply_text(
             f"{no_url_text}\n\n"
-            "пришли ссылку на трек, альбом, плейлист, артиста, подкаст или YouTube-видео"
+            "пришли ссылку на трек, альбом, плейлист, артиста, подкаст, "
+            "YouTube-видео или NTS Radio"
         )
         return
 
-    artist_urls, playlist_urls, youtube_urls, music_urls = _split_source_urls(source_urls)
+    (
+        artist_urls,
+        playlist_urls,
+        youtube_urls,
+        nts_urls,
+        music_urls,
+    ) = _split_source_urls(source_urls)
 
-    if artist_urls and not playlist_urls and not youtube_urls and not music_urls:
+    if (
+        artist_urls
+        and not playlist_urls
+        and not youtube_urls
+        and not nts_urls
+        and not music_urls
+    ):
         artist_client: ArtistClient = context.application.bot_data["artist_client"]
         artists = await _lookup_artists(artist_client, artist_urls)
         await _send_artist_result(
@@ -297,7 +330,13 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         _record_artists_safely(artists, message)
         return
 
-    if playlist_urls and not artist_urls and not youtube_urls and not music_urls:
+    if (
+        playlist_urls
+        and not artist_urls
+        and not youtube_urls
+        and not nts_urls
+        and not music_urls
+    ):
         playlist_client: PlaylistClient = context.application.bot_data["playlist_client"]
         playlists = await _lookup_playlists(playlist_client, playlist_urls)
         await _send_playlist_result(
@@ -311,7 +350,13 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         _record_playlists_safely(playlists, message)
         return
 
-    if youtube_urls and not artist_urls and not playlist_urls and not music_urls:
+    if (
+        youtube_urls
+        and not artist_urls
+        and not playlist_urls
+        and not nts_urls
+        and not music_urls
+    ):
         youtube_client: YouTubeClient = context.application.bot_data["youtube_client"]
         videos = await _lookup_youtube_videos(youtube_client, youtube_urls)
         await _send_youtube_result(
@@ -325,15 +370,36 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         _record_videos_safely(videos, message)
         return
 
-    if youtube_urls or playlist_urls or artist_urls:
+    if (
+        nts_urls
+        and not artist_urls
+        and not playlist_urls
+        and not youtube_urls
+        and not music_urls
+    ):
+        nts_client: NTSClient = context.application.bot_data["nts_client"]
+        radios = await _lookup_nts_radios(nts_client, nts_urls)
+        await _send_nts_result(
+            context.bot,
+            message,
+            radios,
+            user_prefix=user_prefix,
+            include_channel_button=include_channel_button,
+            include_hashtags=include_hashtags,
+        )
+        _record_radios_safely(radios, message)
+        return
+
+    if youtube_urls or nts_urls or playlist_urls or artist_urls:
         client: SonglinkClient = context.application.bot_data["songlink_client"]
         youtube_client: YouTubeClient = context.application.bot_data["youtube_client"]
+        nts_client: NTSClient = context.application.bot_data["nts_client"]
         soundcloud_client: SoundCloudClient = context.application.bot_data[
             "soundcloud_client"
         ]
         playlist_client: PlaylistClient = context.application.bot_data["playlist_client"]
         artist_client: ArtistClient = context.application.bot_data["artist_client"]
-        lookup_result, videos, playlists, artists = await asyncio.gather(
+        lookup_result, videos, radios, playlists, artists = await asyncio.gather(
             _lookup_tracks(
                 client,
                 music_urls,
@@ -344,6 +410,9 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
             _lookup_youtube_videos(youtube_client, youtube_urls)
             if youtube_urls
             else _empty_video_lookup(),
+            _lookup_nts_radios(nts_client, nts_urls)
+            if nts_urls
+            else _empty_radio_lookup(),
             _lookup_playlists(playlist_client, playlist_urls)
             if playlist_urls
             else _empty_playlist_lookup(),
@@ -361,7 +430,13 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
                 only_for_channel_message=message,
             )
 
-        item_count = len(tracks) + len(videos) + len(playlists) + len(artists)
+        item_count = (
+            len(tracks)
+            + len(videos)
+            + len(radios)
+            + len(playlists)
+            + len(artists)
+        )
         if item_count == 0:
             if message.chat.type == "channel":
                 return
@@ -406,6 +481,18 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
             _record_videos_safely(videos, message)
             return
 
+        if item_count == 1 and radios:
+            await _send_nts_result(
+                context.bot,
+                message,
+                radios,
+                user_prefix=user_prefix,
+                include_channel_button=include_channel_button,
+                include_hashtags=include_hashtags,
+            )
+            _record_radios_safely(radios, message)
+            return
+
         if item_count == 1 and playlists:
             await _send_playlist_result(
                 context.bot,
@@ -436,6 +523,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
                 message,
                 tracks,
                 videos,
+                radios,
                 playlists,
                 artists,
                 user_prefix=user_prefix,
@@ -443,7 +531,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
                 include_hashtags=include_hashtags,
                 context=context,
             )
-            _record_mixed_safely(tracks, videos, playlists, artists, message)
+            _record_mixed_safely(tracks, videos, radios, playlists, artists, message)
             return
 
     client: SonglinkClient = context.application.bot_data["songlink_client"]
@@ -540,10 +628,11 @@ def _select_preview_url(
 
 def _split_source_urls(
     source_urls: list[str],
-) -> tuple[list[str], list[str], list[str], list[str]]:
+) -> tuple[list[str], list[str], list[str], list[str], list[str]]:
     artist_urls: list[str] = []
     playlist_urls: list[str] = []
     youtube_urls: list[str] = []
+    nts_urls: list[str] = []
     music_urls: list[str] = []
 
     for source_url in source_urls:
@@ -553,17 +642,20 @@ def _split_source_urls(
             playlist_urls.append(source_url)
         elif is_youtube_video_url(source_url):
             youtube_urls.append(source_url)
+        elif is_nts_url(source_url):
+            nts_urls.append(source_url)
         else:
             music_urls.append(source_url)
 
-    return artist_urls, playlist_urls, youtube_urls, music_urls
+    return artist_urls, playlist_urls, youtube_urls, nts_urls, music_urls
 
 
 def _format_not_found_message(source_urls: list[str]) -> str:
     seed = ",".join(source_urls)
     return (
         f"{pick_phrase('not_found', seed)}\n\n"
-        "проверь, что это ссылка на трек, альбом, плейлист, артиста, подкаст или YouTube-видео"
+        "проверь, что это ссылка на трек, альбом, плейлист, артиста, "
+        "подкаст, YouTube-видео или NTS Radio"
     )
 
 
@@ -637,6 +729,10 @@ async def _empty_video_lookup() -> list[VideoMatch]:
     return []
 
 
+async def _empty_radio_lookup() -> list[RadioMatch]:
+    return []
+
+
 async def _empty_playlist_lookup() -> list[PlaylistMatch]:
     return []
 
@@ -674,6 +770,37 @@ async def _lookup_youtube_videos(
     return videos
 
 
+async def _lookup_nts_radios(
+    client: NTSClient,
+    source_urls: list[str],
+) -> list[RadioMatch]:
+    results = await asyncio.gather(
+        *(client.lookup_radio(source_url) for source_url in source_urls),
+        return_exceptions=True,
+    )
+
+    radios: list[RadioMatch] = []
+    for source_url, result in zip(source_urls, results, strict=False):
+        if isinstance(result, RadioMatch):
+            radios.append(result)
+            continue
+
+        if isinstance(result, NTSLookupError):
+            LOGGER.info("Could not fetch NTS metadata for %s", source_url)
+        elif isinstance(result, Exception):
+            LOGGER.error(
+                "Unexpected error while fetching NTS metadata for %s",
+                source_url,
+                exc_info=(type(result), result, result.__traceback__),
+            )
+
+        fallback_radio = build_nts_fallback(source_url)
+        if fallback_radio is not None:
+            radios.append(fallback_radio)
+
+    return radios
+
+
 async def _send_youtube_result(
     bot: Bot,
     message: Message,
@@ -709,6 +836,47 @@ async def _send_youtube_result(
         preview_url=videos[0].url,
         reply_markup=_build_youtube_collection_keyboard(
             videos,
+            include_channel_button=include_channel_button,
+        ),
+        prefer_large_preview=True,
+    )
+
+
+async def _send_nts_result(
+    bot: Bot,
+    message: Message,
+    radios: list[RadioMatch],
+    *,
+    user_prefix: str,
+    include_channel_button: bool,
+    include_hashtags: bool,
+) -> None:
+    if not radios:
+        return
+
+    if len(radios) == 1:
+        radio = radios[0]
+        await _send_track_result(
+            bot,
+            message,
+            user_prefix + format_radio_message(radio, include_hashtags=include_hashtags),
+            preview_url=radio.url,
+            reply_markup=_build_nts_keyboard(
+                radio.url,
+                include_channel_button=include_channel_button,
+            ),
+            prefer_large_preview=True,
+        )
+        return
+
+    await _send_track_result(
+        bot,
+        message,
+        user_prefix
+        + format_radio_collection_message(radios, include_hashtags=include_hashtags),
+        preview_url=radios[0].url,
+        reply_markup=_build_nts_collection_keyboard(
+            radios,
             include_channel_button=include_channel_button,
         ),
         prefer_large_preview=True,
@@ -809,6 +977,7 @@ async def _send_mixed_result(
     message: Message,
     tracks: list[TrackMatch],
     videos: list[VideoMatch],
+    radios: list[RadioMatch],
     playlists: list[PlaylistMatch],
     artists: list[ArtistMatch],
     *,
@@ -817,7 +986,14 @@ async def _send_mixed_result(
     include_hashtags: bool,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
-    preview_url = _select_mixed_preview_url(tracks, playlists, artists, videos, context)
+    preview_url = _select_mixed_preview_url(
+        tracks,
+        playlists,
+        artists,
+        radios,
+        videos,
+        context,
+    )
     await _send_track_result(
         bot,
         message,
@@ -827,6 +1003,7 @@ async def _send_mixed_result(
             videos,
             playlists,
             artists,
+            radios,
             include_hashtags=include_hashtags,
         ),
         preview_url=preview_url,
@@ -835,6 +1012,7 @@ async def _send_mixed_result(
             videos,
             playlists,
             artists,
+            radios,
             include_channel_button=include_channel_button,
         ),
         prefer_large_preview=True,
@@ -845,6 +1023,7 @@ def _select_mixed_preview_url(
     tracks: list[TrackMatch],
     playlists: list[PlaylistMatch],
     artists: list[ArtistMatch],
+    radios: list[RadioMatch],
     videos: list[VideoMatch],
     context: ContextTypes.DEFAULT_TYPE,
 ) -> str | None:
@@ -856,6 +1035,9 @@ def _select_mixed_preview_url(
 
     if artists:
         return artists[0].url
+
+    if radios:
+        return radios[0].url
 
     if videos:
         return videos[0].url
@@ -1144,6 +1326,18 @@ def _build_youtube_keyboard(
     return InlineKeyboardMarkup(rows)
 
 
+def _build_nts_keyboard(
+    url: str,
+    *,
+    include_channel_button: bool = True,
+) -> InlineKeyboardMarkup:
+    rows = [[InlineKeyboardButton("📡 Открыть на NTS", url=url)]]
+    if include_channel_button:
+        rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
+
+    return InlineKeyboardMarkup(rows)
+
+
 def _build_playlist_keyboard(
     url: str,
     *,
@@ -1179,6 +1373,27 @@ def _build_youtube_collection_keyboard(
             InlineKeyboardButton(
                 text=_shorten_button_text(f"📺 {index}. {video.title}"),
                 url=video.url,
+            )
+        )
+
+    rows = _button_rows(buttons)
+    if include_channel_button:
+        rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
+
+    return InlineKeyboardMarkup(rows)
+
+
+def _build_nts_collection_keyboard(
+    radios: list[RadioMatch],
+    *,
+    include_channel_button: bool = True,
+) -> InlineKeyboardMarkup:
+    buttons: list[InlineKeyboardButton] = []
+    for index, radio in enumerate(radios, start=1):
+        buttons.append(
+            InlineKeyboardButton(
+                text=_shorten_button_text(f"📡 {index}. {radio.title}"),
+                url=radio.url,
             )
         )
 
@@ -1236,11 +1451,13 @@ def _build_mixed_collection_keyboard(
     videos: list[VideoMatch],
     playlists: list[PlaylistMatch] | None = None,
     artists: list[ArtistMatch] | None = None,
+    radios: list[RadioMatch] | None = None,
     *,
     include_channel_button: bool = True,
 ) -> InlineKeyboardMarkup:
     playlists = playlists or []
     artists = artists or []
+    radios = radios or []
     buttons: list[InlineKeyboardButton] = []
     index = 1
 
@@ -1273,6 +1490,15 @@ def _build_mixed_collection_keyboard(
             InlineKeyboardButton(
                 text=_shorten_button_text(f"🧬 {index}. {artist.title}"),
                 url=artist.url,
+            )
+        )
+        index += 1
+
+    for radio in radios:
+        buttons.append(
+            InlineKeyboardButton(
+                text=_shorten_button_text(f"📡 {index}. {radio.title}"),
+                url=radio.url,
             )
         )
         index += 1
@@ -1387,6 +1613,20 @@ def _record_videos_safely(videos: list[VideoMatch], message: Message) -> None:
         LOGGER.exception("Could not update video stats")
 
 
+def _record_radios_safely(radios: list[RadioMatch], message: Message) -> None:
+    if not radios:
+        return
+
+    try:
+        record_radios(
+            radios,
+            user=_build_user_stats_entry(message),
+            chat=_build_chat_stats_entry(message),
+        )
+    except Exception:
+        LOGGER.exception("Could not update radio stats")
+
+
 def _record_playlists_safely(playlists: list[PlaylistMatch], message: Message) -> None:
     if not playlists:
         return
@@ -1418,6 +1658,7 @@ def _record_artists_safely(artists: list[ArtistMatch], message: Message) -> None
 def _record_mixed_safely(
     tracks: list[TrackMatch],
     videos: list[VideoMatch],
+    radios: list[RadioMatch],
     playlists: list[PlaylistMatch],
     artists: list[ArtistMatch],
     message: Message,
@@ -1428,6 +1669,7 @@ def _record_mixed_safely(
             videos,
             playlists,
             artists=artists,
+            radios=radios,
             user=_build_user_stats_entry(message),
             chat=_build_chat_stats_entry(message),
         )

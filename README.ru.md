@@ -20,7 +20,7 @@
 
 ## Обзор
 
-StonerHand Soundlinks Bot собирает музыкальные ссылки в чистые Telegram-посты. Можно отправить трек, альбом, подкаст, Spotify-плейлист, Spotify-артиста, YouTube-видео или несколько ссылок сразу, а бот вернет короткую карточку с названием, preview, хэштегами и кнопками платформ.
+StonerHand Soundlinks Bot собирает музыкальные ссылки в чистые Telegram-посты. Можно отправить трек, альбом, подкаст, Spotify-плейлист, Spotify-артиста, YouTube-видео, NTS Radio или несколько ссылок сразу, а бот вернет короткую карточку с названием, preview, хэштегами и кнопками платформ.
 
 Дефолтный стиль сделан под голос канала [@stonerhand](https://t.me/stonerhand), но архитектура специально оставлена переиспользуемой: можно заменить канал, фразы, подписи кнопок и приоритет платформ, чтобы собрать свою версию.
 
@@ -60,6 +60,7 @@ Track
 | Spotify playlist | Spotify playlist URL | Отдельная карточка плейлиста |
 | Spotify artist | Spotify artist URL | Отдельная карточка артиста |
 | YouTube-видео | `youtube.com/watch`, `youtu.be`, `shorts`, `live`, `embed`, `m.youtube.com` | Видео-карточка с кнопкой YouTube |
+| NTS Radio | `nts.live`, `www.nts.live` и поддомены NTS | Радио-карточка с кнопкой NTS |
 | Подборка | Несколько ссылок в одном сообщении | Нумерованный пост-плейлист |
 
 ## Технический Стек
@@ -70,7 +71,7 @@ Track
 | Telegram SDK | `python-telegram-bot` 21.x |
 | HTTP client | `httpx` с connection limits и явными таймаутами |
 | Музыкальный поиск | Song.link / Odesli API |
-| Легкие метаданные | Spotify, YouTube и SoundCloud oEmbed |
+| Легкие метаданные | Spotify, YouTube и SoundCloud oEmbed, NTS Open Graph |
 | Деплой | Vercel webhook или Railway worker |
 | Конфигурация | Environment variables и опциональный `.env` |
 | Тестирование | `unittest` и compile checks |
@@ -119,13 +120,15 @@ Release
 2. 🎧 · Show Me The Body - Camp Orchestra
 3. 💿 · The Soft Moon - Criminal
 4. 📺 · SANSAE Live Session Vol.3 - Melon
+5. 📡 · NTS Radio - Dark Energy
 
 выбирай с чего начать
 
-#stonerhand #collection #track #album #video
+#stonerhand #collection #track #album #video #radio
 
 [🎧 1. Youth Code] [🎧 2. Show Me The Body]
 [💿 3. The Soft Moon] [📺 4. Live Session]
+[📡 5. Dark Energy]
 ```
 
 ### Отдельные Карточки
@@ -152,6 +155,17 @@ Release
 [🧬 Открыть артиста]
 ```
 
+```text
+📡 · Dark Energy w/ Guest
+станция: NTS Radio
+
+эфир на месте, можно включать
+
+#stonerhand #radio
+
+[📡 Открыть на NTS]
+```
+
 ## Архитектура
 
 ```mermaid
@@ -163,10 +177,12 @@ flowchart LR
     R -->|"Spotify playlist / artist"| O1["Spotify oEmbed"]
     R -->|"YouTube video"| O2["YouTube oEmbed"]
     R -->|"SoundCloud fallback"| O3["SoundCloud oEmbed"]
+    R -->|"NTS Radio"| O4["NTS Open Graph"]
     S --> N["Нормализованный релиз"]
     O1 --> N
     O2 --> N
     O3 --> N
+    O4 --> N
     N --> F["Formatter"]
     F --> K["Inline Keyboard"]
     K --> T
@@ -188,6 +204,7 @@ src/music_links_bot/
 ├── artist.py         Spotify artist metadata через oEmbed
 ├── youtube.py        YouTube video metadata через oEmbed
 ├── soundcloud.py     SoundCloud metadata fallback через oEmbed
+├── nts.py            NTS Radio metadata через Open Graph parsing
 ├── url_utils.py      поиск URL, нормализация, чистка tracking-параметров
 ├── cache.py          in-memory TTL-кеш внешних запросов
 ├── stats.py          privacy-safe счетчики
@@ -207,6 +224,7 @@ src/music_links_bot/
 | Чистота каналов | Обычные посты, Instagram/TikTok/Pinterest и нерелевантные ссылки игнорируются в группах и каналах |
 | Preview | Приоритетная платформа управляет preview и порядком кнопок |
 | SoundCloud | Если Song.link не нашел кроссплатформенные ссылки, прямая SoundCloud-ссылка оформляется через SoundCloud oEmbed |
+| NTS Radio | NTS-ссылки не гоняются через Song.link, а оформляются отдельными радио-карточками |
 | Приватность | Статистика хранит счетчики и ids, но не тексты сообщений и не исходные ссылки |
 | Serverless | Vercel webhook проверяет размер payload до JSON-парсинга |
 | Безопасность админки | Замена сообщений происходит только если Telegram реально дал нужные права |

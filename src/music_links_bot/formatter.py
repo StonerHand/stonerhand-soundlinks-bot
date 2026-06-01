@@ -3,7 +3,13 @@ from __future__ import annotations
 from html import escape
 import hashlib
 
-from music_links_bot.models import ArtistMatch, PlaylistMatch, TrackMatch, VideoMatch
+from music_links_bot.models import (
+    ArtistMatch,
+    PlaylistMatch,
+    RadioMatch,
+    TrackMatch,
+    VideoMatch,
+)
 from music_links_bot.phrases import pick_phrase
 
 TRACK_EMOJIS = ("🎵", "🎧", "🎶", "🔊", "📻")
@@ -30,6 +36,18 @@ VIDEO_COLLECTION_SIGNATURES = (
     "выбирай, что включить первым",
     "экранная пачка готова",
     "можно смотреть по порядку, можно наугад",
+)
+RADIO_SIGNATURES = (
+    "эфир на месте, можно включать",
+    "радио поймано, дальше NTS",
+    "здесь уже можно нырять",
+    "передача готова к запуску",
+    "включай, если хочется провалиться",
+)
+RADIO_COLLECTION_SIGNATURES = (
+    "эфиры рядом, выбирай первый",
+    "радио-пачка готова",
+    "можно включать по порядку, можно наугад",
 )
 ARTIST_SIGNATURES = (
     "точка входа в артиста",
@@ -107,6 +125,20 @@ def format_video_message(video: VideoMatch, *, include_hashtags: bool = True) ->
         f"<i>{escape(signature)}</i>",
     ]
     return _with_hashtags(lines, "#stonerhand #video", include_hashtags=include_hashtags)
+
+
+def format_radio_message(radio: RadioMatch, *, include_hashtags: bool = True) -> str:
+    signature = _pick_signature(
+        RADIO_SIGNATURES,
+        f"{radio.station}:{radio.title}:{radio.url}",
+    )
+    lines = [
+        f"📡 · <b>{escape(radio.title)}</b>",
+        f"станция: {escape(radio.station)}",
+        "",
+        f"<i>{escape(signature)}</i>",
+    ]
+    return _with_hashtags(lines, "#stonerhand #radio", include_hashtags=include_hashtags)
 
 
 def format_playlist_message(
@@ -206,21 +238,46 @@ def format_video_collection_message(
     return _with_hashtags(lines, "#stonerhand #collection #video", include_hashtags=include_hashtags)
 
 
+def format_radio_collection_message(
+    radios: list[RadioMatch],
+    *,
+    include_hashtags: bool = True,
+) -> str:
+    signature = _pick_signature(
+        RADIO_COLLECTION_SIGNATURES,
+        "|".join(radio.url for radio in radios),
+    )
+    lines = ["сегодня на NTS:", ""]
+    for index, radio in enumerate(radios, start=1):
+        lines.append(f"{index}. 📡 · <b>{escape(radio.title)}</b>")
+
+    lines.extend(
+        [
+            "",
+            f"<i>{escape(signature)}</i>",
+        ]
+    )
+    return _with_hashtags(lines, "#stonerhand #collection #radio", include_hashtags=include_hashtags)
+
+
 def format_mixed_collection_message(
     tracks: list[TrackMatch],
     videos: list[VideoMatch],
     playlists: list[PlaylistMatch] | None = None,
     artists: list[ArtistMatch] | None = None,
+    radios: list[RadioMatch] | None = None,
     *,
     include_hashtags: bool = True,
 ) -> str:
     playlists = playlists or []
     artists = artists or []
+    radios = radios or []
     seed = "|".join(
         [
             *(f"{track.artist}:{track.title}:{track.kind}" for track in tracks),
             *(f"{playlist.platform}:{playlist.title}:playlist" for playlist in playlists),
             *(f"{artist.platform}:{artist.title}:artist" for artist in artists),
+            *(f"{radio.station}:{radio.title}:radio" for radio in radios),
             *(f"{video.author}:{video.title}:video" for video in videos),
         ]
     )
@@ -243,6 +300,10 @@ def format_mixed_collection_message(
         lines.append(f"{index}. 🧬 · <b>{escape(artist.title)}</b>")
         index += 1
 
+    for radio in radios:
+        lines.append(f"{index}. 📡 · <b>{escape(radio.title)}</b>")
+        index += 1
+
     for video in videos:
         lines.append(f"{index}. 📺 · <b>{escape(video.title)}</b>")
         index += 1
@@ -260,6 +321,7 @@ def format_mixed_collection_message(
             tracks,
             has_playlists=bool(playlists),
             has_artists=bool(artists),
+            has_radios=bool(radios),
             has_videos=bool(videos),
         ),
         include_hashtags=include_hashtags,
@@ -343,6 +405,7 @@ def build_mixed_collection_hashtags(
     *,
     has_playlists: bool = False,
     has_artists: bool = False,
+    has_radios: bool = False,
     has_videos: bool = True,
 ) -> str:
     hashtags = build_collection_hashtags(tracks).split()
@@ -351,6 +414,9 @@ def build_mixed_collection_hashtags(
 
     if has_artists and "#artist" not in hashtags:
         hashtags.append("#artist")
+
+    if has_radios and "#radio" not in hashtags:
+        hashtags.append("#radio")
 
     if has_videos and "#video" not in hashtags:
         hashtags.append("#video")

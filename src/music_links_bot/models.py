@@ -22,6 +22,13 @@ class VideoMatch:
 
 
 @dataclass(slots=True)
+class RadioMatch:
+    title: str
+    station: str
+    url: str
+
+
+@dataclass(slots=True)
 class PlaylistMatch:
     title: str
     platform: str

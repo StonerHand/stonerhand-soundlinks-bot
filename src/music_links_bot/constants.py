@@ -19,6 +19,8 @@ SUPPORTED_INPUT_HOSTS = {
     "soundcloud.com",
     "m.soundcloud.com",
     "on.soundcloud.com",
+    "nts.live",
+    "www.nts.live",
 }
 
 HTTP_USER_AGENT = "StonerHandBot/0.1 (+https://t.me/stonerhand)"
@@ -47,5 +49,5 @@ PLATFORM_ALIASES = {
 
 INPUT_PLATFORM_HINT = (
     "Spotify (треки, альбомы, плейлисты, артисты), Apple Music / Apple Podcasts, "
-    "YouTube / YouTube Music, Deezer, Tidal, Yandex Music или SoundCloud"
+    "YouTube / YouTube Music, Deezer, Tidal, Yandex Music, SoundCloud или NTS Radio"
 )

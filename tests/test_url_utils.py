@@ -8,6 +8,7 @@ from music_links_bot.url_utils import (
     apple_podcasts_url_type,
     cache_key_for_url,
     extract_supported_urls,
+    is_nts_url,
     is_spotify_artist_url,
     is_spotify_playlist_url,
     is_soundcloud_url,
@@ -32,6 +33,8 @@ class UrlUtilsTests(unittest.TestCase):
         self.assertTrue(is_supported_music_url("https://soundcloud.com/artist/track"))
         self.assertTrue(is_supported_music_url("https://m.soundcloud.com/artist/track"))
         self.assertTrue(is_supported_music_url("https://on.soundcloud.com/abc123"))
+        self.assertTrue(is_supported_music_url("https://www.nts.live/shows/example"))
+        self.assertTrue(is_supported_music_url("https://nts.live/episodes/example"))
 
     def test_is_supported_music_url_rejects_other_hosts(self) -> None:
         self.assertFalse(is_supported_music_url("https://example.com/track/123"))
@@ -152,6 +155,12 @@ class UrlUtilsTests(unittest.TestCase):
         self.assertTrue(is_soundcloud_url("https://m.soundcloud.com/artist/track"))
         self.assertTrue(is_soundcloud_url("https://on.soundcloud.com/abc123"))
         self.assertFalse(is_soundcloud_url("https://example.com/artist/track"))
+
+    def test_is_nts_url_detects_nts_variants(self) -> None:
+        self.assertTrue(is_nts_url("https://www.nts.live/shows/example"))
+        self.assertTrue(is_nts_url("https://nts.live/episodes/example"))
+        self.assertTrue(is_nts_url("https://archive.nts.live/example"))
+        self.assertFalse(is_nts_url("https://example.com/shows/example"))
 
 
 if __name__ == "__main__":

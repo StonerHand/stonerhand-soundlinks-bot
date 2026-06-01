@@ -5,7 +5,13 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from music_links_bot.models import ArtistMatch, PlaylistMatch, TrackMatch, VideoMatch
+from music_links_bot.models import (
+    ArtistMatch,
+    PlaylistMatch,
+    RadioMatch,
+    TrackMatch,
+    VideoMatch,
+)
 from music_links_bot.stats import (
     format_stats_message,
     load_stats,
@@ -13,6 +19,7 @@ from music_links_bot.stats import (
     record_matches,
     record_mixed,
     record_playlists,
+    record_radios,
     record_videos,
 )
 
@@ -63,6 +70,7 @@ class StatsTests(unittest.TestCase):
         self.assertIn("альбомов: 1", message)
         self.assertIn("подкастов: 1", message)
         self.assertIn("видео: 0", message)
+        self.assertIn("радио: 0", message)
         self.assertIn("плейлистов: 0", message)
         self.assertIn("артистов: 0", message)
 
@@ -84,6 +92,26 @@ class StatsTests(unittest.TestCase):
             self.assertEqual(stats["videos"], 2)
             self.assertEqual(stats["collections"], 1)
             self.assertEqual(stats["users"]["123"]["count"], 1)
+            self.assertEqual(load_stats(path), stats)
+
+    def test_record_radios_counts_posts_and_radio_items(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "stats.json"
+
+            stats = record_radios(
+                [
+                    RadioMatch(
+                        title="Dark Energy",
+                        station="NTS Radio",
+                        url="https://nts.live/1",
+                    )
+                ],
+                path=path,
+            )
+
+            self.assertEqual(stats["posts"], 1)
+            self.assertEqual(stats["radios"], 1)
+            self.assertEqual(stats["collections"], 0)
             self.assertEqual(load_stats(path), stats)
 
     def test_record_mixed_counts_one_post_with_music_and_video(self) -> None:
@@ -144,6 +172,28 @@ class StatsTests(unittest.TestCase):
             self.assertEqual(stats["posts"], 1)
             self.assertEqual(stats["videos"], 1)
             self.assertEqual(stats["artists"], 1)
+            self.assertEqual(stats["collections"], 1)
+
+    def test_record_mixed_counts_radios_inside_collections(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "stats.json"
+
+            stats = record_mixed(
+                [],
+                [VideoMatch(title="Live", author="Channel", url="https://youtu.be/1")],
+                radios=[
+                    RadioMatch(
+                        title="Dark Energy",
+                        station="NTS Radio",
+                        url="https://nts.live/1",
+                    )
+                ],
+                path=path,
+            )
+
+            self.assertEqual(stats["posts"], 1)
+            self.assertEqual(stats["videos"], 1)
+            self.assertEqual(stats["radios"], 1)
             self.assertEqual(stats["collections"], 1)
 
     def test_record_playlists_counts_posts_and_playlist_items(self) -> None:
@@ -246,6 +296,7 @@ class StatsTests(unittest.TestCase):
 
             self.assertEqual(stats["posts"], 2)
             self.assertEqual(stats["videos"], 0)
+            self.assertEqual(stats["radios"], 0)
             self.assertEqual(stats["playlists"], 0)
             self.assertEqual(stats["artists"], 0)
             self.assertEqual(stats["users"], {})

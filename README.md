@@ -20,7 +20,7 @@
 
 ## What It Does
 
-StonerHand Soundlinks Bot turns messy music URLs into compact Telegram posts with a consistent editorial style. Send a track, album, podcast, Spotify playlist, Spotify artist, YouTube video or several links at once, and the bot builds a clean card with title, preview, hashtags and platform buttons.
+StonerHand Soundlinks Bot turns messy music URLs into compact Telegram posts with a consistent editorial style. Send a track, album, podcast, Spotify playlist, Spotify artist, YouTube video, NTS Radio page or several links at once, and the bot builds a clean card with title, preview, hashtags and platform buttons.
 
 The default copy is tuned for [@stonerhand](https://t.me/stonerhand), but the architecture is intentionally reusable: swap the channel handle, phrase bank, button labels and platform priority, and it becomes a solid base for another music channel.
 
@@ -60,6 +60,7 @@ Track
 | Spotify playlist | Spotify playlist URL | Playlist card with direct playlist button |
 | Spotify artist | Spotify artist URL | Artist card with direct artist button |
 | YouTube video | `youtube.com/watch`, `youtu.be`, `shorts`, `live`, `embed`, `m.youtube.com` | Video card with YouTube button |
+| NTS Radio | `nts.live`, `www.nts.live` and NTS subdomains | Radio card with direct NTS button |
 | Collection | Several links in one message | Numbered editorial playlist post |
 
 ## Tech Stack
@@ -70,7 +71,7 @@ Track
 | Telegram SDK | `python-telegram-bot` 21.x |
 | HTTP client | `httpx` with connection limits and explicit timeouts |
 | Music resolution | Song.link / Odesli API |
-| Lightweight metadata | Spotify, YouTube and SoundCloud oEmbed |
+| Lightweight metadata | Spotify, YouTube and SoundCloud oEmbed, NTS Open Graph |
 | Deployment | Vercel webhook or Railway worker |
 | Configuration | Environment variables and optional `.env` |
 | Testing | `unittest` plus compile checks |
@@ -119,13 +120,15 @@ Release
 2. 🎧 · Show Me The Body - Camp Orchestra
 3. 💿 · The Soft Moon - Criminal
 4. 📺 · SANSAE Live Session Vol.3 - Melon
+5. 📡 · NTS Radio - Dark Energy
 
 выбирай с чего начать
 
-#stonerhand #collection #track #album #video
+#stonerhand #collection #track #album #video #radio
 
 [🎧 1. Youth Code] [🎧 2. Show Me The Body]
 [💿 3. The Soft Moon] [📺 4. Live Session]
+[📡 5. Dark Energy]
 ```
 
 ### Dedicated Cards
@@ -152,6 +155,17 @@ Release
 [🧬 Открыть артиста]
 ```
 
+```text
+📡 · Dark Energy w/ Guest
+станция: NTS Radio
+
+эфир на месте, можно включать
+
+#stonerhand #radio
+
+[📡 Открыть на NTS]
+```
+
 ## Architecture
 
 ```mermaid
@@ -163,10 +177,12 @@ flowchart LR
     R -->|"Spotify playlist / artist"| O1["Spotify oEmbed"]
     R -->|"YouTube video"| O2["YouTube oEmbed"]
     R -->|"SoundCloud fallback"| O3["SoundCloud oEmbed"]
+    R -->|"NTS Radio"| O4["NTS Open Graph"]
     S --> N["Normalized Release"]
     O1 --> N
     O2 --> N
     O3 --> N
+    O4 --> N
     N --> F["Formatter"]
     F --> K["Inline Keyboard"]
     K --> T
@@ -188,6 +204,7 @@ src/music_links_bot/
 ├── artist.py         Spotify artist metadata through oEmbed
 ├── youtube.py        YouTube video metadata through oEmbed
 ├── soundcloud.py     SoundCloud metadata fallback through oEmbed
+├── nts.py            NTS Radio metadata through Open Graph parsing
 ├── url_utils.py      URL detection, normalization, tracking-param cleanup
 ├── cache.py          In-memory TTL cache for external lookups
 ├── stats.py          Privacy-safe counters
@@ -207,6 +224,7 @@ src/music_links_bot/
 | Channel noise | Non-music posts, Instagram/TikTok/Pinterest and unrelated links are ignored in groups/channels |
 | Preview quality | Preferred platform controls preview source and button priority |
 | SoundCloud support | Song.link links are used when available; direct SoundCloud URLs fall back to SoundCloud oEmbed |
+| NTS Radio support | NTS pages are routed outside Song.link and formatted as dedicated radio cards |
 | Privacy | Stats store counters and ids, not message text or source links |
 | Serverless safety | Vercel payload size is checked before JSON parsing |
 | Admin safety | Message replacement only happens when Telegram grants the required rights |

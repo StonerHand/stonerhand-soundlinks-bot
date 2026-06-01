@@ -6,7 +6,14 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
-from music_links_bot.models import ArtistMatch, PlaylistMatch, TrackMatch, VideoMatch
+from music_links_bot.models import (
+    ArtistMatch,
+    PlaylistMatch,
+    RadioMatch,
+    TrackMatch,
+    VideoMatch,
+)
+
 
 def _default_stats_path() -> Path:
     configured_path = os.getenv("STATS_PATH", "").strip()
@@ -44,6 +51,7 @@ def load_stats(path: Path = STATS_PATH) -> StatsData:
         "album",
         "podcast",
         "videos",
+        "radios",
         "playlists",
         "artists",
         "collections",
@@ -68,6 +76,7 @@ def record_matches(
         path,
         matches=matches,
         video_count=0,
+        radio_count=0,
         playlist_count=0,
         artist_count=0,
         user=user,
@@ -86,6 +95,26 @@ def record_videos(
         path,
         matches=[],
         video_count=len(videos),
+        radio_count=0,
+        playlist_count=0,
+        artist_count=0,
+        user=user,
+        chat=chat,
+    )
+
+
+def record_radios(
+    radios: list[RadioMatch],
+    path: Path = STATS_PATH,
+    *,
+    user: dict[str, object] | None = None,
+    chat: dict[str, object] | None = None,
+) -> StatsData:
+    return _record_activity(
+        path,
+        matches=[],
+        video_count=0,
+        radio_count=len(radios),
         playlist_count=0,
         artist_count=0,
         user=user,
@@ -104,6 +133,7 @@ def record_playlists(
         path,
         matches=[],
         video_count=0,
+        radio_count=0,
         playlist_count=len(playlists),
         artist_count=0,
         user=user,
@@ -122,6 +152,7 @@ def record_artists(
         path,
         matches=[],
         video_count=0,
+        radio_count=0,
         playlist_count=0,
         artist_count=len(artists),
         user=user,
@@ -136,6 +167,7 @@ def record_mixed(
     path: Path = STATS_PATH,
     *,
     artists: list[ArtistMatch] | None = None,
+    radios: list[RadioMatch] | None = None,
     user: dict[str, object] | None = None,
     chat: dict[str, object] | None = None,
 ) -> StatsData:
@@ -143,6 +175,7 @@ def record_mixed(
         path,
         matches=matches,
         video_count=len(videos),
+        radio_count=len(radios or []),
         playlist_count=len(playlists or []),
         artist_count=len(artists or []),
         user=user,
@@ -155,6 +188,7 @@ def _record_activity(
     *,
     matches: list[TrackMatch],
     video_count: int,
+    radio_count: int,
     playlist_count: int,
     artist_count: int,
     user: dict[str, object] | None,
@@ -164,10 +198,18 @@ def _record_activity(
         stats = load_stats(path)
         stats["posts"] += 1
         stats["videos"] += video_count
+        stats["radios"] += radio_count
         stats["playlists"] += playlist_count
         stats["artists"] += artist_count
 
-        if len(matches) + video_count + playlist_count + artist_count > 1:
+        item_count = (
+            len(matches)
+            + video_count
+            + radio_count
+            + playlist_count
+            + artist_count
+        )
+        if item_count > 1:
             stats["collections"] += 1
 
         for match in matches:
@@ -191,6 +233,7 @@ def format_stats_message(stats: StatsData, *, include_private: bool = False) -> 
         f"альбомов: {stats.get('album', 0)}\n"
         f"подкастов: {stats.get('podcast', 0)}\n"
         f"видео: {stats.get('videos', 0)}\n"
+        f"радио: {stats.get('radios', 0)}\n"
         f"плейлистов: {stats.get('playlists', 0)}\n"
         f"артистов: {stats.get('artists', 0)}\n"
         f"подборок: {stats.get('collections', 0)}"
@@ -216,6 +259,7 @@ def _empty_stats() -> StatsData:
         "album": 0,
         "podcast": 0,
         "videos": 0,
+        "radios": 0,
         "playlists": 0,
         "artists": 0,
         "collections": 0,
