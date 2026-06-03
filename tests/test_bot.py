@@ -290,6 +290,7 @@ class BotKeyboardTests(unittest.TestCase):
             [
                 ("start", "что умеет бот"),
                 ("help", "короткая инструкция"),
+                ("guide", "для каналов и групп"),
                 ("platforms", "поддерживаемые сервисы"),
                 ("channel", "открыть StonerHand"),
                 ("stats", "статистика"),
@@ -503,6 +504,12 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(order[0], "soundcloud")
         self.assertIn("spotify", order)
 
+    def test_build_platform_order_accepts_human_platform_aliases(self) -> None:
+        self.assertEqual(_build_platform_order("Spotify")[0], "spotify")
+        self.assertEqual(_build_platform_order("apple")[0], "appleMusic")
+        self.assertEqual(_build_platform_order("yt music")[0], "youtubeMusic")
+        self.assertEqual(_build_platform_order("yandex")[0], "yandexMusic")
+
     def test_split_source_urls_separates_special_links_from_music(self) -> None:
         (
             artist_urls,
@@ -610,12 +617,32 @@ class BotKeyboardTests(unittest.TestCase):
     def test_not_found_message_uses_editorial_copy(self) -> None:
         message = _format_not_found_message(["https://example.com/release"])
 
+        self.assertNotIn("Проверьте", message)
+
+    def test_not_found_message_does_not_repeat_recovery_hint(self) -> None:
+        with patch(
+            "music_links_bot.bot.pick_phrase",
+            return_value="ссылки не собрались - проверь, что это трек или альбом",
+        ):
+            message = _format_not_found_message(["https://example.com/release"])
+
+        self.assertEqual(
+            message,
+            "ссылки не собрались - проверь, что это трек или альбом",
+        )
+
+    def test_not_found_message_adds_detail_when_phrase_has_no_hint(self) -> None:
+        with patch(
+            "music_links_bot.bot.pick_phrase",
+            return_value="ничего подходящего не собралось",
+        ):
+            message = _format_not_found_message(["https://example.com/release"])
+
         self.assertIn(
             "проверь, что это ссылка на трек, альбом, плейлист, артиста, "
             "подкаст, YouTube-видео или NTS Radio",
             message,
         )
-        self.assertNotIn("Проверьте", message)
 
 
 class BotLookupTests(unittest.IsolatedAsyncioTestCase):
@@ -756,7 +783,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(message.replies), 1)
         self.assertIn("🧬 · <b>1.Kla$</b>", message.replies[0])
-        self.assertIn("артист: Spotify", message.replies[0])
+        self.assertIn("профиль: Spotify", message.replies[0])
         self.assertNotIn("#stonerhand #artist", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "🧬 Открыть артиста")

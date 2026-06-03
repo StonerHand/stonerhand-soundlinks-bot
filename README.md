@@ -5,6 +5,10 @@
 **Open-source Telegram bot for turning music links into clean editorial posts**
 
 [Русская версия](README.ru.md)
+· [Bot](https://t.me/StonerHandBot)
+· [Channel](https://t.me/stonerhand)
+· [Vercel setup](#vercel-deployment)
+· [Customization](#customization)
 
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)
@@ -12,7 +16,7 @@
 ![Song.link](https://img.shields.io/badge/Song.link-Odesli-FF6B6B?style=for-the-badge)
 ![GitHub](https://img.shields.io/badge/GitHub-stonerhand--soundlinks--bot-181717?style=for-the-badge&logo=github&logoColor=white)
 
-`streaming URL -> normalized release -> Telegram-ready post`
+`streaming URL -> normalized release -> Telegram-ready editorial post`
 
 </div>
 
@@ -23,6 +27,8 @@
 StonerHand Soundlinks Bot turns messy music URLs into compact Telegram posts with a consistent editorial style. Send a track, album, podcast, Spotify playlist, Spotify artist, YouTube video, NTS Radio page or several links at once, and the bot builds a clean card with title, preview, hashtags and platform buttons.
 
 The default copy is tuned for [@stonerhand](https://t.me/stonerhand), but the architecture is intentionally reusable: swap the channel handle, phrase bank, button labels and platform priority, and it becomes a solid base for another music channel.
+
+This is not a media downloader. It does not fetch or redistribute audio/video files. It resolves public links, fetches lightweight metadata and formats Telegram posts.
 
 ```text
 input
@@ -86,6 +92,7 @@ Track
 | Branding | StonerHand-specific copy lives in formatters, constants and phrase banks |
 | Forkability | The core flow is separated into URL parsing, metadata clients, formatting, keyboards and transport |
 | Safety | Webhook setup can be protected with `SET_WEBHOOK_SECRET` |
+| Scope | No downloader APIs, no media scraping, no stored message text |
 
 ## Visual Language
 
@@ -146,7 +153,7 @@ Release
 
 ```text
 🧬 · 1.Kla$
-артист: Spotify
+профиль: Spotify
 
 профиль открыт, можно копать глубже
 
@@ -383,6 +390,25 @@ python -m compileall -q src tests api
 - `SET_WEBHOOK_SECRET` is configured for a safer setup endpoint
 - Tokens are never committed to git
 - Tokens are rotated if they were ever pasted into a public place
+
+## Repository Hygiene
+
+Useful checks before publishing or deploying:
+
+```bash
+git status --short
+```
+
+```bash
+rg -n "ghp_|x-rapidapi-key|X-RapidAPI-Key|[0-9]{6,}:[A-Za-z0-9_-]{20,}" .
+```
+
+```bash
+find . -path './.venv' -prune -o -path './.git' -prune -o \
+  \( -name '__pycache__' -o -name '*.pyc' -o -name '.DS_Store' -o -name '*.egg-info' \) -print
+```
+
+The repository ignores local runtime artifacts such as `.env`, `.venv`, `__pycache__`, `.DS_Store`, generated egg-info and local stats files.
 
 ## Privacy
 

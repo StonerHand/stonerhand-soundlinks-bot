@@ -170,7 +170,7 @@ def format_artist_message(
     )
     lines = [
         f"🧬 · <b>{escape(artist.title)}</b>",
-        f"артист: {escape(artist.platform)}",
+        f"профиль: {escape(artist.platform)}",
         "",
         f"<i>{escape(signature)}</i>",
     ]

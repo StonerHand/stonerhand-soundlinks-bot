@@ -5,6 +5,10 @@
 **Открытый Telegram-бот, который превращает музыкальные ссылки в аккуратные посты**
 
 [English version](README.md)
+· [Бот](https://t.me/StonerHandBot)
+· [Канал](https://t.me/stonerhand)
+· [Vercel setup](#деплой-на-vercel)
+· [Кастомизация](#кастомизация)
 
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)
@@ -12,7 +16,7 @@
 ![Song.link](https://img.shields.io/badge/Song.link-Odesli-FF6B6B?style=for-the-badge)
 ![GitHub](https://img.shields.io/badge/GitHub-stonerhand--soundlinks--bot-181717?style=for-the-badge&logo=github&logoColor=white)
 
-`стриминговая ссылка -> релиз -> готовый Telegram-пост`
+`стриминговая ссылка -> релиз -> готовый редакторский Telegram-пост`
 
 </div>
 
@@ -23,6 +27,8 @@
 StonerHand Soundlinks Bot собирает музыкальные ссылки в чистые Telegram-посты. Можно отправить трек, альбом, подкаст, Spotify-плейлист, Spotify-артиста, YouTube-видео, NTS Radio или несколько ссылок сразу, а бот вернет короткую карточку с названием, preview, хэштегами и кнопками платформ.
 
 Дефолтный стиль сделан под голос канала [@stonerhand](https://t.me/stonerhand), но архитектура специально оставлена переиспользуемой: можно заменить канал, фразы, подписи кнопок и приоритет платформ, чтобы собрать свою версию.
+
+Это не downloader. Бот не скачивает и не раздает аудио/видео файлы. Он распознает публичные ссылки, забирает легкие метаданные и оформляет Telegram-посты.
 
 ```text
 вход
@@ -86,6 +92,7 @@ Track
 | Брендинг | StonerHand-специфика лежит в formatter/constants/phrase bank |
 | Форки | Поток разделен на URL parsing, metadata clients, formatting, keyboards и transport |
 | Безопасность | Setup endpoint можно закрыть через `SET_WEBHOOK_SECRET` |
+| Границы | Нет downloader API, media scraping и хранения текста сообщений |
 
 ## Визуальный Стиль
 
@@ -146,7 +153,7 @@ Release
 
 ```text
 🧬 · 1.Kla$
-артист: Spotify
+профиль: Spotify
 
 профиль открыт, можно копать глубже
 
@@ -383,6 +390,25 @@ python -m compileall -q src tests api
 - `SET_WEBHOOK_SECRET` задан для более безопасного setup endpoint
 - Токены не попадают в git
 - Токены перевыпущены, если они когда-либо попадали в публичное место
+
+## Чистота Репозитория
+
+Полезные проверки перед публикацией или деплоем:
+
+```bash
+git status --short
+```
+
+```bash
+rg -n "ghp_|x-rapidapi-key|X-RapidAPI-Key|[0-9]{6,}:[A-Za-z0-9_-]{20,}" .
+```
+
+```bash
+find . -path './.venv' -prune -o -path './.git' -prune -o \
+  \( -name '__pycache__' -o -name '*.pyc' -o -name '.DS_Store' -o -name '*.egg-info' \) -print
+```
+
+Репозиторий игнорирует локальные артефакты: `.env`, `.venv`, `__pycache__`, `.DS_Store`, generated egg-info и локальные stats-файлы.
 
 ## Приватность
 

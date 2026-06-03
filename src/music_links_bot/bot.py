@@ -92,9 +92,32 @@ DEFAULT_PLATFORM_ORDER = (
 PUBLIC_BOT_COMMANDS = (
     BotCommand("start", "что умеет бот"),
     BotCommand("help", "короткая инструкция"),
+    BotCommand("guide", "для каналов и групп"),
     BotCommand("platforms", "поддерживаемые сервисы"),
     BotCommand("channel", "открыть StonerHand"),
     BotCommand("stats", "статистика"),
+)
+PRIMARY_PLATFORM_ALIASES = {
+    "spotify": "spotify",
+    "apple": "appleMusic",
+    "applemusic": "appleMusic",
+    "itunes": "appleMusic",
+    "applepodcasts": "applePodcasts",
+    "podcasts": "applePodcasts",
+    "youtube": "youtubeMusic",
+    "youtubemusic": "youtubeMusic",
+    "ytmusic": "youtubeMusic",
+    "soundcloud": "soundcloud",
+    "sc": "soundcloud",
+    "deezer": "deezer",
+    "tidal": "tidal",
+    "yandex": "yandexMusic",
+    "yandexmusic": "yandexMusic",
+    "yamusic": "yandexMusic",
+}
+NOT_FOUND_DETAIL = (
+    "проверь, что это ссылка на трек, альбом, плейлист, артиста, "
+    "подкаст, YouTube-видео или NTS Radio"
 )
 
 
@@ -652,10 +675,24 @@ def _split_source_urls(
 
 def _format_not_found_message(source_urls: list[str]) -> str:
     seed = ",".join(source_urls)
-    return (
-        f"{pick_phrase('not_found', seed)}\n\n"
-        "проверь, что это ссылка на трек, альбом, плейлист, артиста, "
-        "подкаст, YouTube-видео или NTS Radio"
+    phrase = pick_phrase("not_found", seed)
+    if _has_recovery_hint(phrase):
+        return phrase
+
+    return f"{phrase}\n\n{NOT_FOUND_DETAIL}"
+
+
+def _has_recovery_hint(text: str) -> bool:
+    lowered = text.casefold()
+    return any(
+        marker in lowered
+        for marker in (
+            "проверь",
+            "попробуй",
+            "похоже",
+            "не трек",
+            "не альбом",
+        )
     )
 
 
@@ -1536,11 +1573,25 @@ def _build_platform_order(primary_platform: str | None) -> tuple[str, ...]:
     if not primary_platform:
         return DEFAULT_PLATFORM_ORDER
 
-    normalized = primary_platform.strip()
-    if normalized not in DEFAULT_PLATFORM_ORDER:
+    normalized = _normalize_platform_key(primary_platform)
+    if normalized is None:
         return DEFAULT_PLATFORM_ORDER
 
     return (normalized, *(item for item in DEFAULT_PLATFORM_ORDER if item != normalized))
+
+
+def _normalize_platform_key(platform: str) -> str | None:
+    raw_value = platform.strip()
+    if raw_value in DEFAULT_PLATFORM_ORDER:
+        return raw_value
+
+    compact_value = (
+        raw_value.replace("-", "")
+        .replace("_", "")
+        .replace(" ", "")
+        .casefold()
+    )
+    return PRIMARY_PLATFORM_ALIASES.get(compact_value)
 
 
 def _shorten_button_text(text: str) -> str:

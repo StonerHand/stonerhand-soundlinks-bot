@@ -257,7 +257,7 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_artist_message(artist),
             "🧬 · <b>1.Kla$</b>\n"
-            "артист: Spotify\n\n"
+            "профиль: Spotify\n\n"
             f"<i>{signature}</i>\n\n"
             "#stonerhand #artist",
         )
