@@ -5,6 +5,7 @@
 **Открытый Telegram-бот, который превращает музыкальные ссылки в аккуратные посты**
 
 [English version](README.md)
+· [Архитектура](ARCHITECTURE.ru.md)
 · [Бот](https://t.me/StonerHandBot)
 · [Канал](https://t.me/stonerhand)
 · [Vercel setup](#деплой-на-vercel)

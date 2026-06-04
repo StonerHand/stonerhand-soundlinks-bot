@@ -5,6 +5,7 @@
 **Open-source Telegram bot for turning music links into clean editorial posts**
 
 [Русская версия](README.ru.md)
+· [Architecture](ARCHITECTURE.ru.md)
 · [Bot](https://t.me/StonerHandBot)
 · [Channel](https://t.me/stonerhand)
 · [Vercel setup](#vercel-deployment)
