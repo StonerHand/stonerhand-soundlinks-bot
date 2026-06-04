@@ -6,6 +6,7 @@
 
 [Русская версия](README.ru.md)
 · [Architecture](ARCHITECTURE.ru.md)
+· [Skills](#project-skills)
 · [Bot](https://t.me/StonerHandBot)
 · [Channel](https://t.me/stonerhand)
 · [Vercel setup](#vercel-deployment)
@@ -236,6 +237,18 @@ src/music_links_bot/
 | Privacy | Stats store counters and ids, not message text or source links |
 | Serverless safety | Vercel payload size is checked before JSON parsing |
 | Admin safety | Message replacement only happens when Telegram grants the required rights |
+
+## Project Skills
+
+This repository also includes Codex-oriented project skills in `skills/`. They are short operational playbooks for future maintenance, so contributors do not need to rediscover the project structure from scratch.
+
+| Skill | Use it for |
+| --- | --- |
+| `skills/stonerhand-bot-audit` | Full code audit, refactoring, cleanup, stability checks, tests and public-release safety |
+| `skills/stonerhand-bot-deploy` | Vercel, Railway, local polling, webhook setup, env variables and deployment debugging |
+| `skills/stonerhand-bot-editorial-ui` | Telegram post design, copywriting, buttons, hashtags, previews and channel style |
+
+The broader system map lives in [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
 
 ## Commands
 

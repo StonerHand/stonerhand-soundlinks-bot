@@ -6,6 +6,7 @@
 
 [English version](README.md)
 · [Архитектура](ARCHITECTURE.ru.md)
+· [Скиллы](#проектные-скиллы)
 · [Бот](https://t.me/StonerHandBot)
 · [Канал](https://t.me/stonerhand)
 · [Vercel setup](#деплой-на-vercel)
@@ -236,6 +237,18 @@ src/music_links_bot/
 | Приватность | Статистика хранит счетчики и ids, но не тексты сообщений и не исходные ссылки |
 | Serverless | Vercel webhook проверяет размер payload до JSON-парсинга |
 | Безопасность админки | Замена сообщений происходит только если Telegram реально дал нужные права |
+
+## Проектные Скиллы
+
+В репозитории есть Codex-скиллы в `skills/`. Это короткие операционные инструкции для будущей поддержки, чтобы не перечитывать весь код каждый раз заново.
+
+| Скилл | Для чего |
+| --- | --- |
+| `skills/stonerhand-bot-audit` | Полный аудит кода, рефакторинг, чистка, стабильность, тесты и проверка перед публичным релизом |
+| `skills/stonerhand-bot-deploy` | Vercel, Railway, локальный polling, webhook, env variables и диагностика деплоя |
+| `skills/stonerhand-bot-editorial-ui` | Дизайн Telegram-постов, тексты, кнопки, хэштеги, preview и стиль канала |
+
+Большая карта системы лежит в [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
 
 ## Команды
 
