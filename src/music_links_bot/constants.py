@@ -27,12 +27,12 @@ HTTP_USER_AGENT = "StonerHandBot/0.1 (+https://t.me/stonerhand)"
 
 PLATFORM_LABELS = {
     "spotify": "🟢 Spotify",
-    "appleMusic": "🍎 Apple",
-    "applePodcasts": "🎙 Podcasts",
-    "youtubeMusic": "▶️ YouTube",
+    "appleMusic": "⚪ Apple",
+    "applePodcasts": "🟣 Podcasts",
+    "youtubeMusic": "🔴 YouTube",
     "soundcloud": "🟠 SoundCloud",
     "deezer": "🟦 Deezer",
-    "tidal": "🌊 Tidal",
+    "tidal": "⚫ Tidal",
     "yandexMusic": "🟡 Yandex",
 }
 

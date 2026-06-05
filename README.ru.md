@@ -44,7 +44,7 @@ Track
 
 #stonerhand #track
 
-[🟢 Spotify] [🌊 Tidal]
+[🟢 Spotify] [⚫ Tidal]
 [🟦 Deezer]  [🟡 Yandex]
 ```
 
@@ -113,7 +113,7 @@ Release
 
 #stonerhand #album
 
-[🟢 Spotify] [🌊 Tidal]
+[🟢 Spotify] [⚫ Tidal]
 [🟦 Deezer]  [🟡 Yandex]
 ```
 

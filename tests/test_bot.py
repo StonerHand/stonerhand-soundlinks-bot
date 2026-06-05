@@ -345,10 +345,10 @@ class BotKeyboardTests(unittest.TestCase):
 
         rows = keyboard.inline_keyboard
         self.assertEqual(rows[0][0].text, "🟢 Spotify")
-        self.assertEqual(rows[0][1].text, "🍎 Apple")
+        self.assertEqual(rows[0][1].text, "⚪ Apple")
         self.assertEqual(rows[1][0].text, "🟠 SoundCloud")
         self.assertEqual(rows[1][1].text, "🟦 Deezer")
-        self.assertEqual(rows[2][0].text, "🌊 Tidal")
+        self.assertEqual(rows[2][0].text, "⚫ Tidal")
 
     def test_release_keyboard_adds_songlink_hub_button(self) -> None:
         keyboard = _build_link_keyboard(
@@ -364,7 +364,7 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[0][0].text, "🪩 Все платформы")
         self.assertEqual(rows[0][0].url, "https://song.link/transitions")
         self.assertEqual(rows[1][0].text, "🟢 Spotify")
-        self.assertEqual(rows[1][1].text, "🍎 Apple")
+        self.assertEqual(rows[1][1].text, "⚪ Apple")
 
     def test_album_release_keyboard_uses_release_hub_label(self) -> None:
         keyboard = _build_link_keyboard(
