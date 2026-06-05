@@ -212,7 +212,7 @@ flowchart LR
 
 ```text
 api/
-├── telegram.py       Vercel webhook endpoint
+├── telegram.py       Vercel webhook endpoint с fail-fast проверкой payload
 └── set_webhook.py    установка webhook и синхронизация команд
 
 src/music_links_bot/
@@ -245,7 +245,7 @@ src/music_links_bot/
 | SoundCloud | Если Song.link не нашел кроссплатформенные ссылки, прямая SoundCloud-ссылка оформляется через SoundCloud oEmbed |
 | NTS Radio | NTS-ссылки не гоняются через Song.link, а оформляются отдельными радио-карточками |
 | Приватность | Статистика хранит счетчики и ids, но не тексты сообщений и не исходные ссылки |
-| Serverless | Vercel webhook проверяет размер payload до JSON-парсинга |
+| Serverless | Vercel webhook проверяет размер и форму JSON до запуска бота |
 | Безопасность админки | Замена сообщений происходит только если Telegram реально дал нужные права |
 
 ## Проектные Скиллы

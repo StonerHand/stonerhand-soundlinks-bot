@@ -80,6 +80,7 @@ from music_links_bot.youtube import YouTubeClient, YouTubeLookupError
 LOGGER = logging.getLogger(__name__)
 CHANNEL_USERNAME = "stonerhand"
 CHANNEL_URL = f"https://t.me/{CHANNEL_USERNAME}"
+CHANNEL_BUTTON_TEXT = "🪨 Открыть канал"
 MAX_BUTTON_TEXT_LENGTH = 64
 MAX_LINKS_PER_MESSAGE = 12
 MAX_USER_NOTE_LENGTH = 700
@@ -280,9 +281,7 @@ async def channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     await update.message.reply_text(
         "StonerHand рядом",
-        reply_markup=InlineKeyboardMarkup(
-            [[InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)]]
-        ),
+        reply_markup=InlineKeyboardMarkup([[_channel_button()]]),
     )
 
 
@@ -1323,10 +1322,7 @@ def _build_link_keyboard(
         )
 
     rows.extend(_button_rows(buttons))
-    if include_channel_button:
-        rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
-
-    return InlineKeyboardMarkup(rows)
+    return _keyboard_with_optional_channel(rows, include_channel_button)
 
 
 def _build_collection_keyboard(
@@ -1351,11 +1347,7 @@ def _build_collection_keyboard(
             )
         )
 
-    rows = _button_rows(buttons)
-    if include_channel_button:
-        rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
-
-    return InlineKeyboardMarkup(rows)
+    return _keyboard_with_optional_channel(_button_rows(buttons), include_channel_button)
 
 
 def _build_youtube_keyboard(
@@ -1363,11 +1355,12 @@ def _build_youtube_keyboard(
     *,
     include_channel_button: bool = True,
 ) -> InlineKeyboardMarkup:
-    rows = [[_url_button("📺 Смотреть на YouTube", url=url, style="danger")]]
-    if include_channel_button:
-        rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
-
-    return InlineKeyboardMarkup(rows)
+    return _single_url_keyboard(
+        "📺 Смотреть на YouTube",
+        url=url,
+        style="danger",
+        include_channel_button=include_channel_button,
+    )
 
 
 def _build_nts_keyboard(
@@ -1375,11 +1368,12 @@ def _build_nts_keyboard(
     *,
     include_channel_button: bool = True,
 ) -> InlineKeyboardMarkup:
-    rows = [[_url_button("📡 Открыть на NTS", url=url, style="primary")]]
-    if include_channel_button:
-        rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
-
-    return InlineKeyboardMarkup(rows)
+    return _single_url_keyboard(
+        "📡 Открыть на NTS",
+        url=url,
+        style="primary",
+        include_channel_button=include_channel_button,
+    )
 
 
 def _build_playlist_keyboard(
@@ -1387,11 +1381,12 @@ def _build_playlist_keyboard(
     *,
     include_channel_button: bool = True,
 ) -> InlineKeyboardMarkup:
-    rows = [[_url_button("🎛 Открыть плейлист", url=url, style="primary")]]
-    if include_channel_button:
-        rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
-
-    return InlineKeyboardMarkup(rows)
+    return _single_url_keyboard(
+        "🎛 Открыть плейлист",
+        url=url,
+        style="primary",
+        include_channel_button=include_channel_button,
+    )
 
 
 def _build_artist_keyboard(
@@ -1399,11 +1394,12 @@ def _build_artist_keyboard(
     *,
     include_channel_button: bool = True,
 ) -> InlineKeyboardMarkup:
-    rows = [[_url_button("🧬 Открыть артиста", url=url, style="primary")]]
-    if include_channel_button:
-        rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
-
-    return InlineKeyboardMarkup(rows)
+    return _single_url_keyboard(
+        "🧬 Открыть артиста",
+        url=url,
+        style="primary",
+        include_channel_button=include_channel_button,
+    )
 
 
 def _build_youtube_collection_keyboard(
@@ -1421,11 +1417,7 @@ def _build_youtube_collection_keyboard(
             )
         )
 
-    rows = _button_rows(buttons)
-    if include_channel_button:
-        rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
-
-    return InlineKeyboardMarkup(rows)
+    return _keyboard_with_optional_channel(_button_rows(buttons), include_channel_button)
 
 
 def _build_nts_collection_keyboard(
@@ -1443,11 +1435,7 @@ def _build_nts_collection_keyboard(
             )
         )
 
-    rows = _button_rows(buttons)
-    if include_channel_button:
-        rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
-
-    return InlineKeyboardMarkup(rows)
+    return _keyboard_with_optional_channel(_button_rows(buttons), include_channel_button)
 
 
 def _build_playlist_collection_keyboard(
@@ -1465,11 +1453,7 @@ def _build_playlist_collection_keyboard(
             )
         )
 
-    rows = _button_rows(buttons)
-    if include_channel_button:
-        rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
-
-    return InlineKeyboardMarkup(rows)
+    return _keyboard_with_optional_channel(_button_rows(buttons), include_channel_button)
 
 
 def _build_artist_collection_keyboard(
@@ -1487,11 +1471,7 @@ def _build_artist_collection_keyboard(
             )
         )
 
-    rows = _button_rows(buttons)
-    if include_channel_button:
-        rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
-
-    return InlineKeyboardMarkup(rows)
+    return _keyboard_with_optional_channel(_button_rows(buttons), include_channel_button)
 
 
 def _build_mixed_collection_keyboard(
@@ -1565,11 +1545,7 @@ def _build_mixed_collection_keyboard(
         )
         index += 1
 
-    rows = _button_rows(buttons)
-    if include_channel_button:
-        rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
-
-    return InlineKeyboardMarkup(rows)
+    return _keyboard_with_optional_channel(_button_rows(buttons), include_channel_button)
 
 
 def _should_include_channel_button(message: Message) -> bool:
@@ -1644,7 +1620,36 @@ def _button_rows(buttons: list[InlineKeyboardButton]) -> list[list[InlineKeyboar
     return [buttons[index : index + 2] for index in range(0, len(buttons), 2)]
 
 
+def _keyboard_with_optional_channel(
+    rows: list[list[InlineKeyboardButton]],
+    include_channel_button: bool,
+) -> InlineKeyboardMarkup:
+    keyboard_rows = [*rows]
+    if include_channel_button:
+        keyboard_rows.append([_channel_button()])
+
+    return InlineKeyboardMarkup(keyboard_rows)
+
+
+def _single_url_keyboard(
+    text: str,
+    *,
+    url: str,
+    style: str,
+    include_channel_button: bool,
+) -> InlineKeyboardMarkup:
+    return _keyboard_with_optional_channel(
+        [[_url_button(text, url=url, style=style)]],
+        include_channel_button,
+    )
+
+
+def _channel_button() -> InlineKeyboardButton:
+    return InlineKeyboardButton(CHANNEL_BUTTON_TEXT, url=CHANNEL_URL)
+
+
 def _url_button(text: str, url: str, style: str | None = None) -> InlineKeyboardButton:
+    # Keep compatibility while python-telegram-bot catches up with newer Bot API fields.
     api_kwargs = {"style": style} if style else None
     return InlineKeyboardButton(text=text, url=url, api_kwargs=api_kwargs)
 
@@ -1804,7 +1809,7 @@ def _current_stats_time() -> str:
 
 
 def _build_intro_keyboard(bot_username: str | None) -> InlineKeyboardMarkup:
-    main_row = [InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)]
+    main_row = [_channel_button()]
     if bot_username:
         bot_url = f"https://t.me/{bot_username}"
         share_url = "https://t.me/share/url?url=" + quote(bot_url, safe="")

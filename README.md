@@ -212,7 +212,7 @@ flowchart LR
 
 ```text
 api/
-├── telegram.py       Vercel webhook endpoint
+├── telegram.py       Vercel webhook endpoint with fail-fast payload validation
 └── set_webhook.py    one-click Telegram webhook setup and command sync
 
 src/music_links_bot/
@@ -245,7 +245,7 @@ src/music_links_bot/
 | SoundCloud support | Song.link links are used when available; direct SoundCloud URLs fall back to SoundCloud oEmbed |
 | NTS Radio support | NTS pages are routed outside Song.link and formatted as dedicated radio cards |
 | Privacy | Stats store counters and ids, not message text or source links |
-| Serverless safety | Vercel payload size is checked before JSON parsing |
+| Serverless safety | Vercel payload size and JSON shape are checked before bot bootstrap |
 | Admin safety | Message replacement only happens when Telegram grants the required rights |
 
 ## Project Skills

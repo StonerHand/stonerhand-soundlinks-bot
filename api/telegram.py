@@ -48,11 +48,14 @@ class handler(BaseHTTPRequestHandler):
 
         try:
             payload = self.rfile.read(content_length)
-            asyncio.run(_process_telegram_update(payload))
+            update_payload = _decode_update_payload(payload)
         except (json.JSONDecodeError, ValueError):
             LOGGER.exception("Invalid Telegram update payload")
             self._send_json({"ok": False, "error": "invalid json"}, HTTPStatus.BAD_REQUEST)
             return
+
+        try:
+            asyncio.run(_process_telegram_update(update_payload))
         except Exception:
             LOGGER.exception("Could not process Telegram update")
             self._send_json({"ok": False}, HTTPStatus.INTERNAL_SERVER_ERROR)
@@ -73,7 +76,7 @@ class handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 
-async def _process_telegram_update(payload: bytes) -> None:
+async def _process_telegram_update(update_payload: dict[str, object]) -> None:
     settings = Settings.from_env()
     logging.basicConfig(
         level=getattr(logging, settings.log_level, logging.INFO),
@@ -83,15 +86,19 @@ async def _process_telegram_update(payload: bytes) -> None:
     application = build_application(settings)
     try:
         await application.initialize()
-        update_payload = json.loads(payload)
-        if not isinstance(update_payload, dict):
-            raise ValueError("Telegram update payload must be a JSON object.")
-
         update = Update.de_json(update_payload, application.bot)
         await application.process_update(update)
     finally:
         await application.shutdown()
         await close_application_resources(application)
+
+
+def _decode_update_payload(payload: bytes) -> dict[str, object]:
+    update_payload = json.loads(payload)
+    if not isinstance(update_payload, dict):
+        raise ValueError("Telegram update payload must be a JSON object.")
+
+    return update_payload
 
 
 def _read_content_length(raw_value: str | None) -> int | None:
