@@ -330,6 +330,7 @@ class BotKeyboardTests(unittest.TestCase):
 
         button_texts = [button.text for row in keyboard.inline_keyboard for button in row]
         self.assertEqual(button_texts, ["🟢 Spotify"])
+        self.assertEqual(keyboard.inline_keyboard[0][0].api_kwargs, {"style": "success"})
 
     def test_release_keyboard_uses_two_columns(self) -> None:
         keyboard = _build_link_keyboard(
@@ -349,6 +350,11 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[1][0].text, "🟠 SoundCloud")
         self.assertEqual(rows[1][1].text, "🟦 Deezer")
         self.assertEqual(rows[2][0].text, "⚫ Tidal")
+        self.assertEqual(rows[0][0].api_kwargs, {"style": "success"})
+        self.assertEqual(rows[0][1].api_kwargs, {"style": "primary"})
+        self.assertEqual(rows[1][0].api_kwargs, {"style": "primary"})
+        self.assertEqual(rows[1][1].api_kwargs, {"style": "primary"})
+        self.assertEqual(rows[2][0].api_kwargs, {"style": "primary"})
 
     def test_release_keyboard_adds_songlink_hub_button(self) -> None:
         keyboard = _build_link_keyboard(
@@ -363,6 +369,7 @@ class BotKeyboardTests(unittest.TestCase):
         rows = keyboard.inline_keyboard
         self.assertEqual(rows[0][0].text, "🪩 Все платформы")
         self.assertEqual(rows[0][0].url, "https://song.link/transitions")
+        self.assertEqual(rows[0][0].api_kwargs, {"style": "primary"})
         self.assertEqual(rows[1][0].text, "🟢 Spotify")
         self.assertEqual(rows[1][1].text, "⚪ Apple")
 
@@ -401,6 +408,7 @@ class BotKeyboardTests(unittest.TestCase):
 
         button_texts = [button.text for row in keyboard.inline_keyboard for button in row]
         self.assertEqual(button_texts, ["🎧 1. Youth Code - Transitions"])
+        self.assertEqual(keyboard.inline_keyboard[0][0].api_kwargs, {"style": "primary"})
 
     def test_youtube_keyboard_can_hide_channel_button(self) -> None:
         keyboard = _build_youtube_keyboard(
@@ -410,6 +418,7 @@ class BotKeyboardTests(unittest.TestCase):
 
         button_texts = [button.text for row in keyboard.inline_keyboard for button in row]
         self.assertEqual(button_texts, ["📺 Смотреть на YouTube"])
+        self.assertEqual(keyboard.inline_keyboard[0][0].api_kwargs, {"style": "danger"})
 
     def test_nts_keyboard_can_hide_channel_button(self) -> None:
         keyboard = _build_nts_keyboard(
@@ -419,6 +428,7 @@ class BotKeyboardTests(unittest.TestCase):
 
         button_texts = [button.text for row in keyboard.inline_keyboard for button in row]
         self.assertEqual(button_texts, ["📡 Открыть на NTS"])
+        self.assertEqual(keyboard.inline_keyboard[0][0].api_kwargs, {"style": "primary"})
 
     def test_playlist_keyboard_can_hide_channel_button(self) -> None:
         keyboard = _build_playlist_keyboard(
@@ -428,6 +438,7 @@ class BotKeyboardTests(unittest.TestCase):
 
         button_texts = [button.text for row in keyboard.inline_keyboard for button in row]
         self.assertEqual(button_texts, ["🎛 Открыть плейлист"])
+        self.assertEqual(keyboard.inline_keyboard[0][0].api_kwargs, {"style": "primary"})
 
     def test_artist_keyboard_can_hide_channel_button(self) -> None:
         keyboard = _build_artist_keyboard(
@@ -437,6 +448,7 @@ class BotKeyboardTests(unittest.TestCase):
 
         button_texts = [button.text for row in keyboard.inline_keyboard for button in row]
         self.assertEqual(button_texts, ["🧬 Открыть артиста"])
+        self.assertEqual(keyboard.inline_keyboard[0][0].api_kwargs, {"style": "primary"})
 
     def test_mixed_collection_keyboard_lists_music_and_video_buttons(self) -> None:
         keyboard = _build_mixed_collection_keyboard(
@@ -454,8 +466,10 @@ class BotKeyboardTests(unittest.TestCase):
         rows = keyboard.inline_keyboard
         self.assertEqual(rows[0][0].text, "🎧 1. Youth Code - Transitions")
         self.assertEqual(rows[0][0].url, "https://song.link/transitions")
+        self.assertEqual(rows[0][0].api_kwargs, {"style": "primary"})
         self.assertEqual(rows[0][1].text, "📺 2. Live Session")
         self.assertEqual(rows[0][1].url, "https://youtu.be/1")
+        self.assertEqual(rows[0][1].api_kwargs, {"style": "danger"})
 
     def test_mixed_collection_keyboard_lists_radio_buttons(self) -> None:
         keyboard = _build_mixed_collection_keyboard(
@@ -474,7 +488,9 @@ class BotKeyboardTests(unittest.TestCase):
         rows = keyboard.inline_keyboard
         self.assertEqual(rows[0][0].text, "📡 1. Dark Energy")
         self.assertEqual(rows[0][0].url, "https://www.nts.live/shows/example")
+        self.assertEqual(rows[0][0].api_kwargs, {"style": "primary"})
         self.assertEqual(rows[0][1].text, "📺 2. Live Session")
+        self.assertEqual(rows[0][1].api_kwargs, {"style": "danger"})
 
     def test_channel_button_is_hidden_only_in_stonerhand_channel(self) -> None:
         self.assertFalse(_should_include_channel_button(ChannelMessageStub()))

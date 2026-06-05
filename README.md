@@ -100,6 +100,16 @@ Track
 
 The bot intentionally avoids overloaded Telegram posts. The format is short, readable on mobile, and stable on desktop.
 
+Platform buttons use native Telegram button styles where the client supports them:
+
+| Button family | Style | Fallback marker |
+| --- | --- | --- |
+| Spotify | `success` | `🟢 Spotify` |
+| YouTube | `danger` | `🔴 YouTube` / `📺 Смотреть на YouTube` |
+| Release hub, playlists, artists, radio and secondary platforms | `primary` | Platform emoji labels |
+
+Telegram clients can render styles differently, so emoji labels stay in place as a stable visual fallback.
+
 ### Single Release
 
 ```text

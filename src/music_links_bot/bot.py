@@ -20,7 +20,11 @@ from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandl
 
 from music_links_bot.artist import ArtistClient, ArtistLookupError
 from music_links_bot.config import Settings
-from music_links_bot.constants import INPUT_PLATFORM_HINT, PLATFORM_LABELS
+from music_links_bot.constants import (
+    INPUT_PLATFORM_HINT,
+    PLATFORM_BUTTON_STYLES,
+    PLATFORM_LABELS,
+)
 from music_links_bot.formatter import (
     format_artist_collection_message,
     format_artist_message,
@@ -1299,9 +1303,10 @@ def _build_link_keyboard(
         if platform_key not in ordered_platforms and links.get(platform_key)
     ]
     buttons = [
-        InlineKeyboardButton(
+        _url_button(
             text=f"{prefix}{PLATFORM_LABELS[platform_key]}",
             url=links[platform_key],
+            style=PLATFORM_BUTTON_STYLES.get(platform_key),
         )
         for platform_key in [*ordered_platforms, *remaining_platforms]
     ]
@@ -1309,9 +1314,10 @@ def _build_link_keyboard(
     if release_page_url:
         rows.append(
             [
-                InlineKeyboardButton(
+                _url_button(
                     _release_hub_button_label(release_kind, release_format),
                     url=release_page_url,
+                    style="primary",
                 )
             ]
         )
@@ -1336,11 +1342,12 @@ def _build_collection_keyboard(
             continue
 
         buttons.append(
-            InlineKeyboardButton(
+            _url_button(
                 text=_shorten_button_text(
                     f"{_track_button_icon(track)} {index}. {track.artist} - {track.title}"
                 ),
                 url=destination,
+                style="primary",
             )
         )
 
@@ -1356,7 +1363,7 @@ def _build_youtube_keyboard(
     *,
     include_channel_button: bool = True,
 ) -> InlineKeyboardMarkup:
-    rows = [[InlineKeyboardButton("📺 Смотреть на YouTube", url=url)]]
+    rows = [[_url_button("📺 Смотреть на YouTube", url=url, style="danger")]]
     if include_channel_button:
         rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
 
@@ -1368,7 +1375,7 @@ def _build_nts_keyboard(
     *,
     include_channel_button: bool = True,
 ) -> InlineKeyboardMarkup:
-    rows = [[InlineKeyboardButton("📡 Открыть на NTS", url=url)]]
+    rows = [[_url_button("📡 Открыть на NTS", url=url, style="primary")]]
     if include_channel_button:
         rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
 
@@ -1380,7 +1387,7 @@ def _build_playlist_keyboard(
     *,
     include_channel_button: bool = True,
 ) -> InlineKeyboardMarkup:
-    rows = [[InlineKeyboardButton("🎛 Открыть плейлист", url=url)]]
+    rows = [[_url_button("🎛 Открыть плейлист", url=url, style="primary")]]
     if include_channel_button:
         rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
 
@@ -1392,7 +1399,7 @@ def _build_artist_keyboard(
     *,
     include_channel_button: bool = True,
 ) -> InlineKeyboardMarkup:
-    rows = [[InlineKeyboardButton("🧬 Открыть артиста", url=url)]]
+    rows = [[_url_button("🧬 Открыть артиста", url=url, style="primary")]]
     if include_channel_button:
         rows.append([InlineKeyboardButton("🪨 Открыть канал", url=CHANNEL_URL)])
 
@@ -1407,9 +1414,10 @@ def _build_youtube_collection_keyboard(
     buttons: list[InlineKeyboardButton] = []
     for index, video in enumerate(videos, start=1):
         buttons.append(
-            InlineKeyboardButton(
+            _url_button(
                 text=_shorten_button_text(f"📺 {index}. {video.title}"),
                 url=video.url,
+                style="danger",
             )
         )
 
@@ -1428,9 +1436,10 @@ def _build_nts_collection_keyboard(
     buttons: list[InlineKeyboardButton] = []
     for index, radio in enumerate(radios, start=1):
         buttons.append(
-            InlineKeyboardButton(
+            _url_button(
                 text=_shorten_button_text(f"📡 {index}. {radio.title}"),
                 url=radio.url,
+                style="primary",
             )
         )
 
@@ -1449,9 +1458,10 @@ def _build_playlist_collection_keyboard(
     buttons: list[InlineKeyboardButton] = []
     for index, playlist in enumerate(playlists, start=1):
         buttons.append(
-            InlineKeyboardButton(
+            _url_button(
                 text=_shorten_button_text(f"🎛 {index}. {playlist.title}"),
                 url=playlist.url,
+                style="primary",
             )
         )
 
@@ -1470,9 +1480,10 @@ def _build_artist_collection_keyboard(
     buttons: list[InlineKeyboardButton] = []
     for index, artist in enumerate(artists, start=1):
         buttons.append(
-            InlineKeyboardButton(
+            _url_button(
                 text=_shorten_button_text(f"🧬 {index}. {artist.title}"),
                 url=artist.url,
+                style="primary",
             )
         )
 
@@ -1504,47 +1515,52 @@ def _build_mixed_collection_keyboard(
             continue
 
         buttons.append(
-            InlineKeyboardButton(
+            _url_button(
                 text=_shorten_button_text(
                     f"{_track_button_icon(track)} {index}. {track.artist} - {track.title}"
                 ),
                 url=destination,
+                style="primary",
             )
         )
         index += 1
 
     for playlist in playlists:
         buttons.append(
-            InlineKeyboardButton(
+            _url_button(
                 text=_shorten_button_text(f"🎛 {index}. {playlist.title}"),
                 url=playlist.url,
+                style="primary",
             )
         )
         index += 1
 
     for artist in artists:
         buttons.append(
-            InlineKeyboardButton(
+            _url_button(
                 text=_shorten_button_text(f"🧬 {index}. {artist.title}"),
                 url=artist.url,
+                style="primary",
             )
         )
         index += 1
 
     for radio in radios:
         buttons.append(
-            InlineKeyboardButton(
+            _url_button(
                 text=_shorten_button_text(f"📡 {index}. {radio.title}"),
                 url=radio.url,
+                style="primary",
             )
         )
         index += 1
 
     for video in videos:
         buttons.append(
-            InlineKeyboardButton(
+            _url_button(
                 text=_shorten_button_text(f"📺 {index}. {video.title}"),
                 url=video.url,
+                style="danger",
             )
         )
         index += 1
@@ -1626,6 +1642,11 @@ def _release_hub_button_label(release_kind: str, release_format: str | None) -> 
 
 def _button_rows(buttons: list[InlineKeyboardButton]) -> list[list[InlineKeyboardButton]]:
     return [buttons[index : index + 2] for index in range(0, len(buttons), 2)]
+
+
+def _url_button(text: str, url: str, style: str | None = None) -> InlineKeyboardButton:
+    api_kwargs = {"style": style} if style else None
+    return InlineKeyboardButton(text=text, url=url, api_kwargs=api_kwargs)
 
 
 def _get_platform_order(context: ContextTypes.DEFAULT_TYPE | None) -> tuple[str, ...]:
