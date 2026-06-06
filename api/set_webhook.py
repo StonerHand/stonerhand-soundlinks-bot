@@ -17,7 +17,7 @@ if str(SRC_PATH) not in sys.path:
 from music_links_bot.bot import PUBLIC_BOT_COMMANDS
 from music_links_bot.config import Settings
 
-ALLOWED_UPDATES = ("message", "channel_post")
+ALLOWED_UPDATES = ("message", "channel_post", "callback_query")
 
 
 class handler(BaseHTTPRequestHandler):

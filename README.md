@@ -46,6 +46,7 @@ Track
 
 [🟢 Spotify] [⚫ Tidal]
 [🟦 Deezer]  [🟡 Yandex]
+[🪩 All platforms]
 ```
 
 ## Product Surface
@@ -57,6 +58,7 @@ Track
 | Channel | Can replace raw links with editorial posts and stay silent on unrelated content |
 | Multi-link message | Builds a playlist-style collection post |
 | User note above link | Turns the note into a Telegram quote block |
+| Command menu | Inline navigation for quick start, usage, supported services and group/channel setup |
 
 ## Supported Content
 
@@ -110,6 +112,8 @@ Platform buttons use native Telegram button styles where the client supports the
 
 Telegram clients can render styles differently, so emoji labels stay in place as a stable visual fallback.
 
+Release keyboards are platform-first: direct streaming buttons appear before the Song.link hub button, so the most common action takes fewer taps.
+
 ### Single Release
 
 ```text
@@ -125,6 +129,7 @@ Release
 
 [🟢 Spotify] [⚫ Tidal]
 [🟦 Deezer]  [🟡 Yandex]
+[💿 Full release]
 ```
 
 ### Collection
@@ -213,7 +218,7 @@ flowchart LR
 ```text
 api/
 ├── telegram.py       Vercel webhook endpoint with fail-fast payload validation
-└── set_webhook.py    one-click Telegram webhook setup and command sync
+└── set_webhook.py    one-click Telegram webhook setup, callback updates and command sync
 
 src/music_links_bot/
 ├── bot.py            Telegram handlers, routing, keyboards, replacement logic
@@ -241,6 +246,7 @@ src/music_links_bot/
 | Deduplication | Tracking query params like `si`, `utm_*`, `fbclid` are ignored for cache keys |
 | Telegram limits | Long notes and large link packs are trimmed before posting |
 | Channel noise | Non-music posts, Instagram/TikTok/Pinterest and unrelated links are ignored in groups/channels |
+| Navigation | `/start`, `/help`, `/platforms` and `/guide` share one inline menu with active-state markers |
 | Preview quality | Preferred platform controls preview source and button priority |
 | SoundCloud support | Song.link links are used when available; direct SoundCloud URLs fall back to SoundCloud oEmbed |
 | NTS Radio support | NTS pages are routed outside Song.link and formatted as dedicated radio cards |
@@ -264,15 +270,15 @@ The broader system map lives in [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
 
 | Command | Description |
 | --- | --- |
-| `/start` | what the bot can do |
-| `/help` | short usage guide |
-| `/guide` | channel and group guide |
-| `/platforms` | supported services |
+| `/start` | interactive menu and quick start |
+| `/help` | how to use the bot |
+| `/guide` | group and channel setup |
+| `/platforms` | supported services and link types |
 | `/channel` | open StonerHand |
 | `/stats` | public stats, plus private admin stats when configured |
 | `/id` | hidden utility command for `ADMIN_CHAT_ID` setup |
 
-The public command menu is synced during local/Railway startup and through the Vercel `/api/set_webhook` endpoint.
+The public command menu is synced during local/Railway startup and through the Vercel `/api/set_webhook` endpoint. The webhook subscribes to `message`, `channel_post` and `callback_query`, so inline menu buttons work in production.
 
 ## Environment
 
@@ -370,6 +376,7 @@ https://your-vercel-domain.vercel.app/api/set_webhook?secret=your-secret
 ```
 
 Successful response means the Telegram webhook and command menu are connected.
+Open this endpoint again after changing bot commands, callback menu buttons or the production domain.
 
 ### Vercel Endpoints
 

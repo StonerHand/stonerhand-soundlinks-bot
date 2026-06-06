@@ -288,12 +288,12 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(
             [(command.command, command.description) for command in PUBLIC_BOT_COMMANDS],
             [
-                ("start", "что умеет бот"),
-                ("help", "короткая инструкция"),
-                ("guide", "для каналов и групп"),
-                ("platforms", "поддерживаемые сервисы"),
-                ("channel", "открыть StonerHand"),
-                ("stats", "статистика"),
+                ("start", "меню и быстрый старт"),
+                ("help", "как пользоваться"),
+                ("guide", "для групп и каналов"),
+                ("platforms", "сервисы и типы ссылок"),
+                ("channel", "канал StonerHand"),
+                ("stats", "статистика бота"),
             ],
         )
 
@@ -367,11 +367,11 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(rows[0][0].text, "🪩 Все платформы")
-        self.assertEqual(rows[0][0].url, "https://song.link/transitions")
-        self.assertEqual(rows[0][0].api_kwargs, {"style": "primary"})
-        self.assertEqual(rows[1][0].text, "🟢 Spotify")
-        self.assertEqual(rows[1][1].text, "⚪ Apple")
+        self.assertEqual(rows[0][0].text, "🟢 Spotify")
+        self.assertEqual(rows[0][1].text, "⚪ Apple")
+        self.assertEqual(rows[1][0].text, "🪩 Все платформы")
+        self.assertEqual(rows[1][0].url, "https://song.link/transitions")
+        self.assertEqual(rows[1][0].api_kwargs, {"style": "primary"})
 
     def test_album_release_keyboard_uses_release_hub_label(self) -> None:
         keyboard = _build_link_keyboard(
@@ -381,7 +381,7 @@ class BotKeyboardTests(unittest.TestCase):
             release_kind="album",
         )
 
-        self.assertEqual(keyboard.inline_keyboard[0][0].text, "💿 Весь релиз")
+        self.assertEqual(keyboard.inline_keyboard[1][0].text, "💿 Весь релиз")
 
     def test_podcast_release_keyboard_uses_podcast_hub_label(self) -> None:
         keyboard = _build_link_keyboard(
@@ -391,7 +391,7 @@ class BotKeyboardTests(unittest.TestCase):
             release_kind="podcast",
         )
 
-        self.assertEqual(keyboard.inline_keyboard[0][0].text, "🎙 Все площадки")
+        self.assertEqual(keyboard.inline_keyboard[1][0].text, "🎙 Все площадки")
 
     def test_collection_keyboard_can_hide_channel_button(self) -> None:
         keyboard = _build_collection_keyboard(
@@ -500,13 +500,22 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertFalse(_should_include_hashtags(PrivateMessageStub()))
         self.assertTrue(_should_include_hashtags(GroupMessageStub()))
 
-    def test_intro_keyboard_puts_main_buttons_on_one_row(self) -> None:
+    def test_intro_keyboard_uses_menu_rows_and_action_row(self) -> None:
         keyboard = _build_intro_keyboard("StonerHandBot")
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0][0].text, "🪨 Открыть канал")
-        self.assertEqual(rows[0][1].text, "Поделиться ботом")
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(rows[0][0].text, "Быстрый старт")
+        self.assertEqual(rows[0][1].text, "Как пользоваться")
+        self.assertEqual(rows[1][0].text, "Сервисы")
+        self.assertEqual(rows[1][1].text, "Для каналов")
+        self.assertEqual(rows[2][0].text, "🪨 Открыть канал")
+        self.assertEqual(rows[2][1].text, "Поделиться ботом")
+
+    def test_intro_keyboard_marks_active_menu_item(self) -> None:
+        keyboard = _build_intro_keyboard("StonerHandBot", active="menu:platforms")
+
+        self.assertEqual(keyboard.inline_keyboard[1][0].text, "• Сервисы")
 
     def test_build_platform_order_moves_primary_platform_first(self) -> None:
         order = _build_platform_order("yandexMusic")
@@ -655,7 +664,7 @@ class BotKeyboardTests(unittest.TestCase):
             message = _format_not_found_message(["https://example.com/release"])
 
         self.assertIn(
-            "проверь, что это ссылка на трек, альбом, плейлист, артиста, "
+            "Проверь, что это ссылка на трек, альбом, плейлист, артиста, "
             "подкаст, YouTube-видео или NTS Radio",
             message,
         )
@@ -687,7 +696,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertIn("пришли ссылку на трек, альбом, плейлист", message.replies[0])
+        self.assertIn("Пришли ссылку на трек, альбом, плейлист", message.replies[0])
         self.assertEqual(context.bot.sent_messages, [])
 
     async def test_youtube_video_links_use_video_post(self) -> None:
@@ -740,9 +749,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 1)
         self.assertIn("<b>Youth Code</b>\nTransitions", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
-        self.assertEqual(keyboard[0][0].text, "🪩 Все платформы")
-        self.assertEqual(keyboard[0][0].url, "https://song.link/transitions")
-        self.assertEqual(keyboard[1][0].text, "🟢 Spotify")
+        self.assertEqual(keyboard[0][0].text, "🟢 Spotify")
+        self.assertEqual(keyboard[1][0].text, "🪩 Все платформы")
+        self.assertEqual(keyboard[1][0].url, "https://song.link/transitions")
         preview_options = message.reply_kwargs[0]["link_preview_options"]
         self.assertTrue(preview_options.prefer_large_media)
         self.assertFalse(preview_options.prefer_small_media)
@@ -759,9 +768,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 1)
         self.assertIn("<b>Bondage Fairies</b>\nStar Signs", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
-        self.assertEqual(keyboard[0][0].text, "🪩 Все платформы")
+        self.assertEqual(keyboard[0][0].text, "🟠 SoundCloud")
         self.assertEqual(keyboard[0][0].url, "https://soundcloud.com/bondage-fairies/star-signs")
-        self.assertEqual(keyboard[1][0].text, "🟠 SoundCloud")
+        self.assertEqual(keyboard[1][0].text, "🪩 Все платформы")
         self.assertEqual(keyboard[1][0].url, "https://soundcloud.com/bondage-fairies/star-signs")
         preview_options = message.reply_kwargs[0]["link_preview_options"]
         self.assertTrue(preview_options.prefer_large_media)

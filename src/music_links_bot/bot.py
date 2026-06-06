@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from datetime import datetime, timezone
 import logging
 from urllib.parse import quote
@@ -17,6 +18,7 @@ from telegram import (
 from telegram.constants import ParseMode
 from telegram.error import BadRequest, Forbidden, TelegramError
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
+from telegram.ext import CallbackQueryHandler
 
 from music_links_bot.artist import ArtistClient, ArtistLookupError
 from music_links_bot.config import Settings
@@ -81,6 +83,11 @@ LOGGER = logging.getLogger(__name__)
 CHANNEL_USERNAME = "stonerhand"
 CHANNEL_URL = f"https://t.me/{CHANNEL_USERNAME}"
 CHANNEL_BUTTON_TEXT = "🪨 Открыть канал"
+MENU_START = "menu:start"
+MENU_HELP = "menu:help"
+MENU_GUIDE = "menu:guide"
+MENU_PLATFORMS = "menu:platforms"
+MENU_KEYS = frozenset((MENU_START, MENU_HELP, MENU_GUIDE, MENU_PLATFORMS))
 MAX_BUTTON_TEXT_LENGTH = 64
 MAX_LINKS_PER_MESSAGE = 12
 MAX_USER_NOTE_LENGTH = 700
@@ -95,12 +102,12 @@ DEFAULT_PLATFORM_ORDER = (
     "yandexMusic",
 )
 PUBLIC_BOT_COMMANDS = (
-    BotCommand("start", "что умеет бот"),
-    BotCommand("help", "короткая инструкция"),
-    BotCommand("guide", "для каналов и групп"),
-    BotCommand("platforms", "поддерживаемые сервисы"),
-    BotCommand("channel", "открыть StonerHand"),
-    BotCommand("stats", "статистика"),
+    BotCommand("start", "меню и быстрый старт"),
+    BotCommand("help", "как пользоваться"),
+    BotCommand("guide", "для групп и каналов"),
+    BotCommand("platforms", "сервисы и типы ссылок"),
+    BotCommand("channel", "канал StonerHand"),
+    BotCommand("stats", "статистика бота"),
 )
 PRIMARY_PLATFORM_ALIASES = {
     "spotify": "spotify",
@@ -121,7 +128,7 @@ PRIMARY_PLATFORM_ALIASES = {
     "yamusic": "yandexMusic",
 }
 NOT_FOUND_DETAIL = (
-    "проверь, что это ссылка на трек, альбом, плейлист, артиста, "
+    "Проверь, что это ссылка на трек, альбом, плейлист, артиста, "
     "подкаст, YouTube-видео или NTS Radio"
 )
 
@@ -159,6 +166,7 @@ def build_application(settings: Settings) -> Application:
     application.add_handler(CommandHandler("channel", channel_command))
     application.add_handler(CommandHandler("id", id_command))
     application.add_handler(CommandHandler("stats", stats_command))
+    application.add_handler(CallbackQueryHandler(menu_callback, pattern=r"^menu:"))
     application.add_handler(
         MessageHandler(
             (filters.TEXT | filters.CAPTION) & ~filters.COMMAND,
@@ -207,29 +215,14 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if not update.message:
         return
 
-    text = (
-        "🎧 Кидай ссылку на музыку, YouTube или NTS Radio\n\n"
-        "Я соберу аккуратный пост: название, preview и кнопки площадок\n\n"
-        "Можно отправить трек, альбом, плейлист, артиста, подкаст, "
-        "NTS-эфир или несколько ссылок сразу\n\n"
-        "В группах и каналах могу заменить исходную ссылку готовым постом, если у меня есть права админа"
-    )
-    await update.message.reply_text(text, reply_markup=_build_intro_keyboard(context.bot.username))
+    await _reply_with_menu(update.message, context, MENU_START)
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message:
         return
 
-    text = (
-        "Как пользоваться:\n\n"
-        "1. Пришли ссылку на трек, альбом, плейлист, артиста, подкаст, "
-        "NTS-эфир или YouTube-видео\n"
-        "2. Добавь свой текст над ссылкой, если нужна подводка\n"
-        "3. Получи чистую карточку с preview, хэштегами и кнопками\n\n"
-        "Несколько ссылок одним сообщением станут подборкой"
-    )
-    await update.message.reply_text(text, reply_markup=_build_intro_keyboard(context.bot.username))
+    await _reply_with_menu(update.message, context, MENU_HELP)
 
 
 async def guide_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -237,16 +230,9 @@ async def guide_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if not message:
         return
 
-    guide = (
-        "StonerHand guide\n\n"
-        "1. Одна ссылка становится чистым постом с кнопками\n"
-        "2. Несколько ссылок становятся подборкой\n"
-        "3. Текст над ссылкой превращается в цитату\n"
-        "4. Для автозамены в чате нужны права админа на удаление сообщений"
-    )
     sent_message = await message.reply_text(
-        guide,
-        reply_markup=_build_intro_keyboard(context.bot.username),
+        _menu_text(MENU_GUIDE),
+        reply_markup=_build_intro_keyboard(context.bot.username, active=MENU_GUIDE),
     )
 
     if message.chat.type in {"group", "supergroup", "channel"}:
@@ -257,21 +243,10 @@ async def guide_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 async def platforms_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    del context
     if not update.message:
         return
 
-    text = (
-        "Что можно кидать:\n\n"
-        f"{INPUT_PLATFORM_HINT}\n\n"
-        "Что вернется:\n"
-        "Spotify, Apple Music, Apple Podcasts, YouTube Music, SoundCloud, Deezer, "
-        "Tidal, Yandex Music и Song.link, если площадки нашлись\n\n"
-        "YouTube оформляю как видео-пост, NTS Radio - как радио-пост, "
-        "SoundCloud - как музыкальный пост, Spotify playlist - как плейлист, "
-        "Spotify artist - как карточку артиста"
-    )
-    await update.message.reply_text(text)
+    await _reply_with_menu(update.message, context, MENU_PLATFORMS)
 
 
 async def channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -283,6 +258,24 @@ async def channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         "StonerHand рядом",
         reply_markup=InlineKeyboardMarkup([[_channel_button()]]),
     )
+
+
+async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    if query is None:
+        return
+
+    await query.answer()
+    menu_key = query.data if query.data in MENU_KEYS else MENU_START
+    try:
+        await query.edit_message_text(
+            text=_menu_text(menu_key),
+            reply_markup=_build_intro_keyboard(context.bot.username, active=menu_key),
+        )
+    except BadRequest as exc:
+        if "Message is not modified" in str(exc):
+            return
+        raise
 
 
 async def id_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -306,6 +299,17 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     )
 
 
+async def _reply_with_menu(
+    message: Message,
+    context: ContextTypes.DEFAULT_TYPE,
+    menu_key: str,
+) -> None:
+    await message.reply_text(
+        _menu_text(menu_key),
+        reply_markup=_build_intro_keyboard(context.bot.username, active=menu_key),
+    )
+
+
 async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     if message is None:
@@ -320,12 +324,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         if message.chat.type != "private":
             return
 
-        no_url_text = pick_phrase("no_url", message_text or str(message.chat_id))
-        await message.reply_text(
-            f"{no_url_text}\n\n"
-            "пришли ссылку на трек, альбом, плейлист, артиста, подкаст, "
-            "YouTube-видео или NTS Radio"
-        )
+        await message.reply_text(_format_no_url_message(message_text, message.chat_id))
         return
 
     (
@@ -683,6 +682,15 @@ def _format_not_found_message(source_urls: list[str]) -> str:
         return phrase
 
     return f"{phrase}\n\n{NOT_FOUND_DETAIL}"
+
+
+def _format_no_url_message(message_text: str | None, chat_id: int) -> str:
+    seed = message_text or str(chat_id)
+    return (
+        f"{pick_phrase('no_url', seed)}\n\n"
+        "Пришли ссылку на трек, альбом, плейлист, артиста, подкаст, "
+        "YouTube-видео или NTS Radio"
+    )
 
 
 def _has_recovery_hint(text: str) -> bool:
@@ -1309,7 +1317,7 @@ def _build_link_keyboard(
         )
         for platform_key in [*ordered_platforms, *remaining_platforms]
     ]
-    rows: list[list[InlineKeyboardButton]] = []
+    rows = _button_rows(buttons)
     if release_page_url:
         rows.append(
             [
@@ -1321,7 +1329,6 @@ def _build_link_keyboard(
             ]
         )
 
-    rows.extend(_button_rows(buttons))
     return _keyboard_with_optional_channel(rows, include_channel_button)
 
 
@@ -1666,70 +1673,83 @@ def _get_platform_order(context: ContextTypes.DEFAULT_TYPE | None) -> tuple[str,
 
 
 def _record_matches_safely(tracks: list[TrackMatch], message: Message) -> None:
-    try:
-        record_matches(
+    if not tracks:
+        return
+
+    user = _build_user_stats_entry(message)
+    chat = _build_chat_stats_entry(message)
+    _record_stats_safely(
+        "track",
+        lambda: record_matches(
             tracks,
-            user=_build_user_stats_entry(message),
-            chat=_build_chat_stats_entry(message),
-        )
-    except Exception:
-        LOGGER.exception("Could not update stats")
+            user=user,
+            chat=chat,
+        ),
+    )
 
 
 def _record_videos_safely(videos: list[VideoMatch], message: Message) -> None:
     if not videos:
         return
 
-    try:
-        record_videos(
+    user = _build_user_stats_entry(message)
+    chat = _build_chat_stats_entry(message)
+    _record_stats_safely(
+        "video",
+        lambda: record_videos(
             videos,
-            user=_build_user_stats_entry(message),
-            chat=_build_chat_stats_entry(message),
-        )
-    except Exception:
-        LOGGER.exception("Could not update video stats")
+            user=user,
+            chat=chat,
+        ),
+    )
 
 
 def _record_radios_safely(radios: list[RadioMatch], message: Message) -> None:
     if not radios:
         return
 
-    try:
-        record_radios(
+    user = _build_user_stats_entry(message)
+    chat = _build_chat_stats_entry(message)
+    _record_stats_safely(
+        "radio",
+        lambda: record_radios(
             radios,
-            user=_build_user_stats_entry(message),
-            chat=_build_chat_stats_entry(message),
-        )
-    except Exception:
-        LOGGER.exception("Could not update radio stats")
+            user=user,
+            chat=chat,
+        ),
+    )
 
 
 def _record_playlists_safely(playlists: list[PlaylistMatch], message: Message) -> None:
     if not playlists:
         return
 
-    try:
-        record_playlists(
+    user = _build_user_stats_entry(message)
+    chat = _build_chat_stats_entry(message)
+    _record_stats_safely(
+        "playlist",
+        lambda: record_playlists(
             playlists,
-            user=_build_user_stats_entry(message),
-            chat=_build_chat_stats_entry(message),
-        )
-    except Exception:
-        LOGGER.exception("Could not update playlist stats")
+            user=user,
+            chat=chat,
+        ),
+    )
 
 
 def _record_artists_safely(artists: list[ArtistMatch], message: Message) -> None:
     if not artists:
         return
 
-    try:
-        record_artists(
+    user = _build_user_stats_entry(message)
+    chat = _build_chat_stats_entry(message)
+    _record_stats_safely(
+        "artist",
+        lambda: record_artists(
             artists,
-            user=_build_user_stats_entry(message),
-            chat=_build_chat_stats_entry(message),
-        )
-    except Exception:
-        LOGGER.exception("Could not update artist stats")
+            user=user,
+            chat=chat,
+        ),
+    )
 
 
 def _record_mixed_safely(
@@ -1740,18 +1760,30 @@ def _record_mixed_safely(
     artists: list[ArtistMatch],
     message: Message,
 ) -> None:
-    try:
-        record_mixed(
+    if not any((tracks, videos, radios, playlists, artists)):
+        return
+
+    user = _build_user_stats_entry(message)
+    chat = _build_chat_stats_entry(message)
+    _record_stats_safely(
+        "mixed",
+        lambda: record_mixed(
             tracks,
             videos,
             playlists,
             artists=artists,
             radios=radios,
-            user=_build_user_stats_entry(message),
-            chat=_build_chat_stats_entry(message),
-        )
+            user=user,
+            chat=chat,
+        ),
+    )
+
+
+def _record_stats_safely(label: str, callback: Callable[[], None]) -> None:
+    try:
+        callback()
     except Exception:
-        LOGGER.exception("Could not update mixed stats")
+        LOGGER.exception("Could not update %s stats", label)
 
 
 def _build_user_prefix(message: Message) -> str:
@@ -1808,14 +1840,67 @@ def _current_stats_time() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
 
-def _build_intro_keyboard(bot_username: str | None) -> InlineKeyboardMarkup:
-    main_row = [_channel_button()]
+def _build_intro_keyboard(
+    bot_username: str | None,
+    *,
+    active: str | None = None,
+) -> InlineKeyboardMarkup:
+    menu_rows = [
+        [
+            _menu_button("Быстрый старт", MENU_START, active),
+            _menu_button("Как пользоваться", MENU_HELP, active),
+        ],
+        [
+            _menu_button("Сервисы", MENU_PLATFORMS, active),
+            _menu_button("Для каналов", MENU_GUIDE, active),
+        ],
+    ]
+    action_row = [_channel_button()]
     if bot_username:
         bot_url = f"https://t.me/{bot_username}"
         share_url = "https://t.me/share/url?url=" + quote(bot_url, safe="")
-        main_row.append(InlineKeyboardButton("Поделиться ботом", url=share_url))
+        action_row.append(InlineKeyboardButton("Поделиться ботом", url=share_url))
 
-    return InlineKeyboardMarkup([main_row])
+    return InlineKeyboardMarkup([*menu_rows, action_row])
+
+
+def _menu_button(label: str, callback_data: str, active: str | None) -> InlineKeyboardButton:
+    prefix = "• " if callback_data == active else ""
+    return InlineKeyboardButton(f"{prefix}{label}", callback_data=callback_data)
+
+
+def _menu_text(menu_key: str) -> str:
+    if menu_key == MENU_HELP:
+        return (
+            "Как пользоваться\n\n"
+            "1. Пришли ссылку на релиз или видео\n"
+            "2. Если хочешь, добавь свой текст над ссылкой\n"
+            "3. Бот вернет чистый пост с preview и кнопками\n\n"
+            "Несколько ссылок одним сообщением превращаются в подборку"
+        )
+
+    if menu_key == MENU_GUIDE:
+        return (
+            "Для групп и каналов\n\n"
+            "Бот может заменить исходное сообщение готовым постом, если он админ "
+            "и у него есть право удалять сообщения\n\n"
+            "Текст над ссылкой станет цитатой, а хэштеги добавятся автоматически"
+        )
+
+    if menu_key == MENU_PLATFORMS:
+        return (
+            "Что можно присылать\n\n"
+            f"{INPUT_PLATFORM_HINT}\n\n"
+            "Что получится\n"
+            "Музыкальные карточки, YouTube-посты, NTS-эфиры, Spotify-плейлисты, "
+            "артисты и подборки из нескольких ссылок"
+        )
+
+    return (
+        "🎧 StonerHand Soundlinks\n\n"
+        "Кидай трек, альбом, плейлист, артиста, подкаст, YouTube или NTS Radio\n\n"
+        "Я соберу аккуратный пост: название, preview, автохэштеги и кнопки площадок"
+    )
 
 
 async def _notify_admin(

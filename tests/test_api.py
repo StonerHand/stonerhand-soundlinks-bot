@@ -1,6 +1,7 @@
 import json
 import unittest
 
+from api.set_webhook import ALLOWED_UPDATES
 from api.telegram import _decode_update_payload, _read_content_length
 
 
@@ -20,6 +21,9 @@ class VercelWebhookTests(unittest.TestCase):
         self.assertEqual(_read_content_length(None), 0)
         self.assertEqual(_read_content_length("42"), 42)
         self.assertIsNone(_read_content_length("not-a-number"))
+
+    def test_webhook_accepts_menu_button_callbacks(self) -> None:
+        self.assertIn("callback_query", ALLOWED_UPDATES)
 
 
 if __name__ == "__main__":
