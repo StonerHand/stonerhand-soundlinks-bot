@@ -242,7 +242,9 @@ src/music_links_bot/
 | Зона | Как решено |
 | --- | --- |
 | Скорость | Параллельная обработка ссылок, connection pooling, короткие таймауты внешних API |
+| Ощущение скорости | Перед внешними lookup-запросами бот отправляет Telegram typing action |
 | Стабильность | Раздельная обработка not found, service unavailable и неправильного ввода |
+| Исправимые ошибки | В личке ошибки получают компактную клавиатуру поддержки, а не тупик |
 | Дедупликация | `si`, `utm_*`, `fbclid` и похожие параметры не участвуют в cache key |
 | Лимиты Telegram | Длинные подводки и большие пачки ссылок обрезаются до безопасного размера |
 | Чистота каналов | Обычные посты, Instagram/TikTok/Pinterest и нерелевантные ссылки игнорируются в группах и каналах |
@@ -306,6 +308,7 @@ SONGLINK_USER_COUNTRIES=US
 LOG_LEVEL=INFO
 ADMIN_CHAT_ID=
 PRIMARY_PLATFORM=spotify
+BOT_UI_MODE=stonerhand
 SET_WEBHOOK_SECRET=
 STATS_PATH=
 ```
@@ -318,6 +321,7 @@ STATS_PATH=
 | `LOG_LEVEL` | нет | `INFO`, `DEBUG`, `WARNING`, `ERROR` |
 | `ADMIN_CHAT_ID` | нет | Приватная статистика и админ-уведомления |
 | `PRIMARY_PLATFORM` | нет | Приоритет preview и порядка кнопок |
+| `BOT_UI_MODE` | нет | Текст и плотность кнопок: `stonerhand`, `minimal`, `editorial` |
 | `SET_WEBHOOK_SECRET` | нет | Защита `/api/set_webhook` |
 | `STATS_PATH` | нет | Путь к локальному файлу статистики |
 
@@ -332,6 +336,14 @@ soundcloud
 deezer
 tidal
 yandexMusic
+```
+
+Поддерживаемые значения `BOT_UI_MODE`:
+
+```text
+stonerhand  фирменный стиль по умолчанию с эмодзи на кнопках
+minimal     более чистые кнопки без лишнего визуального шума
+editorial   более живые hub-кнопки для канального оформления
 ```
 
 ## Локальный Запуск

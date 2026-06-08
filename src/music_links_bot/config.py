@@ -14,6 +14,7 @@ class Settings:
     log_level: str
     admin_chat_id: int | None
     primary_platform: str | None
+    ui_mode: str
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -35,6 +36,7 @@ class Settings:
             log_level=log_level,
             admin_chat_id=admin_chat_id,
             primary_platform=_parse_primary_platform(),
+            ui_mode=_parse_ui_mode(),
         )
 
 
@@ -66,3 +68,8 @@ def _parse_optional_int(env_name: str) -> int | None:
 def _parse_primary_platform() -> str | None:
     raw_value = os.getenv("PRIMARY_PLATFORM", "").strip()
     return raw_value or None
+
+
+def _parse_ui_mode() -> str:
+    raw_value = os.getenv("BOT_UI_MODE", "stonerhand").strip().casefold()
+    return raw_value if raw_value in {"stonerhand", "minimal", "editorial"} else "stonerhand"

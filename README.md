@@ -242,7 +242,9 @@ src/music_links_bot/
 | Area | Implementation |
 | --- | --- |
 | Speed | Parallel link resolution, connection pooling, short external timeouts |
+| Perceived speed | Sends a Telegram typing action before external lookup work starts |
 | Stability | Separate handling for not-found, service outages and malformed input |
+| Recoverable errors | Private-chat errors include a compact support keyboard instead of a dead end |
 | Deduplication | Tracking query params like `si`, `utm_*`, `fbclid` are ignored for cache keys |
 | Telegram limits | Long notes and large link packs are trimmed before posting |
 | Channel noise | Non-music posts, Instagram/TikTok/Pinterest and unrelated links are ignored in groups/channels |
@@ -306,6 +308,7 @@ SONGLINK_USER_COUNTRIES=US
 LOG_LEVEL=INFO
 ADMIN_CHAT_ID=
 PRIMARY_PLATFORM=spotify
+BOT_UI_MODE=stonerhand
 SET_WEBHOOK_SECRET=
 STATS_PATH=
 ```
@@ -318,6 +321,7 @@ STATS_PATH=
 | `LOG_LEVEL` | no | `INFO`, `DEBUG`, `WARNING`, `ERROR` |
 | `ADMIN_CHAT_ID` | no | Enables private admin stats and channel error notifications |
 | `PRIMARY_PLATFORM` | no | Preferred preview and button priority |
+| `BOT_UI_MODE` | no | Button copy and visual density: `stonerhand`, `minimal`, `editorial` |
 | `SET_WEBHOOK_SECRET` | no | Protects `/api/set_webhook` |
 | `STATS_PATH` | no | Overrides local stats file path |
 
@@ -332,6 +336,14 @@ soundcloud
 deezer
 tidal
 yandexMusic
+```
+
+Supported `BOT_UI_MODE` values:
+
+```text
+stonerhand  default branded style with emoji platform labels
+minimal     cleaner labels with less visual noise
+editorial   more expressive hub buttons for channel-style posts
 ```
 
 ## Local Development

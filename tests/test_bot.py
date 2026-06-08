@@ -11,6 +11,7 @@ from music_links_bot.bot import (
     PUBLIC_BOT_COMMANDS,
     _build_collection_keyboard,
     _build_artist_keyboard,
+    _build_error_keyboard,
     _build_intro_keyboard,
     _build_link_keyboard,
     _build_mixed_collection_keyboard,
@@ -20,6 +21,7 @@ from music_links_bot.bot import (
     _build_podcast_fallback,
     _build_youtube_keyboard,
     _format_not_found_message,
+    _format_service_unavailable_message,
     _lookup_nts_radios,
     _lookup_playlists,
     _lookup_artists,
@@ -142,9 +144,14 @@ class FailingArtistClientStub:
 class BotStub:
     def __init__(self) -> None:
         self.sent_messages: list[dict[str, object]] = []
+        self.chat_actions: list[dict[str, object]] = []
+        self.username = "StonerHandBot"
 
     async def send_message(self, **kwargs: object) -> None:
         self.sent_messages.append(kwargs)
+
+    async def send_chat_action(self, **kwargs: object) -> None:
+        self.chat_actions.append(kwargs)
 
 
 class ContextStub:
@@ -157,6 +164,7 @@ class ContextStub:
         soundcloud_client: object | None = None,
         playlist_client: object | None = None,
         artist_client: object | None = None,
+        ui_mode: str = "stonerhand",
     ) -> None:
         self.bot = BotStub()
         self.application = type(
@@ -171,6 +179,7 @@ class ContextStub:
                     "soundcloud_client": soundcloud_client or SoundCloudClientStub(),
                     "playlist_client": playlist_client or PlaylistClientStub(),
                     "artist_client": artist_client or ArtistClientStub(),
+                    "ui_mode": ui_mode,
                 }
             },
         )()
@@ -373,6 +382,33 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[1][0].url, "https://song.link/transitions")
         self.assertEqual(rows[1][0].api_kwargs, {"style": "primary"})
 
+    def test_minimal_ui_mode_strips_platform_button_emoji(self) -> None:
+        keyboard = _build_link_keyboard(
+            {
+                "spotify": "https://open.spotify.com/track/1",
+                "appleMusic": "https://music.apple.com/song/1",
+            },
+            context=ContextStub(ui_mode="minimal"),
+            include_channel_button=False,
+            release_page_url="https://song.link/transitions",
+        )
+
+        rows = keyboard.inline_keyboard
+        self.assertEqual(rows[0][0].text, "Spotify")
+        self.assertEqual(rows[0][1].text, "Apple")
+        self.assertEqual(rows[1][0].text, "Все платформы")
+
+    def test_editorial_ui_mode_uses_livelier_hub_copy(self) -> None:
+        keyboard = _build_link_keyboard(
+            {"spotify": "https://open.spotify.com/album/1"},
+            context=ContextStub(ui_mode="editorial"),
+            include_channel_button=False,
+            release_page_url="https://album.link/release",
+            release_kind="album",
+        )
+
+        self.assertEqual(keyboard.inline_keyboard[1][0].text, "💿 слушать целиком")
+
     def test_album_release_keyboard_uses_release_hub_label(self) -> None:
         keyboard = _build_link_keyboard(
             {"spotify": "https://open.spotify.com/album/1"},
@@ -392,6 +428,14 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         self.assertEqual(keyboard.inline_keyboard[1][0].text, "🎙 Все площадки")
+
+    def test_error_keyboard_points_to_supported_services(self) -> None:
+        keyboard = _build_error_keyboard("StonerHandBot")
+
+        self.assertEqual(keyboard.inline_keyboard[0][0].text, "Что поддерживается")
+        self.assertEqual(keyboard.inline_keyboard[0][0].callback_data, "menu:platforms")
+        self.assertEqual(keyboard.inline_keyboard[1][0].text, "🪨 Открыть канал")
+        self.assertEqual(keyboard.inline_keyboard[1][1].text, "Поделиться ботом")
 
     def test_collection_keyboard_can_hide_channel_button(self) -> None:
         keyboard = _build_collection_keyboard(
@@ -669,6 +713,11 @@ class BotKeyboardTests(unittest.TestCase):
             message,
         )
 
+    def test_service_unavailable_message_adds_next_step(self) -> None:
+        message = _format_service_unavailable_message("https://open.spotify.com/track/1")
+
+        self.assertIn("Попробуй еще раз чуть позже", message)
+
 
 class BotLookupTests(unittest.IsolatedAsyncioTestCase):
     async def test_channel_posts_without_supported_urls_do_not_notify_admin(self) -> None:
@@ -697,7 +746,10 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(message.replies), 1)
         self.assertIn("Пришли ссылку на трек, альбом, плейлист", message.replies[0])
+        keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
+        self.assertEqual(keyboard[0][0].text, "Что поддерживается")
         self.assertEqual(context.bot.sent_messages, [])
+        self.assertEqual(context.bot.chat_actions, [])
 
     async def test_youtube_video_links_use_video_post(self) -> None:
         message = PrivateYouTubeMessageStub()
@@ -710,6 +762,10 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("📺 · <b>SANSAE Live Session Vol.3 - Melon</b>", message.replies[0])
         self.assertIn("канал: SANSAE", message.replies[0])
         self.assertNotIn("#stonerhand", message.replies[0])
+        self.assertEqual(
+            context.bot.chat_actions,
+            [{"chat_id": message.chat_id, "action": "typing"}],
+        )
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         preview_options = message.reply_kwargs[0]["link_preview_options"]
         self.assertEqual(keyboard[0][0].text, "📺 Смотреть на YouTube")

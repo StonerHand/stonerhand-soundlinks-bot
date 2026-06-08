@@ -15,7 +15,7 @@ from telegram import (
     Message,
     Update,
 )
-from telegram.constants import ParseMode
+from telegram.constants import ChatAction, ParseMode
 from telegram.error import BadRequest, Forbidden, TelegramError
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 from telegram.ext import CallbackQueryHandler
@@ -88,6 +88,7 @@ MENU_HELP = "menu:help"
 MENU_GUIDE = "menu:guide"
 MENU_PLATFORMS = "menu:platforms"
 MENU_KEYS = frozenset((MENU_START, MENU_HELP, MENU_GUIDE, MENU_PLATFORMS))
+DEFAULT_UI_MODE = "stonerhand"
 MAX_BUTTON_TEXT_LENGTH = 64
 MAX_LINKS_PER_MESSAGE = 12
 MAX_USER_NOTE_LENGTH = 700
@@ -158,6 +159,7 @@ def build_application(settings: Settings) -> Application:
     application.bot_data["artist_client"] = artist_client
     application.bot_data["admin_chat_id"] = settings.admin_chat_id
     application.bot_data["platform_order"] = _build_platform_order(settings.primary_platform)
+    application.bot_data["ui_mode"] = settings.ui_mode
 
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
@@ -310,6 +312,27 @@ async def _reply_with_menu(
     )
 
 
+async def _reply_with_error(
+    message: Message,
+    context: ContextTypes.DEFAULT_TYPE,
+    text: str,
+) -> None:
+    await message.reply_text(
+        text,
+        reply_markup=_build_error_keyboard(context.bot.username),
+    )
+
+
+async def _send_typing_action(bot: Bot, message: Message) -> None:
+    if message.chat.type == "channel":
+        return
+
+    try:
+        await bot.send_chat_action(chat_id=message.chat_id, action=ChatAction.TYPING)
+    except TelegramError:
+        LOGGER.debug("Could not send typing action", exc_info=True)
+
+
 async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     if message is None:
@@ -324,8 +347,14 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         if message.chat.type != "private":
             return
 
-        await message.reply_text(_format_no_url_message(message_text, message.chat_id))
+        await _reply_with_error(
+            message,
+            context,
+            _format_no_url_message(message_text, message.chat_id),
+        )
         return
+
+    await _send_typing_action(context.bot, message)
 
     (
         artist_urls,
@@ -465,8 +494,10 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         if item_count == 0:
             if message.chat.type == "channel":
                 return
-            await message.reply_text(
-                _format_not_found_message(source_urls)
+            await _reply_with_error(
+                message,
+                context,
+                _format_not_found_message(source_urls),
             )
             return
 
@@ -577,8 +608,10 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         if message.chat.type == "channel":
             return
-        await message.reply_text(
-            pick_phrase("service_unavailable", unavailable_urls[0])
+        await _reply_with_error(
+            message,
+            context,
+            _format_service_unavailable_message(unavailable_urls[0]),
         )
         return
 
@@ -591,8 +624,10 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         if message.chat.type == "channel":
             return
-        await message.reply_text(
-            _format_not_found_message(source_urls)
+        await _reply_with_error(
+            message,
+            context,
+            _format_not_found_message(source_urls),
         )
         return
 
@@ -690,6 +725,13 @@ def _format_no_url_message(message_text: str | None, chat_id: int) -> str:
         f"{pick_phrase('no_url', seed)}\n\n"
         "Пришли ссылку на трек, альбом, плейлист, артиста, подкаст, "
         "YouTube-видео или NTS Radio"
+    )
+
+
+def _format_service_unavailable_message(seed: str) -> str:
+    return (
+        f"{pick_phrase('service_unavailable', seed)}\n\n"
+        "Попробуй еще раз чуть позже или пришли другую ссылку на этот же релиз"
     )
 
 
@@ -1311,7 +1353,7 @@ def _build_link_keyboard(
     ]
     buttons = [
         _url_button(
-            text=f"{prefix}{PLATFORM_LABELS[platform_key]}",
+            text=f"{prefix}{_platform_button_label(platform_key, context)}",
             url=links[platform_key],
             style=PLATFORM_BUTTON_STYLES.get(platform_key),
         )
@@ -1322,7 +1364,7 @@ def _build_link_keyboard(
         rows.append(
             [
                 _url_button(
-                    _release_hub_button_label(release_kind, release_format),
+                    _release_hub_button_label(release_kind, release_format, context),
                     url=release_page_url,
                     style="primary",
                 )
@@ -1330,6 +1372,18 @@ def _build_link_keyboard(
         )
 
     return _keyboard_with_optional_channel(rows, include_channel_button)
+
+
+def _platform_button_label(
+    platform_key: str,
+    context: ContextTypes.DEFAULT_TYPE | None = None,
+) -> str:
+    label = PLATFORM_LABELS[platform_key]
+    if _get_ui_mode(context) != "minimal":
+        return label
+
+    parts = label.split(maxsplit=1)
+    return parts[1] if len(parts) == 2 else label
 
 
 def _build_collection_keyboard(
@@ -1610,7 +1664,31 @@ def _track_button_icon(track: TrackMatch) -> str:
     return "🎧"
 
 
-def _release_hub_button_label(release_kind: str, release_format: str | None) -> str:
+def _release_hub_button_label(
+    release_kind: str,
+    release_format: str | None,
+    context: ContextTypes.DEFAULT_TYPE | None = None,
+) -> str:
+    ui_mode = _get_ui_mode(context)
+
+    if ui_mode == "minimal":
+        if release_kind == "album":
+            return "Весь EP" if release_format == "ep" else "Весь релиз"
+
+        if release_kind == "podcast":
+            return "Все площадки"
+
+        return "Все платформы"
+
+    if ui_mode == "editorial":
+        if release_kind == "album":
+            return "💿 слушать EP" if release_format == "ep" else "💿 слушать целиком"
+
+        if release_kind == "podcast":
+            return "🎙 открыть выпуск"
+
+        return "🪩 открыть все"
+
     if release_kind == "album":
         if release_format == "ep":
             return "💿 Весь EP"
@@ -1621,6 +1699,14 @@ def _release_hub_button_label(release_kind: str, release_format: str | None) -> 
         return "🎙 Все площадки"
 
     return "🪩 Все платформы"
+
+
+def _get_ui_mode(context: ContextTypes.DEFAULT_TYPE | None = None) -> str:
+    if context is None:
+        return DEFAULT_UI_MODE
+
+    value = context.application.bot_data.get("ui_mode", DEFAULT_UI_MODE)
+    return value if value in {"stonerhand", "minimal", "editorial"} else DEFAULT_UI_MODE
 
 
 def _button_rows(buttons: list[InlineKeyboardButton]) -> list[list[InlineKeyboardButton]]:
@@ -1862,6 +1948,21 @@ def _build_intro_keyboard(
         action_row.append(InlineKeyboardButton("Поделиться ботом", url=share_url))
 
     return InlineKeyboardMarkup([*menu_rows, action_row])
+
+
+def _build_error_keyboard(bot_username: str | None) -> InlineKeyboardMarkup:
+    rows = [[_menu_button("Что поддерживается", MENU_PLATFORMS, None)]]
+    if bot_username:
+        bot_url = f"https://t.me/{bot_username}"
+        share_url = "https://t.me/share/url?url=" + quote(bot_url, safe="")
+        rows.append(
+            [
+                _channel_button(),
+                InlineKeyboardButton("Поделиться ботом", url=share_url),
+            ]
+        )
+
+    return InlineKeyboardMarkup(rows)
 
 
 def _menu_button(label: str, callback_data: str, active: str | None) -> InlineKeyboardButton:

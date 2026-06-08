@@ -52,6 +52,32 @@ class ConfigTests(unittest.TestCase):
 
         self.assertEqual(settings.primary_platform, "yandexMusic")
 
+    def test_from_env_reads_ui_mode(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "BOT_TOKEN": "token",
+                "BOT_UI_MODE": "editorial",
+            },
+            clear=False,
+        ):
+            settings = Settings.from_env()
+
+        self.assertEqual(settings.ui_mode, "editorial")
+
+    def test_from_env_falls_back_to_default_ui_mode(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "BOT_TOKEN": "token",
+                "BOT_UI_MODE": "weird",
+            },
+            clear=False,
+        ):
+            settings = Settings.from_env()
+
+        self.assertEqual(settings.ui_mode, "stonerhand")
+
 
 if __name__ == "__main__":
     unittest.main()
