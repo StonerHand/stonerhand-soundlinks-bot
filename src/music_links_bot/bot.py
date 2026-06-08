@@ -1366,7 +1366,7 @@ def _build_link_keyboard(
                 _url_button(
                     _release_hub_button_label(release_kind, release_format, context),
                     url=release_page_url,
-                    style="primary",
+                    style="danger",
                 )
             ]
         )

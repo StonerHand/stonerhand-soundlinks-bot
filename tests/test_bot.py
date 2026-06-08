@@ -380,7 +380,7 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[0][1].text, "⚪ Apple")
         self.assertEqual(rows[1][0].text, "🪩 Все платформы")
         self.assertEqual(rows[1][0].url, "https://song.link/transitions")
-        self.assertEqual(rows[1][0].api_kwargs, {"style": "primary"})
+        self.assertEqual(rows[1][0].api_kwargs, {"style": "danger"})
 
     def test_minimal_ui_mode_strips_platform_button_emoji(self) -> None:
         keyboard = _build_link_keyboard(
@@ -397,6 +397,7 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[0][0].text, "Spotify")
         self.assertEqual(rows[0][1].text, "Apple")
         self.assertEqual(rows[1][0].text, "Все платформы")
+        self.assertEqual(rows[1][0].api_kwargs, {"style": "danger"})
 
     def test_editorial_ui_mode_uses_livelier_hub_copy(self) -> None:
         keyboard = _build_link_keyboard(
