@@ -1,8 +1,22 @@
 import json
+import os
 import unittest
+from unittest.mock import patch
+from urllib.parse import parse_qs, urlparse
 
-from api.set_webhook import ALLOWED_UPDATES
-from api.telegram import _decode_update_payload, _read_content_length
+from api.set_webhook import (
+    ALLOWED_UPDATES,
+    _is_authorized,
+    _resolve_webhook_url,
+    _setup_secret_is_configured,
+    _telegram_set_webhook_url,
+    _telegram_webhook_secret,
+)
+from api.telegram import (
+    _decode_update_payload,
+    _is_telegram_request_authorized,
+    _read_content_length,
+)
 
 
 class VercelWebhookTests(unittest.TestCase):
@@ -24,6 +38,62 @@ class VercelWebhookTests(unittest.TestCase):
 
     def test_webhook_accepts_menu_button_callbacks(self) -> None:
         self.assertIn("callback_query", ALLOWED_UPDATES)
+
+    def test_telegram_secret_is_optional_and_compared_safely(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertTrue(_is_telegram_request_authorized(None))
+
+        with patch.dict(
+            os.environ,
+            {"TELEGRAM_WEBHOOK_SECRET": "telegram-secret"},
+            clear=True,
+        ):
+            self.assertTrue(_is_telegram_request_authorized("telegram-secret"))
+            self.assertFalse(_is_telegram_request_authorized("wrong"))
+
+    def test_setup_endpoint_requires_its_own_secret(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertFalse(_setup_secret_is_configured())
+
+        with patch.dict(
+            os.environ,
+            {"SET_WEBHOOK_SECRET": "setup-secret"},
+            clear=True,
+        ):
+            self.assertTrue(_setup_secret_is_configured())
+            self.assertTrue(_is_authorized("/api/set_webhook?secret=setup-secret"))
+            self.assertFalse(_is_authorized("/api/set_webhook?secret=wrong"))
+
+    def test_set_webhook_url_includes_telegram_secret(self) -> None:
+        webhook_url = _telegram_set_webhook_url(
+            "bot-token",
+            "https://bot.example/api/telegram",
+            secret_token="telegram-secret",
+        )
+        query = parse_qs(urlparse(webhook_url).query)
+
+        self.assertEqual(query["secret_token"], ["telegram-secret"])
+        self.assertEqual(query["url"], ["https://bot.example/api/telegram"])
+
+    def test_telegram_secret_rejects_invalid_characters(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"TELEGRAM_WEBHOOK_SECRET": "not valid"},
+            clear=True,
+        ):
+            with self.assertRaises(ValueError):
+                _telegram_webhook_secret()
+
+    def test_resolve_webhook_url_prefers_configured_base_url(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"WEBHOOK_BASE_URL": "https://soundlinks.example/custom/path"},
+            clear=True,
+        ):
+            self.assertEqual(
+                _resolve_webhook_url("forged.example"),
+                "https://soundlinks.example/api/telegram",
+            )
 
 
 if __name__ == "__main__":

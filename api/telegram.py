@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 import logging
+import os
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
@@ -27,6 +29,12 @@ class handler(BaseHTTPRequestHandler):
         self._send_json({"ok": True, "service": "StonerHandBot webhook"})
 
     def do_POST(self) -> None:
+        if not _is_telegram_request_authorized(
+            self.headers.get("x-telegram-bot-api-secret-token")
+        ):
+            self._send_json({"ok": False, "error": "forbidden"}, HTTPStatus.FORBIDDEN)
+            return
+
         content_length = _read_content_length(self.headers.get("content-length"))
         if content_length is None:
             self._send_json(
@@ -106,3 +114,11 @@ def _read_content_length(raw_value: str | None) -> int | None:
         return int(raw_value or "0")
     except ValueError:
         return None
+
+
+def _is_telegram_request_authorized(received_secret: str | None) -> bool:
+    expected_secret = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
+    if not expected_secret:
+        return True
+
+    return hmac.compare_digest(received_secret or "", expected_secret)

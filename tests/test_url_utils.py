@@ -118,6 +118,17 @@ class UrlUtilsTests(unittest.TestCase):
             ),
         )
 
+    def test_strip_supported_urls_keeps_unrelated_links_and_punctuation(self) -> None:
+        text = (
+            "Подробнее: https://example.com/article\n\n"
+            "Слушать: https://open.spotify.com/track/1?si=aaa."
+        )
+
+        self.assertEqual(
+            strip_supported_urls(text),
+            "Подробнее: https://example.com/article\n\nСлушать:",
+        )
+
     def test_spotify_url_type_detects_episode_and_show(self) -> None:
         self.assertEqual(
             spotify_url_type("https://open.spotify.com/episode/abc?si=123"),

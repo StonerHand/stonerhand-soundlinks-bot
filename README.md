@@ -17,6 +17,7 @@
 ![Vercel](https://img.shields.io/badge/Vercel-Webhook-000000?style=for-the-badge&logo=vercel&logoColor=white)
 ![Song.link](https://img.shields.io/badge/Song.link-Odesli-FF6B6B?style=for-the-badge)
 ![GitHub](https://img.shields.io/badge/GitHub-stonerhand--soundlinks--bot-181717?style=for-the-badge&logo=github&logoColor=white)
+[![CI](https://github.com/StonerHand/stonerhand-soundlinks-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/StonerHand/stonerhand-soundlinks-bot/actions/workflows/ci.yml)
 
 `streaming URL -> normalized release -> Telegram-ready editorial post`
 
@@ -95,7 +96,7 @@ Track
 | Deployment | Vercel webhook and Railway worker setups are documented |
 | Branding | StonerHand-specific copy lives in formatters, constants and phrase banks |
 | Forkability | The core flow is separated into URL parsing, metadata clients, formatting, keyboards and transport |
-| Safety | Webhook setup can be protected with `SET_WEBHOOK_SECRET` |
+| Safety | Webhook setup requires `SET_WEBHOOK_SECRET`; Telegram request signing is supported |
 | Scope | No downloader APIs, no media scraping, no stored message text |
 
 ## Visual Language
@@ -108,9 +109,11 @@ Platform buttons use native Telegram button styles where the client supports the
 | --- | --- | --- |
 | Spotify | `success` | `🟢 Spotify` |
 | YouTube | `danger` | `🔴 YouTube` / `📺 Смотреть на YouTube` |
-| Release hub, playlists, artists, radio and secondary platforms | `primary` | Platform emoji labels |
+| Song.link hub | `danger` | `🪩 All platforms` / release-specific hub label |
+| Playlists, artists, radio and secondary platforms | `primary` | Platform emoji labels |
 
 Telegram clients can render styles differently, so emoji labels stay in place as a stable visual fallback.
+Menu tabs use `success` for the active section and `primary` for the remaining actions.
 
 Release keyboards are platform-first: direct streaming buttons appear before the Song.link hub button, so the most common action takes fewer taps.
 
@@ -216,9 +219,11 @@ flowchart LR
 ## Code Map
 
 ```text
+.github/workflows/ci.yml  tests Python 3.10/3.13 on pushes and pull requests
+
 api/
-├── telegram.py       Vercel webhook endpoint with fail-fast payload validation
-└── set_webhook.py    one-click Telegram webhook setup, callback updates and command sync
+├── telegram.py       Vercel webhook endpoint with payload and optional signature validation
+└── set_webhook.py    protected Telegram webhook setup and command sync
 
 src/music_links_bot/
 ├── bot.py            Telegram handlers, routing, keyboards, replacement logic
@@ -246,15 +251,16 @@ src/music_links_bot/
 | Stability | Separate handling for not-found, service outages and malformed input |
 | Recoverable errors | Private-chat errors include a compact support keyboard instead of a dead end |
 | Deduplication | Tracking query params like `si`, `utm_*`, `fbclid` are ignored for cache keys |
-| Telegram limits | Long notes and large link packs are trimmed before posting |
+| Telegram limits | Long notes, metadata and large link packs are trimmed before posting |
 | Channel noise | Non-music posts, Instagram/TikTok/Pinterest and unrelated links are ignored in groups/channels |
 | Navigation | `/start`, `/help`, `/platforms` and `/guide` share one inline menu with active-state markers |
 | Preview quality | Preferred platform controls preview source and button priority |
 | SoundCloud support | Song.link links are used when available; direct SoundCloud URLs fall back to SoundCloud oEmbed |
 | NTS Radio support | NTS pages are routed outside Song.link and formatted as dedicated radio cards |
 | Privacy | Stats store counters and ids, not message text or source links |
-| Serverless safety | Vercel payload size and JSON shape are checked before bot bootstrap |
-| Admin safety | Message replacement only happens when Telegram grants the required rights |
+| Serverless safety | Vercel validates payload size, JSON shape and optional Telegram request signature |
+| Admin safety | The finished post is published before the original message is deleted |
+| Continuous integration | GitHub Actions tests Python 3.10 and 3.13 on every change |
 
 ## Project Skills
 
@@ -297,6 +303,7 @@ BOT_TOKEN=your-telegram-bot-token
 SONGLINK_USER_COUNTRIES=US
 LOG_LEVEL=INFO
 PRIMARY_PLATFORM=spotify
+SET_WEBHOOK_SECRET=generate-a-long-random-value
 ```
 
 Full configuration:
@@ -310,6 +317,8 @@ ADMIN_CHAT_ID=
 PRIMARY_PLATFORM=spotify
 BOT_UI_MODE=stonerhand
 SET_WEBHOOK_SECRET=
+TELEGRAM_WEBHOOK_SECRET=
+WEBHOOK_BASE_URL=
 STATS_PATH=
 ```
 
@@ -322,7 +331,9 @@ STATS_PATH=
 | `ADMIN_CHAT_ID` | no | Enables private admin stats and channel error notifications |
 | `PRIMARY_PLATFORM` | no | Preferred preview and button priority |
 | `BOT_UI_MODE` | no | Button copy and visual density: `stonerhand`, `minimal`, `editorial` |
-| `SET_WEBHOOK_SECRET` | no | Protects `/api/set_webhook` |
+| `SET_WEBHOOK_SECRET` | Vercel setup | Required to open `/api/set_webhook` safely |
+| `TELEGRAM_WEBHOOK_SECRET` | no | Verifies `X-Telegram-Bot-Api-Secret-Token` on incoming updates |
+| `WEBHOOK_BASE_URL` | no | Explicit production base URL; otherwise Vercel environment URLs are used |
 | `STATS_PATH` | no | Overrides local stats file path |
 
 Supported `PRIMARY_PLATFORM` values:
@@ -375,13 +386,9 @@ Vercel is the recommended serverless deployment path for this bot. Telegram send
 3. Keep `Root Directory` as `./`
 4. Add production environment variables
 5. Deploy
-6. Open the setup endpoint once:
-
-```text
-https://your-vercel-domain.vercel.app/api/set_webhook
-```
-
-If `SET_WEBHOOK_SECRET` is configured, use:
+6. Generate and add `SET_WEBHOOK_SECRET`
+7. Optionally add a different `TELEGRAM_WEBHOOK_SECRET` using only letters, digits, `_` and `-`
+8. Open the protected setup endpoint once:
 
 ```text
 https://your-vercel-domain.vercel.app/api/set_webhook?secret=your-secret
@@ -389,6 +396,7 @@ https://your-vercel-domain.vercel.app/api/set_webhook?secret=your-secret
 
 Successful response means the Telegram webhook and command menu are connected.
 Open this endpoint again after changing bot commands, callback menu buttons or the production domain.
+If `TELEGRAM_WEBHOOK_SECRET` is set before this step, Telegram signs every update and the receiver rejects forged requests.
 
 ### Vercel Endpoints
 
@@ -423,14 +431,17 @@ Compile check:
 python -m compileall -q src tests api
 ```
 
+GitHub Actions runs both checks automatically on Python 3.10 and 3.13 for every push to `main` and every pull request.
+
 ## Production Checklist
 
 - `BOT_TOKEN` exists in hosting environment variables
 - Only one runtime is active: Vercel webhook or Railway/local polling
-- `/api/set_webhook` was opened after Vercel deploy
+- `SET_WEBHOOK_SECRET` is configured and the protected `/api/set_webhook` URL was opened after deploy
+- `TELEGRAM_WEBHOOK_SECRET` is configured for signed Telegram updates when possible
 - Bot has `Delete messages` permission in channels/groups where replacement is needed
 - `ADMIN_CHAT_ID` is configured if private stats or admin notifications are needed
-- `SET_WEBHOOK_SECRET` is configured for a safer setup endpoint
+- `WEBHOOK_BASE_URL` is set when a custom production domain must override the Vercel URL
 - Tokens are never committed to git
 - Tokens are rotated if they were ever pasted into a public place
 

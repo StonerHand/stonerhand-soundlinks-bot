@@ -25,6 +25,7 @@ BOT_TOKEN=...
 SONGLINK_USER_COUNTRIES=US
 LOG_LEVEL=INFO
 PRIMARY_PLATFORM=spotify
+SET_WEBHOOK_SECRET=...
 ```
 
 Optional:
@@ -32,7 +33,8 @@ Optional:
 ```env
 SONGLINK_API_KEY=...
 ADMIN_CHAT_ID=...
-SET_WEBHOOK_SECRET=...
+TELEGRAM_WEBHOOK_SECRET=...
+WEBHOOK_BASE_URL=...
 STATS_PATH=...
 ```
 
@@ -44,9 +46,10 @@ Never print, commit, quote, or expose real tokens.
 2. Confirm `api/telegram.py` imports the app and handles POST updates.
 3. Confirm env variables are set for Production.
 4. Deploy from `main`.
-5. Open `/api/set_webhook` after deploy.
-6. Test `/start` in Telegram.
-7. Send a Spotify track, SoundCloud link, YouTube link, NTS link, and one invalid message.
+5. Open `/api/set_webhook?secret=...` after deploy; the endpoint stays closed without `SET_WEBHOOK_SECRET`.
+6. If `TELEGRAM_WEBHOOK_SECRET` is configured, confirm setup registered it before testing updates.
+7. Test `/start` in Telegram.
+8. Send a Spotify track, SoundCloud link, YouTube link, NTS link, and one invalid message.
 
 Vercel root `404` is normal. The useful routes are API routes.
 
@@ -72,7 +75,9 @@ Do not paste the real token into docs or chat logs.
 | --- | --- |
 | Bot silent | `BOT_TOKEN`, webhook URL, deploy logs |
 | Duplicate replies | Webhook and polling both active |
-| Vercel deploy works but bot silent | `/api/set_webhook` was not opened |
+| Vercel deploy works but bot silent | Protected `/api/set_webhook?secret=...` was not opened |
+| Setup endpoint returns 503 | `SET_WEBHOOK_SECRET` is missing |
+| Telegram updates return 403 | `TELEGRAM_WEBHOOK_SECRET` was added but webhook was not re-registered |
 | `No module named music_links_bot` | Missing `PYTHONPATH=src` or package install issue |
 | `BOT_TOKEN is not set` | Env variable missing in host |
 | Channel replacement fails | Bot lacks admin rights or delete permission |

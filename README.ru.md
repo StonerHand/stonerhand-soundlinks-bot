@@ -17,6 +17,7 @@
 ![Vercel](https://img.shields.io/badge/Vercel-Webhook-000000?style=for-the-badge&logo=vercel&logoColor=white)
 ![Song.link](https://img.shields.io/badge/Song.link-Odesli-FF6B6B?style=for-the-badge)
 ![GitHub](https://img.shields.io/badge/GitHub-stonerhand--soundlinks--bot-181717?style=for-the-badge&logo=github&logoColor=white)
+[![CI](https://github.com/StonerHand/stonerhand-soundlinks-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/StonerHand/stonerhand-soundlinks-bot/actions/workflows/ci.yml)
 
 `стриминговая ссылка -> релиз -> готовый редакторский Telegram-пост`
 
@@ -95,7 +96,7 @@ Track
 | Деплой | Описаны Vercel webhook и Railway worker |
 | Брендинг | StonerHand-специфика лежит в formatter/constants/phrase bank |
 | Форки | Поток разделен на URL parsing, metadata clients, formatting, keyboards и transport |
-| Безопасность | Setup endpoint можно закрыть через `SET_WEBHOOK_SECRET` |
+| Безопасность | Setup endpoint требует `SET_WEBHOOK_SECRET`, входящие updates можно подписывать |
 | Границы | Нет downloader API, media scraping и хранения текста сообщений |
 
 ## Визуальный Стиль
@@ -108,9 +109,11 @@ Track
 | --- | --- | --- |
 | Spotify | `success` | `🟢 Spotify` |
 | YouTube | `danger` | `🔴 YouTube` / `📺 Смотреть на YouTube` |
-| Song.link hub, плейлисты, артисты, радио и остальные платформы | `primary` | Эмодзи в названии платформы |
+| Song.link hub | `danger` | `🪩 Все платформы` / кнопка по типу релиза |
+| Плейлисты, артисты, радио и остальные платформы | `primary` | Эмодзи в названии платформы |
 
 Разные клиенты Telegram могут рисовать стили по-разному, поэтому эмодзи остаются стабильным fallback.
+В меню активный раздел получает `success`, остальные действия - `primary`.
 
 Клавиатуры релизов идут platform-first: прямые кнопки стримингов стоят выше Song.link hub, чтобы самый частый сценарий занимал меньше тапов.
 
@@ -216,9 +219,11 @@ flowchart LR
 ## Карта Кода
 
 ```text
+.github/workflows/ci.yml  тесты Python 3.10/3.13 для push и pull request
+
 api/
-├── telegram.py       Vercel webhook endpoint с fail-fast проверкой payload
-└── set_webhook.py    установка webhook, callback updates и синхронизация команд
+├── telegram.py       Vercel webhook с проверкой payload и опциональной подписи
+└── set_webhook.py    защищенная установка webhook и синхронизация команд
 
 src/music_links_bot/
 ├── bot.py            Telegram handlers, routing, keyboards, замена сообщений
@@ -246,15 +251,16 @@ src/music_links_bot/
 | Стабильность | Раздельная обработка not found, service unavailable и неправильного ввода |
 | Исправимые ошибки | В личке ошибки получают компактную клавиатуру поддержки, а не тупик |
 | Дедупликация | `si`, `utm_*`, `fbclid` и похожие параметры не участвуют в cache key |
-| Лимиты Telegram | Длинные подводки и большие пачки ссылок обрезаются до безопасного размера |
+| Лимиты Telegram | Длинные подводки, metadata и большие пачки ссылок сокращаются до безопасного размера |
 | Чистота каналов | Обычные посты, Instagram/TikTok/Pinterest и нерелевантные ссылки игнорируются в группах и каналах |
 | Навигация | `/start`, `/help`, `/platforms` и `/guide` используют одно inline-меню с активным состоянием |
 | Preview | Приоритетная платформа управляет preview и порядком кнопок |
 | SoundCloud | Если Song.link не нашел кроссплатформенные ссылки, прямая SoundCloud-ссылка оформляется через SoundCloud oEmbed |
 | NTS Radio | NTS-ссылки не гоняются через Song.link, а оформляются отдельными радио-карточками |
 | Приватность | Статистика хранит счетчики и ids, но не тексты сообщений и не исходные ссылки |
-| Serverless | Vercel webhook проверяет размер и форму JSON до запуска бота |
-| Безопасность админки | Замена сообщений происходит только если Telegram реально дал нужные права |
+| Serverless | Vercel проверяет размер payload, форму JSON и опциональную подпись Telegram |
+| Безопасность админки | Готовый пост публикуется до удаления исходного сообщения |
+| Continuous integration | GitHub Actions проверяет Python 3.10 и 3.13 при каждом изменении |
 
 ## Проектные Скиллы
 
@@ -297,6 +303,7 @@ BOT_TOKEN=your-telegram-bot-token
 SONGLINK_USER_COUNTRIES=US
 LOG_LEVEL=INFO
 PRIMARY_PLATFORM=spotify
+SET_WEBHOOK_SECRET=generate-a-long-random-value
 ```
 
 Полная настройка:
@@ -310,6 +317,8 @@ ADMIN_CHAT_ID=
 PRIMARY_PLATFORM=spotify
 BOT_UI_MODE=stonerhand
 SET_WEBHOOK_SECRET=
+TELEGRAM_WEBHOOK_SECRET=
+WEBHOOK_BASE_URL=
 STATS_PATH=
 ```
 
@@ -322,7 +331,9 @@ STATS_PATH=
 | `ADMIN_CHAT_ID` | нет | Приватная статистика и админ-уведомления |
 | `PRIMARY_PLATFORM` | нет | Приоритет preview и порядка кнопок |
 | `BOT_UI_MODE` | нет | Текст и плотность кнопок: `stonerhand`, `minimal`, `editorial` |
-| `SET_WEBHOOK_SECRET` | нет | Защита `/api/set_webhook` |
+| `SET_WEBHOOK_SECRET` | для Vercel setup | Обязательная защита `/api/set_webhook` |
+| `TELEGRAM_WEBHOOK_SECRET` | нет | Проверка `X-Telegram-Bot-Api-Secret-Token` у входящих updates |
+| `WEBHOOK_BASE_URL` | нет | Явный production URL; иначе используются Vercel environment URL |
 | `STATS_PATH` | нет | Путь к локальному файлу статистики |
 
 Поддерживаемые значения `PRIMARY_PLATFORM`:
@@ -375,13 +386,9 @@ Vercel - основной serverless-вариант. Telegram отправляе
 3. `Root Directory` оставь `./`
 4. Добавь production-переменные окружения
 5. Нажми `Deploy`
-6. После деплоя один раз открой endpoint настройки:
-
-```text
-https://your-vercel-domain.vercel.app/api/set_webhook
-```
-
-Если задан `SET_WEBHOOK_SECRET`, открывай так:
+6. Сгенерируй и добавь `SET_WEBHOOK_SECRET`
+7. По возможности добавь другой `TELEGRAM_WEBHOOK_SECRET` только из букв, цифр, `_` и `-`
+8. После деплоя один раз открой защищенный endpoint настройки:
 
 ```text
 https://your-vercel-domain.vercel.app/api/set_webhook?secret=your-secret
@@ -389,6 +396,7 @@ https://your-vercel-domain.vercel.app/api/set_webhook?secret=your-secret
 
 Если Telegram вернул `"ok": true`, webhook и меню команд подключены.
 Открой этот endpoint заново после изменения команд, callback-меню или production-домена.
+Если перед этим задан `TELEGRAM_WEBHOOK_SECRET`, Telegram подписывает каждый update, а receiver отклоняет поддельные запросы.
 
 ### Vercel Endpoint'ы
 
@@ -423,14 +431,17 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 python -m compileall -q src tests api
 ```
 
+GitHub Actions автоматически выполняет обе проверки на Python 3.10 и 3.13 при каждом push в `main` и в pull request.
+
 ## Production Checklist
 
 - `BOT_TOKEN` добавлен в переменные окружения хостинга
 - Активен только один режим: Vercel webhook или Railway/local polling
-- После деплоя открыт `/api/set_webhook`
+- `SET_WEBHOOK_SECRET` задан, после деплоя открыт защищенный URL `/api/set_webhook`
+- По возможности задан `TELEGRAM_WEBHOOK_SECRET` для подписанных updates
 - У бота есть право `Delete messages` там, где нужна автозамена постов
 - `ADMIN_CHAT_ID` настроен, если нужны приватная статистика и админ-уведомления
-- `SET_WEBHOOK_SECRET` задан для более безопасного setup endpoint
+- `WEBHOOK_BASE_URL` задан, если custom production domain должен иметь приоритет над Vercel URL
 - Токены не попадают в git
 - Токены перевыпущены, если они когда-либо попадали в публичное место
 

@@ -28,10 +28,12 @@ from music_links_bot.bot import (
     _lookup_tracks,
     _lookup_youtube_videos,
     _message_text,
+    _menu_text,
     _should_include_channel_button,
     _should_include_hashtags,
     _split_source_urls,
     _shorten_user_note,
+    _send_track_result,
     track_lookup_message,
 )
 from music_links_bot.artist import ArtistLookupError
@@ -222,6 +224,15 @@ class GroupMessageStub(ChannelMessageStub):
             "username": None,
         },
     )()
+
+
+class ReplaceableMessageStub(GroupMessageStub):
+    def __init__(self) -> None:
+        super().__init__()
+        self.deleted = False
+
+    async def delete(self) -> None:
+        self.deleted = True
 
 
 class PrivateMessageStub(ChannelMessageStub):
@@ -556,11 +567,25 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[1][1].text, "Для каналов")
         self.assertEqual(rows[2][0].text, "🪨 Открыть канал")
         self.assertEqual(rows[2][1].text, "Поделиться ботом")
+        self.assertEqual(rows[2][0].api_kwargs, {"style": "primary"})
+        self.assertEqual(rows[2][1].api_kwargs, {"style": "primary"})
 
     def test_intro_keyboard_marks_active_menu_item(self) -> None:
         keyboard = _build_intro_keyboard("StonerHandBot", active="menu:platforms")
 
         self.assertEqual(keyboard.inline_keyboard[1][0].text, "• Сервисы")
+        self.assertEqual(
+            keyboard.inline_keyboard[1][0].api_kwargs,
+            {"style": "success"},
+        )
+        self.assertEqual(
+            keyboard.inline_keyboard[0][0].api_kwargs,
+            {"style": "primary"},
+        )
+
+    def test_menu_text_uses_compact_html_headings(self) -> None:
+        self.assertTrue(_menu_text("menu:start").startswith("🎧 <b>"))
+        self.assertTrue(_menu_text("menu:help").startswith("<b>Как пользоваться</b>"))
 
     def test_build_platform_order_moves_primary_platform_first(self) -> None:
         order = _build_platform_order("yandexMusic")
@@ -721,6 +746,22 @@ class BotKeyboardTests(unittest.TestCase):
 
 
 class BotLookupTests(unittest.IsolatedAsyncioTestCase):
+    async def test_group_post_is_deleted_only_after_result_is_sent(self) -> None:
+        message = ReplaceableMessageStub()
+        bot = BotStub()
+
+        await _send_track_result(
+            bot,
+            message,
+            "готовый пост",
+            preview_url=None,
+            reply_markup=None,
+        )
+
+        self.assertEqual(len(bot.sent_messages), 1)
+        self.assertTrue(message.deleted)
+        self.assertEqual(message.replies, [])
+
     async def test_channel_posts_without_supported_urls_do_not_notify_admin(self) -> None:
         message = ChannelMessageStub()
         context = ContextStub()

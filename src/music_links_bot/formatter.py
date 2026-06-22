@@ -13,6 +13,8 @@ from music_links_bot.models import (
 from music_links_bot.phrases import pick_phrase
 
 TRACK_EMOJIS = ("🎵", "🎧", "🎶", "🔊", "📻")
+MAX_METADATA_TEXT_LENGTH = 180
+MAX_COLLECTION_TEXT_LENGTH = 96
 VIDEO_SIGNATURES = (
     "видео на месте, можно смотреть",
     "экран готов, жми смотреть",
@@ -76,22 +78,31 @@ def pick_track_emoji(track: TrackMatch) -> str:
 
 
 def format_track_label(track: TrackMatch) -> str:
-    return f"{escape(track.artist)} - {escape(track.title)}"
+    return f"{_display_text(track.artist)} - {_display_text(track.title)}"
 
 
 def format_track_heading(track: TrackMatch) -> str:
-    return f"<b>{escape(track.artist)}</b> - {escape(track.title)}"
+    return (
+        f"<b>{_display_text(track.artist, MAX_COLLECTION_TEXT_LENGTH)}</b> - "
+        f"{_display_text(track.title, MAX_COLLECTION_TEXT_LENGTH)}"
+    )
 
 
 def format_release_heading(track: TrackMatch) -> str:
     if track.kind == "album":
-        return f"💿 · <b>{escape(track.artist)}</b>\n{escape(track.title)}"
+        return f"💿 · <b>{_display_text(track.artist)}</b>\n{_display_text(track.title)}"
 
     if track.kind == "podcast":
         label = "шоу" if track.release_format == "show" else "выпуск"
-        return f"🎙️ · <b>{escape(track.artist)}</b>\n{label}: {escape(track.title)}"
+        return (
+            f"🎙️ · <b>{_display_text(track.artist)}</b>\n"
+            f"{label}: {_display_text(track.title)}"
+        )
 
-    return f"{pick_track_emoji(track)} · <b>{escape(track.artist)}</b>\n{escape(track.title)}"
+    return (
+        f"{pick_track_emoji(track)} · <b>{_display_text(track.artist)}</b>\n"
+        f"{_display_text(track.title)}"
+    )
 
 
 def format_track_message(
@@ -119,8 +130,8 @@ def format_video_message(video: VideoMatch, *, include_hashtags: bool = True) ->
         f"{video.author}:{video.title}:{video.url}",
     )
     lines = [
-        f"📺 · <b>{escape(video.title)}</b>",
-        f"канал: {escape(video.author)}",
+        f"📺 · <b>{_display_text(video.title)}</b>",
+        f"канал: {_display_text(video.author)}",
         "",
         f"<i>{escape(signature)}</i>",
     ]
@@ -133,8 +144,8 @@ def format_radio_message(radio: RadioMatch, *, include_hashtags: bool = True) ->
         f"{radio.station}:{radio.title}:{radio.url}",
     )
     lines = [
-        f"📡 · <b>{escape(radio.title)}</b>",
-        f"станция: {escape(radio.station)}",
+        f"📡 · <b>{_display_text(radio.title)}</b>",
+        f"станция: {_display_text(radio.station)}",
         "",
         f"<i>{escape(signature)}</i>",
     ]
@@ -151,8 +162,8 @@ def format_playlist_message(
         f"{playlist.platform}:{playlist.title}:{playlist.url}",
     )
     lines = [
-        f"🎛 · <b>{escape(playlist.title)}</b>",
-        f"платформа: {escape(playlist.platform)}",
+        f"🎛 · <b>{_display_text(playlist.title)}</b>",
+        f"платформа: {_display_text(playlist.platform)}",
         "",
         f"<i>{escape(signature)}</i>",
     ]
@@ -169,8 +180,8 @@ def format_artist_message(
         f"{artist.platform}:{artist.title}:{artist.url}",
     )
     lines = [
-        f"🧬 · <b>{escape(artist.title)}</b>",
-        f"профиль: {escape(artist.platform)}",
+        f"🧬 · <b>{_display_text(artist.title)}</b>",
+        f"профиль: {_display_text(artist.platform)}",
         "",
         f"<i>{escape(signature)}</i>",
     ]
@@ -188,7 +199,10 @@ def format_artist_collection_message(
     )
     lines = ["сегодня по артистам:", ""]
     for index, artist in enumerate(artists, start=1):
-        lines.append(f"{index}. 🧬 · <b>{escape(artist.title)}</b>")
+        lines.append(
+            f"{index}. 🧬 · "
+            f"<b>{_display_text(artist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
+        )
 
     lines.extend(["", f"<i>{escape(signature)}</i>"])
     return _with_hashtags(lines, "#stonerhand #collection #artist", include_hashtags=include_hashtags)
@@ -205,7 +219,10 @@ def format_playlist_collection_message(
     )
     lines = ["сегодня в плейлистах:", ""]
     for index, playlist in enumerate(playlists, start=1):
-        lines.append(f"{index}. 🎛 · <b>{escape(playlist.title)}</b>")
+        lines.append(
+            f"{index}. 🎛 · "
+            f"<b>{_display_text(playlist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
+        )
 
     lines.extend(
         [
@@ -227,7 +244,10 @@ def format_video_collection_message(
     )
     lines = ["сегодня на экране:", ""]
     for index, video in enumerate(videos, start=1):
-        lines.append(f"{index}. 📺 · <b>{escape(video.title)}</b>")
+        lines.append(
+            f"{index}. 📺 · "
+            f"<b>{_display_text(video.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
+        )
 
     lines.extend(
         [
@@ -249,7 +269,10 @@ def format_radio_collection_message(
     )
     lines = ["сегодня на NTS:", ""]
     for index, radio in enumerate(radios, start=1):
-        lines.append(f"{index}. 📡 · <b>{escape(radio.title)}</b>")
+        lines.append(
+            f"{index}. 📡 · "
+            f"<b>{_display_text(radio.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
+        )
 
     lines.extend(
         [
@@ -293,19 +316,31 @@ def format_mixed_collection_message(
         index += 1
 
     for playlist in playlists:
-        lines.append(f"{index}. 🎛 · <b>{escape(playlist.title)}</b>")
+        lines.append(
+            f"{index}. 🎛 · "
+            f"<b>{_display_text(playlist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
+        )
         index += 1
 
     for artist in artists:
-        lines.append(f"{index}. 🧬 · <b>{escape(artist.title)}</b>")
+        lines.append(
+            f"{index}. 🧬 · "
+            f"<b>{_display_text(artist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
+        )
         index += 1
 
     for radio in radios:
-        lines.append(f"{index}. 📡 · <b>{escape(radio.title)}</b>")
+        lines.append(
+            f"{index}. 📡 · "
+            f"<b>{_display_text(radio.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
+        )
         index += 1
 
     for video in videos:
-        lines.append(f"{index}. 📺 · <b>{escape(video.title)}</b>")
+        lines.append(
+            f"{index}. 📺 · "
+            f"<b>{_display_text(video.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
+        )
         index += 1
 
     lines.extend(
@@ -362,6 +397,14 @@ def prepend_user_text(message_text: str, *, author_label: str | None = None) -> 
         return f"<blockquote>{escape(author_label)}:\n{escape(header)}</blockquote>\n\n"
 
     return f"<blockquote>{escape(header)}</blockquote>\n\n"
+
+
+def _display_text(value: str, max_length: int = MAX_METADATA_TEXT_LENGTH) -> str:
+    normalized = " ".join(value.split())
+    if len(normalized) > max_length:
+        normalized = normalized[: max_length - 1].rstrip() + "…"
+
+    return escape(normalized)
 
 
 def build_auto_hashtags(track: TrackMatch) -> str:

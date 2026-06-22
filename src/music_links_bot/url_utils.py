@@ -96,9 +96,14 @@ def strip_supported_urls(text: str | None) -> str:
     if not text:
         return ""
 
+    spans: list[tuple[int, int]] = []
+    for match in URL_RE.finditer(text):
+        candidate = clean_url_token(match.group(0))
+        if is_supported_music_url(candidate):
+            spans.append(match.span())
+
     stripped = text
-    for match in reversed(tuple(URL_RE.finditer(text))):
-        start, end = match.span()
+    for start, end in reversed(spans):
         before = stripped[start - 1] if start > 0 else ""
         after = stripped[end] if end < len(stripped) else ""
 
@@ -106,7 +111,9 @@ def strip_supported_urls(text: str | None) -> str:
         # every other user-authored space, line break, and empty paragraph.
         if before in " \t" and after in " \t":
             end += 1
-        elif before in " \t" and (not after or after in "\r\n"):
+        elif before in " \t" and (
+            not after or after in "\r\n" or after in TRAILING_PUNCTUATION
+        ):
             start -= 1
         elif (not before or before in "\r\n") and after in " \t":
             end += 1

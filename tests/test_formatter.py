@@ -70,6 +70,19 @@ class FormatterTests(unittest.TestCase):
             "#stonerhand #track",
         )
 
+    def test_format_track_message_normalizes_untrusted_metadata(self) -> None:
+        track = TrackMatch(
+            title="Song\nwith     broken spacing " + "x" * 240,
+            artist="Artist\nName",
+            links={},
+        )
+
+        message = format_track_message(track)
+
+        self.assertIn("<b>Artist Name</b>\nSong with broken spacing", message)
+        self.assertIn("…", message)
+        self.assertNotIn("Song\nwith", message)
+
     def test_format_track_message_can_hide_hashtags(self) -> None:
         track = TrackMatch(
             title="Song",
