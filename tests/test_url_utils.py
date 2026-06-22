@@ -99,6 +99,25 @@ class UrlUtilsTests(unittest.TestCase):
             "мой текст и еще",
         )
 
+    def test_strip_supported_urls_preserves_editorial_layout(self) -> None:
+        text = (
+            "Первый абзац с  двумя пробелами\n\n"
+            "  - пункт с отступом\n"
+            "  - второй пункт\n\n"
+            "https://open.spotify.com/track/1?si=aaa\n\n"
+            "Финальная строка"
+        )
+
+        self.assertEqual(
+            strip_supported_urls(text),
+            (
+                "Первый абзац с  двумя пробелами\n\n"
+                "  - пункт с отступом\n"
+                "  - второй пункт\n\n\n\n"
+                "Финальная строка"
+            ),
+        )
+
     def test_spotify_url_type_detects_episode_and_show(self) -> None:
         self.assertEqual(
             spotify_url_type("https://open.spotify.com/episode/abc?si=123"),

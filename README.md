@@ -57,7 +57,7 @@ Track
 | Group chat | Can delete the original message and replace it with a clean post if admin rights allow it |
 | Channel | Can replace raw links with editorial posts and stay silent on unrelated content |
 | Multi-link message | Builds a playlist-style collection post |
-| User note above link | Turns the note into a Telegram quote block |
+| User note above link | Turns the note into a Telegram quote while preserving paragraphs, blank lines, and indentation |
 | Command menu | Inline navigation for quick start, usage, supported services and group/channel setup |
 
 ## Supported Content

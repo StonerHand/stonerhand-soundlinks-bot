@@ -186,6 +186,18 @@ class FormatterTests(unittest.TestCase):
             "<blockquote>@username: &lt;b&gt;text&lt;/b&gt;</blockquote>\n\n",
         )
 
+    def test_prepend_user_text_preserves_paragraphs_and_spacing(self) -> None:
+        self.assertEqual(
+            prepend_user_text(
+                "Первый абзац\n\n  - пункт один\n  - пункт два",
+                author_label="@username",
+            ),
+            (
+                "<blockquote>@username: Первый абзац\n\n"
+                "  - пункт один\n  - пункт два</blockquote>\n\n"
+            ),
+        )
+
     def test_format_video_message_uses_youtube_style(self) -> None:
         video = VideoMatch(
             title="SANSAE Live Session Vol.3 - Melon",

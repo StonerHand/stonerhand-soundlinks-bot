@@ -96,9 +96,30 @@ def strip_supported_urls(text: str | None) -> str:
     if not text:
         return ""
 
-    stripped = URL_RE.sub("", text)
-    stripped = re.sub(r"\s+", " ", stripped)
-    return stripped.strip(TRAILING_PUNCTUATION + " \n\t")
+    stripped = text
+    for match in reversed(tuple(URL_RE.finditer(text))):
+        start, end = match.span()
+        before = stripped[start - 1] if start > 0 else ""
+        after = stripped[end] if end < len(stripped) else ""
+
+        # Remove one separator together with an inline URL, while preserving
+        # every other user-authored space, line break, and empty paragraph.
+        if before in " \t" and after in " \t":
+            end += 1
+        elif before in " \t" and (not after or after in "\r\n"):
+            start -= 1
+        elif (not before or before in "\r\n") and after in " \t":
+            end += 1
+
+        stripped = stripped[:start] + stripped[end:]
+
+    lines = stripped.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    while lines and not lines[0].strip():
+        lines.pop(0)
+    while lines and not lines[-1].strip():
+        lines.pop()
+
+    return "\n".join(line.rstrip() for line in lines)
 
 
 def is_youtube_video_url(url: str) -> bool:
