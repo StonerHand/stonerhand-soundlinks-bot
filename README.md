@@ -17,7 +17,6 @@
 ![Vercel](https://img.shields.io/badge/Vercel-Webhook-000000?style=for-the-badge&logo=vercel&logoColor=white)
 ![Song.link](https://img.shields.io/badge/Song.link-Odesli-FF6B6B?style=for-the-badge)
 ![GitHub](https://img.shields.io/badge/GitHub-stonerhand--soundlinks--bot-181717?style=for-the-badge&logo=github&logoColor=white)
-[![CI](https://github.com/StonerHand/stonerhand-soundlinks-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/StonerHand/stonerhand-soundlinks-bot/actions/workflows/ci.yml)
 
 `streaming URL -> normalized release -> Telegram-ready editorial post`
 
@@ -219,8 +218,6 @@ flowchart LR
 ## Code Map
 
 ```text
-.github/workflows/ci.yml  tests Python 3.10/3.13 on pushes and pull requests
-
 api/
 ├── telegram.py       Vercel webhook endpoint with payload and optional signature validation
 └── set_webhook.py    protected Telegram webhook setup and command sync
@@ -260,7 +257,6 @@ src/music_links_bot/
 | Privacy | Stats store counters and ids, not message text or source links |
 | Serverless safety | Vercel validates payload size, JSON shape and optional Telegram request signature |
 | Admin safety | The finished post is published before the original message is deleted |
-| Continuous integration | GitHub Actions tests Python 3.10 and 3.13 on every change |
 
 ## Project Skills
 
@@ -430,8 +426,6 @@ Compile check:
 ```bash
 python -m compileall -q src tests api
 ```
-
-GitHub Actions runs both checks automatically on Python 3.10 and 3.13 for every push to `main` and every pull request.
 
 ## Production Checklist
 

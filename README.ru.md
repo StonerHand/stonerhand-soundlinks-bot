@@ -17,7 +17,6 @@
 ![Vercel](https://img.shields.io/badge/Vercel-Webhook-000000?style=for-the-badge&logo=vercel&logoColor=white)
 ![Song.link](https://img.shields.io/badge/Song.link-Odesli-FF6B6B?style=for-the-badge)
 ![GitHub](https://img.shields.io/badge/GitHub-stonerhand--soundlinks--bot-181717?style=for-the-badge&logo=github&logoColor=white)
-[![CI](https://github.com/StonerHand/stonerhand-soundlinks-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/StonerHand/stonerhand-soundlinks-bot/actions/workflows/ci.yml)
 
 `стриминговая ссылка -> релиз -> готовый редакторский Telegram-пост`
 
@@ -219,8 +218,6 @@ flowchart LR
 ## Карта Кода
 
 ```text
-.github/workflows/ci.yml  тесты Python 3.10/3.13 для push и pull request
-
 api/
 ├── telegram.py       Vercel webhook с проверкой payload и опциональной подписи
 └── set_webhook.py    защищенная установка webhook и синхронизация команд
@@ -260,7 +257,6 @@ src/music_links_bot/
 | Приватность | Статистика хранит счетчики и ids, но не тексты сообщений и не исходные ссылки |
 | Serverless | Vercel проверяет размер payload, форму JSON и опциональную подпись Telegram |
 | Безопасность админки | Готовый пост публикуется до удаления исходного сообщения |
-| Continuous integration | GitHub Actions проверяет Python 3.10 и 3.13 при каждом изменении |
 
 ## Проектные Скиллы
 
@@ -430,8 +426,6 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 ```bash
 python -m compileall -q src tests api
 ```
-
-GitHub Actions автоматически выполняет обе проверки на Python 3.10 и 3.13 при каждом push в `main` и в pull request.
 
 ## Production Checklist
 

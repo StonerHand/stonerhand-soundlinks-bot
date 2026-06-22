@@ -383,8 +383,6 @@ PYTHONPATH=src python -m music_links_bot
 
 ## Тесты
 
-GitHub Actions запускает тесты и compile check на Python 3.10 и 3.13 для push в `main` и pull request.
-
 Основная команда:
 
 ```bash
