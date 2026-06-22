@@ -7,7 +7,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from music_links_bot.bot import (
     MAX_BUTTON_TEXT_LENGTH,
-    MAX_USER_NOTE_LENGTH,
     PUBLIC_BOT_COMMANDS,
     _build_collection_keyboard,
     _build_artist_keyboard,
@@ -32,7 +31,6 @@ from music_links_bot.bot import (
     _should_include_channel_button,
     _should_include_hashtags,
     _split_source_urls,
-    _shorten_user_note,
     _send_track_result,
     track_lookup_message,
 )
@@ -695,14 +693,6 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(track.kind, "podcast")
         self.assertEqual(track.release_format, "show")
         self.assertEqual(track.title, "Podcast show")
-
-    def test_shorten_user_note_keeps_telegram_posts_safe(self) -> None:
-        text = "x" * (MAX_USER_NOTE_LENGTH + 20)
-
-        shortened = _shorten_user_note(text)
-
-        self.assertEqual(len(shortened), MAX_USER_NOTE_LENGTH)
-        self.assertTrue(shortened.endswith("…"))
 
     def test_message_text_falls_back_to_caption(self) -> None:
         message = type("MessageStub", (), {"text": None, "caption": "caption link"})()

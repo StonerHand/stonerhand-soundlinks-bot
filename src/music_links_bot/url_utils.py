@@ -93,8 +93,16 @@ def cache_key_for_url(url: str) -> str:
 
 
 def strip_supported_urls(text: str | None) -> str:
+    stripped, _ = strip_supported_urls_with_mapping(text)
+    return stripped
+
+
+def strip_supported_urls_with_mapping(
+    text: str | None,
+) -> tuple[str, tuple[int, ...]]:
+    """Remove supported URLs and map every output character to its source index."""
     if not text:
-        return ""
+        return "", ()
 
     spans: list[tuple[int, int]] = []
     for match in URL_RE.finditer(text):
@@ -102,10 +110,10 @@ def strip_supported_urls(text: str | None) -> str:
         if is_supported_music_url(candidate):
             spans.append(match.span())
 
-    stripped = text
-    for start, end in reversed(spans):
-        before = stripped[start - 1] if start > 0 else ""
-        after = stripped[end] if end < len(stripped) else ""
+    removal_spans: list[tuple[int, int]] = []
+    for start, end in spans:
+        before = text[start - 1] if start > 0 else ""
+        after = text[end] if end < len(text) else ""
 
         # Remove one separator together with an inline URL, while preserving
         # every other user-authored space, line break, and empty paragraph.
@@ -118,15 +126,61 @@ def strip_supported_urls(text: str | None) -> str:
         elif (not before or before in "\r\n") and after in " \t":
             end += 1
 
-        stripped = stripped[:start] + stripped[end:]
+        removal_spans.append((start, end))
 
-    lines = stripped.replace("\r\n", "\n").replace("\r", "\n").split("\n")
-    while lines and not lines[0].strip():
-        lines.pop(0)
-    while lines and not lines[-1].strip():
-        lines.pop()
+    kept = [True] * len(text)
+    for start, end in removal_spans:
+        kept[start:end] = [False] * (end - start)
 
-    return "\n".join(line.rstrip() for line in lines)
+    source_pairs: list[tuple[str, int]] = []
+    for index, character in enumerate(text):
+        if not kept[index]:
+            continue
+
+        if character == "\r":
+            if index + 1 < len(text) and kept[index + 1] and text[index + 1] == "\n":
+                continue
+            character = "\n"
+
+        source_pairs.append((character, index))
+
+    segments: list[tuple[list[tuple[str, int]], tuple[str, int] | None]] = []
+    current_line: list[tuple[str, int]] = []
+    for pair in source_pairs:
+        if pair[0] == "\n":
+            segments.append((current_line, pair))
+            current_line = []
+        else:
+            current_line.append(pair)
+    segments.append((current_line, None))
+
+    normalized_segments: list[
+        tuple[list[tuple[str, int]], tuple[str, int] | None]
+    ] = []
+    for line, separator in segments:
+        while line and line[-1][0] in " \t":
+            line.pop()
+        normalized_segments.append((line, separator))
+
+    while normalized_segments and not _line_has_content(normalized_segments[0][0]):
+        normalized_segments.pop(0)
+    while normalized_segments and not _line_has_content(normalized_segments[-1][0]):
+        normalized_segments.pop()
+
+    output_pairs: list[tuple[str, int]] = []
+    for index, (line, separator) in enumerate(normalized_segments):
+        output_pairs.extend(line)
+        if index < len(normalized_segments) - 1 and separator is not None:
+            output_pairs.append(separator)
+
+    return (
+        "".join(character for character, _ in output_pairs),
+        tuple(source_index for _, source_index in output_pairs),
+    )
+
+
+def _line_has_content(line: list[tuple[str, int]]) -> bool:
+    return any(not character.isspace() for character, _ in line)
 
 
 def is_youtube_video_url(url: str) -> bool:

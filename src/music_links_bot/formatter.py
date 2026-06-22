@@ -399,6 +399,17 @@ def prepend_user_text(message_text: str, *, author_label: str | None = None) -> 
     return f"<blockquote>{escape(header)}</blockquote>\n\n"
 
 
+def prepend_user_html(message_html: str, *, author_label: str | None = None) -> str:
+    header = message_html.strip()
+    if not header:
+        return ""
+
+    if author_label:
+        return f"<blockquote>{escape(author_label)}:\n{header}</blockquote>\n\n"
+
+    return f"<blockquote>{header}</blockquote>\n\n"
+
+
 def _display_text(value: str, max_length: int = MAX_METADATA_TEXT_LENGTH) -> str:
     normalized = " ".join(value.split())
     if len(normalized) > max_length:

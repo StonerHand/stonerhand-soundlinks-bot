@@ -57,7 +57,7 @@ Track
 | Group chat | Can delete the original message and replace it with a clean post if admin rights allow it |
 | Channel | Can replace raw links with editorial posts and stay silent on unrelated content |
 | Multi-link message | Builds a playlist-style collection post |
-| User note above link | Turns the note into a Telegram quote while preserving paragraphs, blank lines, and indentation |
+| User note above link | Preserves paragraphs and Telegram rich text: bold, italic, underline, strike, spoiler, code and text links |
 | Command menu | Inline navigation for quick start, usage, supported services and group/channel setup |
 
 ## Supported Content
@@ -226,6 +226,7 @@ src/music_links_bot/
 ├── bot.py            Telegram handlers, routing, keyboards, replacement logic
 ├── songlink.py       Song.link client, country fallback, release normalization
 ├── formatter.py      Post layout, captions, hashtags, preview selection
+├── telegram_text.py  Safe Telegram entity remapping and rich-text rendering
 ├── playlist.py       Spotify playlist metadata through oEmbed
 ├── artist.py         Spotify artist metadata through oEmbed
 ├── youtube.py        YouTube video metadata through oEmbed

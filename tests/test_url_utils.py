@@ -16,6 +16,7 @@ from music_links_bot.url_utils import (
     is_youtube_video_url,
     spotify_url_type,
     strip_supported_urls,
+    strip_supported_urls_with_mapping,
 )
 
 
@@ -128,6 +129,14 @@ class UrlUtilsTests(unittest.TestCase):
             strip_supported_urls(text),
             "Подробнее: https://example.com/article\n\nСлушать:",
         )
+
+    def test_strip_supported_urls_mapping_points_to_original_characters(self) -> None:
+        text = "🎧 текст\nhttps://open.spotify.com/track/1"
+
+        stripped, mapping = strip_supported_urls_with_mapping(text)
+
+        self.assertEqual(stripped, "🎧 текст")
+        self.assertEqual("".join(text[index] for index in mapping), stripped)
 
     def test_spotify_url_type_detects_episode_and_show(self) -> None:
         self.assertEqual(

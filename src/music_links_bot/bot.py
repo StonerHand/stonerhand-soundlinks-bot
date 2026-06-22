@@ -13,6 +13,7 @@ from telegram import (
     InlineKeyboardMarkup,
     LinkPreviewOptions,
     Message,
+    MessageEntity,
     Update,
 )
 from telegram.constants import ChatAction, ParseMode
@@ -39,7 +40,7 @@ from music_links_bot.formatter import (
     format_track_message,
     format_video_collection_message,
     format_video_message,
-    prepend_user_text,
+    prepend_user_html,
 )
 from music_links_bot.models import (
     ArtistMatch,
@@ -67,6 +68,7 @@ from music_links_bot.stats import (
     record_radios,
     record_videos,
 )
+from music_links_bot.telegram_text import format_user_note_html
 from music_links_bot.url_utils import (
     apple_podcasts_url_type,
     extract_supported_urls,
@@ -75,7 +77,6 @@ from music_links_bot.url_utils import (
     is_spotify_playlist_url,
     is_youtube_video_url,
     spotify_url_type,
-    strip_supported_urls,
 )
 from music_links_bot.youtube import YouTubeClient, YouTubeLookupError
 
@@ -359,7 +360,6 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
 
     message_text = _message_text(message)
     source_urls = extract_supported_urls(message_text)[:MAX_LINKS_PER_MESSAGE]
-    user_prefix = _build_user_prefix(message)
     include_channel_button = _should_include_channel_button(message)
     include_hashtags = _should_include_hashtags(message)
     if not source_urls:
@@ -373,6 +373,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return
 
+    user_prefix = _build_user_prefix(message)
     await _send_typing_action(context.bot, message)
 
     (
@@ -1753,8 +1754,12 @@ def _record_stats_safely(label: str, callback: Callable[[], None]) -> None:
 
 
 def _build_user_prefix(message: Message) -> str:
-    body_text = _shorten_user_note(strip_supported_urls(_message_text(message)))
-    if not body_text:
+    body_html = format_user_note_html(
+        _message_text(message),
+        _message_entities(message),
+        max_length=MAX_USER_NOTE_LENGTH,
+    )
+    if not body_html:
         return ""
 
     user = message.from_user
@@ -1762,18 +1767,17 @@ def _build_user_prefix(message: Message) -> str:
     if user is not None:
         author_label = f"@{user.username}" if user.username else user.full_name
 
-    return prepend_user_text(body_text, author_label=author_label)
+    return prepend_user_html(body_html, author_label=author_label)
 
 
 def _message_text(message: Message) -> str | None:
     return message.text or message.caption
 
 
-def _shorten_user_note(text: str) -> str:
-    if len(text) <= MAX_USER_NOTE_LENGTH:
-        return text
-
-    return text[: MAX_USER_NOTE_LENGTH - 1].rstrip() + "…"
+def _message_entities(message: Message) -> tuple[MessageEntity, ...]:
+    if message.text is not None:
+        return tuple(getattr(message, "entities", None) or ())
+    return tuple(getattr(message, "caption_entities", None) or ())
 
 
 def _build_user_stats_entry(message: Message) -> dict[str, object] | None:

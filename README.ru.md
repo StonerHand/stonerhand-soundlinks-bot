@@ -57,7 +57,7 @@ Track
 | Группа | Может удалить исходную ссылку и заменить ее красивым постом, если есть права админа |
 | Канал | Может превращать сырые ссылки в посты и молчать на обычный контент |
 | Несколько ссылок | Собирает пост-подборку |
-| Текст над ссылкой | Превращает текст в Telegram-цитату, сохраняя абзацы, пустые строки и отступы |
+| Текст над ссылкой | Сохраняет абзацы и Telegram-разметку: жирный, курсив, подчёркивание, зачёркивание, spoiler, code и текстовые ссылки |
 | Меню команд | Inline-навигация для старта, инструкции, сервисов и настройки групп/каналов |
 
 ## Поддерживаемый Контент
@@ -226,6 +226,7 @@ src/music_links_bot/
 ├── bot.py            Telegram handlers, routing, keyboards, замена сообщений
 ├── songlink.py       Song.link client, fallback по регионам, нормализация релиза
 ├── formatter.py      макет поста, подписи, хэштеги, выбор preview
+├── telegram_text.py  безопасный перенос Telegram entities и rich text
 ├── playlist.py       Spotify playlist metadata через oEmbed
 ├── artist.py         Spotify artist metadata через oEmbed
 ├── youtube.py        YouTube video metadata через oEmbed

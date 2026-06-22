@@ -27,6 +27,7 @@ from music_links_bot.formatter import (
     format_video_message,
     pick_track_emoji,
     prepend_user_text,
+    prepend_user_html,
 )
 from music_links_bot.models import (
     ArtistMatch,
@@ -208,6 +209,18 @@ class FormatterTests(unittest.TestCase):
             (
                 "<blockquote>@username:\nПервый абзац\n\n"
                 "  - пункт один\n  - пункт два</blockquote>\n\n"
+            ),
+        )
+
+    def test_prepend_user_html_keeps_safe_generated_markup(self) -> None:
+        self.assertEqual(
+            prepend_user_html(
+                "<b>Жирный</b> и <i>курсив</i>",
+                author_label="@username",
+            ),
+            (
+                "<blockquote>@username:\n"
+                "<b>Жирный</b> и <i>курсив</i></blockquote>\n\n"
             ),
         )
 
