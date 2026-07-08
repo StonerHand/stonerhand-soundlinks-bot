@@ -61,8 +61,31 @@ class VercelWebhookTests(unittest.TestCase):
             clear=True,
         ):
             self.assertTrue(_setup_secret_is_configured())
-            self.assertTrue(_is_authorized("/api/set_webhook?secret=setup-secret"))
-            self.assertFalse(_is_authorized("/api/set_webhook?secret=wrong"))
+            self.assertTrue(_is_authorized("/api/set_webhook?secret=setup-secret", None))
+            self.assertFalse(_is_authorized("/api/set_webhook?secret=wrong", None))
+
+    def test_setup_endpoint_accepts_vercel_cron_bearer_secret(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"SET_WEBHOOK_SECRET": "setup-secret", "CRON_SECRET": "cron-secret"},
+            clear=True,
+        ):
+            self.assertTrue(
+                _is_authorized("/api/set_webhook", "Bearer cron-secret")
+            )
+            self.assertFalse(
+                _is_authorized("/api/set_webhook", "Bearer wrong-secret")
+            )
+            self.assertFalse(_is_authorized("/api/set_webhook", None))
+
+        with patch.dict(
+            os.environ,
+            {"SET_WEBHOOK_SECRET": "setup-secret"},
+            clear=True,
+        ):
+            self.assertFalse(
+                _is_authorized("/api/set_webhook", "Bearer cron-secret")
+            )
 
     def test_set_webhook_url_includes_telegram_secret(self) -> None:
         webhook_url = _telegram_set_webhook_url(

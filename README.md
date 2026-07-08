@@ -317,6 +317,7 @@ SET_WEBHOOK_SECRET=
 TELEGRAM_WEBHOOK_SECRET=
 WEBHOOK_BASE_URL=
 STATS_PATH=
+CRON_SECRET=
 ```
 
 | Variable | Required | Purpose |
@@ -332,6 +333,7 @@ STATS_PATH=
 | `TELEGRAM_WEBHOOK_SECRET` | no | Verifies `X-Telegram-Bot-Api-Secret-Token` on incoming updates |
 | `WEBHOOK_BASE_URL` | no | Explicit production base URL; otherwise Vercel environment URLs are used |
 | `STATS_PATH` | no | Overrides local stats file path |
+| `CRON_SECRET` | recommended on Vercel | Vercel sends `Authorization: Bearer $CRON_SECRET` on scheduled Cron Job runs; setting it enables a daily automatic re-call of `/api/set_webhook` so the webhook subscription (e.g. `allowed_updates`) never goes stale after a deploy |
 
 Supported `PRIMARY_PLATFORM` values:
 
@@ -484,6 +486,7 @@ For another channel, start with these files:
 | Bot does not answer | Missing or wrong `BOT_TOKEN` | Check hosting environment variables |
 | Vercel shows `404` on root page | Normal for this bot | Use `/api/telegram` and `/api/set_webhook` |
 | Telegram still hits old host | Webhook was not updated | Open `/api/set_webhook` on the new domain |
+| Menu buttons (Quick start, How it works, Platforms, For channels) do nothing when tapped | Webhook was registered without `callback_query` in `allowed_updates` (e.g. before this feature shipped) | Open `/api/set_webhook?secret=...` once, or set `CRON_SECRET` so Vercel Cron refreshes the subscription automatically (can also be triggered manually from the Vercel dashboard → Cron Jobs → Run) |
 | Posts are duplicated | Polling and webhook are both active | Stop Railway/local polling |
 | Channel links are not replaced | Missing admin rights | Grant delete-message permission |
 | Some platform is missing | Song.link did not return it for the selected region | Try another source link or adjust country fallback |

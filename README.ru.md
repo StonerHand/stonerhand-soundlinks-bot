@@ -317,6 +317,7 @@ SET_WEBHOOK_SECRET=
 TELEGRAM_WEBHOOK_SECRET=
 WEBHOOK_BASE_URL=
 STATS_PATH=
+CRON_SECRET=
 ```
 
 | Переменная | Обязательна | Зачем нужна |
@@ -332,6 +333,7 @@ STATS_PATH=
 | `TELEGRAM_WEBHOOK_SECRET` | нет | Проверка `X-Telegram-Bot-Api-Secret-Token` у входящих updates |
 | `WEBHOOK_BASE_URL` | нет | Явный production URL; иначе используются Vercel environment URL |
 | `STATS_PATH` | нет | Путь к локальному файлу статистики |
+| `CRON_SECRET` | нет, но рекомендуется на Vercel | Vercel сам шлёт `Authorization: Bearer $CRON_SECRET` в запланированных Cron Job; заданный `CRON_SECRET` включает ежедневный автоматический ре-вызов `/api/set_webhook`, чтобы вебхук не "протухал" (например, после добавления новых типов апдейтов вроде `callback_query`) |
 
 Поддерживаемые значения `PRIMARY_PLATFORM`:
 
@@ -484,6 +486,7 @@ find . -path './.venv' -prune -o -path './.git' -prune -o \
 | Бот не отвечает | Нет или неверный `BOT_TOKEN` | Проверить env variables на хостинге |
 | На корневой странице Vercel `404` | Это нормально для webhook-бота | Использовать `/api/telegram` и `/api/set_webhook` |
 | Telegram ходит на старый хост | Webhook не обновлен | Открыть `/api/set_webhook` на новом домене |
+| Кнопки меню (Быстрый старт, Как пользоваться, Сервисы, Для каналов) не реагируют на нажатие | Webhook зарегистрирован без `callback_query` в `allowed_updates` (например, до апдейта кода) | Открыть `/api/set_webhook?secret=...` вручную один раз, либо задать `CRON_SECRET` — тогда Vercel Cron сам обновит подписку в ближайший запуск (можно запустить вручную из дашборда Vercel → Cron Jobs → Run) |
 | Посты дублируются | Одновременно активны polling и webhook | Остановить Railway/local polling |
 | В канале ссылка не заменяется | Нет прав админа | Выдать право удалять сообщения |
 | Не хватает платформы | Song.link не вернул ее для региона | Попробовать другую исходную ссылку или поменять регион fallback |
