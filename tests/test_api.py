@@ -12,6 +12,7 @@ from api.set_webhook import (
     _telegram_set_webhook_url,
     _telegram_webhook_secret,
 )
+import api.telegram as telegram_api
 from api.telegram import (
     _decode_update_payload,
     _is_telegram_request_authorized,
@@ -106,6 +107,46 @@ class VercelWebhookTests(unittest.TestCase):
         ):
             with self.assertRaises(ValueError):
                 _telegram_webhook_secret()
+
+    def test_webhook_reuses_application_across_warm_invocations(self) -> None:
+        class ApplicationStub:
+            def __init__(self) -> None:
+                self.bot = object()
+                self.initialize_calls = 0
+
+            async def initialize(self) -> None:
+                self.initialize_calls += 1
+
+        build_calls = []
+
+        def fake_build_application(settings):
+            del settings
+            application = ApplicationStub()
+            build_calls.append(application)
+            return application
+
+        class SettingsStub:
+            log_level = "INFO"
+
+        telegram_api._dispose_application_locked()
+        try:
+            with (
+                patch.object(telegram_api, "build_application", fake_build_application),
+                patch.object(
+                    telegram_api.Settings,
+                    "from_env",
+                    classmethod(lambda cls: SettingsStub()),
+                ),
+            ):
+                first_loop, first_app = telegram_api._ensure_application()
+                second_loop, second_app = telegram_api._ensure_application()
+
+                self.assertIs(first_app, second_app)
+                self.assertIs(first_loop, second_loop)
+                self.assertEqual(len(build_calls), 1)
+                self.assertEqual(first_app.initialize_calls, 1)
+        finally:
+            telegram_api._dispose_application_locked()
 
     def test_resolve_webhook_url_prefers_configured_base_url(self) -> None:
         with patch.dict(
