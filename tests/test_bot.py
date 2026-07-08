@@ -558,20 +558,21 @@ class BotKeyboardTests(unittest.TestCase):
         keyboard = _build_intro_keyboard("StonerHandBot")
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(len(rows), 3)
-        self.assertEqual(rows[0][0].text, "Быстрый старт")
-        self.assertEqual(rows[0][1].text, "Как пользоваться")
-        self.assertEqual(rows[1][0].text, "Сервисы")
-        self.assertEqual(rows[1][1].text, "Для каналов")
-        self.assertEqual(rows[2][0].text, "🪨 Открыть канал")
-        self.assertEqual(rows[2][1].text, "Поделиться ботом")
-        self.assertEqual(rows[2][0].api_kwargs, {"style": "primary"})
-        self.assertEqual(rows[2][1].api_kwargs, {"style": "primary"})
+        self.assertEqual(len(rows), 4)
+        self.assertEqual(rows[0][0].text, "🚀 Быстрый старт")
+        self.assertEqual(rows[0][1].text, "📖 Как пользоваться")
+        self.assertEqual(rows[1][0].text, "🎛 Сервисы")
+        self.assertEqual(rows[1][1].text, "📣 Для каналов")
+        self.assertEqual(rows[2][0].text, "🧪 Пример поста")
+        self.assertEqual(rows[3][0].text, "🪨 Открыть канал")
+        self.assertEqual(rows[3][1].text, "Поделиться ботом")
+        self.assertEqual(rows[3][0].api_kwargs, {"style": "primary"})
+        self.assertEqual(rows[3][1].api_kwargs, {"style": "primary"})
 
     def test_intro_keyboard_marks_active_menu_item(self) -> None:
         keyboard = _build_intro_keyboard("StonerHandBot", active="menu:platforms")
 
-        self.assertEqual(keyboard.inline_keyboard[1][0].text, "• Сервисы")
+        self.assertEqual(keyboard.inline_keyboard[1][0].text, "• 🎛 Сервисы")
         self.assertEqual(
             keyboard.inline_keyboard[1][0].api_kwargs,
             {"style": "success"},
@@ -584,6 +585,14 @@ class BotKeyboardTests(unittest.TestCase):
     def test_menu_text_uses_compact_html_headings(self) -> None:
         self.assertTrue(_menu_text("menu:start").startswith("🎧 <b>"))
         self.assertTrue(_menu_text("menu:help").startswith("<b>Как пользоваться</b>"))
+
+    def test_demo_menu_shows_example_post_and_cta(self) -> None:
+        demo_text = _menu_text("menu:demo")
+
+        self.assertTrue(demo_text.startswith("<b>Пример поста</b>"))
+        self.assertIn("<blockquote>", demo_text)
+        self.assertIn("#stonerhand", demo_text)
+        self.assertIn("пришли", demo_text.casefold())
 
     def test_build_platform_order_moves_primary_platform_first(self) -> None:
         order = _build_platform_order("yandexMusic")

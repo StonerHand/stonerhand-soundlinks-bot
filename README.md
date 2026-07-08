@@ -2,7 +2,9 @@
 
 # StonerHand Soundlinks Bot
 
-**Open-source Telegram bot for turning music links into clean editorial posts**
+**One music link in → one clean editorial Telegram post out.**
+
+Title, cover preview, smart hashtags and buttons for every streaming platform — in a single tap.
 
 [Русская версия](README.ru.md)
 · [Architecture](ARCHITECTURE.ru.md)
@@ -251,7 +253,9 @@ src/music_links_bot/
 | Deduplication | Tracking query params like `si`, `utm_*`, `fbclid` are ignored for cache keys |
 | Telegram limits | Long notes, metadata and large link packs are trimmed before posting |
 | Channel noise | Non-music posts, Instagram/TikTok/Pinterest and unrelated links are ignored in groups/channels |
-| Navigation | `/start`, `/help`, `/platforms` and `/guide` share one inline menu with active-state markers |
+| Navigation | `/start`, `/help`, `/platforms` and `/guide` share one inline menu with emoji tabs, active-state markers and a 🧪 example-post tab |
+| Serverless speed | Warm Vercel instances reuse the Telegram application, HTTP pools and lookup caches across updates instead of rebuilding them per message |
+| Webhook self-healing | A daily Vercel Cron re-registers the webhook and command menu, so `allowed_updates` never goes stale after code changes |
 | Preview quality | Preferred platform controls preview source and button priority |
 | SoundCloud support | Song.link links are used when available; direct SoundCloud URLs fall back to SoundCloud oEmbed |
 | NTS Radio support | NTS pages are routed outside Song.link and formatted as dedicated radio cards |
@@ -284,6 +288,8 @@ The broader system map lives in [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
 | `/id` | hidden utility command for `ADMIN_CHAT_ID` setup |
 
 The public command menu is synced during local/Railway startup and through the Vercel `/api/set_webhook` endpoint. The webhook subscribes to `message`, `channel_post` and `callback_query`, so inline menu buttons work in production.
+
+The `/start` menu uses emoji tabs (🚀 quick start, 📖 usage, 🎛 services, 📣 channels) plus a 🧪 example-post tab that renders a mock card, so new users see the output format before sending their first link.
 
 ## Environment
 

@@ -88,7 +88,8 @@ MENU_START = "menu:start"
 MENU_HELP = "menu:help"
 MENU_GUIDE = "menu:guide"
 MENU_PLATFORMS = "menu:platforms"
-MENU_KEYS = frozenset((MENU_START, MENU_HELP, MENU_GUIDE, MENU_PLATFORMS))
+MENU_DEMO = "menu:demo"
+MENU_KEYS = frozenset((MENU_START, MENU_HELP, MENU_GUIDE, MENU_PLATFORMS, MENU_DEMO))
 DEFAULT_UI_MODE = "stonerhand"
 MAX_BUTTON_TEXT_LENGTH = 64
 MAX_LINKS_PER_MESSAGE = 12
@@ -1817,13 +1818,14 @@ def _build_intro_keyboard(
 ) -> InlineKeyboardMarkup:
     menu_rows = [
         [
-            _menu_button("Быстрый старт", MENU_START, active),
-            _menu_button("Как пользоваться", MENU_HELP, active),
+            _menu_button("🚀 Быстрый старт", MENU_START, active),
+            _menu_button("📖 Как пользоваться", MENU_HELP, active),
         ],
         [
-            _menu_button("Сервисы", MENU_PLATFORMS, active),
-            _menu_button("Для каналов", MENU_GUIDE, active),
+            _menu_button("🎛 Сервисы", MENU_PLATFORMS, active),
+            _menu_button("📣 Для каналов", MENU_GUIDE, active),
         ],
+        [_menu_button("🧪 Пример поста", MENU_DEMO, active)],
     ]
     action_row = [_channel_button()]
     if bot_username:
@@ -1865,33 +1867,67 @@ def _menu_text(menu_key: str) -> str:
     if menu_key == MENU_HELP:
         return (
             "<b>Как пользоваться</b>\n\n"
-            "1. Пришли ссылку на релиз или видео\n"
-            "2. Если хочешь, добавь свой текст над ссылкой\n"
-            "3. Бот вернет чистый пост с preview и кнопками\n\n"
-            "Несколько ссылок одним сообщением превращаются в подборку"
+            "1️⃣ Пришли ссылку на релиз, видео или эфир\n"
+            "2️⃣ Хочешь подводку — напиши текст над ссылкой, он станет цитатой\n"
+            "3️⃣ Получи чистый пост: preview, хэштеги и кнопки площадок\n\n"
+            "💡 Несколько ссылок одним сообщением превращаются в нумерованную "
+            "подборку с кнопкой на каждый релиз\n\n"
+            "Разметка в подводке сохраняется: жирный, курсив, спойлеры, ссылки"
+        )
+
+    if menu_key == MENU_DEMO:
+        return (
+            "<b>Пример поста</b>\n\n"
+            "Присылаешь ссылку — получаешь такое:\n\n"
+            "<blockquote>📻 · The Soft Moon\n"
+            "Criminal\n\n"
+            "кнопки ниже, трек ждет\n\n"
+            "#stonerhand #track\n\n"
+            "[🟢 Spotify] [⚪ Apple]\n"
+            "[🟦 Deezer] [⚫ Tidal]\n"
+            "[🪩 Все платформы]</blockquote>\n\n"
+            "Сверху — обложка релиза, снизу — живые кнопки всех площадок, "
+            "где нашелся релиз\n\n"
+            "Попробуй: пришли любую ссылку из Spotify, Apple Music или YouTube 👇"
         )
 
     if menu_key == MENU_GUIDE:
         return (
             "<b>Для групп и каналов</b>\n\n"
-            "Бот может заменить исходное сообщение готовым постом, если он админ "
-            "и у него есть право удалять сообщения\n\n"
-            "Текст над ссылкой станет цитатой, а хэштеги добавятся автоматически"
+            "1️⃣ Добавь бота в группу или канал\n"
+            "2️⃣ Сделай его админом с правом удалять сообщения\n"
+            "3️⃣ Кидай ссылки как обычно — бот заменит их готовыми постами\n\n"
+            "💡 Текст над ссылкой станет цитатой с подписью автора, "
+            "хэштеги добавятся автоматически\n\n"
+            "Пост публикуется до удаления исходного сообщения, "
+            "так что контент не теряется"
         )
 
     if menu_key == MENU_PLATFORMS:
         return (
             "<b>Что можно присылать</b>\n\n"
-            f"{INPUT_PLATFORM_HINT}\n\n"
+            "🟢 Spotify — треки, альбомы, плейлисты, артисты, подкасты\n"
+            "⚪ Apple Music и Apple Podcasts\n"
+            "🔴 YouTube и YouTube Music\n"
+            "🟠 SoundCloud\n"
+            "🟦 Deezer · ⚫ Tidal · 🟡 Yandex Music\n"
+            "📡 NTS Radio\n\n"
             "<b>Что получится</b>\n"
-            "Музыкальные карточки, YouTube-посты, NTS-эфиры, Spotify-плейлисты, "
-            "артисты и подборки из нескольких ссылок"
+            "Карточка релиза с кнопками всех площадок, где он нашелся. "
+            "YouTube оформится как видео-пост, NTS — как радио-эфир, "
+            "несколько ссылок — как подборка"
         )
 
     return (
         "🎧 <b>StonerHand Soundlinks</b>\n\n"
-        "Кидай трек, альбом, плейлист, артиста, подкаст, YouTube или NTS Radio\n\n"
-        "Я соберу аккуратный пост: название, preview, автохэштеги и кнопки площадок"
+        "Превращаю музыкальные ссылки в аккуратные посты: "
+        "обложка, название, автохэштеги и кнопки всех площадок\n\n"
+        "<b>Что умею</b>\n"
+        "• Трек, альбом, плейлист, артист, подкаст\n"
+        "• YouTube-видео и эфиры NTS Radio\n"
+        "• Несколько ссылок разом → нумерованная подборка\n"
+        "• Подводка над ссылкой → цитата в посте\n\n"
+        "Просто пришли ссылку 👇"
     )
 
 

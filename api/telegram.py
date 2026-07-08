@@ -5,6 +5,7 @@ import hmac
 import json
 import logging
 import os
+import threading
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
@@ -22,6 +23,15 @@ from music_links_bot.config import Settings
 
 LOGGER = logging.getLogger(__name__)
 MAX_UPDATE_BYTES = 1024 * 1024
+
+# Warm serverless instances keep module state between invocations, so the
+# Telegram application, its HTTP connection pools and in-memory lookup caches
+# are built once per instance instead of once per update. The container is
+# frozen/reclaimed by the platform, so no per-request shutdown is needed;
+# a failed update disposes the cached application to start clean next time.
+_STATE_LOCK = threading.Lock()
+_LOOP: asyncio.AbstractEventLoop | None = None
+_APPLICATION = None
 
 
 class handler(BaseHTTPRequestHandler):
@@ -63,7 +73,7 @@ class handler(BaseHTTPRequestHandler):
             return
 
         try:
-            asyncio.run(_process_telegram_update(update_payload))
+            _process_telegram_update(update_payload)
         except Exception:
             LOGGER.exception("Could not process Telegram update")
             self._send_json({"ok": False}, HTTPStatus.INTERNAL_SERVER_ERROR)
@@ -84,21 +94,50 @@ class handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 
-async def _process_telegram_update(update_payload: dict[str, object]) -> None:
-    settings = Settings.from_env()
-    logging.basicConfig(
-        level=getattr(logging, settings.log_level, logging.INFO),
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
-
-    application = build_application(settings)
-    try:
-        await application.initialize()
+def _process_telegram_update(update_payload: dict[str, object]) -> None:
+    with _STATE_LOCK:
+        loop, application = _ensure_application()
         update = Update.de_json(update_payload, application.bot)
-        await application.process_update(update)
+        try:
+            loop.run_until_complete(application.process_update(update))
+        except Exception:
+            _dispose_application_locked()
+            raise
+
+
+def _ensure_application():
+    global _LOOP, _APPLICATION
+    if _APPLICATION is None:
+        settings = Settings.from_env()
+        logging.basicConfig(
+            level=getattr(logging, settings.log_level, logging.INFO),
+            format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        )
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        application = build_application(settings)
+        loop.run_until_complete(application.initialize())
+        _LOOP = loop
+        _APPLICATION = application
+
+    return _LOOP, _APPLICATION
+
+
+def _dispose_application_locked() -> None:
+    global _LOOP, _APPLICATION
+    loop, application = _LOOP, _APPLICATION
+    _LOOP = None
+    _APPLICATION = None
+    if loop is None or application is None:
+        return
+
+    try:
+        loop.run_until_complete(application.shutdown())
+        loop.run_until_complete(close_application_resources(application))
+    except Exception:
+        LOGGER.warning("Could not dispose Telegram application cleanly")
     finally:
-        await application.shutdown()
-        await close_application_resources(application)
+        loop.close()
 
 
 def _decode_update_payload(payload: bytes) -> dict[str, object]:
