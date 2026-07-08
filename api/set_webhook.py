@@ -35,7 +35,7 @@ class handler(BaseHTTPRequestHandler):
                 )
                 return
 
-            if not _is_authorized(self.path):
+            if not _is_authorized(self.path, self.headers.get("authorization")):
                 self._send_json(
                     {"ok": False, "error": "forbidden"},
                     HTTPStatus.FORBIDDEN,
@@ -121,10 +121,22 @@ def _sync_commands(bot_token: str) -> dict[str, object]:
         return {"ok": False, "error": "command sync failed"}
 
 
-def _is_authorized(path: str) -> bool:
+def _is_authorized(path: str, authorization_header: str | None) -> bool:
     expected_secret = os.getenv("SET_WEBHOOK_SECRET", "").strip()
     query = parse_qs(urlparse(path).query)
-    return hmac.compare_digest(query.get("secret", [""])[0], expected_secret)
+    if hmac.compare_digest(query.get("secret", [""])[0], expected_secret):
+        return True
+
+    return _is_authorized_cron_request(authorization_header)
+
+
+def _is_authorized_cron_request(authorization_header: str | None) -> bool:
+    cron_secret = os.getenv("CRON_SECRET", "").strip()
+    if not cron_secret:
+        return False
+
+    received = (authorization_header or "").strip()
+    return hmac.compare_digest(received, f"Bearer {cron_secret}")
 
 
 def _setup_secret_is_configured() -> bool:
