@@ -9,6 +9,7 @@ from music_links_bot.bot import (
     MAX_BUTTON_TEXT_LENGTH,
     PUBLIC_BOT_COMMANDS,
     _build_collection_keyboard,
+    _build_inline_result,
     _build_artist_keyboard,
     _build_error_keyboard,
     _build_intro_keyboard,
@@ -185,6 +186,21 @@ class ContextStub:
         )()
 
 
+class EditableReplyStub:
+    """Mimics the Message a real reply returns: editable in place, like the
+    loading placeholder that gets edited into the final post."""
+
+    def __init__(self, owner: "ChannelMessageStub", index: int) -> None:
+        self.chat_id = owner.chat_id
+        self._owner = owner
+        self._index = index
+
+    async def edit_text(self, text: str, **kwargs: object) -> "EditableReplyStub":
+        self._owner.replies[self._index] = text
+        self._owner.reply_kwargs[self._index] = kwargs
+        return self
+
+
 class ChannelMessageStub:
     text = "https://www.instagram.com/sansaetown"
     caption = None
@@ -205,9 +221,10 @@ class ChannelMessageStub:
         self.replies: list[str] = []
         self.reply_kwargs: list[dict[str, object]] = []
 
-    async def reply_text(self, text: str, **kwargs: object) -> None:
+    async def reply_text(self, text: str, **kwargs: object) -> EditableReplyStub:
         self.replies.append(text)
         self.reply_kwargs.append(kwargs)
+        return EditableReplyStub(self, len(self.replies) - 1)
 
 
 class GroupMessageStub(ChannelMessageStub):
@@ -744,6 +761,43 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertIn("Попробуй еще раз чуть позже", message)
 
 
+class InlineModeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_inline_track_result_builds_full_post_with_buttons(self) -> None:
+        result = await _build_inline_result(
+            "https://open.spotify.com/track/abc",
+            ContextStub(),
+        )
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result.title, "Youth Code — Transitions")
+        self.assertEqual(len(result.id), 32)
+        self.assertIn("<b>Youth Code</b>", result.input_message_content.message_text)
+        keyboard = result.reply_markup.inline_keyboard
+        self.assertEqual(keyboard[0][0].text, "🟢 Spotify")
+
+    async def test_inline_youtube_result_uses_video_card(self) -> None:
+        result = await _build_inline_result(
+            "https://www.youtube.com/watch?v=abc123",
+            ContextStub(),
+        )
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result.title, "SANSAE Live Session Vol.3 - Melon")
+        keyboard = result.reply_markup.inline_keyboard
+        self.assertEqual(keyboard[0][0].text, "📺 Смотреть на YouTube")
+
+    async def test_inline_playlist_result_uses_playlist_card(self) -> None:
+        result = await _build_inline_result(
+            "https://open.spotify.com/playlist/37i9dQZF1DX51TD2wakW3K",
+            ContextStub(),
+        )
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result.title, "Women of Punk")
+        keyboard = result.reply_markup.inline_keyboard
+        self.assertEqual(keyboard[0][0].text, "🎛 Открыть плейлист")
+
+
 class BotLookupTests(unittest.IsolatedAsyncioTestCase):
     async def test_group_post_is_deleted_only_after_result_is_sent(self) -> None:
         message = ReplaceableMessageStub()
@@ -803,10 +857,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("📺 · <b>SANSAE Live Session Vol.3 - Melon</b>", message.replies[0])
         self.assertIn("канал: SANSAE", message.replies[0])
         self.assertNotIn("#stonerhand", message.replies[0])
-        self.assertEqual(
-            context.bot.chat_actions,
-            [{"chat_id": message.chat_id, "action": "typing"}],
-        )
+        # Private chats show an editable loading placeholder instead of a
+        # typing action, so no chat action is expected here.
+        self.assertEqual(context.bot.chat_actions, [])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         preview_options = message.reply_kwargs[0]["link_preview_options"]
         self.assertEqual(keyboard[0][0].text, "📺 Смотреть на YouTube")

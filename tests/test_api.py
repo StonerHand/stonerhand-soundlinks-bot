@@ -40,6 +40,9 @@ class VercelWebhookTests(unittest.TestCase):
     def test_webhook_accepts_menu_button_callbacks(self) -> None:
         self.assertIn("callback_query", ALLOWED_UPDATES)
 
+    def test_webhook_accepts_inline_queries(self) -> None:
+        self.assertIn("inline_query", ALLOWED_UPDATES)
+
     def test_telegram_secret_is_optional_and_compared_safely(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             self.assertTrue(_is_telegram_request_authorized(None))

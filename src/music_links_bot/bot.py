@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+import contextvars
 from datetime import datetime, timezone
+import hashlib
 import logging
 from urllib.parse import quote
 
@@ -11,6 +13,9 @@ from telegram import (
     BotCommand,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    InlineQueryResultArticle,
+    InlineQueryResultsButton,
+    InputTextMessageContent,
     LinkPreviewOptions,
     Message,
     MessageEntity,
@@ -19,7 +24,7 @@ from telegram import (
 from telegram.constants import ChatAction, ParseMode
 from telegram.error import BadRequest, Forbidden, TelegramError
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
-from telegram.ext import CallbackQueryHandler
+from telegram.ext import CallbackQueryHandler, InlineQueryHandler
 
 from music_links_bot.artist import ArtistClient, ArtistLookupError
 from music_links_bot.config import Settings
@@ -94,6 +99,21 @@ DEFAULT_UI_MODE = "stonerhand"
 MAX_BUTTON_TEXT_LENGTH = 64
 MAX_LINKS_PER_MESSAGE = 12
 MAX_USER_NOTE_LENGTH = 700
+LOADING_TEXTS = (
+    "⏳ Собираю пост…",
+    "🔍 Ищу площадки…",
+    "🎧 Ловлю релиз…",
+    "📀 Раскладываю по сервисам…",
+)
+INLINE_CACHE_SECONDS = 1800
+
+# The "collecting the post" placeholder for the current update. ContextVars are
+# task-local in asyncio, and PTB processes each update in its own task, so this
+# never leaks between concurrent updates.
+_PLACEHOLDER_MESSAGE: contextvars.ContextVar[Message | None] = contextvars.ContextVar(
+    "placeholder_message",
+    default=None,
+)
 DEFAULT_PLATFORM_ORDER = (
     "spotify",
     "appleMusic",
@@ -171,6 +191,7 @@ def build_application(settings: Settings) -> Application:
     application.add_handler(CommandHandler("id", id_command))
     application.add_handler(CommandHandler("stats", stats_command))
     application.add_handler(CallbackQueryHandler(menu_callback, pattern=r"^menu:"))
+    application.add_handler(InlineQueryHandler(inline_query_handler))
     application.add_handler(
         MessageHandler(
             (filters.TEXT | filters.CAPTION) & ~filters.COMMAND,
@@ -300,6 +321,158 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         raise
 
 
+async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    inline_query = update.inline_query
+    if inline_query is None:
+        return
+
+    source_urls = extract_supported_urls(inline_query.query or "")
+    if not source_urls:
+        await _answer_inline_hint(inline_query, "🎧 Вставь ссылку на трек, альбом или видео")
+        return
+
+    try:
+        result = await _build_inline_result(source_urls[0], context)
+    except Exception:
+        LOGGER.exception("Inline lookup failed for %s", source_urls[0])
+        result = None
+
+    if result is None:
+        await _answer_inline_hint(inline_query, "Не нашел площадок — открыть бота")
+        return
+
+    try:
+        await inline_query.answer(
+            [result],
+            cache_time=INLINE_CACHE_SECONDS,
+            is_personal=False,
+        )
+    except TelegramError:
+        LOGGER.debug("Could not answer inline query", exc_info=True)
+
+
+async def _answer_inline_hint(inline_query, button_text: str) -> None:
+    try:
+        await inline_query.answer(
+            [],
+            cache_time=10,
+            button=InlineQueryResultsButton(text=button_text, start_parameter="inline"),
+        )
+    except TelegramError:
+        LOGGER.debug("Could not answer inline query with hint", exc_info=True)
+
+
+async def _build_inline_result(
+    source_url: str,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> InlineQueryResultArticle | None:
+    bot_data = context.application.bot_data
+
+    if is_spotify_artist_url(source_url):
+        artists = await _lookup_artists(bot_data["artist_client"], [source_url])
+        artist = artists[0]
+        return _inline_article(
+            source_url,
+            title=artist.title,
+            description=f"Карточка артиста · {artist.platform}",
+            text=format_artist_message(artist, include_hashtags=True),
+            keyboard=_build_artist_keyboard(artist.url),
+            preview_url=artist.url,
+        )
+
+    if is_spotify_playlist_url(source_url):
+        playlists = await _lookup_playlists(bot_data["playlist_client"], [source_url])
+        playlist = playlists[0]
+        return _inline_article(
+            source_url,
+            title=playlist.title,
+            description=f"Плейлист · {playlist.platform}",
+            text=format_playlist_message(playlist, include_hashtags=True),
+            keyboard=_build_playlist_keyboard(playlist.url),
+            preview_url=playlist.url,
+        )
+
+    if is_youtube_video_url(source_url):
+        videos = await _lookup_youtube_videos(bot_data["youtube_client"], [source_url])
+        video = videos[0]
+        return _inline_article(
+            source_url,
+            title=video.title,
+            description=f"Видео · {video.author}",
+            text=format_video_message(video, include_hashtags=True),
+            keyboard=_build_youtube_keyboard(video.url),
+            preview_url=video.url,
+        )
+
+    if is_nts_url(source_url):
+        radios = await _lookup_nts_radios(bot_data["nts_client"], [source_url])
+        if not radios:
+            return None
+
+        radio = radios[0]
+        return _inline_article(
+            source_url,
+            title=radio.title,
+            description=f"Эфир · {radio.station}",
+            text=format_radio_message(radio, include_hashtags=True),
+            keyboard=_build_nts_keyboard(radio.url),
+            preview_url=radio.url,
+        )
+
+    tracks, _unavailable = await _lookup_tracks(
+        bot_data["songlink_client"],
+        [source_url],
+        soundcloud_client=bot_data["soundcloud_client"],
+    )
+    tracks = [track for track in tracks if track.links]
+    if not tracks:
+        return None
+
+    track = tracks[0]
+    return _inline_article(
+        source_url,
+        title=f"{track.artist} — {track.title}",
+        description="Пост с кнопками всех площадок",
+        text=format_track_message(track, include_hashtags=True),
+        keyboard=_build_link_keyboard(
+            track.links,
+            context=context,
+            release_page_url=track.page_url,
+            release_kind=track.kind,
+            release_format=track.release_format,
+        ),
+        preview_url=_select_preview_url(track.links, context) or track.thumbnail_url,
+        thumbnail_url=track.thumbnail_url,
+    )
+
+
+def _inline_article(
+    source_url: str,
+    *,
+    title: str,
+    description: str,
+    text: str,
+    keyboard: InlineKeyboardMarkup,
+    preview_url: str | None,
+    thumbnail_url: str | None = None,
+) -> InlineQueryResultArticle:
+    return InlineQueryResultArticle(
+        id=hashlib.sha256(source_url.encode("utf-8")).hexdigest()[:32],
+        title=title,
+        description=description,
+        thumbnail_url=thumbnail_url,
+        input_message_content=InputTextMessageContent(
+            message_text=text,
+            parse_mode=ParseMode.HTML,
+            link_preview_options=_build_link_preview_options(
+                preview_url,
+                prefer_large_media=True,
+            ),
+        ),
+        reply_markup=keyboard,
+    )
+
+
 async def id_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     del context
     message = update.effective_message
@@ -338,10 +511,16 @@ async def _reply_with_error(
     context: ContextTypes.DEFAULT_TYPE,
     text: str,
 ) -> None:
-    await message.reply_text(
-        text,
-        reply_markup=_build_error_keyboard(context.bot.username),
-    )
+    reply_markup = _build_error_keyboard(context.bot.username)
+    placeholder = _take_placeholder(message.chat_id)
+    if placeholder is not None:
+        try:
+            await placeholder.edit_text(text, reply_markup=reply_markup)
+            return
+        except TelegramError:
+            LOGGER.debug("Could not edit loading placeholder", exc_info=True)
+
+    await message.reply_text(text, reply_markup=reply_markup)
 
 
 async def _send_typing_action(bot: Bot, message: Message) -> None:
@@ -352,6 +531,28 @@ async def _send_typing_action(bot: Bot, message: Message) -> None:
         await bot.send_chat_action(chat_id=message.chat_id, action=ChatAction.TYPING)
     except TelegramError:
         LOGGER.debug("Could not send typing action", exc_info=True)
+
+
+async def _send_loading_placeholder(message: Message) -> None:
+    seed = _message_text(message) or str(message.chat_id)
+    digest = hashlib.sha256(seed.encode("utf-8")).digest()
+    loading_text = LOADING_TEXTS[digest[0] % len(LOADING_TEXTS)]
+    try:
+        placeholder = await message.reply_text(loading_text)
+    except TelegramError:
+        LOGGER.debug("Could not send loading placeholder", exc_info=True)
+        return
+
+    _PLACEHOLDER_MESSAGE.set(placeholder)
+
+
+def _take_placeholder(chat_id: int) -> Message | None:
+    placeholder = _PLACEHOLDER_MESSAGE.get()
+    if placeholder is None or placeholder.chat_id != chat_id:
+        return None
+
+    _PLACEHOLDER_MESSAGE.set(None)
+    return placeholder
 
 
 async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -375,7 +576,10 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     user_prefix = _build_user_prefix(message)
-    await _send_typing_action(context.bot, message)
+    if message.chat.type == "private":
+        await _send_loading_placeholder(message)
+    else:
+        await _send_typing_action(context.bot, message)
 
     (
         artist_urls,
@@ -457,7 +661,8 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
                     tracks,
                     include_hashtags=include_hashtags,
                 ),
-                preview_url=_select_preview_url(tracks[0].links, context),
+                preview_url=_select_preview_url(tracks[0].links, context)
+                or tracks[0].thumbnail_url,
                 reply_markup=_build_collection_keyboard(
                     tracks,
                     include_channel_button=include_channel_button,
@@ -476,7 +681,8 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
                 track,
                 include_hashtags=include_hashtags,
             ),
-            preview_url=_select_preview_url(track.links, context),
+            preview_url=_select_preview_url(track.links, context)
+            or track.thumbnail_url,
             reply_markup=_build_link_keyboard(
                 track.links,
                 context=context,
@@ -1180,13 +1386,26 @@ async def _reply_with_track(
     reply_markup: InlineKeyboardMarkup | None,
     prefer_large_preview: bool = False,
 ) -> Message:
+    link_preview_options = _build_link_preview_options(
+        preview_url,
+        prefer_large_media=prefer_large_preview,
+    )
+    placeholder = _take_placeholder(message.chat_id)
+    if placeholder is not None:
+        try:
+            return await placeholder.edit_text(
+                text=text,
+                parse_mode=ParseMode.HTML,
+                link_preview_options=link_preview_options,
+                reply_markup=reply_markup,
+            )
+        except TelegramError:
+            LOGGER.debug("Could not edit loading placeholder", exc_info=True)
+
     return await message.reply_text(
         text=text,
         parse_mode=ParseMode.HTML,
-        link_preview_options=_build_link_preview_options(
-            preview_url,
-            prefer_large_media=prefer_large_preview,
-        ),
+        link_preview_options=link_preview_options,
         reply_markup=reply_markup,
     )
 
@@ -1872,6 +2091,8 @@ def _menu_text(menu_key: str) -> str:
             "3️⃣ Получи чистый пост: preview, хэштеги и кнопки площадок\n\n"
             "💡 Несколько ссылок одним сообщением превращаются в нумерованную "
             "подборку с кнопкой на каждый релиз\n\n"
+            "⚡ В любом другом чате набери <code>@StonerHandBot ссылка</code> — "
+            "вставишь готовый пост, не выходя из разговора\n\n"
             "Разметка в подводке сохраняется: жирный, курсив, спойлеры, ссылки"
         )
 
@@ -1926,7 +2147,8 @@ def _menu_text(menu_key: str) -> str:
         "• Трек, альбом, плейлист, артист, подкаст\n"
         "• YouTube-видео и эфиры NTS Radio\n"
         "• Несколько ссылок разом → нумерованная подборка\n"
-        "• Подводка над ссылкой → цитата в посте\n\n"
+        "• Подводка над ссылкой → цитата в посте\n"
+        "• Inline: набери @StonerHandBot + ссылку в любом чате\n\n"
         "Просто пришли ссылку 👇"
     )
 

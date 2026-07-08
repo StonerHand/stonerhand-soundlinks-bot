@@ -138,6 +138,7 @@ class SonglinkClient:
             entity_type,
         )
         release_format = self._extract_release_format(entity)
+        thumbnail_url = self._extract_thumbnail_url(entity, entities, entity_type)
         return TrackMatch(
             title=title,
             artist=artist,
@@ -146,6 +147,7 @@ class SonglinkClient:
             release_year=release_year,
             kind=entity_type,
             release_format=release_format,
+            thumbnail_url=thumbnail_url,
         )
 
     def _merge_matches(self, matches: list[TrackMatch]) -> TrackMatch:
@@ -170,6 +172,10 @@ class SonglinkClient:
             kind=primary.kind,
             release_format=primary.release_format or next(
                 (match.release_format for match in matches if match.release_format),
+                None,
+            ),
+            thumbnail_url=primary.thumbnail_url or next(
+                (match.thumbnail_url for match in matches if match.thumbnail_url),
                 None,
             ),
         )
@@ -231,6 +237,30 @@ class SonglinkClient:
             release_year = self._extract_release_year(entity)
             if release_year:
                 return release_year
+
+        return None
+
+    def _extract_thumbnail_url(
+        self,
+        entity: Mapping[str, object],
+        entities: Mapping[str, object],
+        entity_type: str,
+    ) -> str | None:
+        thumbnail = str(entity.get("thumbnailUrl") or "").strip()
+        if thumbnail.startswith("http"):
+            return thumbnail
+
+        for candidate in entities.values():
+            if not isinstance(candidate, Mapping):
+                continue
+
+            candidate_type = self._normalize_entity_type(candidate.get("type"))
+            if candidate_type and candidate_type != entity_type:
+                continue
+
+            thumbnail = str(candidate.get("thumbnailUrl") or "").strip()
+            if thumbnail.startswith("http"):
+                return thumbnail
 
         return None
 
