@@ -1115,11 +1115,19 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 1)
         self.assertIn("<b>Bondage Fairies</b>\nStar Signs", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
-        self.assertEqual(keyboard[0][0].text, "🟠 SoundCloud")
-        self.assertEqual(keyboard[0][0].url, "https://soundcloud.com/bondage-fairies/star-signs")
-        self.assertEqual(keyboard[1][0].text, "🪩 Все платформы")
-        self.assertEqual(keyboard[1][0].url, "https://soundcloud.com/bondage-fairies/star-signs")
+        self.assertEqual(keyboard[0][0].text, "🟢 Spotify")
+        self.assertEqual(
+            keyboard[0][0].url,
+            "https://open.spotify.com/search/Bondage%20Fairies%20Star%20Signs",
+        )
+        self.assertEqual(keyboard[0][1].text, "🟠 SoundCloud")
+        self.assertEqual(keyboard[0][1].url, "https://soundcloud.com/bondage-fairies/star-signs")
+        # The synthetic Spotify search link must not become the preview.
         preview_options = message.reply_kwargs[0]["link_preview_options"]
+        self.assertEqual(
+            preview_options.url,
+            "https://soundcloud.com/bondage-fairies/star-signs",
+        )
         self.assertTrue(preview_options.prefer_large_media)
         self.assertTrue(preview_options.show_above_text)
         record_matches.assert_called_once()
@@ -1278,6 +1286,29 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             {"spotify": "https://open.spotify.com/episode/abc?si=123"},
         )
 
+    async def test_lookup_tracks_guarantees_spotify_button_first(self) -> None:
+        class NoSpotifyLookupClient:
+            async def lookup_track(self, source_url: str) -> TrackMatch:
+                del source_url
+                return TrackMatch(
+                    title="Paranoid",
+                    artist="Black Sabbath",
+                    links={"appleMusic": "https://music.apple.com/album/paranoid"},
+                    page_url="https://song.link/paranoid",
+                )
+
+        tracks, _ = await _lookup_tracks(
+            NoSpotifyLookupClient(),
+            ["https://music.apple.com/album/paranoid"],
+        )
+
+        self.assertEqual(
+            tracks[0].links["spotify"],
+            "https://open.spotify.com/search/Black%20Sabbath%20Paranoid",
+        )
+        keyboard = _build_link_keyboard(tracks[0].links)
+        self.assertEqual(keyboard.inline_keyboard[0][0].text, "🟢 Spotify")
+
     async def test_lookup_tracks_uses_soundcloud_metadata_fallback(self) -> None:
         tracks, unavailable_urls = await _lookup_tracks(
             FailingLookupClient(),
@@ -1291,7 +1322,10 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(tracks[0].title, "Star Signs")
         self.assertEqual(
             tracks[0].links,
-            {"soundcloud": "https://soundcloud.com/bondage-fairies/star-signs"},
+            {
+                "soundcloud": "https://soundcloud.com/bondage-fairies/star-signs",
+                "spotify": "https://open.spotify.com/search/Bondage%20Fairies%20Star%20Signs",
+            },
         )
 
     async def test_lookup_tracks_keeps_generic_soundcloud_fallback_when_metadata_fails(self) -> None:
@@ -1307,7 +1341,10 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(tracks[0].title, "SoundCloud")
         self.assertEqual(
             tracks[0].links,
-            {"soundcloud": "https://soundcloud.com/bondage-fairies/star-signs"},
+            {
+                "soundcloud": "https://soundcloud.com/bondage-fairies/star-signs",
+                "spotify": "https://open.spotify.com/search/SoundCloud%20SoundCloud",
+            },
         )
 
 
