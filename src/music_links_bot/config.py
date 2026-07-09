@@ -15,6 +15,7 @@ class Settings:
     admin_chat_id: int | None
     primary_platform: str | None
     ui_mode: str
+    publish_chat_id: str | None = None
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -37,6 +38,7 @@ class Settings:
             admin_chat_id=admin_chat_id,
             primary_platform=_parse_primary_platform(),
             ui_mode=_parse_ui_mode(),
+            publish_chat_id=os.getenv("PUBLISH_CHAT_ID", "").strip() or None,
         )
 
 

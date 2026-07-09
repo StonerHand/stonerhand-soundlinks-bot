@@ -30,7 +30,10 @@
 
 | | Feature | What it feels like |
 | --- | --- | --- |
-| 🪄 | **Inline mode** | Type `@StonerHandBot <link>` in *any* chat and insert a finished post without leaving the conversation |
+| 🔎 | **Search without a link** | Type `artist - track` in DM or inline — the bot finds the release itself, no URL required |
+| 🎚 | **Post editor** | Every DM post comes with toggles: hashtags on/off, quote on/off, ✅ finalize, 🗑 delete |
+| 📤 | **Publish to channel** | The bot owner gets a one-tap button that posts the finished card straight to the channel |
+| 🪄 | **Inline mode** | Type `@StonerHandBot <link>` (or a track name) in *any* chat and insert a finished post without leaving the conversation |
 | ⚡ | **Live loading** | An instant "⏳ собираю пост…" placeholder morphs into the final card — no dead air, no typing-indicator guessing |
 | 🖼 | **Artwork previews** | Big cover art on top of every card, with release artwork as a fallback when a platform page has no preview |
 | 🎛 | **Every platform, one tap** | Spotify, Apple Music, YouTube Music, SoundCloud, Deezer, Tidal, Yandex Music + a Song.link hub button |
@@ -39,6 +42,8 @@
 | 🤖 | **Channel autopilot** | As an admin, the bot silently swaps raw links in channels/groups for clean editorial posts |
 | 🚀 | **Serverless-fast** | Warm instances reuse connections and caches; repeated links resolve near-instantly |
 | 🔁 | **Self-healing** | A daily cron re-registers the webhook and command menu — the bot never silently goes stale |
+| 🧠 | **Shared Redis cache** | With Upstash/Vercel KV configured, lookups and `/stats` survive cold starts and are shared across instances |
+| 🌍 | **Bilingual interface** | Menus, hints and editor controls switch to English automatically based on the user's Telegram language |
 
 ## What It Does
 
@@ -362,6 +367,8 @@ CRON_SECRET=
 | `WEBHOOK_BASE_URL` | no | Explicit production base URL; otherwise Vercel environment URLs are used |
 | `STATS_PATH` | no | Overrides local stats file path |
 | `CRON_SECRET` | recommended on Vercel | Vercel sends `Authorization: Bearer $CRON_SECRET` on scheduled Cron Job runs; setting it enables a daily automatic re-call of `/api/set_webhook` so the webhook subscription (e.g. `allowed_updates`) never goes stale after a deploy |
+| `PUBLISH_CHAT_ID` | no | Target chat/channel for the 📤 publish button in the post editor (defaults to `@stonerhand`) |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | recommended | Upstash Redis REST credentials (Vercel KV `KV_REST_API_URL`/`KV_REST_API_TOKEN` also work): shared lookup cache across instances, persistent editor drafts and live `/stats` counters. Without them everything still works in-memory |
 
 Supported `PRIMARY_PLATFORM` values:
 

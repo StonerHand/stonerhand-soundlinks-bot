@@ -3,9 +3,11 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 import contextvars
+from dataclasses import asdict
 from datetime import datetime, timezone
 import hashlib
 import logging
+import secrets
 from urllib.parse import quote
 
 from telegram import (
@@ -28,6 +30,13 @@ from telegram.ext import CallbackQueryHandler, InlineQueryHandler
 
 from music_links_bot.artist import ArtistClient, ArtistLookupError
 from music_links_bot.config import Settings
+from music_links_bot.i18n import get_text, get_texts, resolve_lang
+from music_links_bot.kvstore import KVStore
+from music_links_bot.search import (
+    SearchClient,
+    SearchLookupError,
+    normalize_search_query,
+)
 from music_links_bot.constants import (
     INPUT_PLATFORM_HINT,
     PLATFORM_BUTTON_STYLES,
@@ -66,6 +75,7 @@ from music_links_bot.soundcloud import (
 from music_links_bot.stats import (
     format_stats_message,
     load_stats,
+    merge_stats,
     record_artists,
     record_matches,
     record_mixed,
@@ -99,13 +109,10 @@ DEFAULT_UI_MODE = "stonerhand"
 MAX_BUTTON_TEXT_LENGTH = 64
 MAX_LINKS_PER_MESSAGE = 12
 MAX_USER_NOTE_LENGTH = 700
-LOADING_TEXTS = (
-    "⏳ Собираю пост…",
-    "🔍 Ищу площадки…",
-    "🎧 Ловлю релиз…",
-    "📀 Раскладываю по сервисам…",
-)
 INLINE_CACHE_SECONDS = 1800
+DRAFT_TTL_SECONDS = 48 * 3600
+MAX_MEMORY_DRAFTS = 300
+STATS_KV_KEY = "stats:v1"
 
 # The "collecting the post" placeholder for the current update. ContextVars are
 # task-local in asyncio, and PTB processes each update in its own task, so this
@@ -157,15 +164,18 @@ NOT_FOUND_DETAIL = (
 
 
 def build_application(settings: Settings) -> Application:
+    kv_store = KVStore.from_env()
     songlink_client = SonglinkClient(
         user_countries=settings.songlink_user_countries,
         api_key=settings.songlink_api_key,
+        kv=kv_store,
     )
     youtube_client = YouTubeClient()
     nts_client = NTSClient()
     soundcloud_client = SoundCloudClient()
     playlist_client = PlaylistClient()
     artist_client = ArtistClient()
+    search_client = SearchClient()
     application = (
         Application.builder()
         .token(settings.bot_token)
@@ -179,6 +189,10 @@ def build_application(settings: Settings) -> Application:
     application.bot_data["soundcloud_client"] = soundcloud_client
     application.bot_data["playlist_client"] = playlist_client
     application.bot_data["artist_client"] = artist_client
+    application.bot_data["search_client"] = search_client
+    application.bot_data["kv_store"] = kv_store
+    application.bot_data["drafts"] = {}
+    application.bot_data["publish_chat_id"] = settings.publish_chat_id
     application.bot_data["admin_chat_id"] = settings.admin_chat_id
     application.bot_data["platform_order"] = _build_platform_order(settings.primary_platform)
     application.bot_data["ui_mode"] = settings.ui_mode
@@ -191,6 +205,7 @@ def build_application(settings: Settings) -> Application:
     application.add_handler(CommandHandler("id", id_command))
     application.add_handler(CommandHandler("stats", stats_command))
     application.add_handler(CallbackQueryHandler(menu_callback, pattern=r"^menu:"))
+    application.add_handler(CallbackQueryHandler(editor_callback, pattern=r"^ed\|"))
     application.add_handler(InlineQueryHandler(inline_query_handler))
     application.add_handler(
         MessageHandler(
@@ -217,6 +232,8 @@ async def close_application_resources(application: Application) -> None:
         "soundcloud_client",
         "playlist_client",
         "artist_client",
+        "search_client",
+        "kv_store",
     )
     clients = [application.bot_data.get(key) for key in client_keys]
     active_clients = [client for client in clients if client is not None]
@@ -252,18 +269,23 @@ async def _application_error_handler(
     LOGGER.error("Unhandled Telegram update error: %r", error)
 
 
+def _update_lang(update: Update) -> str:
+    user = update.effective_user
+    return resolve_lang(user.language_code if user else None)
+
+
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message:
         return
 
-    await _reply_with_menu(update.message, context, MENU_START)
+    await _reply_with_menu(update.message, context, MENU_START, lang=_update_lang(update))
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message:
         return
 
-    await _reply_with_menu(update.message, context, MENU_HELP)
+    await _reply_with_menu(update.message, context, MENU_HELP, lang=_update_lang(update))
 
 
 async def guide_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -271,10 +293,15 @@ async def guide_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if not message:
         return
 
+    lang = _update_lang(update)
     sent_message = await message.reply_text(
-        _menu_text(MENU_GUIDE),
+        _menu_text(MENU_GUIDE, lang=lang),
         parse_mode=ParseMode.HTML,
-        reply_markup=_build_intro_keyboard(context.bot.username, active=MENU_GUIDE),
+        reply_markup=_build_intro_keyboard(
+            context.bot.username,
+            active=MENU_GUIDE,
+            lang=lang,
+        ),
     )
 
     if message.chat.type in {"group", "supergroup", "channel"}:
@@ -288,7 +315,12 @@ async def platforms_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if not update.message:
         return
 
-    await _reply_with_menu(update.message, context, MENU_PLATFORMS)
+    await _reply_with_menu(
+        update.message,
+        context,
+        MENU_PLATFORMS,
+        lang=_update_lang(update),
+    )
 
 
 async def channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -308,12 +340,17 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     await query.answer()
+    lang = resolve_lang(query.from_user.language_code if query.from_user else None)
     menu_key = query.data if query.data in MENU_KEYS else MENU_START
     try:
         await query.edit_message_text(
-            text=_menu_text(menu_key),
+            text=_menu_text(menu_key, lang=lang),
             parse_mode=ParseMode.HTML,
-            reply_markup=_build_intro_keyboard(context.bot.username, active=menu_key),
+            reply_markup=_build_intro_keyboard(
+                context.bot.username,
+                active=menu_key,
+                lang=lang,
+            ),
         )
     except BadRequest as exc:
         if "Message is not modified" in str(exc):
@@ -326,10 +363,26 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     if inline_query is None:
         return
 
-    source_urls = extract_supported_urls(inline_query.query or "")
+    lang = resolve_lang(
+        inline_query.from_user.language_code if inline_query.from_user else None
+    )
+    query_text = inline_query.query or ""
+    source_urls = extract_supported_urls(query_text)
     if not source_urls:
-        await _answer_inline_hint(inline_query, "🎧 Вставь ссылку на трек, альбом или видео")
-        return
+        search_query = normalize_search_query(query_text)
+        if search_query is None:
+            await _answer_inline_hint(inline_query, get_text(lang, "inline_hint_empty"))
+            return
+
+        search_client: SearchClient = context.application.bot_data["search_client"]
+        try:
+            source_urls = [await search_client.search_release_url(search_query)]
+        except SearchLookupError:
+            await _answer_inline_hint(
+                inline_query,
+                get_text(lang, "inline_hint_not_found"),
+            )
+            return
 
     try:
         result = await _build_inline_result(source_urls[0], context)
@@ -338,7 +391,7 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         result = None
 
     if result is None:
-        await _answer_inline_hint(inline_query, "Не нашел площадок — открыть бота")
+        await _answer_inline_hint(inline_query, get_text(lang, "inline_hint_not_found"))
         return
 
     try:
@@ -473,6 +526,247 @@ def _inline_article(
     )
 
 
+async def _send_track_draft(
+    message: Message,
+    context: ContextTypes.DEFAULT_TYPE,
+    track: TrackMatch,
+    *,
+    user_prefix: str,
+    lang: str,
+) -> None:
+    admin_chat_id = context.application.bot_data.get("admin_chat_id")
+    draft_id = secrets.token_hex(8)
+    draft = {
+        "v": 1,
+        "type": "track",
+        "item": asdict(track),
+        "prefix": user_prefix,
+        "hashtags": False,
+        "quote": bool(user_prefix),
+        "chat_id": message.chat_id,
+        "lang": lang,
+        "can_publish": (
+            message.from_user is not None
+            and admin_chat_id is not None
+            and message.from_user.id == admin_chat_id
+        ),
+    }
+
+    text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
+    await _reply_with_track(
+        message,
+        text,
+        preview_url=_select_preview_url(track.links, context) or track.thumbnail_url,
+        reply_markup=keyboard,
+        prefer_large_preview=True,
+    )
+    await _store_draft(context, draft_id, draft)
+
+
+def _render_track_draft(
+    draft: dict,
+    context: ContextTypes.DEFAULT_TYPE | None,
+    *,
+    draft_id: str | None = None,
+) -> tuple[str, InlineKeyboardMarkup]:
+    track = TrackMatch(**draft["item"])
+    prefix = draft.get("prefix") or ""
+    text = (prefix if draft.get("quote") and prefix else "") + format_track_message(
+        track,
+        include_hashtags=bool(draft.get("hashtags")),
+    )
+    keyboard = _build_link_keyboard(
+        track.links,
+        context=context,
+        include_channel_button=True,
+        release_page_url=track.page_url,
+        release_kind=track.kind,
+        release_format=track.release_format,
+    )
+    if draft_id is None:
+        return text, keyboard
+
+    rows = [*keyboard.inline_keyboard, *_editor_rows(draft_id, draft)]
+    return text, InlineKeyboardMarkup(rows)
+
+
+def _editor_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
+    lang = draft.get("lang") or "ru"
+    state = lambda flag: get_text(lang, "ed_on" if draft.get(flag) else "ed_off")  # noqa: E731
+    toggle_row = [
+        InlineKeyboardButton(
+            f"{get_text(lang, 'ed_hashtags')}: {state('hashtags')}",
+            callback_data=f"ed|h|{draft_id}",
+        )
+    ]
+    if draft.get("prefix"):
+        toggle_row.append(
+            InlineKeyboardButton(
+                f"{get_text(lang, 'ed_quote')}: {state('quote')}",
+                callback_data=f"ed|q|{draft_id}",
+            )
+        )
+
+    action_row = [
+        InlineKeyboardButton(get_text(lang, "ed_done"), callback_data=f"ed|f|{draft_id}"),
+        InlineKeyboardButton(get_text(lang, "ed_delete"), callback_data=f"ed|d|{draft_id}"),
+    ]
+    if draft.get("can_publish"):
+        action_row.append(
+            InlineKeyboardButton(
+                get_text(lang, "ed_publish"),
+                callback_data=f"ed|p|{draft_id}",
+            )
+        )
+
+    return [toggle_row, action_row]
+
+
+async def _store_draft(
+    context: ContextTypes.DEFAULT_TYPE,
+    draft_id: str,
+    draft: dict,
+) -> None:
+    drafts: dict = context.application.bot_data.setdefault("drafts", {})
+    while len(drafts) >= MAX_MEMORY_DRAFTS:
+        drafts.pop(next(iter(drafts)))
+
+    drafts[draft_id] = draft
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    if kv is not None:
+        await kv.set_json(f"draft:{draft_id}", draft, ttl_seconds=DRAFT_TTL_SECONDS)
+
+
+async def _load_draft(
+    context: ContextTypes.DEFAULT_TYPE,
+    draft_id: str,
+) -> dict | None:
+    drafts: dict = context.application.bot_data.setdefault("drafts", {})
+    draft = drafts.get(draft_id)
+    if draft is not None:
+        return draft
+
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    if kv is None:
+        return None
+
+    draft = await kv.get_json(f"draft:{draft_id}")
+    if isinstance(draft, dict) and draft.get("type") == "track":
+        drafts[draft_id] = draft
+        return draft
+
+    return None
+
+
+async def editor_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    if query is None or not query.data:
+        return
+
+    parts = query.data.split("|")
+    if len(parts) != 3:
+        await query.answer()
+        return
+
+    _, action, draft_id = parts
+    user_lang = resolve_lang(query.from_user.language_code if query.from_user else None)
+    draft = await _load_draft(context, draft_id)
+    if draft is None:
+        await query.answer(get_text(user_lang, "ed_expired"), show_alert=True)
+        return
+
+    lang = draft.get("lang") or user_lang
+
+    if action == "d":
+        await query.answer()
+        if query.message is not None:
+            await _try_delete_message(query.message)
+        return
+
+    if action == "p":
+        admin_chat_id = context.application.bot_data.get("admin_chat_id")
+        is_admin = (
+            query.from_user is not None
+            and admin_chat_id is not None
+            and query.from_user.id == admin_chat_id
+        )
+        if not is_admin:
+            await query.answer(get_text(lang, "ed_admin_only"), show_alert=True)
+            return
+
+        published = await _publish_draft(context, draft)
+        await query.answer(
+            get_text(lang, "ed_published" if published else "ed_publish_failed"),
+            show_alert=not published,
+        )
+        return
+
+    if action == "h":
+        draft["hashtags"] = not draft.get("hashtags")
+    elif action == "q":
+        draft["quote"] = not draft.get("quote")
+    elif action != "f":
+        await query.answer()
+        return
+
+    await query.answer()
+    await _store_draft(context, draft_id, draft)
+    editor_id = None if action == "f" else draft_id
+    text, keyboard = _render_track_draft(draft, context, draft_id=editor_id)
+    track = TrackMatch(**draft["item"])
+    try:
+        await query.edit_message_text(
+            text=text,
+            parse_mode=ParseMode.HTML,
+            link_preview_options=_build_link_preview_options(
+                _select_preview_url(track.links, context) or track.thumbnail_url,
+                prefer_large_media=True,
+            ),
+            reply_markup=keyboard,
+        )
+    except BadRequest as exc:
+        if "Message is not modified" not in str(exc):
+            raise
+
+
+async def _publish_draft(context: ContextTypes.DEFAULT_TYPE, draft: dict) -> bool:
+    target = context.application.bot_data.get("publish_chat_id") or f"@{CHANNEL_USERNAME}"
+    track = TrackMatch(**draft["item"])
+    prefix = draft.get("prefix") or ""
+    # Channel posts always carry hashtags — that is the channel house style.
+    text = (prefix if draft.get("quote") and prefix else "") + format_track_message(
+        track,
+        include_hashtags=True,
+    )
+    include_channel_button = (
+        str(target).lstrip("@").casefold() != CHANNEL_USERNAME
+    )
+    keyboard = _build_link_keyboard(
+        track.links,
+        context=context,
+        include_channel_button=include_channel_button,
+        release_page_url=track.page_url,
+        release_kind=track.kind,
+        release_format=track.release_format,
+    )
+    try:
+        await context.bot.send_message(
+            chat_id=target,
+            text=text,
+            parse_mode=ParseMode.HTML,
+            link_preview_options=_build_link_preview_options(
+                _select_preview_url(track.links, context) or track.thumbnail_url,
+                prefer_large_media=True,
+            ),
+            reply_markup=keyboard,
+        )
+    except TelegramError:
+        LOGGER.warning("Could not publish draft to %s", target, exc_info=True)
+        return False
+
+    return True
+
+
 async def id_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     del context
     message = update.effective_message
@@ -489,8 +783,13 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     admin_chat_id: int | None = context.application.bot_data.get("admin_chat_id")
     include_private = admin_chat_id is not None and message.chat_id == admin_chat_id
+    stats_data = load_stats()
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    if kv is not None:
+        stats_data = merge_stats(stats_data, await kv.get_json(STATS_KV_KEY))
+
     await message.reply_text(
-        format_stats_message(load_stats(), include_private=include_private)
+        format_stats_message(stats_data, include_private=include_private)
     )
 
 
@@ -498,11 +797,17 @@ async def _reply_with_menu(
     message: Message,
     context: ContextTypes.DEFAULT_TYPE,
     menu_key: str,
+    *,
+    lang: str = "ru",
 ) -> None:
     await message.reply_text(
-        _menu_text(menu_key),
+        _menu_text(menu_key, lang=lang),
         parse_mode=ParseMode.HTML,
-        reply_markup=_build_intro_keyboard(context.bot.username, active=menu_key),
+        reply_markup=_build_intro_keyboard(
+            context.bot.username,
+            active=menu_key,
+            lang=lang,
+        ),
     )
 
 
@@ -510,8 +815,10 @@ async def _reply_with_error(
     message: Message,
     context: ContextTypes.DEFAULT_TYPE,
     text: str,
+    *,
+    lang: str = "ru",
 ) -> None:
-    reply_markup = _build_error_keyboard(context.bot.username)
+    reply_markup = _build_error_keyboard(context.bot.username, lang=lang)
     placeholder = _take_placeholder(message.chat_id)
     if placeholder is not None:
         try:
@@ -533,10 +840,14 @@ async def _send_typing_action(bot: Bot, message: Message) -> None:
         LOGGER.debug("Could not send typing action", exc_info=True)
 
 
-async def _send_loading_placeholder(message: Message) -> None:
+async def _send_loading_placeholder(message: Message, lang: str = "ru") -> None:
+    if _PLACEHOLDER_MESSAGE.get() is not None:
+        return
+
+    loading_texts = get_texts(lang, "loading")
     seed = _message_text(message) or str(message.chat_id)
     digest = hashlib.sha256(seed.encode("utf-8")).digest()
-    loading_text = LOADING_TEXTS[digest[0] % len(LOADING_TEXTS)]
+    loading_text = loading_texts[digest[0] % len(loading_texts)]
     try:
         placeholder = await message.reply_text(loading_text)
     except TelegramError:
@@ -564,20 +875,41 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
     source_urls = extract_supported_urls(message_text)[:MAX_LINKS_PER_MESSAGE]
     include_channel_button = _should_include_channel_button(message)
     include_hashtags = _should_include_hashtags(message)
+    is_private = message.chat.type == "private"
+    lang = _update_lang(update) if is_private else "ru"
+    found_via_search = False
     if not source_urls:
-        if message.chat.type != "private":
+        if not is_private:
             return
 
-        await _reply_with_error(
-            message,
-            context,
-            _format_no_url_message(message_text, message.chat_id),
-        )
-        return
+        search_query = normalize_search_query(message_text or "")
+        if search_query is None:
+            await _reply_with_error(
+                message,
+                context,
+                _format_no_url_message(message_text, message.chat_id, lang=lang),
+                lang=lang,
+            )
+            return
 
-    user_prefix = _build_user_prefix(message)
-    if message.chat.type == "private":
-        await _send_loading_placeholder(message)
+        await _send_loading_placeholder(message, lang)
+        search_client: SearchClient = context.application.bot_data["search_client"]
+        try:
+            source_urls = [await search_client.search_release_url(search_query)]
+            found_via_search = True
+        except SearchLookupError:
+            await _reply_with_error(
+                message,
+                context,
+                get_text(lang, "search_not_found"),
+                lang=lang,
+            )
+            return
+
+    # The whole message was the search query, so quoting it back is noise.
+    user_prefix = "" if found_via_search else _build_user_prefix(message)
+    if is_private:
+        await _send_loading_placeholder(message, lang)
     else:
         await _send_typing_action(context.bot, message)
 
@@ -645,6 +977,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
             _format_service_unavailable_message(unavailable_urls[0])
             if unavailable_urls
             else _format_not_found_message(source_urls),
+            lang=lang,
         )
         return
 
@@ -669,31 +1002,40 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
                 ),
                 prefer_large_preview=True,
             )
-            _record_matches_safely(tracks, message)
+            _record_matches_safely(tracks, message, context=context)
             return
 
         track = tracks[0]
-        await _send_track_result(
-            context.bot,
-            message,
-            user_prefix
-            + format_track_message(
+        if is_private:
+            await _send_track_draft(
+                message,
+                context,
                 track,
-                include_hashtags=include_hashtags,
-            ),
-            preview_url=_select_preview_url(track.links, context)
-            or track.thumbnail_url,
-            reply_markup=_build_link_keyboard(
-                track.links,
-                context=context,
-                include_channel_button=include_channel_button,
-                release_page_url=track.page_url,
-                release_kind=track.kind,
-                release_format=track.release_format,
-            ),
-            prefer_large_preview=True,
-        )
-        _record_matches_safely([track], message)
+                user_prefix=user_prefix,
+                lang=lang,
+            )
+        else:
+            await _send_track_result(
+                context.bot,
+                message,
+                user_prefix
+                + format_track_message(
+                    track,
+                    include_hashtags=include_hashtags,
+                ),
+                preview_url=_select_preview_url(track.links, context)
+                or track.thumbnail_url,
+                reply_markup=_build_link_keyboard(
+                    track.links,
+                    context=context,
+                    include_channel_button=include_channel_button,
+                    release_page_url=track.page_url,
+                    release_kind=track.kind,
+                    release_format=track.release_format,
+                ),
+                prefer_large_preview=True,
+            )
+        _record_matches_safely([track], message, context=context)
         return
 
     if content_type_count == 1 and videos:
@@ -705,7 +1047,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
             include_channel_button=include_channel_button,
             include_hashtags=include_hashtags,
         )
-        _record_videos_safely(videos, message)
+        _record_videos_safely(videos, message, context=context)
         return
 
     if content_type_count == 1 and radios:
@@ -717,7 +1059,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
             include_channel_button=include_channel_button,
             include_hashtags=include_hashtags,
         )
-        _record_radios_safely(radios, message)
+        _record_radios_safely(radios, message, context=context)
         return
 
     if content_type_count == 1 and playlists:
@@ -729,7 +1071,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
             include_channel_button=include_channel_button,
             include_hashtags=include_hashtags,
         )
-        _record_playlists_safely(playlists, message)
+        _record_playlists_safely(playlists, message, context=context)
         return
 
     if content_type_count == 1 and artists:
@@ -741,7 +1083,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
             include_channel_button=include_channel_button,
             include_hashtags=include_hashtags,
         )
-        _record_artists_safely(artists, message)
+        _record_artists_safely(artists, message, context=context)
         return
 
     await _send_mixed_result(
@@ -757,7 +1099,15 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         include_hashtags=include_hashtags,
         context=context,
     )
-    _record_mixed_safely(tracks, videos, radios, playlists, artists, message)
+    _record_mixed_safely(
+        tracks,
+        videos,
+        radios,
+        playlists,
+        artists,
+        message,
+        context=context,
+    )
 
 
 def _select_preview_url(
@@ -806,13 +1156,18 @@ def _format_not_found_message(source_urls: list[str]) -> str:
     return f"{phrase}\n\n{NOT_FOUND_DETAIL}"
 
 
-def _format_no_url_message(message_text: str | None, chat_id: int) -> str:
+def _format_no_url_message(
+    message_text: str | None,
+    chat_id: int,
+    *,
+    lang: str = "ru",
+) -> str:
+    hint = get_text(lang, "no_url_hint")
+    if lang != "ru":
+        return hint
+
     seed = message_text or str(chat_id)
-    return (
-        f"{pick_phrase('no_url', seed)}\n\n"
-        "Пришли ссылку на трек, альбом, плейлист, артиста, подкаст, "
-        "YouTube-видео или NTS Radio"
-    )
+    return f"{pick_phrase('no_url', seed)}\n\n{hint}"
 
 
 def _format_service_unavailable_message(seed: str) -> str:
@@ -1859,7 +2214,12 @@ def _get_platform_order(context: ContextTypes.DEFAULT_TYPE | None) -> tuple[str,
     return DEFAULT_PLATFORM_ORDER
 
 
-def _record_matches_safely(tracks: list[TrackMatch], message: Message) -> None:
+def _record_matches_safely(
+    tracks: list[TrackMatch],
+    message: Message,
+    *,
+    context: ContextTypes.DEFAULT_TYPE | None = None,
+) -> None:
     if not tracks:
         return
 
@@ -1872,10 +2232,16 @@ def _record_matches_safely(tracks: list[TrackMatch], message: Message) -> None:
             user=user,
             chat=chat,
         ),
+        context=context,
     )
 
 
-def _record_videos_safely(videos: list[VideoMatch], message: Message) -> None:
+def _record_videos_safely(
+    videos: list[VideoMatch],
+    message: Message,
+    *,
+    context: ContextTypes.DEFAULT_TYPE | None = None,
+) -> None:
     if not videos:
         return
 
@@ -1888,10 +2254,16 @@ def _record_videos_safely(videos: list[VideoMatch], message: Message) -> None:
             user=user,
             chat=chat,
         ),
+        context=context,
     )
 
 
-def _record_radios_safely(radios: list[RadioMatch], message: Message) -> None:
+def _record_radios_safely(
+    radios: list[RadioMatch],
+    message: Message,
+    *,
+    context: ContextTypes.DEFAULT_TYPE | None = None,
+) -> None:
     if not radios:
         return
 
@@ -1904,10 +2276,16 @@ def _record_radios_safely(radios: list[RadioMatch], message: Message) -> None:
             user=user,
             chat=chat,
         ),
+        context=context,
     )
 
 
-def _record_playlists_safely(playlists: list[PlaylistMatch], message: Message) -> None:
+def _record_playlists_safely(
+    playlists: list[PlaylistMatch],
+    message: Message,
+    *,
+    context: ContextTypes.DEFAULT_TYPE | None = None,
+) -> None:
     if not playlists:
         return
 
@@ -1920,10 +2298,16 @@ def _record_playlists_safely(playlists: list[PlaylistMatch], message: Message) -
             user=user,
             chat=chat,
         ),
+        context=context,
     )
 
 
-def _record_artists_safely(artists: list[ArtistMatch], message: Message) -> None:
+def _record_artists_safely(
+    artists: list[ArtistMatch],
+    message: Message,
+    *,
+    context: ContextTypes.DEFAULT_TYPE | None = None,
+) -> None:
     if not artists:
         return
 
@@ -1936,6 +2320,7 @@ def _record_artists_safely(artists: list[ArtistMatch], message: Message) -> None
             user=user,
             chat=chat,
         ),
+        context=context,
     )
 
 
@@ -1946,6 +2331,8 @@ def _record_mixed_safely(
     playlists: list[PlaylistMatch],
     artists: list[ArtistMatch],
     message: Message,
+    *,
+    context: ContextTypes.DEFAULT_TYPE | None = None,
 ) -> None:
     if not any((tracks, videos, radios, playlists, artists)):
         return
@@ -1963,14 +2350,41 @@ def _record_mixed_safely(
             user=user,
             chat=chat,
         ),
+        context=context,
     )
 
 
-def _record_stats_safely(label: str, callback: Callable[[], None]) -> None:
+def _record_stats_safely(
+    label: str,
+    callback: Callable[[], object],
+    *,
+    context: ContextTypes.DEFAULT_TYPE | None = None,
+) -> None:
     try:
-        callback()
+        stats_data = callback()
     except Exception:
         LOGGER.exception("Could not update %s stats", label)
+        return
+
+    kv: KVStore | None = (
+        context.application.bot_data.get("kv_store") if context is not None else None
+    )
+    if kv is None or not isinstance(stats_data, dict):
+        return
+
+    try:
+        asyncio.get_running_loop().create_task(_persist_stats_to_kv(kv, stats_data))
+    except RuntimeError:
+        LOGGER.debug("No running loop to persist stats to KV")
+
+
+async def _persist_stats_to_kv(kv: KVStore, stats_data: dict) -> None:
+    try:
+        existing = await kv.get_json(STATS_KV_KEY)
+        merged = merge_stats(stats_data, existing)
+        await kv.set_json(STATS_KV_KEY, merged)
+    except Exception:
+        LOGGER.debug("Could not persist stats to KV", exc_info=True)
 
 
 def _build_user_prefix(message: Message) -> str:
@@ -2034,38 +2448,43 @@ def _build_intro_keyboard(
     bot_username: str | None,
     *,
     active: str | None = None,
+    lang: str = "ru",
 ) -> InlineKeyboardMarkup:
     menu_rows = [
         [
-            _menu_button("🚀 Быстрый старт", MENU_START, active),
-            _menu_button("📖 Как пользоваться", MENU_HELP, active),
+            _menu_button(get_text(lang, "tab_start"), MENU_START, active),
+            _menu_button(get_text(lang, "tab_help"), MENU_HELP, active),
         ],
         [
-            _menu_button("🎛 Сервисы", MENU_PLATFORMS, active),
-            _menu_button("📣 Для каналов", MENU_GUIDE, active),
+            _menu_button(get_text(lang, "tab_platforms"), MENU_PLATFORMS, active),
+            _menu_button(get_text(lang, "tab_guide"), MENU_GUIDE, active),
         ],
-        [_menu_button("🧪 Пример поста", MENU_DEMO, active)],
+        [_menu_button(get_text(lang, "tab_demo"), MENU_DEMO, active)],
     ]
     action_row = [_channel_button()]
     if bot_username:
         bot_url = f"https://t.me/{bot_username}"
         share_url = "https://t.me/share/url?url=" + quote(bot_url, safe="")
         action_row.append(
-            _url_button("Поделиться ботом", url=share_url, style="primary")
+            _url_button(get_text(lang, "share_button"), url=share_url, style="primary")
         )
 
     return InlineKeyboardMarkup([*menu_rows, action_row])
 
 
-def _build_error_keyboard(bot_username: str | None) -> InlineKeyboardMarkup:
-    rows = [[_menu_button("Что поддерживается", MENU_PLATFORMS, None)]]
+def _build_error_keyboard(
+    bot_username: str | None,
+    *,
+    lang: str = "ru",
+) -> InlineKeyboardMarkup:
+    rows = [[_menu_button(get_text(lang, "error_platforms_button"), MENU_PLATFORMS, None)]]
     if bot_username:
         bot_url = f"https://t.me/{bot_username}"
         share_url = "https://t.me/share/url?url=" + quote(bot_url, safe="")
         rows.append(
             [
                 _channel_button(),
-                _url_button("Поделиться ботом", url=share_url, style="primary"),
+                _url_button(get_text(lang, "share_button"), url=share_url, style="primary"),
             ]
         )
 
@@ -2082,75 +2501,14 @@ def _menu_button(label: str, callback_data: str, active: str | None) -> InlineKe
     )
 
 
-def _menu_text(menu_key: str) -> str:
-    if menu_key == MENU_HELP:
-        return (
-            "<b>Как пользоваться</b>\n\n"
-            "1️⃣ Пришли ссылку на релиз, видео или эфир\n"
-            "2️⃣ Хочешь подводку — напиши текст над ссылкой, он станет цитатой\n"
-            "3️⃣ Получи чистый пост: preview, хэштеги и кнопки площадок\n\n"
-            "💡 Несколько ссылок одним сообщением превращаются в нумерованную "
-            "подборку с кнопкой на каждый релиз\n\n"
-            "⚡ В любом другом чате набери <code>@StonerHandBot ссылка</code> — "
-            "вставишь готовый пост, не выходя из разговора\n\n"
-            "Разметка в подводке сохраняется: жирный, курсив, спойлеры, ссылки"
-        )
-
-    if menu_key == MENU_DEMO:
-        return (
-            "<b>Пример поста</b>\n\n"
-            "Присылаешь ссылку — получаешь такое:\n\n"
-            "<blockquote>📻 · The Soft Moon\n"
-            "Criminal\n\n"
-            "кнопки ниже, трек ждет\n\n"
-            "#stonerhand #track\n\n"
-            "[🟢 Spotify] [⚪ Apple]\n"
-            "[🟦 Deezer] [⚫ Tidal]\n"
-            "[🪩 Все платформы]</blockquote>\n\n"
-            "Сверху — обложка релиза, снизу — живые кнопки всех площадок, "
-            "где нашелся релиз\n\n"
-            "Попробуй: пришли любую ссылку из Spotify, Apple Music или YouTube 👇"
-        )
-
-    if menu_key == MENU_GUIDE:
-        return (
-            "<b>Для групп и каналов</b>\n\n"
-            "1️⃣ Добавь бота в группу или канал\n"
-            "2️⃣ Сделай его админом с правом удалять сообщения\n"
-            "3️⃣ Кидай ссылки как обычно — бот заменит их готовыми постами\n\n"
-            "💡 Текст над ссылкой станет цитатой с подписью автора, "
-            "хэштеги добавятся автоматически\n\n"
-            "Пост публикуется до удаления исходного сообщения, "
-            "так что контент не теряется"
-        )
-
-    if menu_key == MENU_PLATFORMS:
-        return (
-            "<b>Что можно присылать</b>\n\n"
-            "🟢 Spotify — треки, альбомы, плейлисты, артисты, подкасты\n"
-            "⚪ Apple Music и Apple Podcasts\n"
-            "🔴 YouTube и YouTube Music\n"
-            "🟠 SoundCloud\n"
-            "🟦 Deezer · ⚫ Tidal · 🟡 Yandex Music\n"
-            "📡 NTS Radio\n\n"
-            "<b>Что получится</b>\n"
-            "Карточка релиза с кнопками всех площадок, где он нашелся. "
-            "YouTube оформится как видео-пост, NTS — как радио-эфир, "
-            "несколько ссылок — как подборка"
-        )
-
-    return (
-        "🎧 <b>StonerHand Soundlinks</b>\n\n"
-        "Превращаю музыкальные ссылки в аккуратные посты: "
-        "обложка, название, автохэштеги и кнопки всех площадок\n\n"
-        "<b>Что умею</b>\n"
-        "• Трек, альбом, плейлист, артист, подкаст\n"
-        "• YouTube-видео и эфиры NTS Radio\n"
-        "• Несколько ссылок разом → нумерованная подборка\n"
-        "• Подводка над ссылкой → цитата в посте\n"
-        "• Inline: набери @StonerHandBot + ссылку в любом чате\n\n"
-        "Просто пришли ссылку 👇"
-    )
+def _menu_text(menu_key: str, *, lang: str = "ru") -> str:
+    key_map = {
+        MENU_HELP: "menu_help",
+        MENU_DEMO: "menu_demo",
+        MENU_GUIDE: "menu_guide",
+        MENU_PLATFORMS: "menu_platforms",
+    }
+    return get_text(lang, key_map.get(menu_key, "menu_start"))
 
 
 async def _notify_admin(
