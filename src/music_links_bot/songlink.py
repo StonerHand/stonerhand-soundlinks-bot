@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import asdict, fields
 import re
 from collections.abc import Mapping
 
@@ -8,10 +9,13 @@ import httpx
 
 from music_links_bot.cache import TTLCache
 from music_links_bot.constants import HTTP_USER_AGENT, PLATFORM_ALIASES
+from music_links_bot.kvstore import KVStore
 from music_links_bot.models import TrackMatch
 from music_links_bot.url_utils import cache_key_for_url
 
 HTTP_HEADERS = {"User-Agent": HTTP_USER_AGENT}
+KV_TTL_SECONDS = 7 * 24 * 3600
+_TRACK_FIELDS = {field.name for field in fields(TrackMatch)}
 
 
 class SonglinkError(RuntimeError):
@@ -29,9 +33,11 @@ class SonglinkClient:
         user_countries: tuple[str, ...],
         api_key: str | None = None,
         timeout: float = 8.0,
+        kv: KVStore | None = None,
     ) -> None:
         self._user_countries = user_countries
         self._api_key = api_key
+        self._kv = kv
         self._client = httpx.AsyncClient(
             base_url="https://api.song.link/v1-alpha.1",
             headers=HTTP_HEADERS,
@@ -48,6 +54,11 @@ class SonglinkClient:
         cached_match = self._cache.get(cache_key)
         if cached_match is not None:
             return cached_match
+
+        shared_match = await self._get_shared_cache(cache_key)
+        if shared_match is not None:
+            self._cache.set(cache_key, shared_match)
+            return shared_match
 
         results = await asyncio.gather(
             *(
@@ -79,7 +90,39 @@ class SonglinkClient:
 
         match = self._merge_matches(matches)
         self._cache.set(cache_key, match)
+        await self._set_shared_cache(cache_key, match)
         return match
+
+    async def _get_shared_cache(self, cache_key: str) -> TrackMatch | None:
+        if self._kv is None:
+            return None
+
+        payload = await self._kv.get_json(f"sl:{cache_key}")
+        if not isinstance(payload, dict):
+            return None
+
+        known_fields = {
+            key: value for key, value in payload.items() if key in _TRACK_FIELDS
+        }
+        try:
+            match = TrackMatch(**known_fields)
+        except TypeError:
+            return None
+
+        if not match.title or not isinstance(match.links, dict):
+            return None
+
+        return match
+
+    async def _set_shared_cache(self, cache_key: str, match: TrackMatch) -> None:
+        if self._kv is None:
+            return
+
+        await self._kv.set_json(
+            f"sl:{cache_key}",
+            asdict(match),
+            ttl_seconds=KV_TTL_SECONDS,
+        )
 
     async def _lookup_track_for_country(self, source_url: str, user_country: str) -> TrackMatch:
         params = {

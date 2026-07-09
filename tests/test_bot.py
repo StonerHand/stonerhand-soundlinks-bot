@@ -33,6 +33,8 @@ from music_links_bot.bot import (
     _should_include_hashtags,
     _split_source_urls,
     _send_track_result,
+    _editor_rows,
+    _render_track_draft,
     track_lookup_message,
 )
 from music_links_bot.artist import ArtistLookupError
@@ -45,6 +47,7 @@ from music_links_bot.models import (
 )
 from music_links_bot.nts import NTSLookupError
 from music_links_bot.playlist import PlaylistLookupError
+from music_links_bot.search import SearchLookupError
 from music_links_bot.songlink import SonglinkError
 from music_links_bot.soundcloud import SoundCloudLookupError
 from music_links_bot.youtube import YouTubeLookupError
@@ -136,6 +139,18 @@ class ArtistClientStub:
         )
 
 
+class FailingSearchClientStub:
+    async def search_release_url(self, query: str) -> str:
+        del query
+        raise SearchLookupError("nothing matched")
+
+
+class SuccessfulSearchClientStub:
+    async def search_release_url(self, query: str) -> str:
+        del query
+        return "https://open.spotify.com/track/abc"
+
+
 class FailingArtistClientStub:
     async def lookup_artist(self, source_url: str) -> ArtistMatch:
         del source_url
@@ -165,6 +180,7 @@ class ContextStub:
         soundcloud_client: object | None = None,
         playlist_client: object | None = None,
         artist_client: object | None = None,
+        search_client: object | None = None,
         ui_mode: str = "stonerhand",
     ) -> None:
         self.bot = BotStub()
@@ -180,6 +196,8 @@ class ContextStub:
                     "soundcloud_client": soundcloud_client or SoundCloudClientStub(),
                     "playlist_client": playlist_client or PlaylistClientStub(),
                     "artist_client": artist_client or ArtistClientStub(),
+                    "search_client": search_client or FailingSearchClientStub(),
+                    "drafts": {},
                     "ui_mode": ui_mode,
                 }
             },
@@ -316,6 +334,7 @@ class PrivateMixedPlaylistMessageStub(PrivateMessageStub):
 class UpdateStub:
     def __init__(self, message: ChannelMessageStub) -> None:
         self.effective_message = message
+        self.effective_user = None
 
 
 class BotKeyboardTests(unittest.TestCase):
@@ -798,6 +817,91 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(keyboard[0][0].text, "🎛 Открыть плейлист")
 
 
+class PostEditorTests(unittest.TestCase):
+    def _draft(self, **overrides: object) -> dict:
+        draft = {
+            "v": 1,
+            "type": "track",
+            "item": {
+                "title": "Transitions",
+                "artist": "Youth Code",
+                "links": {"spotify": "https://open.spotify.com/track/1"},
+                "page_url": "https://song.link/transitions",
+                "release_year": None,
+                "kind": "song",
+                "release_format": None,
+                "thumbnail_url": None,
+            },
+            "prefix": "",
+            "hashtags": False,
+            "quote": False,
+            "chat_id": 456,
+            "lang": "ru",
+            "can_publish": False,
+        }
+        draft.update(overrides)
+        return draft
+
+    def test_editor_rows_show_toggle_states_and_actions(self) -> None:
+        rows = _editor_rows("abc123", self._draft(hashtags=True))
+
+        self.assertEqual(rows[0][0].text, "#️⃣ Хэштеги: вкл")
+        self.assertEqual(rows[0][0].callback_data, "ed|h|abc123")
+        self.assertEqual(rows[1][0].text, "✅ Готово")
+        self.assertEqual(rows[1][1].text, "🗑 Удалить")
+        self.assertEqual(len(rows[1]), 2)
+
+    def test_editor_rows_add_publish_button_for_admin(self) -> None:
+        rows = _editor_rows("abc123", self._draft(can_publish=True))
+
+        self.assertEqual(rows[1][2].text, "📤 В канал")
+        self.assertEqual(rows[1][2].callback_data, "ed|p|abc123")
+
+    def test_editor_rows_show_quote_toggle_only_with_prefix(self) -> None:
+        rows_without_quote = _editor_rows("abc123", self._draft())
+        rows_with_quote = _editor_rows(
+            "abc123",
+            self._draft(prefix="<blockquote>интро</blockquote>\n", quote=True),
+        )
+
+        self.assertEqual(len(rows_without_quote[0]), 1)
+        self.assertEqual(len(rows_with_quote[0]), 2)
+        self.assertEqual(rows_with_quote[0][1].text, "💬 Цитата: вкл")
+
+    def test_render_track_draft_respects_toggles(self) -> None:
+        draft = self._draft(
+            prefix="<blockquote>интро</blockquote>\n",
+            quote=True,
+            hashtags=True,
+        )
+
+        text, keyboard = _render_track_draft(draft, None, draft_id="abc123")
+
+        self.assertIn("интро", text)
+        self.assertIn("#stonerhand", text)
+        editor_buttons = [
+            button.callback_data
+            for row in keyboard.inline_keyboard
+            for button in row
+            if button.callback_data
+        ]
+        self.assertIn("ed|h|abc123", editor_buttons)
+
+        draft["quote"] = False
+        draft["hashtags"] = False
+        text, keyboard = _render_track_draft(draft, None, draft_id=None)
+
+        self.assertNotIn("интро", text)
+        self.assertNotIn("#stonerhand", text)
+        editor_buttons = [
+            button.callback_data
+            for row in keyboard.inline_keyboard
+            for button in row
+            if button.callback_data
+        ]
+        self.assertEqual(editor_buttons, [])
+
+
 class BotLookupTests(unittest.IsolatedAsyncioTestCase):
     async def test_group_post_is_deleted_only_after_result_is_sent(self) -> None:
         message = ReplaceableMessageStub()
@@ -840,11 +944,52 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertIn("Пришли ссылку на трек, альбом, плейлист", message.replies[0])
+        self.assertIn("Ничего не нашел по этому запросу", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "Что поддерживается")
         self.assertEqual(context.bot.sent_messages, [])
         self.assertEqual(context.bot.chat_actions, [])
+
+    async def test_private_plain_text_searches_and_builds_track_post(self) -> None:
+        message = PrivateMessageStub()
+        context = ContextStub(search_client=SuccessfulSearchClientStub())
+
+        with patch("music_links_bot.bot.record_matches"):
+            await track_lookup_message(UpdateStub(message), context)
+
+        self.assertEqual(len(message.replies), 1)
+        self.assertIn("<b>Youth Code</b>", message.replies[0])
+        # The query itself must not be quoted back into the post.
+        self.assertNotIn("привет", message.replies[0])
+        keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
+        callback_data = [
+            button.callback_data
+            for row in keyboard
+            for button in row
+            if button.callback_data
+        ]
+        self.assertTrue(any(data.startswith("ed|") for data in callback_data))
+
+    async def test_private_single_track_post_includes_editor_row(self) -> None:
+        message = PrivateSpotifyTrackMessageStub()
+        context = ContextStub()
+
+        with patch("music_links_bot.bot.record_matches"):
+            await track_lookup_message(UpdateStub(message), context)
+
+        self.assertEqual(len(message.replies), 1)
+        keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
+        callback_data = [
+            button.callback_data
+            for row in keyboard
+            for button in row
+            if button.callback_data
+        ]
+        self.assertIn(
+            True,
+            [data.startswith("ed|h|") for data in callback_data],
+        )
+        self.assertEqual(len(context.application.bot_data["drafts"]), 1)
 
     async def test_youtube_video_links_use_video_post(self) -> None:
         message = PrivateYouTubeMessageStub()

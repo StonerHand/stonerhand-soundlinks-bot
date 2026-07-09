@@ -225,6 +225,48 @@ def _record_activity(
         return stats
 
 
+def merge_stats(base: StatsData, other: object) -> StatsData:
+    """Merges two stats snapshots (e.g. the local file and the Redis blob).
+
+    Counters diverge across serverless instances, so the merged view takes the
+    maximum of each counter and unions the user/chat maps entry by entry.
+    """
+    if not isinstance(other, dict):
+        return base
+
+    merged = _empty_stats()
+    for key in (
+        "posts",
+        "song",
+        "album",
+        "podcast",
+        "videos",
+        "radios",
+        "playlists",
+        "artists",
+        "collections",
+    ):
+        base_value = base.get(key, 0)
+        other_value = other.get(key, 0)
+        merged[key] = max(
+            base_value if isinstance(base_value, int) else 0,
+            other_value if isinstance(other_value, int) else 0,
+        )
+
+    for map_key in ("users", "chats"):
+        merged_map = dict(_clean_counter_map(other.get(map_key)))
+        for entry_id, entry in _clean_counter_map(base.get(map_key)).items():
+            existing = merged_map.get(entry_id)
+            if existing is None or int(entry.get("count") or 0) >= int(
+                existing.get("count") or 0
+            ):
+                merged_map[entry_id] = entry
+
+        merged[map_key] = merged_map
+
+    return merged
+
+
 def format_stats_message(stats: StatsData, *, include_private: bool = False) -> str:
     lines = [
         "StonerHand stats\n\n"
