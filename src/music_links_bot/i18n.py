@@ -172,7 +172,8 @@ STRINGS: dict[str, dict[str, str]] = {
             "[🪩 Все платформы]</blockquote>\n\n"
             "Сверху — обложка релиза, снизу — живые кнопки всех площадок, "
             "где нашелся релиз\n\n"
-            "Попробуй: пришли любую ссылку из Spotify, Apple Music или YouTube 👇"
+            "Попробуй: пришли ссылку из Spotify, Apple Music, YouTube — "
+            "или просто название трека 👇"
         ),
         EN: (
             "<b>Example post</b>\n\n"
@@ -185,7 +186,8 @@ STRINGS: dict[str, dict[str, str]] = {
             "[🟦 Deezer] [⚫ Tidal]\n"
             "[🪩 All platforms]</blockquote>\n\n"
             "Cover art on top, live buttons for every matched platform below\n\n"
-            "Try it: send any Spotify, Apple Music or YouTube link 👇"
+            "Try it: send a Spotify, Apple Music or YouTube link — "
+            "or just type a track name 👇"
         ),
     },
     "no_url_hint": {
@@ -214,6 +216,9 @@ STRINGS: dict[str, dict[str, str]] = {
     "ed_quote": {RU: "💬 Цитата", EN: "💬 Quote"},
     "ed_on": {RU: "вкл", EN: "on"},
     "ed_off": {RU: "выкл", EN: "off"},
+    "ed_preview": {RU: "🖼 Превью", EN: "🖼 Preview"},
+    "ed_preview_small": {RU: "компакт", EN: "compact"},
+    "ed_preview_large": {RU: "большое", EN: "large"},
     "ed_done": {RU: "✅ Готово", EN: "✅ Done"},
     "ed_delete": {RU: "🗑 Удалить", EN: "🗑 Delete"},
     "ed_publish": {RU: "📤 В канал", EN: "📤 To channel"},

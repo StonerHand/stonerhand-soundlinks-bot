@@ -561,7 +561,7 @@ def _inline_article(
             parse_mode=ParseMode.HTML,
             link_preview_options=_build_link_preview_options(
                 preview_url,
-                prefer_large_media=True,
+                prefer_large_media=False,
             ),
         ),
         reply_markup=keyboard,
@@ -585,6 +585,7 @@ async def _send_track_draft(
         "prefix": user_prefix,
         "hashtags": False,
         "quote": bool(user_prefix),
+        "large_preview": False,
         "chat_id": message.chat_id,
         "lang": lang,
         "can_publish": (
@@ -600,7 +601,7 @@ async def _send_track_draft(
         text,
         preview_url=_select_preview_url(track.links, context) or track.thumbnail_url,
         reply_markup=keyboard,
-        prefer_large_preview=True,
+        prefer_large_preview=bool(draft.get("large_preview")),
     )
     await _store_draft(context, draft_id, draft)
 
@@ -648,6 +649,17 @@ def _editor_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]
                 callback_data=f"ed|q|{draft_id}",
             )
         )
+
+    preview_state = get_text(
+        lang,
+        "ed_preview_large" if draft.get("large_preview") else "ed_preview_small",
+    )
+    toggle_row.append(
+        InlineKeyboardButton(
+            f"{get_text(lang, 'ed_preview')}: {preview_state}",
+            callback_data=f"ed|v|{draft_id}",
+        )
+    )
 
     action_row = [
         InlineKeyboardButton(get_text(lang, "ed_done"), callback_data=f"ed|f|{draft_id}"),
@@ -747,6 +759,8 @@ async def editor_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         draft["hashtags"] = not draft.get("hashtags")
     elif action == "q":
         draft["quote"] = not draft.get("quote")
+    elif action == "v":
+        draft["large_preview"] = not draft.get("large_preview")
     elif action != "f":
         await query.answer()
         return
@@ -762,7 +776,7 @@ async def editor_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             parse_mode=ParseMode.HTML,
             link_preview_options=_build_link_preview_options(
                 _select_preview_url(track.links, context) or track.thumbnail_url,
-                prefer_large_media=True,
+                prefer_large_media=bool(draft.get("large_preview")),
             ),
             reply_markup=keyboard,
         )
@@ -798,7 +812,7 @@ async def _publish_draft(context: ContextTypes.DEFAULT_TYPE, draft: dict) -> boo
             parse_mode=ParseMode.HTML,
             link_preview_options=_build_link_preview_options(
                 _select_preview_url(track.links, context) or track.thumbnail_url,
-                prefer_large_media=True,
+                prefer_large_media=bool(draft.get("large_preview")),
             ),
             reply_markup=keyboard,
         )
@@ -1050,8 +1064,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
                     tracks,
                     include_channel_button=include_channel_button,
                 ),
-                prefer_large_preview=True,
-            )
+                )
             _record_matches_safely(tracks, message, context=context)
             return
 
@@ -1083,8 +1096,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
                     release_kind=track.kind,
                     release_format=track.release_format,
                 ),
-                prefer_large_preview=True,
-            )
+                )
         _record_matches_safely([track], message, context=context)
         return
 
@@ -1417,7 +1429,6 @@ async def _send_youtube_result(
                 video.url,
                 include_channel_button=include_channel_button,
             ),
-            prefer_large_preview=True,
         )
         return
 
@@ -1431,7 +1442,6 @@ async def _send_youtube_result(
             videos,
             include_channel_button=include_channel_button,
         ),
-        prefer_large_preview=True,
     )
 
 
@@ -1458,7 +1468,6 @@ async def _send_nts_result(
                 radio.url,
                 include_channel_button=include_channel_button,
             ),
-            prefer_large_preview=True,
         )
         return
 
@@ -1472,7 +1481,6 @@ async def _send_nts_result(
             radios,
             include_channel_button=include_channel_button,
         ),
-        prefer_large_preview=True,
     )
 
 
@@ -1500,7 +1508,6 @@ async def _send_playlist_result(
                 playlist.url,
                 include_channel_button=include_channel_button,
             ),
-            prefer_large_preview=True,
         )
         return
 
@@ -1517,7 +1524,6 @@ async def _send_playlist_result(
             playlists,
             include_channel_button=include_channel_button,
         ),
-        prefer_large_preview=True,
     )
 
 
@@ -1544,7 +1550,6 @@ async def _send_artist_result(
                 artist.url,
                 include_channel_button=include_channel_button,
             ),
-            prefer_large_preview=True,
         )
         return
 
@@ -1561,7 +1566,6 @@ async def _send_artist_result(
             artists,
             include_channel_button=include_channel_button,
         ),
-        prefer_large_preview=True,
     )
 
 
@@ -1608,7 +1612,6 @@ async def _send_mixed_result(
             radios,
             include_channel_button=include_channel_button,
         ),
-        prefer_large_preview=True,
     )
 
 
@@ -1735,6 +1738,10 @@ async def _build_lookup_fallback(
     return generic_soundcloud_fallback
 
 
+def _songlink_page_url(source_url: str) -> str:
+    return f"https://song.link/{source_url}"
+
+
 def _build_podcast_fallback(source_url: str) -> TrackMatch | None:
     spotify_type = spotify_url_type(source_url)
     if spotify_type == "episode":
@@ -1742,7 +1749,7 @@ def _build_podcast_fallback(source_url: str) -> TrackMatch | None:
             title="Podcast episode",
             artist="Spotify",
             links={"spotify": source_url},
-            page_url=source_url,
+            page_url=_songlink_page_url(source_url),
             kind="podcast",
         )
 
@@ -1751,7 +1758,7 @@ def _build_podcast_fallback(source_url: str) -> TrackMatch | None:
             title="Podcast show",
             artist="Spotify",
             links={"spotify": source_url},
-            page_url=source_url,
+            page_url=_songlink_page_url(source_url),
             kind="podcast",
             release_format="show",
         )
@@ -1762,7 +1769,7 @@ def _build_podcast_fallback(source_url: str) -> TrackMatch | None:
             title="Podcast episode",
             artist="Apple Podcasts",
             links={"applePodcasts": source_url},
-            page_url=source_url,
+            page_url=_songlink_page_url(source_url),
             kind="podcast",
         )
 
@@ -1771,7 +1778,7 @@ def _build_podcast_fallback(source_url: str) -> TrackMatch | None:
             title="Podcast show",
             artist="Apple Podcasts",
             links={"applePodcasts": source_url},
-            page_url=source_url,
+            page_url=_songlink_page_url(source_url),
             kind="podcast",
             release_format="show",
         )

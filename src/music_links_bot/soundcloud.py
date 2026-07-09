@@ -69,7 +69,7 @@ def parse_soundcloud_metadata(
         title=title or "SoundCloud",
         artist=artist or "SoundCloud",
         links={"soundcloud": source_url},
-        page_url=source_url,
+        page_url=f"https://song.link/{source_url}",
         kind=_soundcloud_release_kind(source_url),
     )
 
@@ -82,7 +82,7 @@ def build_soundcloud_fallback(source_url: str) -> TrackMatch | None:
         title="SoundCloud",
         artist="SoundCloud",
         links={"soundcloud": source_url},
-        page_url=source_url,
+        page_url=f"https://song.link/{source_url}",
         kind=_soundcloud_release_kind(source_url),
     )
 
