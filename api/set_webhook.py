@@ -17,7 +17,11 @@ SRC_PATH = PROJECT_ROOT / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
-from music_links_bot.bot import PUBLIC_BOT_COMMANDS
+from music_links_bot.bot import (
+    BOT_DESCRIPTIONS,
+    BOT_SHORT_DESCRIPTIONS,
+    PUBLIC_BOT_COMMANDS,
+)
 from music_links_bot.config import Settings
 
 ALLOWED_UPDATES = ("message", "channel_post", "callback_query", "inline_query")
@@ -115,10 +119,32 @@ def _sync_commands(bot_token: str) -> dict[str, object]:
         commands_url = _telegram_set_commands_url(bot_token)
         with urlopen(commands_url, timeout=20) as response:
             payload = json.loads(response.read().decode("utf-8"))
-            return payload if isinstance(payload, dict) else {"ok": False}
+
+        _sync_descriptions(bot_token)
+        return payload if isinstance(payload, dict) else {"ok": False}
     except Exception as exc:
         LOGGER.error("Command sync failed: %s", type(exc).__name__)
         return {"ok": False, "error": "command sync failed"}
+
+
+def _sync_descriptions(bot_token: str) -> None:
+    calls = [
+        ("setMyDescription", "description", BOT_DESCRIPTIONS),
+        ("setMyShortDescription", "short_description", BOT_SHORT_DESCRIPTIONS),
+    ]
+    for method, field, texts in calls:
+        for language_code, text in texts.items():
+            params = {field: text}
+            if language_code:
+                params["language_code"] = language_code
+
+            query = urlencode(params)
+            url = f"https://api.telegram.org/bot{bot_token}/{method}?{query}"
+            try:
+                with urlopen(url, timeout=20):
+                    pass
+            except Exception as exc:
+                LOGGER.error("%s sync failed: %s", method, type(exc).__name__)
 
 
 def _is_authorized(path: str, authorization_header: str | None) -> bool:

@@ -33,6 +33,7 @@ from music_links_bot.bot import (
     _should_include_hashtags,
     _split_source_urls,
     _send_track_result,
+    _strip_bot_mention,
     _editor_rows,
     _render_track_draft,
     track_lookup_message,
@@ -338,6 +339,17 @@ class UpdateStub:
 
 
 class BotKeyboardTests(unittest.TestCase):
+    def test_strip_bot_mention_is_case_insensitive(self) -> None:
+        self.assertEqual(
+            _strip_bot_mention("@stonerhandbot paranoid", "StonerHandBot"),
+            "paranoid",
+        )
+        self.assertEqual(
+            _strip_bot_mention("paranoid", "StonerHandBot"),
+            "paranoid",
+        )
+        self.assertEqual(_strip_bot_mention("paranoid", None), "paranoid")
+
     def test_public_command_menu_stays_curated(self) -> None:
         self.assertEqual(
             [(command.command, command.description) for command in PUBLIC_BOT_COMMANDS],
@@ -949,6 +961,28 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(keyboard[0][0].text, "Что поддерживается")
         self.assertEqual(context.bot.sent_messages, [])
         self.assertEqual(context.bot.chat_actions, [])
+
+    async def test_search_query_drops_bot_mention(self) -> None:
+        class RecordingSearchClientStub:
+            def __init__(self) -> None:
+                self.queries: list[str] = []
+
+            async def search_release_url(self, query: str) -> str:
+                self.queries.append(query)
+                return "https://open.spotify.com/track/abc"
+
+        search_client = RecordingSearchClientStub()
+
+        class MentionMessageStub(PrivateMessageStub):
+            text = "@StonerHandBot paranoid"
+
+        message = MentionMessageStub()
+        context = ContextStub(search_client=search_client)
+
+        with patch("music_links_bot.bot.record_matches"):
+            await track_lookup_message(UpdateStub(message), context)
+
+        self.assertEqual(search_client.queries, ["paranoid"])
 
     async def test_private_plain_text_searches_and_builds_track_post(self) -> None:
         message = PrivateMessageStub()

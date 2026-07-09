@@ -217,9 +217,51 @@ def build_application(settings: Settings) -> Application:
     return application
 
 
+BOT_DESCRIPTIONS = {
+    "": (
+        "Превращаю музыкальные ссылки в аккуратные посты: обложка, "
+        "автохэштеги и кнопки всех площадок.\n\n"
+        "• Ссылка или просто название трека\n"
+        "• Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
+        "Yandex Music, NTS Radio\n"
+        "• Inline: @StonerHandBot + запрос в любом чате\n"
+        "• Редактор поста: хэштеги, цитата, публикация в канал"
+    ),
+    "en": (
+        "I turn music links into clean posts: cover art, smart hashtags "
+        "and buttons for every platform.\n\n"
+        "• A link or just a track name\n"
+        "• Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
+        "Yandex Music, NTS Radio\n"
+        "• Inline: @StonerHandBot + a query in any chat\n"
+        "• Post editor: hashtags, quote, publish-to-channel"
+    ),
+}
+BOT_SHORT_DESCRIPTIONS = {
+    "": (
+        "Музыкальные ссылки → посты с кнопками всех площадок. "
+        "Поиск по названию, inline и редактор"
+    ),
+    "en": (
+        "Music links → posts with buttons for every platform. "
+        "Name search, inline mode and a post editor"
+    ),
+}
+
+
 async def sync_application_commands(application: Application) -> None:
     try:
         await application.bot.set_my_commands(PUBLIC_BOT_COMMANDS)
+        for language_code, description in BOT_DESCRIPTIONS.items():
+            await application.bot.set_my_description(
+                description,
+                language_code=language_code or None,
+            )
+        for language_code, short_description in BOT_SHORT_DESCRIPTIONS.items():
+            await application.bot.set_my_short_description(
+                short_description,
+                language_code=language_code or None,
+            )
     except TelegramError:
         LOGGER.info("Could not sync bot command menu")
 
@@ -882,7 +924,9 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         if not is_private:
             return
 
-        search_query = normalize_search_query(message_text or "")
+        search_query = normalize_search_query(
+            _strip_bot_mention(message_text or "", context.bot.username)
+        )
         if search_query is None:
             await _reply_with_error(
                 message,
@@ -1154,6 +1198,17 @@ def _format_not_found_message(source_urls: list[str]) -> str:
         return phrase
 
     return f"{phrase}\n\n{NOT_FOUND_DETAIL}"
+
+
+def _strip_bot_mention(text: str, bot_username: str | None) -> str:
+    if not bot_username:
+        return text
+
+    mention = f"@{bot_username}"
+    cleaned = " ".join(
+        word for word in text.split() if word.casefold() != mention.casefold()
+    )
+    return cleaned
 
 
 def _format_no_url_message(
