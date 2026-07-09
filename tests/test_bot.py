@@ -48,7 +48,7 @@ from music_links_bot.models import (
 )
 from music_links_bot.nts import NTSLookupError
 from music_links_bot.playlist import PlaylistLookupError
-from music_links_bot.search import SearchLookupError
+from music_links_bot.search import SearchCandidate, SearchLookupError
 from music_links_bot.songlink import SonglinkError
 from music_links_bot.soundcloud import SoundCloudLookupError
 from music_links_bot.youtube import YouTubeLookupError
@@ -145,11 +145,30 @@ class FailingSearchClientStub:
         del query
         raise SearchLookupError("nothing matched")
 
+    async def search_release_candidates(self, query: str) -> list[SearchCandidate]:
+        del query
+        raise SearchLookupError("nothing matched")
+
 
 class SuccessfulSearchClientStub:
     async def search_release_url(self, query: str) -> str:
         del query
         return "https://open.spotify.com/track/abc"
+
+    async def search_release_candidates(self, query: str) -> list[SearchCandidate]:
+        del query
+        return [
+            SearchCandidate(
+                url="https://open.spotify.com/track/abc",
+                title="Transitions",
+                artist="Youth Code",
+            ),
+            SearchCandidate(
+                url="https://open.spotify.com/track/def",
+                title="Anagnorisis",
+                artist="Youth Code",
+            ),
+        ]
 
 
 class FailingArtistClientStub:
@@ -818,6 +837,35 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.title, "SANSAE Live Session Vol.3 - Melon")
         keyboard = result.reply_markup.inline_keyboard
         self.assertEqual(keyboard[0][0].text, "📺 Смотреть на YouTube")
+
+    async def test_inline_text_search_offers_multiple_results(self) -> None:
+        from music_links_bot.bot import inline_query_handler
+
+        class InlineQueryStub:
+            query = "youth code"
+            from_user = None
+
+            def __init__(self) -> None:
+                self.answers: list[list] = []
+                self.answer_kwargs: list[dict] = []
+
+            async def answer(self, results, **kwargs) -> None:
+                self.answers.append(list(results))
+                self.answer_kwargs.append(kwargs)
+
+        class InlineUpdateStub:
+            def __init__(self, inline_query) -> None:
+                self.inline_query = inline_query
+
+        inline_query = InlineQueryStub()
+        context = ContextStub(search_client=SuccessfulSearchClientStub())
+
+        await inline_query_handler(InlineUpdateStub(inline_query), context)
+
+        self.assertEqual(len(inline_query.answers), 1)
+        self.assertEqual(len(inline_query.answers[0]), 2)
+        ids = {result.id for result in inline_query.answers[0]}
+        self.assertEqual(len(ids), 2)
 
     async def test_inline_playlist_result_uses_playlist_card(self) -> None:
         result = await _build_inline_result(

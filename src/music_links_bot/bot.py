@@ -409,7 +409,7 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         inline_query.from_user.language_code if inline_query.from_user else None
     )
     query_text = inline_query.query or ""
-    source_urls = extract_supported_urls(query_text)
+    source_urls = extract_supported_urls(query_text)[:1]
     if not source_urls:
         search_query = normalize_search_query(query_text)
         if search_query is None:
@@ -418,7 +418,7 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
         search_client: SearchClient = context.application.bot_data["search_client"]
         try:
-            source_urls = [await search_client.search_release_url(search_query)]
+            candidates = await search_client.search_release_candidates(search_query)
         except SearchLookupError:
             await _answer_inline_hint(
                 inline_query,
@@ -426,19 +426,30 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             )
             return
 
-    try:
-        result = await _build_inline_result(source_urls[0], context)
-    except Exception:
-        LOGGER.exception("Inline lookup failed for %s", source_urls[0])
-        result = None
+        source_urls = [candidate.url for candidate in candidates]
 
-    if result is None:
+    outcomes = await asyncio.gather(
+        *(_build_inline_result(source_url, context) for source_url in source_urls),
+        return_exceptions=True,
+    )
+    results = []
+    for source_url, outcome in zip(source_urls, outcomes, strict=False):
+        if isinstance(outcome, InlineQueryResultArticle):
+            results.append(outcome)
+        elif isinstance(outcome, Exception):
+            LOGGER.error(
+                "Inline lookup failed for %s",
+                source_url,
+                exc_info=(type(outcome), outcome, outcome.__traceback__),
+            )
+
+    if not results:
         await _answer_inline_hint(inline_query, get_text(lang, "inline_hint_not_found"))
         return
 
     try:
         await inline_query.answer(
-            [result],
+            results,
             cache_time=INLINE_CACHE_SECONDS,
             is_personal=False,
         )

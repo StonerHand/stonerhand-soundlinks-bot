@@ -529,4 +529,4 @@ For another channel, start with these files:
 
 ## License
 
-No license file is included yet. If you want people to freely fork, modify and reuse the project, add an explicit license such as MIT or Apache-2.0.
+[MIT](LICENSE) — fork it, remix it, run it for your own channel.

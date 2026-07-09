@@ -5,7 +5,11 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from music_links_bot.kvstore import KVStore
-from music_links_bot.search import _extract_release_url, normalize_search_query
+from music_links_bot.search import (
+    _extract_release_candidates,
+    _extract_release_url,
+    normalize_search_query,
+)
 
 
 class SearchQueryTests(unittest.TestCase):
@@ -35,6 +39,37 @@ class SearchQueryTests(unittest.TestCase):
         self.assertEqual(
             _extract_release_url(payload),
             "https://music.apple.com/album/1",
+        )
+
+    def test_extract_release_candidates_dedupes_and_caps(self) -> None:
+        payload = {
+            "results": [
+                {
+                    "trackViewUrl": "https://music.apple.com/track/1",
+                    "trackName": "Paranoid",
+                    "artistName": "Black Sabbath",
+                    "artworkUrl100": "https://images.example/1.jpg",
+                },
+                {"trackViewUrl": "https://music.apple.com/track/1"},
+                {"trackViewUrl": "https://music.apple.com/track/2"},
+                {"trackViewUrl": "https://music.apple.com/track/3"},
+                {"trackViewUrl": "https://music.apple.com/track/4"},
+            ]
+        }
+
+        candidates = _extract_release_candidates(payload)
+
+        self.assertEqual(len(candidates), 3)
+        self.assertEqual(candidates[0].title, "Paranoid")
+        self.assertEqual(candidates[0].artist, "Black Sabbath")
+        self.assertEqual(candidates[0].artwork_url, "https://images.example/1.jpg")
+        self.assertEqual(
+            [candidate.url for candidate in candidates],
+            [
+                "https://music.apple.com/track/1",
+                "https://music.apple.com/track/2",
+                "https://music.apple.com/track/3",
+            ],
         )
 
     def test_extract_release_url_handles_malformed_payloads(self) -> None:
