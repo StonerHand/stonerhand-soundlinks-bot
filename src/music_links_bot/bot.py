@@ -913,6 +913,12 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
     if message is None:
         return
 
+    # Posts inserted through this bot's own inline mode arrive as regular
+    # messages; re-processing them would send their text into search.
+    via_bot = getattr(message, "via_bot", None)
+    if via_bot is not None and via_bot.id == getattr(context.bot, "id", None):
+        return
+
     message_text = _message_text(message)
     source_urls = extract_supported_urls(message_text)[:MAX_LINKS_PER_MESSAGE]
     include_channel_button = _should_include_channel_button(message)
