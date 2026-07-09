@@ -1167,7 +1167,7 @@ def _select_preview_url(
     platform_order = _get_platform_order(context)
     for platform in platform_order:
         url = links.get(platform)
-        if url:
+        if url and not url.startswith(SPOTIFY_SEARCH_URL):
             return url
 
     return None
@@ -1686,7 +1686,24 @@ async def _lookup_tracks(
             )
             unavailable_urls.append(source_url)
 
-    return tracks, unavailable_urls
+    return [_ensure_spotify_link(track) for track in tracks], unavailable_urls
+
+
+SPOTIFY_SEARCH_URL = "https://open.spotify.com/search/"
+
+
+def _ensure_spotify_link(track: TrackMatch) -> TrackMatch:
+    """Every music card must have a Spotify button. When Song.link has no
+    direct link, fall back to a Spotify search deep link for the release."""
+    if track.links.get("spotify"):
+        return track
+
+    query = " ".join(part for part in (track.artist, track.title) if part).strip()
+    if not query:
+        return track
+
+    track.links["spotify"] = SPOTIFY_SEARCH_URL + quote(query, safe="")
+    return track
 
 
 async def _build_lookup_fallback(
