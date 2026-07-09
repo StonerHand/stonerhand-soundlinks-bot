@@ -163,6 +163,7 @@ class BotStub:
         self.sent_messages: list[dict[str, object]] = []
         self.chat_actions: list[dict[str, object]] = []
         self.username = "StonerHandBot"
+        self.id = 424242
 
     async def send_message(self, **kwargs: object) -> None:
         self.sent_messages.append(kwargs)
@@ -225,6 +226,7 @@ class ChannelMessageStub:
     caption = None
     chat_id = -1002903607636
     from_user = None
+    via_bot = None
     chat = type(
         "ChatStub",
         (),
@@ -961,6 +963,22 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(keyboard[0][0].text, "Что поддерживается")
         self.assertEqual(context.bot.sent_messages, [])
         self.assertEqual(context.bot.chat_actions, [])
+
+    async def test_messages_via_own_inline_mode_are_ignored(self) -> None:
+        class ViaBotStub:
+            id = 424242
+
+        class ViaBotMessageStub(PrivateMessageStub):
+            text = "🎧 · Black Sabbath\nParanoid\n\n#stonerhand #track"
+            via_bot = ViaBotStub()
+
+        message = ViaBotMessageStub()
+        context = ContextStub()
+
+        await track_lookup_message(UpdateStub(message), context)
+
+        self.assertEqual(message.replies, [])
+        self.assertEqual(context.bot.sent_messages, [])
 
     async def test_search_query_drops_bot_mention(self) -> None:
         class RecordingSearchClientStub:
