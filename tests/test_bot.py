@@ -849,6 +849,7 @@ class PostEditorTests(unittest.TestCase):
             "prefix": "",
             "hashtags": False,
             "quote": False,
+            "large_preview": True,
             "chat_id": 456,
             "lang": "ru",
             "can_publish": False,
@@ -881,7 +882,7 @@ class PostEditorTests(unittest.TestCase):
         self.assertEqual(len(rows_without_quote[0]), 2)
         self.assertEqual(len(rows_with_quote[0]), 3)
         self.assertEqual(rows_with_quote[0][1].text, "💬 Цитата: вкл")
-        self.assertEqual(rows_without_quote[0][1].text, "🖼 Превью: компакт")
+        self.assertEqual(rows_without_quote[0][1].text, "🖼 Превью: большое")
         self.assertEqual(rows_without_quote[0][1].callback_data, "ed|v|abc123")
 
     def test_render_track_draft_respects_toggles(self) -> None:
@@ -1063,9 +1064,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         preview_options = message.reply_kwargs[0]["link_preview_options"]
         self.assertEqual(keyboard[0][0].text, "📺 Смотреть на YouTube")
         self.assertEqual(keyboard[0][0].url, "https://www.youtube.com/watch?v=abc123")
-        self.assertTrue(preview_options.prefer_small_media)
-        self.assertFalse(bool(preview_options.prefer_large_media))
-        self.assertFalse(bool(preview_options.show_above_text))
+        self.assertTrue(preview_options.prefer_large_media)
+        self.assertFalse(bool(preview_options.prefer_small_media))
+        self.assertTrue(preview_options.show_above_text)
         record_videos.assert_called_once()
 
     async def test_nts_links_use_radio_post(self) -> None:
@@ -1083,9 +1084,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         preview_options = message.reply_kwargs[0]["link_preview_options"]
         self.assertEqual(keyboard[0][0].text, "📡 Открыть на NTS")
         self.assertEqual(keyboard[0][0].url, "https://www.nts.live/shows/example")
-        self.assertTrue(preview_options.prefer_small_media)
-        self.assertFalse(bool(preview_options.prefer_large_media))
-        self.assertFalse(bool(preview_options.show_above_text))
+        self.assertTrue(preview_options.prefer_large_media)
+        self.assertFalse(bool(preview_options.prefer_small_media))
+        self.assertTrue(preview_options.show_above_text)
         record_radios.assert_called_once()
 
     async def test_spotify_track_links_request_large_preview_above_text(self) -> None:
@@ -1102,9 +1103,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(keyboard[1][0].text, "🪩 Все платформы")
         self.assertEqual(keyboard[1][0].url, "https://song.link/transitions")
         preview_options = message.reply_kwargs[0]["link_preview_options"]
-        self.assertTrue(preview_options.prefer_small_media)
-        self.assertFalse(bool(preview_options.prefer_large_media))
-        self.assertFalse(bool(preview_options.show_above_text))
+        self.assertTrue(preview_options.prefer_large_media)
+        self.assertFalse(bool(preview_options.prefer_small_media))
+        self.assertTrue(preview_options.show_above_text)
         record_matches.assert_called_once()
 
     async def test_soundcloud_links_use_soundcloud_fallback_post(self) -> None:
@@ -1130,8 +1131,8 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             preview_options.url,
             "https://soundcloud.com/bondage-fairies/star-signs",
         )
-        self.assertTrue(preview_options.prefer_small_media)
-        self.assertFalse(bool(preview_options.show_above_text))
+        self.assertTrue(preview_options.prefer_large_media)
+        self.assertTrue(preview_options.show_above_text)
         record_matches.assert_called_once()
 
     async def test_spotify_playlist_links_use_playlist_post(self) -> None:
@@ -1151,9 +1152,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             "https://open.spotify.com/playlist/37i9dQZF1DX51TD2wakW3K?si=123",
         )
         preview_options = message.reply_kwargs[0]["link_preview_options"]
-        self.assertTrue(preview_options.prefer_small_media)
-        self.assertFalse(bool(preview_options.prefer_large_media))
-        self.assertFalse(bool(preview_options.show_above_text))
+        self.assertTrue(preview_options.prefer_large_media)
+        self.assertFalse(bool(preview_options.prefer_small_media))
+        self.assertTrue(preview_options.show_above_text)
         record_playlists.assert_called_once()
 
     async def test_spotify_artist_links_use_artist_post(self) -> None:
@@ -1174,9 +1175,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             "https://open.spotify.com/artist/2KbKmQQgFN6MabWViBVlO6?si=123",
         )
         preview_options = message.reply_kwargs[0]["link_preview_options"]
-        self.assertTrue(preview_options.prefer_small_media)
-        self.assertFalse(bool(preview_options.prefer_large_media))
-        self.assertFalse(bool(preview_options.show_above_text))
+        self.assertTrue(preview_options.prefer_large_media)
+        self.assertFalse(bool(preview_options.prefer_small_media))
+        self.assertTrue(preview_options.show_above_text)
         record_artists.assert_called_once()
 
     async def test_mixed_music_and_youtube_links_use_collection_post(self) -> None:
@@ -1195,9 +1196,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         preview_options = message.reply_kwargs[0]["link_preview_options"]
         self.assertEqual(keyboard[0][0].text, "🎧 1. Youth Code - Transitions")
         self.assertEqual(keyboard[0][1].text, "📺 2. SANSAE Live Session Vol.3 - Melon")
-        self.assertTrue(preview_options.prefer_small_media)
-        self.assertFalse(bool(preview_options.prefer_large_media))
-        self.assertFalse(bool(preview_options.show_above_text))
+        self.assertTrue(preview_options.prefer_large_media)
+        self.assertFalse(bool(preview_options.prefer_small_media))
+        self.assertTrue(preview_options.show_above_text)
         record_mixed.assert_called_once()
 
     async def test_mixed_playlist_and_youtube_links_keep_both_items(self) -> None:

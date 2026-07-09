@@ -561,7 +561,7 @@ def _inline_article(
             parse_mode=ParseMode.HTML,
             link_preview_options=_build_link_preview_options(
                 preview_url,
-                prefer_large_media=False,
+                prefer_large_media=True,
             ),
         ),
         reply_markup=keyboard,
@@ -585,7 +585,7 @@ async def _send_track_draft(
         "prefix": user_prefix,
         "hashtags": False,
         "quote": bool(user_prefix),
-        "large_preview": False,
+        "large_preview": True,
         "chat_id": message.chat_id,
         "lang": lang,
         "can_publish": (
@@ -1793,7 +1793,7 @@ async def _send_track_result(
     *,
     preview_url: str | None,
     reply_markup: InlineKeyboardMarkup | None,
-    prefer_large_preview: bool = False,
+    prefer_large_preview: bool = True,
 ) -> None:
     if message.chat.type in {"group", "supergroup", "channel"}:
         await bot.send_message(
@@ -1824,7 +1824,7 @@ async def _reply_with_track(
     *,
     preview_url: str | None,
     reply_markup: InlineKeyboardMarkup | None,
-    prefer_large_preview: bool = False,
+    prefer_large_preview: bool = True,
 ) -> Message:
     link_preview_options = _build_link_preview_options(
         preview_url,
