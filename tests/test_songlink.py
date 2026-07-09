@@ -124,6 +124,54 @@ class SonglinkClientTests(unittest.TestCase):
             },
         )
 
+    def test_extract_thumbnail_url_prefers_primary_entity(self) -> None:
+        client = SonglinkClient(user_countries=("US",))
+
+        thumbnail = client._extract_thumbnail_url(
+            {"thumbnailUrl": "https://images.example/cover.jpg"},
+            {},
+            "song",
+        )
+
+        self.assertEqual(thumbnail, "https://images.example/cover.jpg")
+
+    def test_extract_thumbnail_url_falls_back_to_matching_entities(self) -> None:
+        client = SonglinkClient(user_countries=("US",))
+
+        thumbnail = client._extract_thumbnail_url(
+            {},
+            {
+                "spotify:album:1": {
+                    "type": "album",
+                    "thumbnailUrl": "https://images.example/album.jpg",
+                },
+                "spotify:song:1": {
+                    "type": "track",
+                    "thumbnailUrl": "https://images.example/song.jpg",
+                },
+            },
+            "song",
+        )
+
+        self.assertEqual(thumbnail, "https://images.example/song.jpg")
+
+    def test_merge_matches_keeps_first_thumbnail(self) -> None:
+        client = SonglinkClient(user_countries=("RU", "US"))
+
+        merged = client._merge_matches(
+            [
+                TrackMatch(title="Song", artist="Artist", links={}),
+                TrackMatch(
+                    title="Song",
+                    artist="Artist",
+                    links={},
+                    thumbnail_url="https://images.example/cover.jpg",
+                ),
+            ]
+        )
+
+        self.assertEqual(merged.thumbnail_url, "https://images.example/cover.jpg")
+
     def test_normalize_entity_type_supports_podcast_episode_aliases(self) -> None:
         client = SonglinkClient(user_countries=("US",))
 

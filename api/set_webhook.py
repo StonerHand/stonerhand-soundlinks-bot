@@ -20,7 +20,7 @@ if str(SRC_PATH) not in sys.path:
 from music_links_bot.bot import PUBLIC_BOT_COMMANDS
 from music_links_bot.config import Settings
 
-ALLOWED_UPDATES = ("message", "channel_post", "callback_query")
+ALLOWED_UPDATES = ("message", "channel_post", "callback_query", "inline_query")
 LOGGER = logging.getLogger(__name__)
 WEBHOOK_SECRET_RE = re.compile(r"^[A-Za-z0-9_-]{1,256}$")
 

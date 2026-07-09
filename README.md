@@ -1,10 +1,10 @@
 <div align="center">
 
-# StonerHand Soundlinks Bot
+# 🎧 StonerHand Soundlinks Bot
 
-**One music link in → one clean editorial Telegram post out.**
+### One music link in → one perfect Telegram post out
 
-Title, cover preview, smart hashtags and buttons for every streaming platform — in a single tap.
+**Drop any music URL — get an editorial-grade post: cover art, smart hashtags and buttons for every streaming platform. In DMs, groups, channels, and inline in any chat.**
 
 [Русская версия](README.ru.md)
 · [Architecture](ARCHITECTURE.ru.md)
@@ -25,6 +25,20 @@ Title, cover preview, smart hashtags and buttons for every streaming platform �
 </div>
 
 ---
+
+## ✨ Highlights
+
+| | Feature | What it feels like |
+| --- | --- | --- |
+| 🪄 | **Inline mode** | Type `@StonerHandBot <link>` in *any* chat and insert a finished post without leaving the conversation |
+| ⚡ | **Live loading** | An instant "⏳ собираю пост…" placeholder morphs into the final card — no dead air, no typing-indicator guessing |
+| 🖼 | **Artwork previews** | Big cover art on top of every card, with release artwork as a fallback when a platform page has no preview |
+| 🎛 | **Every platform, one tap** | Spotify, Apple Music, YouTube Music, SoundCloud, Deezer, Tidal, Yandex Music + a Song.link hub button |
+| 🎨 | **Native button styles** | Green Spotify, red YouTube, success-highlighted active menu tab — real Telegram button colors, not just emoji |
+| 📚 | **Collections** | Several links in one message become a numbered playlist-style post with a button per release |
+| 🤖 | **Channel autopilot** | As an admin, the bot silently swaps raw links in channels/groups for clean editorial posts |
+| 🚀 | **Serverless-fast** | Warm instances reuse connections and caches; repeated links resolve near-instantly |
+| 🔁 | **Self-healing** | A daily cron re-registers the webhook and command menu — the bot never silently goes stale |
 
 ## What It Does
 
@@ -55,12 +69,13 @@ Track
 
 | Surface | Behavior |
 | --- | --- |
-| Private chat | Replies with a formatted card and buttons |
+| Private chat | Shows a live loading placeholder, then edits it into the formatted card with buttons |
 | Group chat | Can delete the original message and replace it with a clean post if admin rights allow it |
 | Channel | Can replace raw links with editorial posts and stay silent on unrelated content |
+| Inline (`@bot link`) | Resolves the link on the fly and inserts a full post with buttons into any chat |
 | Multi-link message | Builds a playlist-style collection post |
 | User note above link | Preserves paragraphs and Telegram rich text: bold, italic, underline, strike, spoiler, code and text links |
-| Command menu | Inline navigation for quick start, usage, supported services and group/channel setup |
+| Command menu | Emoji tabs, an active-state marker and a 🧪 example-post tab |
 
 ## Supported Content
 
@@ -247,7 +262,8 @@ src/music_links_bot/
 | Area | Implementation |
 | --- | --- |
 | Speed | Parallel link resolution, connection pooling, short external timeouts |
-| Perceived speed | Sends a Telegram typing action before external lookup work starts |
+| Perceived speed | Private chats get an instant loading placeholder that is edited into the final post; groups/channels get a typing action |
+| Inline safety | Inline lookups reuse the same clients and caches; failed lookups collapse into a "open the bot" hint instead of a broken result |
 | Stability | Separate handling for not-found, service outages and malformed input |
 | Recoverable errors | Private-chat errors include a compact support keyboard instead of a dead end |
 | Deduplication | Tracking query params like `si`, `utm_*`, `fbclid` are ignored for cache keys |
@@ -290,6 +306,12 @@ The broader system map lives in [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
 The public command menu is synced during local/Railway startup and through the Vercel `/api/set_webhook` endpoint. The webhook subscribes to `message`, `channel_post` and `callback_query`, so inline menu buttons work in production.
 
 The `/start` menu uses emoji tabs (🚀 quick start, 📖 usage, 🎛 services, 📣 channels) plus a 🧪 example-post tab that renders a mock card, so new users see the output format before sending their first link.
+
+### Inline Mode
+
+Type `@StonerHandBot <link>` in any chat: the bot resolves the link, shows an article with the release artwork, and inserts the full post (text + platform buttons) when tapped. An empty or unresolvable query shows a hint button that opens the bot.
+
+> Inline mode must be enabled once via [@BotFather](https://t.me/BotFather): `/setinline` → pick the bot → set any placeholder text. The webhook already subscribes to `inline_query`.
 
 ## Environment
 

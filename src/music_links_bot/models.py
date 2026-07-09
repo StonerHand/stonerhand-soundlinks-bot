@@ -12,6 +12,7 @@ class TrackMatch:
     release_year: str | None = None
     kind: str = "song"
     release_format: str | None = None
+    thumbnail_url: str | None = None
 
 
 @dataclass(slots=True)
