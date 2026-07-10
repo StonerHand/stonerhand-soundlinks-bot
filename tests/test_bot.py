@@ -34,6 +34,7 @@ from music_links_bot.bot import (
     _split_source_urls,
     _send_track_result,
     _strip_bot_mention,
+    _release_fingerprint,
     _editor_rows,
     _render_track_draft,
     track_lookup_message,
@@ -149,6 +150,10 @@ class FailingSearchClientStub:
         del query
         raise SearchLookupError("nothing matched")
 
+    async def lookup_genre(self, artist: str, title: str) -> str | None:
+        del artist, title
+        return None
+
 
 class SuccessfulSearchClientStub:
     async def search_release_url(self, query: str) -> str:
@@ -169,6 +174,10 @@ class SuccessfulSearchClientStub:
                 artist="Youth Code",
             ),
         ]
+
+    async def lookup_genre(self, artist: str, title: str) -> str | None:
+        del artist, title
+        return "Industrial"
 
 
 class FailingArtistClientStub:
@@ -360,6 +369,14 @@ class UpdateStub:
 
 
 class BotKeyboardTests(unittest.TestCase):
+    def test_release_fingerprint_is_stable_and_case_insensitive(self) -> None:
+        first = _release_fingerprint("Black Sabbath", "Paranoid")
+        second = _release_fingerprint("black sabbath", "PARANOID")
+
+        self.assertEqual(first, second)
+        self.assertTrue(first.startswith("posted:"))
+        self.assertNotEqual(first, _release_fingerprint("Sleep", "Dragonaut"))
+
     def test_strip_bot_mention_is_case_insensitive(self) -> None:
         self.assertEqual(
             _strip_bot_mention("@stonerhandbot paranoid", "StonerHandBot"),
@@ -1040,6 +1057,10 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
                 self.queries.append(query)
                 return "https://open.spotify.com/track/abc"
 
+            async def lookup_genre(self, artist: str, title: str) -> str | None:
+                del artist, title
+                return None
+
         search_client = RecordingSearchClientStub()
 
         class MentionMessageStub(PrivateMessageStub):
@@ -1336,6 +1357,20 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             tracks[0].links,
             {"spotify": "https://open.spotify.com/episode/abc?si=123"},
         )
+
+    async def test_lookup_tracks_fills_genre_from_search_client(self) -> None:
+        class GenreSearchStub:
+            async def lookup_genre(self, artist: str, title: str) -> str | None:
+                del artist, title
+                return "Industrial"
+
+        tracks, _ = await _lookup_tracks(
+            SuccessfulLookupClient(),
+            ["https://open.spotify.com/track/abc"],
+            search_client=GenreSearchStub(),
+        )
+
+        self.assertEqual(tracks[0].genre, "Industrial")
 
     async def test_lookup_tracks_guarantees_spotify_button_first(self) -> None:
         class NoSpotifyLookupClient:

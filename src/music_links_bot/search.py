@@ -43,6 +43,7 @@ class SearchClient:
             timeout=httpx.Timeout(timeout, connect=3.0),
         )
         self._cache: TTLCache[list[SearchCandidate]] = TTLCache(ttl_seconds=6 * 3600)
+        self._genre_cache: TTLCache[str] = TTLCache(ttl_seconds=24 * 3600)
 
     async def aclose(self) -> None:
         await self._client.aclose()
@@ -50,6 +51,39 @@ class SearchClient:
     async def search_release_url(self, query: str) -> str:
         candidates = await self.search_release_candidates(query)
         return candidates[0].url
+
+    async def lookup_genre(self, artist: str, title: str) -> str | None:
+        """Best-effort genre for a release; empty-string cache entries mark
+        known misses so they are not retried on every post."""
+        query = normalize_search_query(f"{artist} {title}")
+        if query is None:
+            return None
+
+        cache_key = query.casefold()
+        cached_genre = self._genre_cache.get(cache_key)
+        if cached_genre is not None:
+            return cached_genre or None
+
+        try:
+            response = await self._client.get(
+                "/search",
+                params={
+                    "term": query,
+                    "media": "music",
+                    "entity": "song,album",
+                    "limit": 1,
+                    "country": self._country,
+                },
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except (httpx.HTTPError, ValueError):
+            LOGGER.debug("Genre lookup failed for %s", query, exc_info=True)
+            return None
+
+        genre = _extract_genre(payload)
+        self._genre_cache.set(cache_key, genre or "")
+        return genre
 
     async def search_release_candidates(self, query: str) -> list[SearchCandidate]:
         normalized_query = normalize_search_query(query)
@@ -91,6 +125,23 @@ def normalize_search_query(query: str) -> str | None:
         return None
 
     return normalized[:MAX_QUERY_LENGTH]
+
+
+def _extract_genre(payload: object) -> str | None:
+    if not isinstance(payload, dict):
+        return None
+
+    results = payload.get("results")
+    if not isinstance(results, list):
+        return None
+
+    for result in results:
+        if isinstance(result, dict):
+            genre = result.get("primaryGenreName")
+            if isinstance(genre, str) and genre.strip():
+                return genre.strip()
+
+    return None
 
 
 def _extract_release_candidates(payload: object) -> list[SearchCandidate]:

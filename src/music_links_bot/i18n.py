@@ -231,6 +231,10 @@ STRINGS: dict[str, dict[str, str]] = {
         EN: "Only the bot owner can publish to the channel",
     },
     "ed_published": {RU: "Опубликовано в канал 🎉", EN: "Published to the channel 🎉"},
+    "ed_duplicate": {
+        RU: "⚠️ Уже публиковалось {date}. Нажми 📤 ещё раз, чтобы опубликовать снова",
+        EN: "⚠️ Already published on {date}. Tap 📤 again to publish anyway",
+    },
     "ed_publish_failed": {
         RU: "Не получилось опубликовать — проверь права бота в канале",
         EN: "Could not publish — check the bot's rights in the channel",

@@ -23,6 +23,7 @@ from music_links_bot.formatter import (
     format_radio_collection_message,
     format_radio_message,
     format_track_message,
+    genre_hashtags,
     format_video_collection_message,
     format_video_message,
     pick_track_emoji,
@@ -40,6 +41,37 @@ from music_links_bot.phrases import pick_phrase
 
 
 class FormatterTests(unittest.TestCase):
+    def test_genre_hashtags_normalize_itunes_genres(self) -> None:
+        self.assertEqual(genre_hashtags("Heavy Metal"), ["#heavymetal"])
+        self.assertEqual(genre_hashtags("Hip-Hop/Rap"), ["#hiphop", "#rap"])
+        self.assertEqual(genre_hashtags("R&B/Soul"), ["#rnb", "#soul"])
+        self.assertEqual(genre_hashtags("Music"), [])
+        self.assertEqual(genre_hashtags(None), [])
+
+    def test_track_hashtags_include_genre(self) -> None:
+        from music_links_bot.formatter import build_auto_hashtags
+
+        track = TrackMatch(
+            title="Paranoid",
+            artist="Black Sabbath",
+            links={},
+            genre="Heavy Metal",
+        )
+
+        self.assertEqual(build_auto_hashtags(track), "#stonerhand #track #heavymetal")
+
+    def test_track_cta_links_to_release_hub(self) -> None:
+        track = TrackMatch(
+            title="Paranoid",
+            artist="Black Sabbath",
+            links={},
+            page_url="https://song.link/paranoid",
+        )
+
+        message = format_track_message(track, include_hashtags=False)
+
+        self.assertIn('<a href="https://song.link/paranoid">', message)
+
     def test_format_track_message_includes_heading_and_hashtag(self) -> None:
         track = TrackMatch(
             title="Song",
