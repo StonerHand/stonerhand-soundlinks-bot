@@ -38,7 +38,6 @@ from music_links_bot.search import (
     normalize_search_query,
 )
 from music_links_bot.constants import (
-    INPUT_PLATFORM_HINT,
     PLATFORM_BUTTON_STYLES,
     PLATFORM_LABELS,
 )
@@ -699,7 +698,11 @@ async def _store_draft(
     drafts[draft_id] = draft
     kv: KVStore | None = context.application.bot_data.get("kv_store")
     if kv is not None:
-        await kv.set_json(f"draft:{draft_id}", draft, ttl_seconds=DRAFT_TTL_SECONDS)
+        # Fire-and-forget: the in-memory copy already serves this instance,
+        # Redis only needs to catch up for other instances and restarts.
+        asyncio.get_running_loop().create_task(
+            kv.set_json(f"draft:{draft_id}", draft, ttl_seconds=DRAFT_TTL_SECONDS)
+        )
 
 
 async def _load_draft(

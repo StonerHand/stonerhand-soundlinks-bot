@@ -132,7 +132,3 @@ def _extract_release_candidates(payload: object) -> list[SearchCandidate]:
 
     return candidates
 
-
-def _extract_release_url(payload: object) -> str | None:
-    candidates = _extract_release_candidates(payload)
-    return candidates[0].url if candidates else None
