@@ -528,6 +528,7 @@ async def _build_inline_result(
         bot_data["songlink_client"],
         [source_url],
         soundcloud_client=bot_data["soundcloud_client"],
+        search_client=bot_data.get("search_client"),
     )
     tracks = [track for track in tracks if track.links]
     if not tracks:
@@ -762,7 +763,22 @@ async def editor_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             await query.answer(get_text(lang, "ed_admin_only"), show_alert=True)
             return
 
+        track = TrackMatch(**draft["item"])
+        if not draft.get("dup_ok"):
+            posted_date = await _find_posted_date(context, track)
+            if posted_date:
+                draft["dup_ok"] = True
+                await _store_draft(context, draft_id, draft)
+                await query.answer(
+                    get_text(lang, "ed_duplicate").replace("{date}", posted_date),
+                    show_alert=True,
+                )
+                return
+
         published = await _publish_draft(context, draft)
+        if published:
+            _schedule_mark_posted(context, track)
+
         await query.answer(
             get_text(lang, "ed_published" if published else "ed_publish_failed"),
             show_alert=not published,
@@ -1008,7 +1024,12 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
     artist_client: ArtistClient = context.application.bot_data["artist_client"]
 
     lookup_result, videos, radios, playlists, artists = await asyncio.gather(
-        _lookup_tracks(client, music_urls, soundcloud_client=soundcloud_client)
+        _lookup_tracks(
+            client,
+            music_urls,
+            soundcloud_client=soundcloud_client,
+            search_client=context.application.bot_data.get("search_client"),
+        )
         if music_urls
         else _empty_track_lookup(),
         _lookup_youtube_videos(youtube_client, youtube_urls)
@@ -1660,6 +1681,7 @@ async def _lookup_tracks(
     source_urls: list[str],
     *,
     soundcloud_client: SoundCloudClient | None = None,
+    search_client: SearchClient | None = None,
 ) -> tuple[list[TrackMatch], list[str]]:
     results = await asyncio.gather(
         *(client.lookup_track(source_url) for source_url in source_urls),
@@ -1703,7 +1725,29 @@ async def _lookup_tracks(
             )
             unavailable_urls.append(source_url)
 
-    return [_ensure_spotify_link(track) for track in tracks], unavailable_urls
+    tracks = [_ensure_spotify_link(track) for track in tracks]
+    if search_client is not None:
+        await _fill_genres(search_client, tracks)
+
+    return tracks, unavailable_urls
+
+
+async def _fill_genres(search_client: SearchClient, tracks: list[TrackMatch]) -> None:
+    pending = [
+        track
+        for track in tracks
+        if track.genre is None and track.kind in {"song", "album"}
+    ]
+    if not pending:
+        return
+
+    genres = await asyncio.gather(
+        *(search_client.lookup_genre(track.artist, track.title) for track in pending),
+        return_exceptions=True,
+    )
+    for track, genre in zip(pending, genres, strict=False):
+        if isinstance(genre, str):
+            track.genre = genre
 
 
 SPOTIFY_SEARCH_URL = "https://open.spotify.com/search/"
@@ -1750,6 +1794,40 @@ async def _build_lookup_fallback(
         )
 
     return generic_soundcloud_fallback
+
+
+def _release_fingerprint(artist: str, title: str) -> str:
+    normalized = f"{artist}|{title}".casefold()
+    digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:24]
+    return f"posted:{digest}"
+
+
+async def _find_posted_date(
+    context: ContextTypes.DEFAULT_TYPE,
+    track: TrackMatch,
+) -> str | None:
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    if kv is None:
+        return None
+
+    return await kv.get(_release_fingerprint(track.artist, track.title))
+
+
+def _schedule_mark_posted(
+    context: ContextTypes.DEFAULT_TYPE,
+    track: TrackMatch,
+) -> None:
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    if kv is None:
+        return
+
+    posted_date = datetime.now(timezone.utc).strftime("%d.%m.%Y")
+    try:
+        asyncio.get_running_loop().create_task(
+            kv.set(_release_fingerprint(track.artist, track.title), posted_date)
+        )
+    except RuntimeError:
+        LOGGER.debug("No running loop to record posted release")
 
 
 def _songlink_page_url(source_url: str) -> str:

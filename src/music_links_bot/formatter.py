@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from html import escape
+import re
 import hashlib
 
 from music_links_bot.models import (
@@ -116,10 +117,19 @@ def format_track_message(
         "podcast": "podcast_cta",
     }.get(track.kind, "track_cta")
 
+    cta_text = escape(pick_phrase(cta_key, seed))
+    # The CTA doubles as a hub link: forwarded messages lose inline keyboards
+    # (a Telegram limitation), so the text itself keeps a tappable path to
+    # every platform.
+    if track.page_url:
+        cta_line = f'<i><a href="{escape(track.page_url, quote=True)}">{cta_text}</a></i>'
+    else:
+        cta_line = f"<i>{cta_text}</i>"
+
     lines = [
         format_release_heading(track),
         "",
-        f"<i>{escape(pick_phrase(cta_key, seed))}</i>",
+        cta_line,
     ]
     return _with_hashtags(lines, build_auto_hashtags(track), include_hashtags=include_hashtags)
 
@@ -433,13 +443,32 @@ def build_auto_hashtags(track: TrackMatch) -> str:
             hashtags.append("#ep")
         elif track.release_format == "single":
             hashtags.append("#single")
+        hashtags.extend(genre_hashtags(track.genre))
         return " ".join(hashtags)
 
     hashtags.append("#track")
     if track.release_format == "single":
         hashtags.append("#single")
+    hashtags.extend(genre_hashtags(track.genre))
 
     return " ".join(hashtags)
+
+
+def genre_hashtags(genre: str | None, *, limit: int = 2) -> list[str]:
+    """Turns an iTunes genre like "Hip-Hop/Rap" into ["#hiphop", "#rap"]."""
+    if not genre:
+        return []
+
+    tags: list[str] = []
+    for part in re.split(r"[/,]", genre.replace("&", "n")):
+        slug = re.sub(r"[^a-z0-9а-яё]", "", part.casefold())
+        if slug and slug not in {"music", "музыка"} and f"#{slug}" not in tags:
+            tags.append(f"#{slug}")
+
+        if len(tags) >= limit:
+            break
+
+    return tags
 
 
 def _with_hashtags(lines: list[str], hashtags: str, *, include_hashtags: bool) -> str:
