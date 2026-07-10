@@ -57,8 +57,3 @@ PLATFORM_ALIASES = {
     "tidal": ("tidal",),
     "yandexMusic": ("yandexMusic", "yandex"),
 }
-
-INPUT_PLATFORM_HINT = (
-    "Spotify (треки, альбомы, плейлисты, артисты), Apple Music / Apple Podcasts, "
-    "YouTube / YouTube Music, Deezer, Tidal, Yandex Music, SoundCloud или NTS Radio"
-)

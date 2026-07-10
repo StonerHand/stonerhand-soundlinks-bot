@@ -7,7 +7,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from music_links_bot.kvstore import KVStore
 from music_links_bot.search import (
     _extract_release_candidates,
-    _extract_release_url,
     normalize_search_query,
 )
 
@@ -28,7 +27,7 @@ class SearchQueryTests(unittest.TestCase):
         self.assertIsNotNone(normalized)
         self.assertLessEqual(len(normalized), 120)
 
-    def test_extract_release_url_prefers_track_url(self) -> None:
+    def test_extract_release_candidates_prefer_first_result(self) -> None:
         payload = {
             "results": [
                 {"collectionViewUrl": "https://music.apple.com/album/1"},
@@ -36,10 +35,8 @@ class SearchQueryTests(unittest.TestCase):
             ]
         }
 
-        self.assertEqual(
-            _extract_release_url(payload),
-            "https://music.apple.com/album/1",
-        )
+        candidates = _extract_release_candidates(payload)
+        self.assertEqual(candidates[0].url, "https://music.apple.com/album/1")
 
     def test_extract_release_candidates_dedupes_and_caps(self) -> None:
         payload = {
@@ -72,10 +69,13 @@ class SearchQueryTests(unittest.TestCase):
             ],
         )
 
-    def test_extract_release_url_handles_malformed_payloads(self) -> None:
-        self.assertIsNone(_extract_release_url(None))
-        self.assertIsNone(_extract_release_url({"results": "nope"}))
-        self.assertIsNone(_extract_release_url({"results": [{"trackViewUrl": 5}]}))
+    def test_extract_release_candidates_handle_malformed_payloads(self) -> None:
+        self.assertEqual(_extract_release_candidates(None), [])
+        self.assertEqual(_extract_release_candidates({"results": "nope"}), [])
+        self.assertEqual(
+            _extract_release_candidates({"results": [{"trackViewUrl": 5}]}),
+            [],
+        )
 
 
 class KVStoreTests(unittest.TestCase):

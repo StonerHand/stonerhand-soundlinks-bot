@@ -33,7 +33,7 @@
 | 🔎 | **Search without a link** | Type `artist - track` in DM or inline — the bot finds the release itself, no URL required |
 | 🎚 | **Post editor** | Every DM post comes with toggles: hashtags on/off, quote on/off, ✅ finalize, 🗑 delete |
 | 📤 | **Publish to channel** | The bot owner gets a one-tap button that posts the finished card straight to the channel |
-| 🪄 | **Inline mode** | Type `@StonerHandBot <link>` (or a track name) in *any* chat and insert a finished post without leaving the conversation |
+| 🪄 | **Inline mode** | Type `@StonerHandBot <link>` (or a track name) in *any* chat — pick from up to three matches and insert a finished post without leaving the conversation |
 | ⚡ | **Live loading** | An instant "⏳ собираю пост…" placeholder morphs into the final card — no dead air, no typing-indicator guessing |
 | 🖼 | **Artwork previews** | Big cover art on top of every card, with release artwork as a fallback when a platform page has no preview |
 | 🎛 | **Every platform, one tap** | Spotify, Apple Music, YouTube Music, SoundCloud, Deezer, Tidal, Yandex Music + a Song.link hub button |
@@ -74,10 +74,10 @@ Track
 
 | Surface | Behavior |
 | --- | --- |
-| Private chat | Shows a live loading placeholder, then edits it into the formatted card with buttons |
+| Private chat | Live loading placeholder morphs into the card, with an editor row: hashtags, quote, preview size, publish |
 | Group chat | Can delete the original message and replace it with a clean post if admin rights allow it |
 | Channel | Can replace raw links with editorial posts and stay silent on unrelated content |
-| Inline (`@bot link`) | Resolves the link on the fly and inserts a full post with buttons into any chat |
+| Inline (`@bot link` or a name) | Resolves on the fly, offers up to three matches with cover art, inserts a full post with buttons |
 | Multi-link message | Builds a playlist-style collection post |
 | User note above link | Preserves paragraphs and Telegram rich text: bold, italic, underline, strike, spoiler, code and text links |
 | Command menu | Emoji tabs, an active-state marker and a 🧪 example-post tab |
@@ -103,10 +103,13 @@ Track
 | Telegram SDK | `python-telegram-bot` 21.x |
 | HTTP client | `httpx` with connection limits and explicit timeouts |
 | Music resolution | Song.link / Odesli API |
+| Name search | iTunes Search API (public, keyless) |
 | Lightweight metadata | Spotify, YouTube and SoundCloud oEmbed, NTS Open Graph |
-| Deployment | Vercel webhook or Railway worker |
+| Shared cache & drafts | Upstash Redis / Vercel KV over REST (optional, graceful fallback) |
+| Interface languages | RU/EN catalog in `i18n.py`, routed by the user's Telegram language |
+| Deployment | Vercel webhook (warm instance reuse) or Railway worker |
 | Configuration | Environment variables and optional `.env` |
-| Testing | `unittest` plus compile checks |
+| Testing | 189 `unittest` tests plus compile checks, no network required |
 
 ## Why It Is Public-Ready
 
@@ -245,8 +248,11 @@ api/
 └── set_webhook.py    protected Telegram webhook setup and command sync
 
 src/music_links_bot/
-├── bot.py            Telegram handlers, routing, keyboards, replacement logic
-├── songlink.py       Song.link client, country fallback, release normalization
+├── bot.py            Telegram handlers, routing, keyboards, editor drafts, inline mode
+├── songlink.py       Song.link client, country fallback, artwork, Redis-backed cache
+├── search.py         iTunes Search: free text → release candidates
+├── kvstore.py        Upstash/Vercel KV REST client (optional, graceful fallback)
+├── i18n.py           RU/EN interface string catalog
 ├── formatter.py      Post layout, captions, hashtags, preview selection
 ├── telegram_text.py  Safe Telegram entity remapping and rich-text rendering
 ├── playlist.py       Spotify playlist metadata through oEmbed
@@ -277,7 +283,9 @@ src/music_links_bot/
 | Navigation | `/start`, `/help`, `/platforms` and `/guide` share one inline menu with emoji tabs, active-state markers and a 🧪 example-post tab |
 | Serverless speed | Warm Vercel instances reuse the Telegram application, HTTP pools and lookup caches across updates instead of rebuilding them per message |
 | Webhook self-healing | A daily Vercel Cron re-registers the webhook and command menu, so `allowed_updates` never goes stale after code changes |
-| Preview quality | Preferred platform controls preview source and button priority |
+| Preview quality | Preferred platform controls preview source and button priority; release artwork backs cards with no platform preview |
+| Spotify guarantee | Every music card leads with a 🟢 Spotify button — a search deep link fills in when Song.link has no direct match |
+| Editor drafts | DM drafts live in memory with Redis write-through, so toggles survive instance restarts |
 | SoundCloud support | Song.link links are used when available; direct SoundCloud URLs fall back to SoundCloud oEmbed |
 | NTS Radio support | NTS pages are routed outside Song.link and formatted as dedicated radio cards |
 | Privacy | Stats store counters and ids, not message text or source links |
@@ -286,7 +294,7 @@ src/music_links_bot/
 
 ## Project Skills
 
-This repository also includes Codex-oriented project skills in `skills/`. They are short operational playbooks for future maintenance, so contributors do not need to rediscover the project structure from scratch.
+This repository also includes agent-oriented project skills in `skills/`. They are short operational playbooks for future maintenance, so contributors do not need to rediscover the project structure from scratch.
 
 | Skill | Use it for |
 | --- | --- |
