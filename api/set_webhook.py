@@ -57,6 +57,10 @@ class handler(BaseHTTPRequestHandler):
                 telegram_payload = json.loads(response.read().decode("utf-8"))
 
             commands_payload = _sync_commands(settings.bot_token)
+            _sync_menu_button(
+                settings.bot_token,
+                urlparse(webhook_url).netloc,
+            )
         except Exception as exc:
             LOGGER.error("Webhook setup failed: %s", type(exc).__name__)
             self._send_json(
@@ -125,6 +129,27 @@ def _sync_commands(bot_token: str) -> dict[str, object]:
     except Exception as exc:
         LOGGER.error("Command sync failed: %s", type(exc).__name__)
         return {"ok": False, "error": "command sync failed"}
+
+
+def _sync_menu_button(bot_token: str, host: str | None) -> None:
+    webapp_url = os.getenv("WEBAPP_URL", "").strip()
+    if not webapp_url and host:
+        webapp_url = f"https://{host}/app"
+
+    if not webapp_url:
+        return
+
+    menu_button = json.dumps(
+        {"type": "web_app", "text": "Студия", "web_app": {"url": webapp_url}},
+        ensure_ascii=False,
+    )
+    query = urlencode({"menu_button": menu_button})
+    url = f"https://api.telegram.org/bot{bot_token}/setChatMenuButton?{query}"
+    try:
+        with urlopen(url, timeout=20):
+            pass
+    except Exception as exc:
+        LOGGER.error("Menu button sync failed: %s", type(exc).__name__)
 
 
 def _sync_descriptions(bot_token: str) -> None:

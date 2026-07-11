@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>StonerHand Studio</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #17181c);
+    --fg: var(--tg-theme-text-color, #f4f4f6);
+    --hint: var(--tg-theme-hint-color, #9a9ba3);
+    --card: var(--tg-theme-secondary-bg-color, #23252b);
+    --accent: var(--tg-theme-button-color, #5b8af0);
+    --accent-fg: var(--tg-theme-button-text-color, #ffffff);
+    --link: var(--tg-theme-link-color, #7aa5f8);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font: 16px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 16px 16px 96px;
+  }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .sub { color: var(--hint); font-size: 14px; margin-bottom: 16px; }
+  .row { display: flex; gap: 8px; margin-bottom: 16px; }
+  input[type="text"] {
+    flex: 1; padding: 12px 14px; border-radius: 12px; border: none;
+    background: var(--card); color: var(--fg); font-size: 16px; outline: none;
+  }
+  button.go {
+    padding: 12px 18px; border-radius: 12px; border: none;
+    background: var(--accent); color: var(--accent-fg); font-size: 16px;
+  }
+  .status { color: var(--hint); font-size: 14px; min-height: 20px; margin-bottom: 12px; }
+  .card {
+    background: var(--card); border-radius: 16px; overflow: hidden;
+    display: none; animation: pop .18s ease-out;
+  }
+  @keyframes pop { from { transform: scale(.97); opacity: .4; } }
+  .card img.cover { width: 100%; display: block; aspect-ratio: 1; object-fit: cover; }
+  .card img.cover.small { width: 96px; border-radius: 12px; margin: 14px 14px 0; }
+  .card .body { padding: 14px 16px 16px; }
+  .heading { font-weight: 700; }
+  .title { margin-bottom: 10px; }
+  .cta { font-style: italic; color: var(--link); margin-bottom: 10px; font-size: 15px; }
+  .tags { color: var(--link); font-size: 14px; margin-bottom: 12px; display: none; }
+  .platforms { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .platforms a {
+    display: block; text-align: center; padding: 9px 6px; border-radius: 10px;
+    background: var(--bg); color: var(--fg); text-decoration: none; font-size: 14px;
+  }
+  .platforms a.success { background: #2e7d4f; color: #fff; }
+  .platforms a.danger  { background: #b3403c; color: #fff; }
+  .platforms a.wide { grid-column: 1 / -1; }
+  .toggles { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+  .chip {
+    padding: 8px 14px; border-radius: 20px; font-size: 14px;
+    background: var(--card); color: var(--hint); border: 1px solid transparent;
+  }
+  .chip.on { color: var(--accent-fg); background: var(--accent); }
+  .publish {
+    display: none; width: 100%; padding: 13px; border-radius: 12px; border: none;
+    background: var(--card); color: var(--fg); font-size: 16px; margin-top: 4px;
+  }
+</style>
+</head>
+<body>
+  <h1 id="t-title">🎛 Студия</h1>
+  <div class="sub" id="t-sub">Ссылка или название — живой предпросмотр поста</div>
+
+  <div class="row">
+    <input type="text" id="query" placeholder="artist - track или ссылка" autocomplete="off">
+    <button class="go" id="go">→</button>
+  </div>
+  <div class="status" id="status"></div>
+
+  <div class="card" id="card">
+    <img class="cover" id="cover" alt="">
+    <div class="body">
+      <div class="heading" id="heading"></div>
+      <div class="title" id="title"></div>
+      <div class="cta" id="cta"></div>
+      <div class="tags" id="tags"></div>
+      <div class="platforms" id="platforms"></div>
+    </div>
+  </div>
+
+  <div class="toggles" id="toggles" style="display:none">
+    <button class="chip" id="chip-tags"></button>
+    <button class="chip" id="chip-preview"></button>
+    <button class="chip" id="chip-quote" style="display:none"></button>
+  </div>
+
+  <button class="publish" id="publish"></button>
+
+<script>
+(function () {
+  const tg = window.Telegram.WebApp;
+  tg.ready();
+  tg.expand();
+
+  const EN = !((tg.initDataUnsafe?.user?.language_code || "ru").match(/^(ru|uk|be|kk)/));
+  const T = EN ? {
+    title: "🎛 Studio", sub: "Link or a name — live post preview",
+    ph: "artist - track or a link", loading: "Building the preview…",
+    notFound: "Nothing found. Try artist + title", err: "Something broke, try again",
+    tagsOn: "# hashtags: on", tagsOff: "# hashtags: off",
+    prevBig: "🖼 preview: large", prevSmall: "🖼 preview: compact",
+    quoteOn: "💬 quote: on", quoteOff: "💬 quote: off",
+    send: "Send to me", publish: "📤 Publish to channel",
+    sent: "Sent! Check the chat", published: "Published 🎉",
+    dup: "Already published on ", dupAsk: ". Publish anyway?",
+  } : {
+    title: "🎛 Студия", sub: "Ссылка или название — живой предпросмотр поста",
+    ph: "artist - track или ссылка", loading: "Собираю предпросмотр…",
+    notFound: "Ничего не нашлось. Попробуй: артист + название", err: "Что-то сломалось, попробуй ещё раз",
+    tagsOn: "# хэштеги: вкл", tagsOff: "# хэштеги: выкл",
+    prevBig: "🖼 превью: большое", prevSmall: "🖼 превью: компакт",
+    quoteOn: "💬 цитата: вкл", quoteOff: "💬 цитата: выкл",
+    send: "Отправить себе", publish: "📤 Опубликовать в канал",
+    sent: "Отправлено! Проверь чат", published: "Опубликовано 🎉",
+    dup: "Уже публиковалось ", dupAsk: ". Опубликовать всё равно?",
+  };
+
+  const $ = (id) => document.getElementById(id);
+  $("t-title").textContent = T.title;
+  $("t-sub").textContent = T.sub;
+  $("query").placeholder = T.ph;
+
+  let state = null; // {draft_id, flags, release, can_publish}
+
+  async function api(action, payload) {
+    const response = await fetch("/api/webapp", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ init_data: tg.initData, action, payload }),
+    });
+    return response.json();
+  }
+
+  function renderPreview() {
+    if (!state) return;
+    const r = state.release;
+    const f = state.flags;
+    $("cover").src = r.artwork || "";
+    $("cover").style.display = r.artwork ? "block" : "none";
+    $("cover").className = f.large_preview ? "cover" : "cover small";
+    $("heading").textContent = `${r.emoji} · ${r.artist}`;
+    $("title").textContent = r.title + (r.year ? ` · ${r.year}` : "");
+    $("cta").textContent = r.cta;
+    $("tags").textContent = r.hashtags;
+    $("tags").style.display = f.hashtags ? "block" : "none";
+
+    const platforms = $("platforms");
+    platforms.innerHTML = "";
+    for (const p of r.platforms) {
+      const a = document.createElement("a");
+      a.href = p.url; a.target = "_blank"; a.textContent = p.label;
+      a.className = p.style;
+      platforms.appendChild(a);
+    }
+    if (r.page_url) {
+      const hub = document.createElement("a");
+      hub.href = r.page_url; hub.target = "_blank";
+      hub.textContent = EN ? "🪩 All platforms" : "🪩 Все платформы";
+      hub.className = "danger wide";
+      platforms.appendChild(hub);
+    }
+
+    $("chip-tags").textContent = f.hashtags ? T.tagsOn : T.tagsOff;
+    $("chip-tags").classList.toggle("on", f.hashtags);
+    $("chip-preview").textContent = f.large_preview ? T.prevBig : T.prevSmall;
+    $("chip-preview").classList.toggle("on", f.large_preview);
+    $("chip-quote").style.display = f.has_prefix ? "" : "none";
+    $("chip-quote").textContent = f.quote ? T.quoteOn : T.quoteOff;
+    $("chip-quote").classList.toggle("on", f.quote);
+
+    $("card").style.display = "block";
+    $("toggles").style.display = "flex";
+    $("publish").style.display = state.can_publish ? "block" : "none";
+    $("publish").textContent = T.publish;
+    tg.MainButton.setText(T.send);
+    tg.MainButton.show();
+  }
+
+  async function resolve(query) {
+    $("status").textContent = T.loading;
+    tg.MainButton.showProgress();
+    try {
+      const result = await api("resolve", { query });
+      if (!result.ok) {
+        $("status").textContent = T.notFound;
+        return;
+      }
+      state = result;
+      $("status").textContent = "";
+      renderPreview();
+      tg.HapticFeedback?.notificationOccurred("success");
+    } catch (e) {
+      $("status").textContent = T.err;
+    } finally {
+      tg.MainButton.hideProgress();
+    }
+  }
+
+  async function loadDraft(draftId) {
+    $("status").textContent = T.loading;
+    const result = await api("draft", { draft_id: draftId });
+    if (result.ok) { state = result; $("status").textContent = ""; renderPreview(); }
+    else { $("status").textContent = ""; }
+  }
+
+  async function deliver(action, extra) {
+    if (!state) return;
+    tg.MainButton.showProgress();
+    try {
+      const result = await api(action, {
+        draft_id: state.draft_id,
+        hashtags: state.flags.hashtags,
+        quote: state.flags.quote,
+        large_preview: state.flags.large_preview,
+        ...extra,
+      });
+      if (result.ok) {
+        tg.HapticFeedback?.notificationOccurred("success");
+        $("status").textContent = action === "publish" ? T.published : T.sent;
+        if (action === "send") tg.close();
+      } else if (result.error === "duplicate") {
+        tg.showConfirm(T.dup + result.posted_date + T.dupAsk, (confirmed) => {
+          if (confirmed) deliver("publish", { force: true });
+        });
+      } else {
+        $("status").textContent = T.err;
+      }
+    } catch (e) {
+      $("status").textContent = T.err;
+    } finally {
+      tg.MainButton.hideProgress();
+    }
+  }
+
+  $("go").addEventListener("click", () => {
+    const query = $("query").value.trim();
+    if (query) resolve(query);
+  });
+  $("query").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") $("go").click();
+  });
+  $("chip-tags").addEventListener("click", () => {
+    state.flags.hashtags = !state.flags.hashtags; renderPreview();
+  });
+  $("chip-preview").addEventListener("click", () => {
+    state.flags.large_preview = !state.flags.large_preview; renderPreview();
+  });
+  $("chip-quote").addEventListener("click", () => {
+    state.flags.quote = !state.flags.quote; renderPreview();
+  });
+  tg.MainButton.onClick(() => deliver("send"));
+  $("publish").addEventListener("click", () => deliver("publish"));
+
+  const params = new URLSearchParams(window.location.search);
+  const draftParam = params.get("draft") || tg.initDataUnsafe?.start_param;
+  if (draftParam) loadDraft(draftParam);
+})();
+</script>
+</body>
+</html>

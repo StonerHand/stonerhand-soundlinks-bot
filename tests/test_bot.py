@@ -950,6 +950,21 @@ class PostEditorTests(unittest.TestCase):
         self.assertEqual(rows_without_quote[0][1].text, "🖼 Превью: большое")
         self.assertEqual(rows_without_quote[0][1].callback_data, "ed|v|abc123")
 
+    def test_editor_rows_add_studio_webapp_button_when_configured(self) -> None:
+        import os
+        from unittest.mock import patch as env_patch
+
+        with env_patch.dict(
+            os.environ,
+            {"WEBAPP_URL": "https://studio.example/app"},
+            clear=False,
+        ):
+            rows = _editor_rows("abc123", self._draft())
+
+        studio = rows[1][0]
+        self.assertEqual(studio.text, "🎛 Студия")
+        self.assertEqual(studio.web_app.url, "https://studio.example/app?draft=abc123")
+
     def test_render_track_draft_respects_toggles(self) -> None:
         draft = self._draft(
             prefix="<blockquote>интро</blockquote>\n",
