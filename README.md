@@ -30,6 +30,7 @@
 
 | | Feature | What it feels like |
 | --- | --- | --- |
+| 🎛 | **Studio Mini App** | A full visual post editor inside Telegram: live preview with cover art, toggle chips, one-tap send or publish — opens from the menu button or the editor row |
 | 🔎 | **Search without a link** | Type `artist - track` in DM or inline — the bot finds the release itself, no URL required |
 | 🎚 | **Post editor** | Every DM post comes with toggles: hashtags on/off, quote on/off, ✅ finalize, 🗑 delete |
 | 📤 | **Publish to channel** | The bot owner gets a one-tap button that posts the finished card straight to the channel |
@@ -320,6 +321,10 @@ The public command menu is synced during local/Railway startup and through the V
 
 The `/start` menu uses emoji tabs (🚀 quick start, 📖 usage, 🎛 services, 📣 channels) plus a 🧪 example-post tab that renders a mock card, so new users see the output format before sending their first link.
 
+### Studio Mini App
+
+`/app` serves a self-contained Telegram Mini App: paste a link or type a name, get a live preview card (cover art, CTA, hashtags, platform buttons), flip the toggle chips and send the post to yourself — or, as the bot owner, publish it straight to the channel with duplicate protection. It opens from the chat menu button (synced automatically) and from the 🎛 button in the post editor. The `/api/webapp` backend validates Telegram `initData` signatures, so requests can't be forged.
+
 ### Inline Mode
 
 Type `@StonerHandBot <link>` in any chat: the bot resolves the link, shows an article with the release artwork, and inserts the full post (text + platform buttons) when tapped. An empty or unresolvable query shows a hint button that opens the bot.
@@ -374,6 +379,7 @@ CRON_SECRET=
 | `TELEGRAM_WEBHOOK_SECRET` | no | Verifies `X-Telegram-Bot-Api-Secret-Token` on incoming updates |
 | `WEBHOOK_BASE_URL` | no | Explicit production base URL; otherwise Vercel environment URLs are used |
 | `STATS_PATH` | no | Overrides local stats file path |
+| `WEBAPP_URL` | no | Explicit Studio Mini App URL; defaults to `https://<production-domain>/app` on Vercel |
 | `CRON_SECRET` | recommended on Vercel | Vercel sends `Authorization: Bearer $CRON_SECRET` on scheduled Cron Job runs; setting it enables a daily automatic re-call of `/api/set_webhook` so the webhook subscription (e.g. `allowed_updates`) never goes stale after a deploy |
 | `PUBLISH_CHAT_ID` | no | Target chat/channel for the 📤 publish button in the post editor (defaults to `@stonerhand`) |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | recommended | Upstash Redis REST credentials (Vercel KV `KV_REST_API_URL`/`KV_REST_API_TOKEN` also work): shared lookup cache across instances, persistent editor drafts and live `/stats` counters. Without them everything still works in-memory |

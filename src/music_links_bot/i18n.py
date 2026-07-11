@@ -216,6 +216,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "ed_quote": {RU: "💬 Цитата", EN: "💬 Quote"},
     "ed_on": {RU: "вкл", EN: "on"},
     "ed_off": {RU: "выкл", EN: "off"},
+    "ed_studio": {RU: "🎛 Студия", EN: "🎛 Studio"},
+    "menu_button_studio": {RU: "Студия", EN: "Studio"},
     "ed_preview": {RU: "🖼 Превью", EN: "🖼 Preview"},
     "ed_preview_small": {RU: "компакт", EN: "compact"},
     "ed_preview_large": {RU: "большое", EN: "large"},

@@ -19,9 +19,11 @@ from telegram import (
     InlineQueryResultsButton,
     InputTextMessageContent,
     LinkPreviewOptions,
+    MenuButtonWebApp,
     Message,
     MessageEntity,
     Update,
+    WebAppInfo,
 )
 from telegram.constants import ChatAction, ParseMode
 from telegram.error import BadRequest, Forbidden, TelegramError
@@ -251,6 +253,14 @@ BOT_SHORT_DESCRIPTIONS = {
 async def sync_application_commands(application: Application) -> None:
     try:
         await application.bot.set_my_commands(PUBLIC_BOT_COMMANDS)
+        webapp_url = _webapp_url()
+        if webapp_url:
+            await application.bot.set_chat_menu_button(
+                menu_button=MenuButtonWebApp(
+                    text=get_text("ru", "menu_button_studio"),
+                    web_app=WebAppInfo(url=webapp_url),
+                )
+            )
         for language_code, description in BOT_DESCRIPTIONS.items():
             await application.bot.set_my_description(
                 description,
@@ -676,6 +686,15 @@ def _editor_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]
         InlineKeyboardButton(get_text(lang, "ed_done"), callback_data=f"ed|f|{draft_id}"),
         InlineKeyboardButton(get_text(lang, "ed_delete"), callback_data=f"ed|d|{draft_id}"),
     ]
+    webapp_url = _webapp_url()
+    if webapp_url:
+        action_row.insert(
+            0,
+            InlineKeyboardButton(
+                get_text(lang, "ed_studio"),
+                web_app=WebAppInfo(url=f"{webapp_url}?draft={draft_id}"),
+            ),
+        )
     if draft.get("can_publish"):
         action_row.append(
             InlineKeyboardButton(
@@ -1794,6 +1813,20 @@ async def _build_lookup_fallback(
         )
 
     return generic_soundcloud_fallback
+
+
+def _webapp_url() -> str | None:
+    import os
+
+    explicit = os.getenv("WEBAPP_URL", "").strip()
+    if explicit:
+        return explicit
+
+    domain = os.getenv("VERCEL_PROJECT_PRODUCTION_URL", "").strip()
+    if domain:
+        return f"https://{domain}/app"
+
+    return None
 
 
 def _release_fingerprint(artist: str, title: str) -> str:
