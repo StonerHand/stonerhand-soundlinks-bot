@@ -4,7 +4,6 @@ import asyncio
 import hmac
 import json
 import logging
-import os
 import threading
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
@@ -171,8 +170,12 @@ def _read_content_length(raw_value: str | None) -> int | None:
 
 
 def _is_telegram_request_authorized(received_secret: str | None) -> bool:
-    expected_secret = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
+    from music_links_bot.webhook_secret import telegram_webhook_secret
+
+    expected_secret = telegram_webhook_secret()
     if not expected_secret:
+        # No explicit secret and no bot token to derive one from — nothing
+        # meaningful to compare against (local development only).
         return True
 
     return hmac.compare_digest(received_secret or "", expected_secret)
