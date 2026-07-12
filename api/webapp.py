@@ -19,6 +19,7 @@ if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
 from music_links_bot.bot import (
+    CHANNEL_USERNAME,
     DRAFT_TTL_SECONDS,
     STATS_KV_KEY,
     _find_posted_date,
@@ -35,7 +36,11 @@ from music_links_bot.bot import (
 )
 from music_links_bot.config import Settings
 from music_links_bot.constants import PLATFORM_BUTTON_STYLES, PLATFORM_LABELS
-from music_links_bot.formatter import build_auto_hashtags, pick_track_emoji
+from music_links_bot.formatter import (
+    build_auto_hashtags,
+    format_collection_message,
+    pick_track_emoji,
+)
 from music_links_bot.i18n import resolve_lang
 from music_links_bot.kvstore import KVStore
 from music_links_bot.models import TrackMatch
@@ -59,6 +64,8 @@ MAX_HISTORY_ITEMS = 10
 HISTORY_TTL_SECONDS = 90 * 24 * 3600
 MAX_CUSTOM_CTA_LENGTH = 200
 MAX_CUSTOM_TAGS = 8
+MAX_CRATE_ITEMS = 10
+CRATE_TTL_SECONDS = 14 * 24 * 3600
 
 _STATE_LOCK = threading.Lock()
 _LOOP: asyncio.AbstractEventLoop | None = None
@@ -185,6 +192,25 @@ async def _handle_action(application, settings: Settings, user: dict, payload: d
     if action == "stats":
         return await _action_stats(context, is_admin)
 
+    if action == "crate":
+        return await _crate_response(context, user_id)
+
+    if action == "crate_add":
+        return await _action_crate_add(context, body, user_id)
+
+    if action == "crate_remove":
+        return await _action_crate_remove(context, body, user_id)
+
+    if action == "crate_order":
+        return await _action_crate_order(context, body, user_id)
+
+    if action == "crate_clear":
+        await _save_crate(context, user_id, [])
+        return {"ok": True, "items": []}
+
+    if action in {"crate_send", "crate_publish"}:
+        return await _action_crate_deliver(context, action, user_id, is_admin)
+
     return {"ok": False, "error": "unknown action"}
 
 
@@ -310,16 +336,25 @@ async def _action_deliver(context, action: str, body: dict, user_id: int, is_adm
 
     text, keyboard = _render_track_draft(draft, context, draft_id=None)
     try:
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=text,
-            parse_mode=ParseMode.HTML,
-            link_preview_options=_build_link_preview_options(
-                _select_preview_url(track.links, context) or track.thumbnail_url,
-                prefer_large_media=bool(draft.get("large_preview")),
-            ),
-            reply_markup=keyboard,
-        )
+        if draft.get("as_photo") and track.thumbnail_url:
+            await context.bot.send_photo(
+                chat_id=user_id,
+                photo=track.thumbnail_url,
+                caption=text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=keyboard,
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=text,
+                parse_mode=ParseMode.HTML,
+                link_preview_options=_build_link_preview_options(
+                    _select_preview_url(track.links, context) or track.thumbnail_url,
+                    prefer_large_media=bool(draft.get("large_preview")),
+                ),
+                reply_markup=keyboard,
+            )
     except Exception:
         LOGGER.exception("Studio send failed")
         return {"ok": False, "error": "send failed"}
@@ -478,6 +513,144 @@ async def _load_history_items(context, user_id: int) -> list[dict]:
     return list(histories.get(user_id) or [])
 
 
+async def _load_crate(context, user_id: int) -> list[dict]:
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    if kv is not None:
+        items = await kv.get_json(f"crate:{user_id}")
+        if isinstance(items, list):
+            return [item for item in items if isinstance(item, dict)][:MAX_CRATE_ITEMS]
+
+    crates: dict = context.application.bot_data.setdefault("webapp_crate", {})
+    return list(crates.get(user_id) or [])
+
+
+async def _save_crate(context, user_id: int, items: list[dict]) -> None:
+    crates: dict = context.application.bot_data.setdefault("webapp_crate", {})
+    crates[user_id] = items
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    if kv is not None:
+        await kv.set_json(f"crate:{user_id}", items, ttl_seconds=CRATE_TTL_SECONDS)
+
+
+async def _crate_response(context, user_id: int) -> dict:
+    items = await _load_crate(context, user_id)
+    return {
+        "ok": True,
+        "count": len(items),
+        "max": MAX_CRATE_ITEMS,
+        "items": [
+            {
+                "artist": str(item.get("artist") or ""),
+                "title": str(item.get("title") or ""),
+                "emoji": pick_track_emoji(TrackMatch(**item)),
+                "artwork": item.get("thumbnail_url"),
+            }
+            for item in items
+        ],
+    }
+
+
+async def _action_crate_add(context, body: dict, user_id: int) -> dict:
+    draft_id = str(body.get("draft_id") or "")
+    draft = await _load_draft(context, draft_id)
+    if draft is None or draft.get("chat_id") != user_id:
+        return {"ok": False, "error": "draft not found"}
+
+    track_item = draft["item"]
+    fingerprint = _release_fingerprint(
+        str(track_item.get("artist") or ""), str(track_item.get("title") or "")
+    )
+    items = await _load_crate(context, user_id)
+    if any(
+        _release_fingerprint(str(item.get("artist") or ""), str(item.get("title") or ""))
+        == fingerprint
+        for item in items
+    ):
+        return await _crate_response(context, user_id)
+
+    if len(items) >= MAX_CRATE_ITEMS:
+        return {"ok": False, "error": "crate full"}
+
+    items = [*items, dict(track_item)]
+    await _save_crate(context, user_id, items)
+    return await _crate_response(context, user_id)
+
+
+async def _action_crate_remove(context, body: dict, user_id: int) -> dict:
+    try:
+        index = int(body.get("index"))
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "bad index"}
+
+    items = await _load_crate(context, user_id)
+    if not 0 <= index < len(items):
+        return {"ok": False, "error": "bad index"}
+
+    items.pop(index)
+    await _save_crate(context, user_id, items)
+    return await _crate_response(context, user_id)
+
+
+async def _action_crate_order(context, body: dict, user_id: int) -> dict:
+    indices = body.get("indices")
+    items = await _load_crate(context, user_id)
+    if (
+        not isinstance(indices, list)
+        or sorted(index for index in indices if isinstance(index, int))
+        != list(range(len(items)))
+    ):
+        return {"ok": False, "error": "bad order"}
+
+    await _save_crate(context, user_id, [items[index] for index in indices])
+    return await _crate_response(context, user_id)
+
+
+async def _action_crate_deliver(context, action: str, user_id: int, is_admin: bool) -> dict:
+    from music_links_bot.bot import _build_collection_keyboard, _build_link_preview_options
+
+    if action == "crate_publish" and not is_admin:
+        return {"ok": False, "error": "admin only"}
+
+    items = await _load_crate(context, user_id)
+    if len(items) < 2:
+        return {"ok": False, "error": "need more tracks"}
+
+    tracks = [TrackMatch(**item) for item in items]
+    text = format_collection_message(tracks, include_hashtags=True)
+
+    if action == "crate_publish":
+        target = context.application.bot_data.get("publish_chat_id") or f"@{CHANNEL_USERNAME}"
+        include_channel_button = str(target).lstrip("@").casefold() != CHANNEL_USERNAME
+    else:
+        target = user_id
+        include_channel_button = True
+
+    keyboard = _build_collection_keyboard(
+        tracks, include_channel_button=include_channel_button
+    )
+    try:
+        await context.bot.send_message(
+            chat_id=target,
+            text=text,
+            parse_mode=ParseMode.HTML,
+            link_preview_options=_build_link_preview_options(
+                _select_preview_url(tracks[0].links, context) or tracks[0].thumbnail_url,
+                prefer_large_media=True,
+            ),
+            reply_markup=keyboard,
+        )
+    except Exception:
+        LOGGER.exception("Crate deliver failed")
+        return {"ok": False, "error": "send failed"}
+
+    if action == "crate_publish":
+        for track in tracks:
+            _schedule_mark_posted(context, track)
+        await _save_crate(context, user_id, [])
+
+    return {"ok": True}
+
+
 async def _lookup_track_preview(context, track: TrackMatch) -> str | None:
     if track.kind != "song":
         return None
@@ -494,7 +667,7 @@ async def _lookup_track_preview(context, track: TrackMatch) -> str | None:
 
 
 def _apply_draft_patch(draft: dict, body: dict) -> None:
-    for flag in ("hashtags", "quote", "large_preview"):
+    for flag in ("hashtags", "quote", "large_preview", "as_photo"):
         if isinstance(body.get(flag), bool):
             draft[flag] = body[flag]
 
@@ -573,6 +746,7 @@ async def _draft_response(context, draft_id: str, draft: dict, is_admin: bool) -
             "hashtags": bool(draft.get("hashtags")),
             "quote": bool(draft.get("quote")),
             "large_preview": bool(draft.get("large_preview")),
+            "as_photo": bool(draft.get("as_photo")),
             "has_prefix": bool(draft.get("prefix")),
         },
         "can_publish": bool(is_admin and draft.get("can_publish", True)),

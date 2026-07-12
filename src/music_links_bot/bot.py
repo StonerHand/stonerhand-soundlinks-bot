@@ -905,16 +905,27 @@ async def _publish_draft(context: ContextTypes.DEFAULT_TYPE, draft: dict) -> boo
         platform_selection=_draft_platform_selection(draft),
     )
     try:
-        await context.bot.send_message(
-            chat_id=target,
-            text=text,
-            parse_mode=ParseMode.HTML,
-            link_preview_options=_build_link_preview_options(
-                _select_preview_url(track.links, context) or track.thumbnail_url,
-                prefer_large_media=bool(draft.get("large_preview")),
-            ),
-            reply_markup=keyboard,
-        )
+        if draft.get("as_photo") and track.thumbnail_url:
+            # Photo posts pin the artwork on top on every Telegram client,
+            # at the cost of the preview-size toggle.
+            await context.bot.send_photo(
+                chat_id=target,
+                photo=track.thumbnail_url,
+                caption=text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=keyboard,
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=target,
+                text=text,
+                parse_mode=ParseMode.HTML,
+                link_preview_options=_build_link_preview_options(
+                    _select_preview_url(track.links, context) or track.thumbnail_url,
+                    prefer_large_media=bool(draft.get("large_preview")),
+                ),
+                reply_markup=keyboard,
+            )
     except TelegramError:
         LOGGER.warning("Could not publish draft to %s", target, exc_info=True)
         return False

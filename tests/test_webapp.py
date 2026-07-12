@@ -163,3 +163,144 @@ class StudioApiHelperTests(unittest.TestCase):
 
         self.assertEqual(entries, [{"label": "b", "count": 9}, {"label": "c", "count": 5}])
         self.assertEqual(_top_entries("junk"), [])
+
+
+class _CrateBotStub:
+    def __init__(self) -> None:
+        self.sent: list[dict] = []
+        self.photos: list[dict] = []
+
+    async def send_message(self, **kwargs):
+        self.sent.append(kwargs)
+
+    async def send_photo(self, **kwargs):
+        self.photos.append(kwargs)
+
+
+def _crate_context():
+    from types import SimpleNamespace
+
+    application = SimpleNamespace(bot_data={"drafts": {}}, bot=_CrateBotStub())
+    return SimpleNamespace(application=application, bot=application.bot)
+
+
+def _crate_track(title: str) -> dict:
+    return {
+        "artist": "Sleep",
+        "title": title,
+        "links": {"spotify": f"https://open.spotify.com/track/{title}"},
+        "page_url": f"https://song.link/{title}",
+        "kind": "song",
+        "thumbnail_url": "https://img.example/a.jpg",
+    }
+
+
+class CrateApiTests(unittest.TestCase):
+    def _add(self, context, title: str) -> dict:
+        import asyncio
+        from api.webapp import _action_crate_add
+
+        draft_id = f"d-{title}"
+        context.application.bot_data["drafts"][draft_id] = {
+            "type": "track",
+            "item": _crate_track(title),
+            "chat_id": 7,
+        }
+        return asyncio.run(_action_crate_add(context, {"draft_id": draft_id}, 7))
+
+    def test_crate_add_dedupes_and_lists(self) -> None:
+        context = _crate_context()
+
+        first = self._add(context, "Dopesmoker")
+        again = self._add(context, "Dopesmoker")
+        second = self._add(context, "Dragonaut")
+
+        self.assertEqual(first["count"], 1)
+        self.assertEqual(again["count"], 1)
+        self.assertEqual(second["count"], 2)
+        self.assertEqual(second["items"][1]["title"], "Dragonaut")
+
+    def test_crate_reorder_and_remove(self) -> None:
+        import asyncio
+        from api.webapp import _action_crate_order, _action_crate_remove
+
+        context = _crate_context()
+        self._add(context, "One")
+        self._add(context, "Two")
+
+        reordered = asyncio.run(_action_crate_order(context, {"indices": [1, 0]}, 7))
+        self.assertEqual(reordered["items"][0]["title"], "Two")
+
+        bad = asyncio.run(_action_crate_order(context, {"indices": [0, 0]}, 7))
+        self.assertFalse(bad["ok"])
+
+        removed = asyncio.run(_action_crate_remove(context, {"index": 0}, 7))
+        self.assertEqual(removed["count"], 1)
+        self.assertEqual(removed["items"][0]["title"], "One")
+
+    def test_crate_deliver_needs_two_tracks_then_sends_collection(self) -> None:
+        import asyncio
+        from api.webapp import _action_crate_deliver
+
+        context = _crate_context()
+        self._add(context, "One")
+
+        too_few = asyncio.run(_action_crate_deliver(context, "crate_send", 7, False))
+        self.assertEqual(too_few["error"], "need more tracks")
+
+        self._add(context, "Two")
+        sent = asyncio.run(_action_crate_deliver(context, "crate_send", 7, False))
+        self.assertTrue(sent["ok"])
+        self.assertEqual(len(context.bot.sent), 1)
+        self.assertIn("1.", context.bot.sent[0]["text"])
+        self.assertIn("2.", context.bot.sent[0]["text"])
+
+    def test_crate_publish_is_admin_only_and_clears_crate(self) -> None:
+        import asyncio
+        from api.webapp import _action_crate_deliver, _load_crate
+
+        context = _crate_context()
+        self._add(context, "One")
+        self._add(context, "Two")
+
+        denied = asyncio.run(_action_crate_deliver(context, "crate_publish", 7, False))
+        self.assertEqual(denied["error"], "admin only")
+
+        published = asyncio.run(_action_crate_deliver(context, "crate_publish", 7, True))
+        self.assertTrue(published["ok"])
+        self.assertEqual(context.bot.sent[0]["chat_id"], "@stonerhand")
+        self.assertEqual(asyncio.run(_load_crate(context, 7)), [])
+
+
+class PhotoPostTests(unittest.TestCase):
+    def test_publish_draft_as_photo_uses_send_photo(self) -> None:
+        import asyncio
+        from music_links_bot.bot import _publish_draft
+
+        context = _crate_context()
+        draft = {
+            "type": "track",
+            "item": _crate_track("Dopesmoker"),
+            "chat_id": 7,
+            "hashtags": True,
+            "as_photo": True,
+        }
+
+        self.assertTrue(asyncio.run(_publish_draft(context, draft)))
+        self.assertEqual(len(context.bot.photos), 1)
+        self.assertEqual(context.bot.photos[0]["photo"], "https://img.example/a.jpg")
+        self.assertIn("Dopesmoker", context.bot.photos[0]["caption"])
+        self.assertEqual(context.bot.sent, [])
+
+    def test_publish_draft_without_artwork_falls_back_to_text(self) -> None:
+        import asyncio
+        from music_links_bot.bot import _publish_draft
+
+        context = _crate_context()
+        item = _crate_track("Dopesmoker")
+        item["thumbnail_url"] = None
+        draft = {"type": "track", "item": item, "chat_id": 7, "as_photo": True}
+
+        self.assertTrue(asyncio.run(_publish_draft(context, draft)))
+        self.assertEqual(context.bot.photos, [])
+        self.assertEqual(len(context.bot.sent), 1)

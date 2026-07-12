@@ -14,6 +14,8 @@ auto-hashtags and buttons for every streaming platform. One tap.**
 ![Vercel](https://img.shields.io/badge/Vercel-Serverless-000000?style=for-the-badge&logo=vercel&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-2ea44f?style=for-the-badge)
 
+<img src="assets/studio-demo.svg" alt="Studio demo: search → vinyl → card with platform buttons" width="100%">
+
 </div>
 
 ```text
@@ -32,7 +34,10 @@ out  →  📻 · Black Sabbath
 
 ## What it does
 
-- 🎛 **Studio** — a Mini App inside Telegram: live preview, pick from several matches, ▶ 30-sec audio preview right on the cover, custom text and hashtags, platform button set and order
+- 🎛 **Studio** — a Mini App inside Telegram: live preview, pick from several matches, ▶ 30-sec audio preview right on the cover, custom text and hashtags, platform button set and order, ↗️ share to any chat
+- 🧺 **Collection crate** — "➕ To crate" on any card, reorder, publish one playlist post
+- 📸 **Photo mode** — the post ships as a photo with caption: artwork always on top on every client
+- 🎨 **Living accent** — the card UI takes on the artwork's dominant color
 - 🕒 **Scheduled posting** — "Schedule" in the Studio: the post goes to the channel by itself, the queue is visible and cancellable
 - 🕘 **History** — recent releases on the Studio home screen, marked when already in the channel
 - 📊 **Dashboard** — stats with charts right in the Mini App (admin)
@@ -112,7 +117,7 @@ src/music_links_bot/
 Full map: [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
 
 ```bash
-PYTHONPATH=src python -m pytest tests/   # 222 tests, no network
+PYTHONPATH=src python -m pytest tests/   # 228 tests, no network
 ```
 
 ## Your channel instead of StonerHand
