@@ -872,6 +872,18 @@
     div.textContent = value == null ? "" : String(value);
     return div.innerHTML;
   }
+  /* URLs from external APIs go into src/href — allow http(s) only and
+     HTML-escape so a crafted value can never break out of the attribute */
+  function safeUrl(value) {
+    const url = String(value == null ? "" : value);
+    return /^https?:\/\//i.test(url) ? esc(url) : "";
+  }
+  function artHtml(url, emoji, cls) {
+    const src = safeUrl(url);
+    return src
+      ? '<img class="' + cls + '" alt="" src="' + src + '">'
+      : '<div class="' + cls + '">' + esc(emoji || "🎵") + "</div>";
+  }
 
   /* ── navigation + BackButton ── */
   function show(view, push) {
@@ -926,6 +938,7 @@
     document.querySelectorAll(".play-ring").forEach((r) => { r.style.background = "none"; });
   }
   function togglePreview(url, btn, ring, vu) {
+    if (!/^https?:\/\//i.test(String(url || ""))) return;
     if (playingBtn === btn) { stopAudio(); return; }
     stopAudio();
     hap.tap();
@@ -991,9 +1004,10 @@
       : "";
     const vuHtml = r.preview ? '<div class="vu" id="vu"><i></i><i></i><i></i><i></i></div>' : "";
 
+    const artSrc = safeUrl(r.artwork);
     if (mode === "large") {
-      zone.innerHTML = r.artwork
-        ? '<img class="cover-large" crossorigin="anonymous" alt="" src="' + r.artwork + '">' + playHtml + vuHtml
+      zone.innerHTML = artSrc
+        ? '<img class="cover-large" crossorigin="anonymous" alt="" src="' + artSrc + '">' + playHtml + vuHtml
         : "";
       body.innerHTML =
         '<div class="post-artist">' + r.emoji + " · " + esc(r.artist) + "</div>" +
@@ -1001,8 +1015,8 @@
     } else {
       zone.innerHTML =
         '<div class="compact-row">' +
-        (r.artwork
-          ? '<div class="cover-small-wrap"><img class="cover-small" crossorigin="anonymous" alt="" src="' + r.artwork + '">' + playHtml + "</div>"
+        (artSrc
+          ? '<div class="cover-small-wrap"><img class="cover-small" crossorigin="anonymous" alt="" src="' + artSrc + '">' + playHtml + "</div>"
           : "") +
         '<div class="compact-meta">' +
         '<div class="post-artist">' + r.emoji + " · " + esc(r.artist) + "</div>" +
@@ -1038,6 +1052,7 @@
     grid.innerHTML = "";
     const enabled = r.platforms.filter((p) => p.enabled !== false);
     enabled.forEach((p, i) => {
+      if (!/^https?:\/\//i.test(String(p.url || ""))) return;
       const meta = PLATFORM_META[p.key] || { color: "#8C8C88", letter: "♪", name: p.label.replace(/^\S+\s/, "") };
       const a = document.createElement("a");
       a.className = "p-btn";
@@ -1048,7 +1063,7 @@
       grid.appendChild(a);
       setTimeout(() => a.classList.add("in"), 560 + i * 60);
     });
-    if (r.page_url) {
+    if (/^https?:\/\//i.test(String(r.page_url || ""))) {
       const hub = document.createElement("a");
       hub.className = "p-btn p-hub";
       hub.href = r.page_url; hub.target = "_blank"; hub.rel = "noopener";
@@ -1290,9 +1305,7 @@
     candidates.forEach((c, i) => {
       const item = document.createElement("button");
       item.className = "cand-item";
-      const art = c.artwork
-        ? '<img class="cand-art" alt="" src="' + c.artwork + '">'
-        : '<div class="cand-art">🎵</div>';
+      const art = artHtml(c.artwork, "🎵", "cand-art");
       item.innerHTML =
         art +
         '<div class="cand-meta"><div class="cand-title">' + esc(c.title) + '</div>' +
@@ -1340,9 +1353,7 @@
       items.forEach((item, i) => {
         const b = document.createElement("button");
         b.className = "hist-item";
-        const art = item.artwork
-          ? '<img class="hist-art" alt="" src="' + item.artwork + '">'
-          : '<div class="hist-art">' + (item.emoji || "🎵") + "</div>";
+        const art = artHtml(item.artwork, item.emoji, "hist-art");
         b.innerHTML =
           art +
           '<div class="hist-meta"><div class="hist-title">' + esc(item.title) + "</div>" +
@@ -1395,9 +1406,7 @@
     crateItems.forEach((item, i) => {
       const row = document.createElement("div");
       row.className = "crate-row";
-      const art = item.artwork
-        ? '<img class="hist-art" alt="" src="' + item.artwork + '">'
-        : '<div class="hist-art">' + (item.emoji || "🎵") + "</div>";
+      const art = artHtml(item.artwork, item.emoji, "hist-art");
       row.innerHTML =
         '<div class="crate-num">' + (i + 1) + "</div>" + art +
         '<div class="hist-meta"><div class="hist-title">' + esc(item.title) + "</div>" +
@@ -1607,9 +1616,7 @@
       items.forEach((item) => {
         const row = document.createElement("div");
         row.className = "q-item";
-        const art = item.artwork
-          ? '<img class="hist-art" alt="" src="' + item.artwork + '">'
-          : '<div class="hist-art">' + (item.emoji || "🎵") + "</div>";
+        const art = artHtml(item.artwork, item.emoji, "hist-art");
         row.innerHTML =
           art +
           '<div class="hist-meta"><div class="hist-title">' + esc(item.title) + "</div>" +
@@ -1743,9 +1750,7 @@
     box.innerHTML = "";
     hits.forEach((item) => {
       const b = document.createElement("button");
-      const art = item.artwork
-        ? '<img class="ta-art" alt="" src="' + item.artwork + '">'
-        : '<span class="ta-art">' + (item.emoji || "🎵") + "</span>";
+      const art = artHtml(item.artwork, item.emoji, "ta-art");
       b.innerHTML =
         art + "<span>" + esc(item.artist) + " – <b>" + esc(item.title) + "</b></span>" +
         '<span class="ta-clock">🕘</span>';

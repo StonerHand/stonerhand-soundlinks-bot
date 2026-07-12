@@ -78,7 +78,7 @@
 | `PRIMARY_PLATFORM` | какая площадка первая: `spotify`, `appleMusic`, `tidal`… |
 | `SONGLINK_USER_COUNTRIES` | регионы Song.link через запятую, например `US,DE` |
 | `BOT_UI_MODE` | стиль кнопок: `stonerhand` / `minimal` / `editorial` |
-| `TELEGRAM_WEBHOOK_SECRET` | подпись входящих updates |
+| `TELEGRAM_WEBHOOK_SECRET` | подпись входящих updates (не задан — выводится из токена автоматически) |
 | `WEBAPP_URL`, `WEBHOOK_BASE_URL`, `STATS_PATH`, `LOG_LEVEL` | тонкая настройка |
 
 Алиасы Vercel KV (`KV_REST_API_URL/TOKEN`) тоже работают. Без Redis всё живёт в памяти.
@@ -117,7 +117,7 @@ src/music_links_bot/
 Полная карта — в [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
 
 ```bash
-PYTHONPATH=src python -m pytest tests/   # 228 тестов, без сети
+PYTHONPATH=src python -m pytest tests/   # 230 тестов, без сети
 ```
 
 ## Свой канал вместо StonerHand

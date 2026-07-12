@@ -55,6 +55,31 @@ class VercelWebhookTests(unittest.TestCase):
             self.assertTrue(_is_telegram_request_authorized("telegram-secret"))
             self.assertFalse(_is_telegram_request_authorized("wrong"))
 
+    def test_webhook_secret_is_derived_from_bot_token_when_unset(self) -> None:
+        from music_links_bot.webhook_secret import telegram_webhook_secret
+
+        with patch.dict(os.environ, {"BOT_TOKEN": "123:abc"}, clear=True):
+            derived = telegram_webhook_secret()
+            # Forged updates without the derived secret must be rejected.
+            self.assertFalse(_is_telegram_request_authorized(None))
+            self.assertFalse(_is_telegram_request_authorized("guess"))
+            self.assertTrue(_is_telegram_request_authorized(derived))
+            self.assertEqual(len(derived), 48)
+            self.assertNotIn("123:abc", derived)
+
+        with patch.dict(
+            os.environ,
+            {"BOT_TOKEN": "123:abc", "TELEGRAM_WEBHOOK_SECRET": "explicit"},
+            clear=True,
+        ):
+            self.assertEqual(telegram_webhook_secret(), "explicit")
+
+    def test_set_webhook_registers_derived_secret(self) -> None:
+        from music_links_bot.webhook_secret import telegram_webhook_secret
+
+        with patch.dict(os.environ, {"BOT_TOKEN": "123:abc"}, clear=True):
+            self.assertEqual(_telegram_webhook_secret(), telegram_webhook_secret())
+
     def test_setup_endpoint_requires_its_own_secret(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             self.assertFalse(_setup_secret_is_configured())

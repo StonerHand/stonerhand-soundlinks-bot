@@ -195,7 +195,9 @@ def _setup_secret_is_configured() -> bool:
 
 
 def _telegram_webhook_secret() -> str | None:
-    secret = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
+    from music_links_bot.webhook_secret import telegram_webhook_secret
+
+    secret = telegram_webhook_secret()
     if not secret:
         return None
 

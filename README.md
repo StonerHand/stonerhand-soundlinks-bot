@@ -78,7 +78,7 @@ Forwarded posts keep working: the CTA phrase is a live song.link hub link
 | `PRIMARY_PLATFORM` | which platform goes first: `spotify`, `appleMusic`, `tidal`… |
 | `SONGLINK_USER_COUNTRIES` | Song.link regions, comma-separated, e.g. `US,DE` |
 | `BOT_UI_MODE` | button style: `stonerhand` / `minimal` / `editorial` |
-| `TELEGRAM_WEBHOOK_SECRET` | signs incoming updates |
+| `TELEGRAM_WEBHOOK_SECRET` | signs incoming updates (unset — derived from the bot token automatically) |
 | `WEBAPP_URL`, `WEBHOOK_BASE_URL`, `STATS_PATH`, `LOG_LEVEL` | fine-tuning |
 
 Vercel KV aliases (`KV_REST_API_URL/TOKEN`) work too. Without Redis everything lives in memory.
@@ -117,7 +117,7 @@ src/music_links_bot/
 Full map: [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
 
 ```bash
-PYTHONPATH=src python -m pytest tests/   # 228 tests, no network
+PYTHONPATH=src python -m pytest tests/   # 230 tests, no network
 ```
 
 ## Your channel instead of StonerHand
