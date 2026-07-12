@@ -428,6 +428,58 @@
   .status-note { font-family: "Space Mono", monospace; font-size: 11px; letter-spacing: 1px; color: var(--muted); text-align: center; margin-top: 12px; min-height: 16px; text-transform: uppercase; }
   .view-title { font-family: "Fraunces", serif; font-size: 21px; font-weight: 600; margin: 4px 0 14px; }
   .hidden { display: none !important; }
+
+  /* ── Typeahead from history ── */
+  .search-wrap { position: relative; }
+  .typeahead {
+    position: absolute; left: 0; right: 0; top: calc(100% - 12px); z-index: 40;
+    background: var(--card); border: 1px solid var(--divider); border-radius: 0 0 14px 14px;
+    border-top: none; overflow: hidden; display: none; box-shadow: 0 12px 32px rgba(0,0,0,.5);
+  }
+  .typeahead.open { display: block; }
+  .typeahead button {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    background: none; border: none; border-bottom: 1px solid var(--divider);
+    color: var(--text); font-size: 13px; font-family: inherit; padding: 9px 14px;
+  }
+  .typeahead button:last-child { border-bottom: none; }
+  .typeahead button:active { background: var(--surface); }
+  .ta-art { width: 30px; height: 30px; border-radius: 7px; object-fit: cover; flex-shrink: 0; background: var(--surface); display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  .ta-clock { color: var(--muted); font-size: 11px; margin-left: auto; flex-shrink: 0; }
+
+  /* ── Crate ── */
+  .crate-row {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface); border: 1px solid var(--divider); border-radius: 14px;
+    padding: 9px 12px; margin-bottom: 8px;
+  }
+  .crate-num { font-family: "Space Mono", monospace; font-size: 12px; color: var(--accent); width: 18px; text-align: center; flex-shrink: 0; }
+  .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .action-grid .action-secondary { margin: 0; }
+  .crate-actions { margin-top: 16px; }
+  .crate-clear { width: 100%; margin-top: 10px; background: none; border: none; color: var(--muted); font-size: 12px; font-family: inherit; padding: 8px; }
+
+  /* ── Onboarding coach marks ── */
+  .coach-mask { position: fixed; inset: 0; z-index: 120; background: rgba(0,0,0,.66); display: none; }
+  .coach-mask.open { display: block; }
+  .coach {
+    position: fixed; z-index: 121; left: 50%; transform: translateX(-50%);
+    width: calc(100% - 48px); max-width: 330px;
+    background: var(--card); border: 1px solid rgba(201,122,30,.4); border-radius: 16px;
+    padding: 16px; box-shadow: 0 8px 48px rgba(0,0,0,.7), 0 0 24px rgba(201,122,30,.15);
+    display: none; animation: fade-up .3s ease;
+  }
+  .coach.open { display: block; }
+  .coach .c-emoji { font-size: 26px; margin-bottom: 8px; }
+  .coach .c-text { font-size: 14px; line-height: 1.5; margin-bottom: 12px; }
+  .coach .c-row { display: flex; align-items: center; gap: 10px; }
+  .coach .c-dots { display: flex; gap: 5px; flex: 1; }
+  .coach .c-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--divider); }
+  .coach .c-dots i.on { background: var(--accent); }
+  .coach .c-next {
+    padding: 9px 20px; border-radius: 10px; border: none;
+    background: var(--accent); color: #0D0D0E; font-size: 13px; font-weight: 700; font-family: inherit;
+  }
 </style>
 </head>
 <body>
@@ -441,19 +493,23 @@
     <button class="h-btn hidden" id="btn-fs" title="Fullscreen">⛶</button>
   </div>
 
-  <div class="searchbar" id="searchbar">
-    <span class="icon">⌕</span>
-    <input type="text" id="query" placeholder="artist – track или ссылка" autocomplete="off" enterkeyhint="search">
-    <button class="btn-clear" id="clear">✕</button>
-    <button class="btn-paste hidden" id="paste" title="Paste">📋</button>
-    <button class="btn-go" id="go">⌕</button>
+  <div class="search-wrap" id="searchbar">
+    <div class="searchbar" style="margin-bottom:16px">
+      <span class="icon">⌕</span>
+      <input type="text" id="query" placeholder="artist – track или ссылка" autocomplete="off" enterkeyhint="search">
+      <button class="btn-clear" id="clear">✕</button>
+      <button class="btn-paste hidden" id="paste" title="Paste">📋</button>
+      <button class="btn-go" id="go">⌕</button>
+    </div>
+    <div class="typeahead" id="typeahead"></div>
   </div>
 
   <!-- Home -->
   <div id="view-home">
-    <div class="admin-row hidden" id="admin-row">
-      <button id="btn-queue">🕒 <span id="t-queue">Очередь</span><span class="badge-n" id="queue-n"></span></button>
-      <button id="btn-stats">📊 <span id="t-stats">Статистика</span></button>
+    <div class="admin-row" id="admin-row">
+      <button class="hidden" id="btn-crate">🧺 <span id="t-crate">Подборка</span><span class="badge-n" id="crate-n"></span></button>
+      <button class="hidden" id="btn-queue">🕒 <span id="t-queue">Очередь</span><span class="badge-n" id="queue-n"></span></button>
+      <button class="hidden" id="btn-stats">📊 <span id="t-stats">Статистика</span></button>
     </div>
     <div id="home-history" class="hidden">
       <div class="section-label" id="t-recent">НЕДАВНИЕ РЕЛИЗЫ</div>
@@ -533,6 +589,7 @@
       <button class="chip hidden" id="chip-quote"><span>💬</span><span id="t-chip-quote">Цитата</span></button>
       <button class="chip" id="chip-edit"><span>✏️</span><span id="t-chip-edit">Текст</span></button>
       <button class="chip" id="chip-pm"><span>🎚</span><span id="t-chip-pm">Кнопки</span></button>
+      <button class="chip" id="chip-photo"><span>📸</span><span id="t-chip-photo">Фото</span></button>
       <button class="mode-toggle" id="mode-toggle">⊞ full</button>
     </div>
 
@@ -572,9 +629,11 @@
     </div>
 
     <button class="action-primary" id="action-main"></button>
-    <div class="action-row2">
+    <div class="action-grid">
       <button class="action-secondary hidden" id="action-schedule">🕒 <span id="t-schedule">Запланировать</span></button>
       <button class="action-secondary hidden" id="action-alt"></button>
+      <button class="action-secondary" id="action-crate">➕ <span id="t-to-crate">В подборку</span></button>
+      <button class="action-secondary" id="action-share">↗️ <span id="t-share">Поделиться</span></button>
     </div>
     <div class="status-note" id="status"></div>
   </div>
@@ -585,6 +644,20 @@
     <div class="poetry" id="t-poetry">Даже самые редкие пластинки иногда теряются.</div>
     <div class="q"><span id="t-nf">Не удалось найти</span> <b id="nf-query"></b></div>
     <button class="btn-retry" id="retry">↺ <span id="t-retry">Попробовать снова</span></button>
+  </div>
+
+  <!-- Crate -->
+  <div class="hidden anim-in" id="view-crate">
+    <div class="view-title" id="t-crate-title">Подборка</div>
+    <div id="crate-list"></div>
+    <div class="status-note" id="crate-empty"></div>
+    <div class="crate-actions">
+      <button class="action-primary hidden" id="crate-main"></button>
+      <div class="action-grid">
+        <button class="action-secondary hidden" id="crate-alt"></button>
+      </div>
+      <button class="crate-clear hidden" id="crate-clear-btn"></button>
+    </div>
   </div>
 
   <!-- Queue -->
@@ -614,6 +687,17 @@
   <div class="dt-row">
     <input type="datetime-local" id="dt-input">
     <button id="dt-go">OK</button>
+  </div>
+</div>
+
+<!-- Onboarding coach -->
+<div class="coach-mask" id="coach-mask"></div>
+<div class="coach" id="coach">
+  <div class="c-emoji" id="coach-emoji"></div>
+  <div class="c-text" id="coach-text"></div>
+  <div class="c-row">
+    <div class="c-dots" id="coach-dots"></div>
+    <button class="c-next" id="coach-next"></button>
   </div>
 </div>
 
@@ -656,6 +740,17 @@
     tonight: "Tonight 19:00", tomorrow: "Tomorrow 10:00",
     posted: "in channel", homescreen: "Add to home screen", addTag: "+ tag",
     statNames: { posts: "posts", song: "tracks", album: "albums", podcast: "podcasts", videos: "videos", collections: "sets" },
+    chipPhoto: "Photo", crate: "Crate", crateTitle: "Collection crate",
+    toCrate: "To crate", inCrate: "✓ In crate", crateFull: "Crate is full",
+    crateEmpty: "ADD TRACKS FROM ANY CARD", crateSend: "Send to me",
+    cratePublish: "Publish collection", crateClear: "Clear crate",
+    share: "Share", needMore: "ADD AT LEAST 2 TRACKS",
+    coach: [
+      ["🎧", "Tap ▶ on the cover — a 30-second preview plays right here."],
+      ["✏️", "Tap the post phrase or hashtags to rewrite them your way."],
+      ["🎚", "Chips up top: platform buttons, 📸 photo mode, hashtags."],
+    ],
+    gotIt: "Got it", next: "Next",
   } : {
     title: "Студия", lead: "Создавай музыкальные посты за пару секунд",
     hint: "Введи исполнителя и трек<br>или вставь ссылку на любую платформу",
@@ -677,6 +772,17 @@
     tonight: "Сегодня 19:00", tomorrow: "Завтра 10:00",
     posted: "в канале", homescreen: "Добавить на домашний экран", addTag: "+ тег",
     statNames: { posts: "постов", song: "треков", album: "альбомов", podcast: "подкастов", videos: "видео", collections: "подборок" },
+    chipPhoto: "Фото", crate: "Подборка", crateTitle: "Подборка",
+    toCrate: "В подборку", inCrate: "✓ В подборке", crateFull: "Подборка заполнена",
+    crateEmpty: "ДОБАВЛЯЙ ТРЕКИ С ЛЮБОЙ КАРТОЧКИ", crateSend: "Отправить себе",
+    cratePublish: "Опубликовать подборку", crateClear: "Очистить подборку",
+    share: "Поделиться", needMore: "НУЖНО МИНИМУМ 2 ТРЕКА",
+    coach: [
+      ["🎧", "Тапни ▶ на обложке — 30 секунд трека заиграют прямо здесь."],
+      ["✏️", "Тапни по фразе поста или хэштегам — перепишешь по-своему."],
+      ["🎚", "Чипы сверху: кнопки платформ, 📸 фото-режим, хэштеги."],
+    ],
+    gotIt: "Понятно", next: "Дальше",
   };
 
   const SUGGESTIONS = [
@@ -697,12 +803,14 @@
   };
 
   const $ = (id) => document.getElementById(id);
-  const VIEWS = ["home", "candidates", "loading", "result", "notfound", "queue", "stats"];
+  const VIEWS = ["home", "candidates", "loading", "result", "notfound", "crate", "queue", "stats"];
   let state = null;          // last draft response
   let navStack = ["home"];   // for BackButton
   let isAdmin = false;
   let syncTimer = null;
   let playingBtn = null;
+  let historyItems = [];     // for the typeahead
+  let crateCount = 0;
 
   /* ── haptics ── */
   const hap = {
@@ -746,6 +854,11 @@
   $("edit-save").textContent = T.save;
   $("pm-default").textContent = T.pmDefault;
   $("pm-done").textContent = T.pmDone;
+  $("t-chip-photo").textContent = T.chipPhoto;
+  $("t-crate").textContent = T.crate;
+  $("t-crate-title").textContent = T.crateTitle;
+  $("t-to-crate").textContent = T.toCrate;
+  $("t-share").textContent = T.share;
 
   SUGGESTIONS.forEach((s) => {
     const b = document.createElement("button");
@@ -763,6 +876,7 @@
   /* ── navigation + BackButton ── */
   function show(view, push) {
     stopAudio();
+    $("typeahead").classList.remove("open");
     VIEWS.forEach((v) => $("view-" + v).classList.toggle("hidden", v !== view));
     $("searchbar").classList.toggle("hidden", view !== "home" && view !== "notfound" && view !== "candidates");
     if (push !== false) {
@@ -825,16 +939,49 @@
     player.ontimeupdate = () => {
       if (!ring || !player.duration) return;
       const pct = (player.currentTime / player.duration) * 360;
-      ring.style.background = "conic-gradient(var(--accent) " + pct + "deg, rgba(255,255,255,.12) " + pct + "deg)";
+      ring.style.background = "conic-gradient(" + dynRGB(1) + " " + pct + "deg, rgba(255,255,255,.12) " + pct + "deg)";
     };
     player.onended = stopAudio;
+  }
+
+  /* ── dynamic accent from the artwork ── */
+  let dyn = { r: 201, g: 122, b: 30 };
+  function dynRGB(alpha) { return "rgba(" + dyn.r + "," + dyn.g + "," + dyn.b + "," + alpha + ")"; }
+  function extractAccent(img) {
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 10;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, 10, 10);
+      const data = ctx.getImageData(0, 0, 10, 10).data;
+      let best = null, bestScore = -1;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i + 1], b = data[i + 2];
+        const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+        const lum = (mx + mn) / 2;
+        const score = (mx - mn) + (lum > 40 && lum < 215 ? 60 : 0);
+        if (score > bestScore) { bestScore = score; best = [r, g, b]; }
+      }
+      if (best && bestScore > 70) { dyn = { r: best[0], g: best[1], b: best[2] }; applyAccent(); }
+    } catch (e) { /* tainted canvas → keep the amber */ }
+  }
+  function applyAccent() {
+    const card = $("card");
+    card.style.borderColor = dynRGB(.35);
+    card.style.boxShadow = "0 4px 40px rgba(0,0,0,.4), 0 0 36px " + dynRGB(.12);
+    document.querySelectorAll(".vu i").forEach((el) => { el.style.background = dynRGB(.95); });
+    const hub = document.querySelector(".p-hub");
+    if (hub) { hub.style.borderColor = dynRGB(.3); hub.style.background = dynRGB(.07); }
   }
 
   /* ── render result card ── */
   function renderCard() {
     const r = state.release, f = state.flags;
-    const mode = f.large_preview ? "large" : "compact";
+    const photo = Boolean(f.as_photo);
+    const mode = photo || f.large_preview ? "large" : "compact";
     $("mode-toggle").textContent = mode === "large" ? "⊞ full" : "⊟ mini";
+    $("mode-toggle").style.display = photo ? "none" : "";
+    $("chip-photo").classList.toggle("on", photo);
 
     const zone = $("cover-zone");
     const body = $("post-body");
@@ -846,7 +993,7 @@
 
     if (mode === "large") {
       zone.innerHTML = r.artwork
-        ? '<img class="cover-large" alt="" src="' + r.artwork + '">' + playHtml + vuHtml
+        ? '<img class="cover-large" crossorigin="anonymous" alt="" src="' + r.artwork + '">' + playHtml + vuHtml
         : "";
       body.innerHTML =
         '<div class="post-artist">' + r.emoji + " · " + esc(r.artist) + "</div>" +
@@ -855,7 +1002,7 @@
       zone.innerHTML =
         '<div class="compact-row">' +
         (r.artwork
-          ? '<div class="cover-small-wrap"><img class="cover-small" alt="" src="' + r.artwork + '">' + playHtml + "</div>"
+          ? '<div class="cover-small-wrap"><img class="cover-small" crossorigin="anonymous" alt="" src="' + r.artwork + '">' + playHtml + "</div>"
           : "") +
         '<div class="compact-meta">' +
         '<div class="post-artist">' + r.emoji + " · " + esc(r.artist) + "</div>" +
@@ -875,6 +1022,13 @@
       const btn = $("btn-play"), ring = $("play-ring"), vu = $("vu");
       if (btn) btn.addEventListener("click", (event) => { event.stopPropagation(); togglePreview(r.preview, btn, ring, vu); });
     }
+    const coverImg = zone.querySelector("img");
+    dyn = { r: 201, g: 122, b: 30 };
+    if (coverImg) {
+      if (coverImg.complete) extractAccent(coverImg);
+      else coverImg.addEventListener("load", () => extractAccent(coverImg));
+    }
+    setTimeout(applyAccent, 700); /* after the hub button lands */
     const ctaLine = $("cta-line");
     if (ctaLine) ctaLine.addEventListener("click", () => openEditPanel());
     const tagsLine = $("tags-line");
@@ -923,6 +1077,7 @@
       sch.classList.add("hidden");
       alt.classList.add("hidden");
     }
+    $("action-crate").innerHTML = "➕ " + T.toCrate + (crateCount > 0 ? " (" + crateCount + ")" : "");
     $("status").textContent = "";
   }
 
@@ -1116,6 +1271,7 @@
     renderCard();
     playEntrance();
     hap.ok();
+    maybeCoach();
     if (applyDefaults) {
       loadPrefs((prefs) => {
         if (!prefs) return;
@@ -1171,9 +1327,12 @@
       const result = await api("history", {});
       if (!result.ok) return;
       isAdmin = Boolean(result.is_admin);
-      $("admin-row").classList.toggle("hidden", !isAdmin);
+      $("btn-queue").classList.toggle("hidden", !isAdmin);
+      $("btn-stats").classList.toggle("hidden", !isAdmin);
       if (isAdmin) refreshQueueBadge();
+      refreshCrateBadge();
       const items = result.items || [];
+      historyItems = items;
       $("home-history").classList.toggle("hidden", items.length === 0);
       $("home-empty").classList.toggle("hidden", items.length > 0);
       const list = $("hist-list");
@@ -1206,6 +1365,115 @@
     } catch (e) {}
   }
 
+  async function refreshCrateBadge(data) {
+    try {
+      const result = data || await api("crate", {});
+      crateCount = result.count || 0;
+      const badge = $("crate-n");
+      badge.style.display = crateCount > 0 ? "flex" : "none";
+      badge.textContent = crateCount;
+      $("btn-crate").classList.toggle("hidden", crateCount === 0);
+      $("admin-row").classList.toggle("hidden", !isAdmin && crateCount === 0);
+    } catch (e) {}
+  }
+
+  /* ── crate (collection builder) ── */
+  let crateItems = [];
+  async function openCrate() {
+    hap.tap();
+    show("crate");
+    try {
+      const result = await api("crate", {});
+      crateItems = result.items || [];
+      drawCrate();
+    } catch (e) { $("crate-empty").textContent = T.err; }
+  }
+  function drawCrate() {
+    const list = $("crate-list");
+    list.innerHTML = "";
+    $("crate-empty").textContent = crateItems.length === 0 ? T.crateEmpty : "";
+    crateItems.forEach((item, i) => {
+      const row = document.createElement("div");
+      row.className = "crate-row";
+      const art = item.artwork
+        ? '<img class="hist-art" alt="" src="' + item.artwork + '">'
+        : '<div class="hist-art">' + (item.emoji || "🎵") + "</div>";
+      row.innerHTML =
+        '<div class="crate-num">' + (i + 1) + "</div>" + art +
+        '<div class="hist-meta"><div class="hist-title">' + esc(item.title) + "</div>" +
+        '<div class="hist-sub">' + esc(item.artist) + "</div></div>";
+      const move = document.createElement("div");
+      move.className = "pm-move";
+      const up = document.createElement("button");
+      up.textContent = "↑"; up.disabled = i === 0;
+      up.addEventListener("click", () => crateSwap(i, i - 1));
+      const down = document.createElement("button");
+      down.textContent = "↓"; down.disabled = i === crateItems.length - 1;
+      down.addEventListener("click", () => crateSwap(i, i + 1));
+      move.appendChild(up); move.appendChild(down);
+      const x = document.createElement("button");
+      x.className = "q-x";
+      x.textContent = "✕";
+      x.addEventListener("click", async () => {
+        hap.tap();
+        try {
+          const result = await api("crate_remove", { index: i });
+          if (result.ok) { crateItems = result.items; refreshCrateBadge(result); drawCrate(); }
+        } catch (e) {}
+      });
+      row.appendChild(move); row.appendChild(x);
+      list.appendChild(row);
+    });
+
+    const main = $("crate-main"), alt = $("crate-alt"), clear = $("crate-clear-btn");
+    const enough = crateItems.length >= 2;
+    main.classList.toggle("hidden", !enough);
+    clear.classList.toggle("hidden", crateItems.length === 0);
+    clear.textContent = "🗑 " + T.crateClear;
+    if (isAdmin) {
+      main.innerHTML = "📤 " + T.cratePublish;
+      main.dataset.action = "crate_publish";
+      alt.classList.toggle("hidden", !enough);
+      alt.textContent = T.crateSend;
+    } else {
+      main.textContent = T.crateSend;
+      main.dataset.action = "crate_send";
+      alt.classList.add("hidden");
+    }
+    if (crateItems.length === 1) $("crate-empty").textContent = T.needMore;
+  }
+  async function crateSwap(a, b) {
+    hap.pick();
+    const indices = crateItems.map((_, i) => i);
+    [indices[a], indices[b]] = [indices[b], indices[a]];
+    try {
+      const result = await api("crate_order", { indices });
+      if (result.ok) { crateItems = result.items; drawCrate(); }
+    } catch (e) {}
+  }
+  async function crateDeliver(action) {
+    const main = $("crate-main");
+    main.disabled = true;
+    try {
+      const result = await api(action, {});
+      if (result.ok) {
+        hap.ok();
+        main.classList.add("done");
+        main.textContent = action === "crate_publish" ? T.published : T.sent;
+        if (action === "crate_publish") {
+          crateItems = [];
+          setTimeout(() => { main.classList.remove("done"); refreshCrateBadge(); drawCrate(); }, 1800);
+        } else {
+          setTimeout(() => { main.classList.remove("done"); drawCrate(); }, 2200);
+        }
+      } else {
+        hap.err();
+        $("crate-empty").textContent = result.error === "need more tracks" ? T.needMore : T.err;
+      }
+    } catch (e) { hap.err(); $("crate-empty").textContent = T.err; }
+    finally { main.disabled = false; }
+  }
+
   /* ── deliver / schedule ── */
   async function deliver(action, extra) {
     const main = $("action-main");
@@ -1217,6 +1485,7 @@
         hashtags: state.flags.hashtags,
         quote: state.flags.quote,
         large_preview: state.flags.large_preview,
+        as_photo: Boolean(state.flags.as_photo),
         ...(extra || {}),
       });
       if (result.ok) {
@@ -1257,6 +1526,7 @@
         hashtags: state.flags.hashtags,
         quote: state.flags.quote,
         large_preview: state.flags.large_preview,
+        as_photo: Boolean(state.flags.as_photo),
       });
       if (result.ok) {
         hap.ok();
@@ -1416,12 +1686,127 @@
   $("mode-toggle").addEventListener("click", () => { hap.pick(); state.flags.large_preview = !state.flags.large_preview; renderCard(); softIn(); syncDraft({ large_preview: state.flags.large_preview }); });
   $("chip-edit").addEventListener("click", openEditPanel);
   $("chip-pm").addEventListener("click", openPmPanel);
+  $("chip-photo").addEventListener("click", () => {
+    hap.pick();
+    state.flags.as_photo = !state.flags.as_photo;
+    renderCard(); softIn();
+    syncDraft({ as_photo: state.flags.as_photo });
+  });
   $("action-main").addEventListener("click", () => deliver($("action-main").dataset.action));
   $("action-alt").addEventListener("click", () => deliver("send"));
   $("action-schedule").addEventListener("click", openSheet);
+  $("action-crate").addEventListener("click", async () => {
+    hap.tap();
+    try {
+      const result = await api("crate_add", { draft_id: state.draft_id });
+      if (result.ok) {
+        hap.ok();
+        refreshCrateBadge(result);
+        $("action-crate").innerHTML = T.inCrate + " (" + result.count + ")";
+      } else {
+        hap.err();
+        $("status").textContent = result.error === "crate full" ? T.crateFull.toUpperCase() : T.err;
+      }
+    } catch (e) { hap.err(); }
+  });
+  $("action-share").addEventListener("click", () => {
+    hap.tap();
+    const enabled = (state.release.platforms || []).filter((p) => p.enabled !== false);
+    const url = (enabled[0] || {}).url || state.release.page_url;
+    if (!url) return;
+    try { tg.switchInlineQuery(url, ["users", "groups", "channels"]); }
+    catch (e) { try { tg.switchInlineQuery(url); } catch (e2) {} }
+  });
+  $("btn-crate").addEventListener("click", openCrate);
+  $("crate-main").addEventListener("click", () => crateDeliver($("crate-main").dataset.action));
+  $("crate-alt").addEventListener("click", () => crateDeliver("crate_send"));
+  $("crate-clear-btn").addEventListener("click", async () => {
+    hap.tap();
+    try {
+      const result = await api("crate_clear", {});
+      if (result.ok) { crateItems = []; refreshCrateBadge({ count: 0 }); drawCrate(); }
+    } catch (e) {}
+  });
   $("btn-queue").addEventListener("click", openQueue);
   $("btn-stats").addEventListener("click", openStats);
   $("toast-cancel").addEventListener("click", () => $("toast").classList.remove("visible"));
+
+  /* ── typeahead from history ── */
+  function renderTypeahead() {
+    const box = $("typeahead");
+    const query = $("query").value.trim().toLowerCase();
+    if (query.length < 2) { box.classList.remove("open"); return; }
+    const hits = historyItems
+      .filter((item) => (item.artist + " " + item.title).toLowerCase().includes(query))
+      .slice(0, 4);
+    if (!hits.length) { box.classList.remove("open"); return; }
+    box.innerHTML = "";
+    hits.forEach((item) => {
+      const b = document.createElement("button");
+      const art = item.artwork
+        ? '<img class="ta-art" alt="" src="' + item.artwork + '">'
+        : '<span class="ta-art">' + (item.emoji || "🎵") + "</span>";
+      b.innerHTML =
+        art + "<span>" + esc(item.artist) + " – <b>" + esc(item.title) + "</b></span>" +
+        '<span class="ta-clock">🕘</span>';
+      b.addEventListener("click", () => {
+        hap.pick();
+        box.classList.remove("open");
+        $("query").value = item.artist + " – " + item.title;
+        search(item.source_url);
+      });
+      box.appendChild(b);
+    });
+    box.classList.add("open");
+  }
+  $("query").addEventListener("input", renderTypeahead);
+  $("query").addEventListener("blur", () => setTimeout(() => $("typeahead").classList.remove("open"), 180));
+
+  /* ── onboarding coach marks ── */
+  let coachShown = false;
+  function maybeCoach() {
+    if (coachShown) return;
+    coachShown = true;
+    const KEY = "coach1";
+    const start = () => setTimeout(startCoach, 900);
+    try {
+      tg.CloudStorage.getItem(KEY, (err, value) => {
+        if (err || value) return;
+        start();
+        tg.CloudStorage.setItem(KEY, "1");
+      });
+    } catch (e) {
+      try {
+        if (!localStorage.getItem(KEY)) { start(); localStorage.setItem(KEY, "1"); }
+      } catch (e2) {}
+    }
+  }
+  function startCoach() {
+    let step = 0;
+    const steps = T.coach;
+    const render = () => {
+      $("coach-emoji").textContent = steps[step][0];
+      $("coach-text").textContent = steps[step][1];
+      $("coach-dots").innerHTML = steps
+        .map((_, i) => "<i" + (i === step ? ' class="on"' : "") + "></i>")
+        .join("");
+      $("coach-next").textContent = step === steps.length - 1 ? T.gotIt : T.next;
+    };
+    $("coach").style.bottom = "28px";
+    $("coach-mask").classList.add("open");
+    $("coach").classList.add("open");
+    render();
+    $("coach-next").onclick = () => {
+      hap.tap();
+      step += 1;
+      if (step >= steps.length) {
+        $("coach-mask").classList.remove("open");
+        $("coach").classList.remove("open");
+        return;
+      }
+      render();
+    };
+  }
 
   /* ── clipboard paste ── */
   (function initPaste() {
