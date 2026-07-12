@@ -32,7 +32,10 @@ out  →  📻 · Black Sabbath
 
 ## What it does
 
-- 🎛 **Studio** — a Mini App inside Telegram: live preview, toggle chips, one-tap publish
+- 🎛 **Studio** — a Mini App inside Telegram: live preview, pick from several matches, ▶ 30-sec audio preview right on the cover, custom text and hashtags, platform button set and order
+- 🕒 **Scheduled posting** — "Schedule" in the Studio: the post goes to the channel by itself, the queue is visible and cancellable
+- 🕘 **History** — recent releases on the Studio home screen, marked when already in the channel
+- 📊 **Dashboard** — stats with charts right in the Mini App (admin)
 - 🔎 **Search without a link** — type `artist - track`, the bot finds the release itself
 - 🪄 **Inline** — `@StonerHandBot query` in any chat → pick from three releases with cover art
 - 🎚 **Post editor** — hashtags, quote, preview size, 📤 to channel — right under the post
@@ -64,7 +67,7 @@ Forwarded posts keep working: the CTA phrase is a live song.link hub link
 | `BOT_TOKEN` ⭐ | token from BotFather |
 | `SET_WEBHOOK_SECRET` ⭐ | protects `/api/set_webhook` |
 | `CRON_SECRET` | daily webhook self-healing via Vercel Cron |
-| `UPSTASH_REDIS_REST_URL/TOKEN` | Redis: shared cache, live `/stats`, persistent drafts, dup guard |
+| `UPSTASH_REDIS_REST_URL/TOKEN` | Redis: shared cache, live `/stats`, persistent drafts, dup guard, Studio history & queue |
 | `ADMIN_CHAT_ID` | your chat id (`/id` command): private stats + the 📤 button |
 | `PUBLISH_CHAT_ID` | where 📤 posts (defaults to `@stonerhand`) |
 | `PRIMARY_PLATFORM` | which platform goes first: `spotify`, `appleMusic`, `tidal`… |
@@ -109,7 +112,7 @@ src/music_links_bot/
 Full map: [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
 
 ```bash
-PYTHONPATH=src python -m pytest tests/   # 203 tests, no network
+PYTHONPATH=src python -m pytest tests/   # 222 tests, no network
 ```
 
 ## Your channel instead of StonerHand
@@ -128,6 +131,7 @@ PYTHONPATH=src python -m pytest tests/   # 203 tests, no network
 | Links not replaced in channel | Grant the bot delete-messages right |
 | `/stats` shows zeros | Plug in Redis (Upstash, free) |
 | Inline not working | `/setinline` in BotFather + one `/api/set_webhook` call |
+| Scheduled post is late | The queue ticks on any bot activity; for minute precision ping `GET /api/webapp` every 5 min (UptimeRobot, free) |
 | Site root gives 404 | By design: the live paths are `/app` and `/api/*` |
 
 </details>

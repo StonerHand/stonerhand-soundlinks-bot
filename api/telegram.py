@@ -20,6 +20,7 @@ from telegram import Update
 
 from music_links_bot.bot import build_application, close_application_resources
 from music_links_bot.config import Settings
+from music_links_bot.publish_queue import process_due_jobs
 
 LOGGER = logging.getLogger(__name__)
 MAX_UPDATE_BYTES = 1024 * 1024
@@ -103,6 +104,20 @@ def _process_telegram_update(update_payload: dict[str, object]) -> None:
         except Exception:
             _dispose_application_locked()
             raise
+
+        # Opportunistic queue tick: every incoming update also delivers
+        # scheduled posts whose time has come.
+        try:
+            loop.run_until_complete(_run_queue_tick(application))
+        except Exception:
+            LOGGER.warning("Queue tick failed", exc_info=True)
+
+
+async def _run_queue_tick(application) -> int:
+    from types import SimpleNamespace
+
+    context = SimpleNamespace(application=application, bot=application.bot)
+    return await process_due_jobs(context)
 
 
 def _ensure_application():

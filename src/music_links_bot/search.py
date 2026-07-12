@@ -24,6 +24,7 @@ class SearchCandidate:
     title: str
     artist: str
     artwork_url: str | None = None
+    preview_url: str | None = None
 
 
 class SearchClient:
@@ -44,6 +45,7 @@ class SearchClient:
         )
         self._cache: TTLCache[list[SearchCandidate]] = TTLCache(ttl_seconds=6 * 3600)
         self._genre_cache: TTLCache[str] = TTLCache(ttl_seconds=24 * 3600)
+        self._preview_cache: TTLCache[str] = TTLCache(ttl_seconds=24 * 3600)
 
     async def aclose(self) -> None:
         await self._client.aclose()
@@ -85,6 +87,39 @@ class SearchClient:
         self._genre_cache.set(cache_key, genre or "")
         return genre
 
+    async def lookup_preview(self, artist: str, title: str) -> str | None:
+        """Best-effort 30-second audio preview URL for a release; empty-string
+        cache entries mark known misses so they are not retried."""
+        query = normalize_search_query(f"{artist} {title}")
+        if query is None:
+            return None
+
+        cache_key = query.casefold()
+        cached_preview = self._preview_cache.get(cache_key)
+        if cached_preview is not None:
+            return cached_preview or None
+
+        try:
+            response = await self._client.get(
+                "/search",
+                params={
+                    "term": query,
+                    "media": "music",
+                    "entity": "song",
+                    "limit": 3,
+                    "country": self._country,
+                },
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except (httpx.HTTPError, ValueError):
+            LOGGER.debug("Preview lookup failed for %s", query, exc_info=True)
+            return None
+
+        preview_url = _extract_preview_url(payload)
+        self._preview_cache.set(cache_key, preview_url or "")
+        return preview_url
+
     async def search_release_candidates(self, query: str) -> list[SearchCandidate]:
         normalized_query = normalize_search_query(query)
         if normalized_query is None:
@@ -125,6 +160,23 @@ def normalize_search_query(query: str) -> str | None:
         return None
 
     return normalized[:MAX_QUERY_LENGTH]
+
+
+def _extract_preview_url(payload: object) -> str | None:
+    if not isinstance(payload, dict):
+        return None
+
+    results = payload.get("results")
+    if not isinstance(results, list):
+        return None
+
+    for result in results:
+        if isinstance(result, dict):
+            preview = result.get("previewUrl")
+            if isinstance(preview, str) and preview.startswith("http"):
+                return preview
+
+    return None
 
 
 def _extract_genre(payload: object) -> str | None:
@@ -170,12 +222,14 @@ def _extract_release_candidates(payload: object) -> list[SearchCandidate]:
 
         seen_urls.add(url)
         artwork = result.get("artworkUrl100") or result.get("artworkUrl60")
+        preview = result.get("previewUrl")
         candidates.append(
             SearchCandidate(
                 url=url,
                 title=str(result.get("trackName") or result.get("collectionName") or ""),
                 artist=str(result.get("artistName") or ""),
                 artwork_url=artwork if isinstance(artwork, str) else None,
+                preview_url=preview if isinstance(preview, str) else None,
             )
         )
         if len(candidates) >= MAX_CANDIDATES:

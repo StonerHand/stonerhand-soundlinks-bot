@@ -7,6 +7,7 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 import hashlib
 import logging
+import re
 import secrets
 from urllib.parse import quote
 
@@ -635,9 +636,13 @@ def _render_track_draft(
 ) -> tuple[str, InlineKeyboardMarkup]:
     track = TrackMatch(**draft["item"])
     prefix = draft.get("prefix") or ""
+    include_hashtags, overrides = _draft_message_overrides(
+        draft, include_hashtags=bool(draft.get("hashtags"))
+    )
     text = (prefix if draft.get("quote") and prefix else "") + format_track_message(
         track,
-        include_hashtags=bool(draft.get("hashtags")),
+        include_hashtags=include_hashtags,
+        **overrides,
     )
     keyboard = _build_link_keyboard(
         track.links,
@@ -646,12 +651,53 @@ def _render_track_draft(
         release_page_url=track.page_url,
         release_kind=track.kind,
         release_format=track.release_format,
+        platform_selection=_draft_platform_selection(draft),
     )
     if draft_id is None:
         return text, keyboard
 
     rows = [*keyboard.inline_keyboard, *_editor_rows(draft_id, draft)]
     return text, InlineKeyboardMarkup(rows)
+
+
+def _draft_message_overrides(
+    draft: dict,
+    *,
+    include_hashtags: bool,
+) -> tuple[bool, dict]:
+    """Custom CTA text and hashtags set in the Studio replace the generated
+    ones; an explicitly emptied hashtag list wins over the house style."""
+    overrides: dict = {}
+    custom_cta = draft.get("custom_cta")
+    if isinstance(custom_cta, str) and custom_cta.strip():
+        overrides["cta_text"] = custom_cta.strip()
+
+    custom_tags = draft.get("custom_tags")
+    if isinstance(custom_tags, list):
+        tags = [tag for tag in (normalize_hashtag(value) for value in custom_tags) if tag]
+        if tags:
+            overrides["hashtags"] = " ".join(tags)
+        else:
+            include_hashtags = False
+
+    return include_hashtags, overrides
+
+
+def normalize_hashtag(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+
+    slug = re.sub(r"[^0-9a-zа-яё_]", "", value.casefold())
+    return f"#{slug[:32]}" if slug else None
+
+
+def _draft_platform_selection(draft: dict) -> list[str] | None:
+    platforms = draft.get("platforms")
+    if not isinstance(platforms, list):
+        return None
+
+    selection = [key for key in platforms if isinstance(key, str) and key in PLATFORM_LABELS]
+    return selection or None
 
 
 def _editor_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
@@ -838,10 +884,13 @@ async def _publish_draft(context: ContextTypes.DEFAULT_TYPE, draft: dict) -> boo
     target = context.application.bot_data.get("publish_chat_id") or f"@{CHANNEL_USERNAME}"
     track = TrackMatch(**draft["item"])
     prefix = draft.get("prefix") or ""
-    # Channel posts always carry hashtags — that is the channel house style.
+    # Channel posts always carry hashtags — that is the channel house style —
+    # unless the Studio explicitly replaced or emptied the list.
+    include_hashtags, overrides = _draft_message_overrides(draft, include_hashtags=True)
     text = (prefix if draft.get("quote") and prefix else "") + format_track_message(
         track,
-        include_hashtags=True,
+        include_hashtags=include_hashtags,
+        **overrides,
     )
     include_channel_button = (
         str(target).lstrip("@").casefold() != CHANNEL_USERNAME
@@ -853,6 +902,7 @@ async def _publish_draft(context: ContextTypes.DEFAULT_TYPE, draft: dict) -> boo
         release_page_url=track.page_url,
         release_kind=track.kind,
         release_format=track.release_format,
+        platform_selection=_draft_platform_selection(draft),
     )
     try:
         await context.bot.send_message(
@@ -2005,25 +2055,40 @@ def _build_link_keyboard(
     release_page_url: str | None = None,
     release_kind: str = "song",
     release_format: str | None = None,
+    platform_selection: list[str] | None = None,
 ) -> InlineKeyboardMarkup:
-    platform_order = _get_platform_order(context)
-    ordered_platforms = [
-        platform_key
-        for platform_key in platform_order
-        if links.get(platform_key) and platform_key in PLATFORM_LABELS
-    ]
-    remaining_platforms = [
-        platform_key
-        for platform_key in PLATFORM_LABELS
-        if platform_key not in ordered_platforms and links.get(platform_key)
-    ]
+    if platform_selection is not None:
+        selected_platforms = [
+            platform_key
+            for platform_key in platform_selection
+            if links.get(platform_key) and platform_key in PLATFORM_LABELS
+        ]
+    else:
+        selected_platforms = []
+
+    if selected_platforms:
+        final_platforms = selected_platforms
+    else:
+        platform_order = _get_platform_order(context)
+        ordered_platforms = [
+            platform_key
+            for platform_key in platform_order
+            if links.get(platform_key) and platform_key in PLATFORM_LABELS
+        ]
+        remaining_platforms = [
+            platform_key
+            for platform_key in PLATFORM_LABELS
+            if platform_key not in ordered_platforms and links.get(platform_key)
+        ]
+        final_platforms = [*ordered_platforms, *remaining_platforms]
+
     buttons = [
         _url_button(
             text=f"{prefix}{_platform_button_label(platform_key, context)}",
             url=links[platform_key],
             style=PLATFORM_BUTTON_STYLES.get(platform_key),
         )
-        for platform_key in [*ordered_platforms, *remaining_platforms]
+        for platform_key in final_platforms
     ]
     rows = _button_rows(buttons)
     if release_page_url:

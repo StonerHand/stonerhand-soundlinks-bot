@@ -1451,3 +1451,94 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StudioOverrideTests(unittest.TestCase):
+    def _draft(self, **overrides: object) -> dict:
+        draft = {
+            "v": 1,
+            "type": "track",
+            "item": {
+                "title": "Dopesmoker",
+                "artist": "Sleep",
+                "links": {
+                    "spotify": "https://open.spotify.com/track/1",
+                    "tidal": "https://tidal.com/track/1",
+                    "deezer": "https://deezer.com/track/1",
+                },
+                "page_url": "https://song.link/dopesmoker",
+                "kind": "song",
+            },
+            "prefix": "",
+            "hashtags": True,
+            "quote": False,
+            "large_preview": True,
+            "chat_id": 456,
+            "lang": "ru",
+            "can_publish": False,
+        }
+        draft.update(overrides)
+        return draft
+
+    def test_custom_cta_replaces_generated_phrase(self) -> None:
+        text, _ = _render_track_draft(
+            self._draft(custom_cta="жми и слушай громко"), None
+        )
+
+        self.assertIn("жми и слушай громко", text)
+        self.assertIn('href="https://song.link/dopesmoker"', text)
+
+    def test_custom_tags_replace_auto_hashtags(self) -> None:
+        text, _ = _render_track_draft(
+            self._draft(custom_tags=["#doom", "Sludge Metal"]), None
+        )
+
+        self.assertIn("#doom #sludgemetal", text)
+        self.assertNotIn("#stonerhand", text)
+
+    def test_empty_custom_tags_suppress_hashtags_even_on_publish_path(self) -> None:
+        from music_links_bot.bot import _draft_message_overrides
+
+        include, overrides = _draft_message_overrides(
+            self._draft(custom_tags=[]), include_hashtags=True
+        )
+
+        self.assertFalse(include)
+        self.assertEqual(overrides, {})
+
+    def test_normalize_hashtag_slugs_and_rejects_junk(self) -> None:
+        from music_links_bot.bot import normalize_hashtag
+
+        self.assertEqual(normalize_hashtag("#Hip-Hop!"), "#hiphop")
+        self.assertEqual(normalize_hashtag("Дум метал"), "#думметал")
+        self.assertIsNone(normalize_hashtag("!!!"))
+        self.assertIsNone(normalize_hashtag(42))
+
+    def test_platform_selection_filters_and_orders_buttons(self) -> None:
+        _, keyboard = _render_track_draft(
+            self._draft(platforms=["tidal", "spotify"]), None
+        )
+
+        urls = [
+            button.url
+            for row in keyboard.inline_keyboard
+            for button in row
+            if button.url and "song.link" not in button.url and "t.me" not in button.url
+        ]
+        self.assertEqual(
+            urls,
+            ["https://tidal.com/track/1", "https://open.spotify.com/track/1"],
+        )
+
+    def test_unknown_platform_selection_falls_back_to_default(self) -> None:
+        _, keyboard = _render_track_draft(
+            self._draft(platforms=["nope"]), None
+        )
+
+        urls = [
+            button.url
+            for row in keyboard.inline_keyboard
+            for button in row
+            if button.url and "song.link" not in button.url and "t.me" not in button.url
+        ]
+        self.assertEqual(len(urls), 3)

@@ -96,3 +96,70 @@ class WebAppUrlTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StudioApiHelperTests(unittest.TestCase):
+    def test_apply_draft_patch_normalizes_everything(self) -> None:
+        from api.webapp import _apply_draft_patch
+
+        draft = {"hashtags": False, "quote": False, "large_preview": True}
+        _apply_draft_patch(
+            draft,
+            {
+                "hashtags": True,
+                "cta": "  жми   сюда  ",
+                "tags": ["#Doom", "stoner rock", "!!!"],
+                "platforms": ["tidal", "bogus", "spotify"],
+            },
+        )
+
+        self.assertTrue(draft["hashtags"])
+        self.assertEqual(draft["custom_cta"], "жми сюда")
+        self.assertEqual(draft["custom_tags"], ["#doom", "#stonerrock"])
+        self.assertEqual(draft["platforms"], ["tidal", "spotify"])
+
+    def test_apply_draft_patch_resets_customization(self) -> None:
+        from api.webapp import _apply_draft_patch
+
+        draft = {
+            "custom_cta": "x",
+            "custom_tags": ["#x"],
+            "platforms": ["spotify"],
+        }
+        _apply_draft_patch(draft, {"cta": None, "tags": None, "platforms": []})
+
+        self.assertNotIn("custom_cta", draft)
+        self.assertNotIn("custom_tags", draft)
+        self.assertNotIn("platforms", draft)
+
+    def test_apply_draft_patch_keeps_explicit_empty_tags(self) -> None:
+        from api.webapp import _apply_draft_patch
+
+        draft = {}
+        _apply_draft_patch(draft, {"tags": []})
+
+        self.assertEqual(draft["custom_tags"], [])
+
+    def test_upscale_artwork(self) -> None:
+        from api.webapp import _upscale_artwork
+
+        self.assertEqual(
+            _upscale_artwork("https://img.example/a/100x100bb.jpg"),
+            "https://img.example/a/300x300bb.jpg",
+        )
+        self.assertIsNone(_upscale_artwork(None))
+
+    def test_top_entries_sorted_and_limited(self) -> None:
+        from api.webapp import _top_entries
+
+        entries = _top_entries(
+            {
+                "1": {"label": "a", "count": 2},
+                "2": {"label": "b", "count": 9},
+                "3": {"label": "c", "count": 5},
+            },
+            limit=2,
+        )
+
+        self.assertEqual(entries, [{"label": "b", "count": 9}, {"label": "c", "count": 5}])
+        self.assertEqual(_top_entries("junk"), [])
