@@ -53,8 +53,17 @@ class KVStore:
         result = await self._command(["GET", key])
         return result if isinstance(result, str) else None
 
-    async def set(self, key: str, value: str, *, ttl_seconds: int | None = None) -> bool:
+    async def set(
+        self,
+        key: str,
+        value: str,
+        *,
+        ttl_seconds: int | None = None,
+        nx: bool = False,
+    ) -> bool:
         command: list[str] = ["SET", key, value]
+        if nx:
+            command.append("NX")
         if ttl_seconds is not None:
             command += ["EX", str(ttl_seconds)]
 
@@ -62,6 +71,16 @@ class KVStore:
 
     async def delete(self, key: str) -> None:
         await self._command(["DEL", key])
+
+    async def mget(self, keys: list[str]) -> list[str | None]:
+        if not keys:
+            return []
+
+        result = await self._command(["MGET", *keys])
+        if not isinstance(result, list):
+            return [None] * len(keys)
+
+        return [value if isinstance(value, str) else None for value in result]
 
     async def get_json(self, key: str) -> Any | None:
         raw_value = await self.get(key)

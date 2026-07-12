@@ -96,6 +96,28 @@ flowchart LR
   - `d` — удалить пост
   - `p` — 📤 опубликовать в канал: только для владельца (`from_user.id == ADMIN_CHAT_ID`), цель — `PUBLISH_CHAT_ID` (по умолчанию `@stonerhand`), хэштеги при публикации всегда включаются
 
+## Mini App «Студия» (`webapp/` + `api/webapp.py`)
+
+Одностраничный визуальный редактор внутри Telegram (кнопка меню и кнопка 🎛 под постом). Статика — `webapp/index.html` (`/app`), API — `POST /api/webapp` с телом `{init_data, action, payload}`. Подпись `initData` проверяется по официальному HMAC-алгоритму (`webapp_auth.py`), свежесть — 24 часа.
+
+Действия API:
+
+| Action | Кто | Что делает |
+| --- | --- | --- |
+| `resolve` | все | Ссылка или текст → черновик; текстовый запрос с несколькими совпадениями возвращает список кандидатов (обложка + 30-сек `previewUrl` из iTunes), выбор возвращается как `resolve` c `pick` |
+| `draft` | владелец | Открыть существующий черновик (из чат-редактора), лениво догружает аудио-превью |
+| `update` | владелец | Патч черновика: флаги, свой CTA-текст, свои хэштеги (`custom_tags`), набор и порядок платформ (`platforms`) |
+| `send` / `publish` | все / админ | Отправить себе / опубликовать в канал (антидубль с `force`) |
+| `schedule` / `queue` / `unschedule` | админ | Отложенная публикация: очередь в Redis `queue:v1` |
+| `history` | все | Последние 10 релизов пользователя (`hist:<id>`, TTL 90 дней) с отметкой «уже в канале» (MGET по фингерпринтам) |
+| `stats` | админ | Счётчики + топы для дашборда |
+
+Клиентские фишки: хэптика, системная кнопка «Назад», вставка из буфера, дефолты в `CloudStorage`, полноэкранный режим и ярлык на домашний экран (Bot API 8.0).
+
+## Очередь публикаций (`publish_queue.py`)
+
+Задания `{id, publish_at, draft}` лежат в Redis (`queue:v1`, без Redis — память инстанса). Доставка **оппортунистическая**: тик очереди выполняется после каждого telegram-апдейта и на каждый `GET /api/webapp` — внешний пинг (UptimeRobot) даёт точность до минут. Кросс-инстансовый лок `queue:lock` (SET NX, TTL 30 с) исключает двойную публикацию.
+
 ## Локализация (`i18n.py`)
 
 Интерфейс (меню, вкладки, подсказки, ошибки, тексты загрузки, кнопки редактора, описания профиля) — RU/EN, язык выбирается по `language_code` пользователя (ru/uk/be/kk → RU, остальные → EN). Тексты постов (CTA-фразы из `phrases.py`, подписи форматтера) остаются на русском — это голос канала.
@@ -117,20 +139,27 @@ flowchart LR
 | `SET_WEBHOOK_SECRET` | защита `/api/set_webhook` |
 | `TELEGRAM_WEBHOOK_SECRET` | подпись входящих updates |
 | `CRON_SECRET` | авторизация Vercel Cron для ежедневного самовосстановления |
-| `UPSTASH_REDIS_REST_URL/TOKEN` (или `KV_REST_API_*`) | Redis: общий кеш, черновики, статистика |
+| `UPSTASH_REDIS_REST_URL/TOKEN` (или `KV_REST_API_*`) | Redis: общий кеш, черновики, статистика, история и очередь Студии |
+| `WEBAPP_URL` | адрес Mini App (по умолчанию `https://<прод-домен>/app`) |
 | `WEBHOOK_BASE_URL`, `STATS_PATH`, `LOG_LEVEL`, `SONGLINK_API_KEY` | тонкая настройка |
 
 ## Карта кода
 
 ```text
 api/
-├── telegram.py       webhook: валидация, тёплый reuse приложения
-└── set_webhook.py    регистрация webhook + синк команд и описаний (cron-совместимо)
+├── telegram.py       webhook: валидация, тёплый reuse приложения, тик очереди
+├── webapp.py         API Студии: resolve/draft/update/deliver/schedule/history/stats
+└── set_webhook.py    регистрация webhook + синк команд, описаний и кнопки меню
+
+webapp/
+└── index.html        Mini App «Студия»: один файл, vanilla JS, дизайн Vintage Amplifier
 
 src/music_links_bot/
 ├── bot.py            хендлеры, роутинг, клавиатуры, редактор, inline, черновики
 ├── songlink.py       Song.link client, регионы, обложки, Redis-кеш
-├── search.py         iTunes Search: текст → кандидаты релизов
+├── search.py         iTunes Search: текст → кандидаты релизов, жанры, аудио-превью
+├── publish_queue.py  очередь отложенных публикаций (Redis + память)
+├── webapp_auth.py    проверка подписи initData Mini App
 ├── kvstore.py        Upstash/Vercel KV REST-клиент (graceful degradation)
 ├── i18n.py           RU/EN каталог интерфейсных строк
 ├── formatter.py      макет постов, хэштеги, выбор превью
@@ -142,7 +171,7 @@ src/music_links_bot/
 ├── phrases.py        фразы CTA и ошибок (голос канала)
 └── config.py         Settings из env
 
-tests/                189 тестов: unittest, стабы клиентов, без сети
+tests/                222 теста: unittest, стабы клиентов, без сети
 ```
 
 ## Принципы

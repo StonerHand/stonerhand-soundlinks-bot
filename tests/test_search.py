@@ -104,3 +104,40 @@ class KVStoreTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PreviewExtractionTests(unittest.TestCase):
+    def test_candidates_carry_preview_url(self) -> None:
+        from music_links_bot.search import _extract_preview_url
+
+        payload = {
+            "results": [
+                {
+                    "trackViewUrl": "https://music.apple.com/track/1",
+                    "trackName": "Paranoid",
+                    "artistName": "Black Sabbath",
+                    "previewUrl": "https://audio.example/p.m4a",
+                }
+            ]
+        }
+
+        candidates = _extract_release_candidates(payload)
+        self.assertEqual(candidates[0].preview_url, "https://audio.example/p.m4a")
+        self.assertEqual(_extract_preview_url(payload), "https://audio.example/p.m4a")
+
+    def test_preview_url_ignores_non_http_values(self) -> None:
+        from music_links_bot.search import _extract_preview_url
+
+        payload = {"results": [{"previewUrl": 42}, {"previewUrl": "ftp://x"}]}
+        self.assertIsNone(_extract_preview_url(payload))
+
+
+class KVStoreShapeTests(unittest.TestCase):
+    def test_mget_with_no_keys_returns_empty_list(self) -> None:
+        import asyncio
+
+        store = KVStore("https://kv.example", "token")
+        try:
+            self.assertEqual(asyncio.run(store.mget([])), [])
+        finally:
+            asyncio.run(store.aclose())

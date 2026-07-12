@@ -110,6 +110,8 @@ def format_track_message(
     track: TrackMatch,
     *,
     include_hashtags: bool = True,
+    cta_text: str | None = None,
+    hashtags: str | None = None,
 ) -> str:
     seed = f"{track.artist}:{track.title}:{track.kind}"
     cta_key = {
@@ -117,21 +119,25 @@ def format_track_message(
         "podcast": "podcast_cta",
     }.get(track.kind, "track_cta")
 
-    cta_text = escape(pick_phrase(cta_key, seed))
+    escaped_cta = escape(cta_text if cta_text else pick_phrase(cta_key, seed))
     # The CTA doubles as a hub link: forwarded messages lose inline keyboards
     # (a Telegram limitation), so the text itself keeps a tappable path to
     # every platform.
     if track.page_url:
-        cta_line = f'<i><a href="{escape(track.page_url, quote=True)}">{cta_text}</a></i>'
+        cta_line = f'<i><a href="{escape(track.page_url, quote=True)}">{escaped_cta}</a></i>'
     else:
-        cta_line = f"<i>{cta_text}</i>"
+        cta_line = f"<i>{escaped_cta}</i>"
 
     lines = [
         format_release_heading(track),
         "",
         cta_line,
     ]
-    return _with_hashtags(lines, build_auto_hashtags(track), include_hashtags=include_hashtags)
+    return _with_hashtags(
+        lines,
+        hashtags if hashtags is not None else build_auto_hashtags(track),
+        include_hashtags=include_hashtags,
+    )
 
 
 def format_video_message(video: VideoMatch, *, include_hashtags: bool = True) -> str:
