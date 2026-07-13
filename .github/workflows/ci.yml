@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pyflakes
+
+      - name: Lint
+        run: python -m pyflakes src api tests
+
+      - name: Tests
+        run: python -m pytest tests/ -q
+        env:
+          PYTHONPATH: src
+
+      - name: Mini App JS syntax
+        run: |
+          python - <<'EOF'
+          import re, pathlib
+          html = pathlib.Path("webapp/index.html").read_text()
+          js = "\n".join(re.findall(r"<script>(.*?)</script>", html, re.S))
+          pathlib.Path("studio.js").write_text(js)
+          EOF
+          node --check studio.js

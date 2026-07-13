@@ -100,8 +100,9 @@ def _process_telegram_update(update_payload: dict[str, object]) -> None:
         update = Update.de_json(update_payload, application.bot)
         try:
             loop.run_until_complete(application.process_update(update))
-        except Exception:
+        except Exception as exc:
             _dispose_application_locked()
+            _alert_crash_safely(exc)
             raise
 
         # Opportunistic queue tick: every incoming update also delivers
@@ -117,6 +118,19 @@ async def _run_queue_tick(application) -> int:
 
     context = SimpleNamespace(application=application, bot=application.bot)
     return await process_due_jobs(context)
+
+
+def _alert_crash_safely(exc: Exception) -> None:
+    try:
+        from music_links_bot.alerts import send_admin_alert
+
+        send_admin_alert(
+            f"Webhook update crashed: {type(exc).__name__}. "
+            "The instance was recycled; check the Vercel logs.",
+            dedup_key="webhook-crash",
+        )
+    except Exception:
+        LOGGER.debug("Crash alert failed", exc_info=True)
 
 
 def _ensure_application():

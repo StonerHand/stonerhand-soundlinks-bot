@@ -116,7 +116,30 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
             if await _publish_draft(context, draft):
                 published += 1
                 _schedule_mark_posted(context, TrackMatch(**draft["item"]))
+            else:
+                await _alert_job_failure(context, draft)
         except Exception:
             LOGGER.exception("Scheduled publish failed for job %s", job.get("id"))
+            await _alert_job_failure(context, draft)
 
     return published
+
+
+async def _alert_job_failure(context, draft: dict) -> None:
+    """A dropped scheduled post must never fail silently — DM the owner."""
+    admin_chat_id = context.application.bot_data.get("admin_chat_id")
+    if not admin_chat_id:
+        return
+
+    item = draft.get("item") or {}
+    label = f"{item.get('artist') or '?'} - {item.get('title') or '?'}"
+    try:
+        await context.bot.send_message(
+            chat_id=admin_chat_id,
+            text=(
+                f"🚨 Отложенный пост не ушёл и снят с очереди: {label}. "
+                "Проверь права бота в канале и запланируй заново."
+            ),
+        )
+    except Exception:
+        LOGGER.debug("Queue failure alert failed", exc_info=True)
