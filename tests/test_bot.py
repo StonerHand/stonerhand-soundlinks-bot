@@ -925,10 +925,10 @@ class PostEditorTests(unittest.TestCase):
     def test_editor_rows_show_toggle_states_and_actions(self) -> None:
         rows = _editor_rows("abc123", self._draft(hashtags=True))
 
-        self.assertEqual(rows[0][0].text, "#️⃣ Хэштеги: вкл")
+        self.assertEqual(rows[0][0].text, "#️⃣ ✓")
         self.assertEqual(rows[0][0].callback_data, "ed|h|abc123")
-        self.assertEqual(rows[1][0].text, "✅ Готово")
-        self.assertEqual(rows[1][1].text, "🗑 Удалить")
+        self.assertEqual(rows[1][0].text, "✅")
+        self.assertEqual(rows[1][1].text, "🗑")
         self.assertEqual(len(rows[1]), 2)
 
     def test_editor_rows_add_publish_button_for_admin(self) -> None:
@@ -946,8 +946,8 @@ class PostEditorTests(unittest.TestCase):
 
         self.assertEqual(len(rows_without_quote[0]), 2)
         self.assertEqual(len(rows_with_quote[0]), 3)
-        self.assertEqual(rows_with_quote[0][1].text, "💬 Цитата: вкл")
-        self.assertEqual(rows_without_quote[0][1].text, "🖼 Превью: большое")
+        self.assertEqual(rows_with_quote[0][1].text, "💬 ✓")
+        self.assertEqual(rows_without_quote[0][1].text, "🖼 ⊞")
         self.assertEqual(rows_without_quote[0][1].callback_data, "ed|v|abc123")
 
     def test_editor_rows_add_studio_webapp_button_when_configured(self) -> None:

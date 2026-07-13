@@ -705,14 +705,14 @@ def _editor_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]
     state = lambda flag: get_text(lang, "ed_on" if draft.get(flag) else "ed_off")  # noqa: E731
     toggle_row = [
         InlineKeyboardButton(
-            f"{get_text(lang, 'ed_hashtags')}: {state('hashtags')}",
+            f"{get_text(lang, 'ed_hashtags')} {state('hashtags')}",
             callback_data=f"ed|h|{draft_id}",
         )
     ]
     if draft.get("prefix"):
         toggle_row.append(
             InlineKeyboardButton(
-                f"{get_text(lang, 'ed_quote')}: {state('quote')}",
+                f"{get_text(lang, 'ed_quote')} {state('quote')}",
                 callback_data=f"ed|q|{draft_id}",
             )
         )
@@ -723,7 +723,7 @@ def _editor_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]
     )
     toggle_row.append(
         InlineKeyboardButton(
-            f"{get_text(lang, 'ed_preview')}: {preview_state}",
+            f"{get_text(lang, 'ed_preview')} {preview_state}",
             callback_data=f"ed|v|{draft_id}",
         )
     )
@@ -880,7 +880,12 @@ async def editor_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             raise
 
 
-async def _publish_draft(context: ContextTypes.DEFAULT_TYPE, draft: dict) -> bool:
+async def _publish_draft(
+    context: ContextTypes.DEFAULT_TYPE,
+    draft: dict,
+) -> Message | bool | None:
+    """Returns the sent message (so callers can offer undo), a bare True when
+    the transport does not return one, or None on failure."""
     target = context.application.bot_data.get("publish_chat_id") or f"@{CHANNEL_USERNAME}"
     track = TrackMatch(**draft["item"])
     prefix = draft.get("prefix") or ""
@@ -908,7 +913,7 @@ async def _publish_draft(context: ContextTypes.DEFAULT_TYPE, draft: dict) -> boo
         if draft.get("as_photo") and track.thumbnail_url:
             # Photo posts pin the artwork on top on every Telegram client,
             # at the cost of the preview-size toggle.
-            await context.bot.send_photo(
+            sent = await context.bot.send_photo(
                 chat_id=target,
                 photo=track.thumbnail_url,
                 caption=text,
@@ -916,7 +921,7 @@ async def _publish_draft(context: ContextTypes.DEFAULT_TYPE, draft: dict) -> boo
                 reply_markup=keyboard,
             )
         else:
-            await context.bot.send_message(
+            sent = await context.bot.send_message(
                 chat_id=target,
                 text=text,
                 parse_mode=ParseMode.HTML,
@@ -928,9 +933,9 @@ async def _publish_draft(context: ContextTypes.DEFAULT_TYPE, draft: dict) -> boo
             )
     except TelegramError:
         LOGGER.warning("Could not publish draft to %s", target, exc_info=True)
-        return False
+        return None
 
-    return True
+    return sent if sent is not None else True
 
 
 async def id_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

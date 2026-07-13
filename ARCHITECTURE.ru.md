@@ -172,7 +172,7 @@ src/music_links_bot/
 ├── phrases.py        фразы CTA и ошибок (голос канала)
 └── config.py         Settings из env
 
-tests/                230 тестов: unittest, стабы клиентов, без сети
+tests/                231 тест: unittest, стабы клиентов, без сети
 ```
 
 ## Принципы
