@@ -180,6 +180,9 @@ async def _handle_action(application, settings: Settings, user: dict, payload: d
     if action in {"send", "publish"}:
         return await _action_deliver(context, action, body, user_id, is_admin)
 
+    if action == "unpublish":
+        return await _action_unpublish(context, body, user_id, is_admin)
+
     if action == "schedule":
         return await _action_schedule(context, body, user_id, is_admin)
 
@@ -330,7 +333,11 @@ async def _action_deliver(context, action: str, body: dict, user_id: int, is_adm
         if published:
             _schedule_mark_posted(context, track)
 
-        return {"ok": published, "error": None if published else "publish failed"}
+        return {
+            "ok": bool(published),
+            "error": None if published else "publish failed",
+            "message_id": getattr(published, "message_id", None),
+        }
 
     from music_links_bot.bot import _build_link_preview_options
 
@@ -358,6 +365,37 @@ async def _action_deliver(context, action: str, body: dict, user_id: int, is_adm
     except Exception:
         LOGGER.exception("Studio send failed")
         return {"ok": False, "error": "send failed"}
+
+    return {"ok": True}
+
+
+async def _action_unpublish(context, body: dict, user_id: int, is_admin: bool) -> dict:
+    """The 5-second "undo" after publishing: deletes the channel post and
+    clears the posted-fingerprint so the duplicate guard forgets it."""
+    if not is_admin:
+        return {"ok": False, "error": "admin only"}
+
+    draft_id = str(body.get("draft_id") or "")
+    draft = await _load_draft(context, draft_id)
+    if draft is None or draft.get("chat_id") != user_id:
+        return {"ok": False, "error": "draft not found"}
+
+    try:
+        message_id = int(body.get("message_id"))
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "bad message"}
+
+    target = context.application.bot_data.get("publish_chat_id") or f"@{CHANNEL_USERNAME}"
+    try:
+        await context.bot.delete_message(chat_id=target, message_id=message_id)
+    except Exception:
+        LOGGER.warning("Undo delete failed", exc_info=True)
+        return {"ok": False, "error": "delete failed"}
+
+    track = TrackMatch(**draft["item"])
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    if kv is not None:
+        await kv.delete(_release_fingerprint(track.artist, track.title))
 
     return {"ok": True}
 

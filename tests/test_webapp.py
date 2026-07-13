@@ -304,3 +304,44 @@ class PhotoPostTests(unittest.TestCase):
         self.assertTrue(asyncio.run(_publish_draft(context, draft)))
         self.assertEqual(context.bot.photos, [])
         self.assertEqual(len(context.bot.sent), 1)
+
+
+class UnpublishTests(unittest.TestCase):
+    def test_unpublish_deletes_channel_message(self) -> None:
+        import asyncio
+        from api.webapp import _action_unpublish
+
+        class _Bot(_CrateBotStub):
+            def __init__(self):
+                super().__init__()
+                self.deleted = []
+
+            async def delete_message(self, **kwargs):
+                self.deleted.append(kwargs)
+
+        from types import SimpleNamespace
+
+        bot = _Bot()
+        application = SimpleNamespace(bot_data={"drafts": {}}, bot=bot)
+        context = SimpleNamespace(application=application, bot=bot)
+        application.bot_data["drafts"]["d1"] = {
+            "type": "track",
+            "item": _crate_track("Dopesmoker"),
+            "chat_id": 7,
+        }
+
+        denied = asyncio.run(
+            _action_unpublish(context, {"draft_id": "d1", "message_id": 5}, 7, False)
+        )
+        self.assertEqual(denied["error"], "admin only")
+
+        ok = asyncio.run(
+            _action_unpublish(context, {"draft_id": "d1", "message_id": 5}, 7, True)
+        )
+        self.assertTrue(ok["ok"])
+        self.assertEqual(bot.deleted, [{"chat_id": "@stonerhand", "message_id": 5}])
+
+        bad = asyncio.run(
+            _action_unpublish(context, {"draft_id": "d1", "message_id": "x"}, 7, True)
+        )
+        self.assertEqual(bad["error"], "bad message")

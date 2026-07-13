@@ -34,7 +34,7 @@ out  →  📻 · Black Sabbath
 
 ## What it does
 
-- 🎛 **Studio** — a Mini App inside Telegram: live preview, pick from several matches, ▶ 30-sec audio preview right on the cover, custom text and hashtags, platform button set and order, ↗️ share to any chat
+- 🎛 **Studio** — a Mini App inside Telegram: live preview, pick from several matches, ▶ 30-sec audio preview right on the cover, custom text and hashtags, platform button set and order, ↗️ share to any chat, smart clipboard paste and post-publish undo
 - 🧺 **Collection crate** — "➕ To crate" on any card, reorder, publish one playlist post
 - 📸 **Photo mode** — the post ships as a photo with caption: artwork always on top on every client
 - 🎨 **Living accent** — the card UI takes on the artwork's dominant color
@@ -117,7 +117,7 @@ src/music_links_bot/
 Full map: [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
 
 ```bash
-PYTHONPATH=src python -m pytest tests/   # 230 tests, no network
+PYTHONPATH=src python -m pytest tests/   # 231 tests, no network
 ```
 
 ## Your channel instead of StonerHand
