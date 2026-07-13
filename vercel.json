@@ -14,6 +14,10 @@
       "use": "@vercel/python"
     },
     {
+      "src": "api/health.py",
+      "use": "@vercel/python"
+    },
+    {
       "src": "webapp/index.html",
       "use": "@vercel/static"
     }
@@ -30,6 +34,10 @@
     {
       "src": "/api/webapp",
       "dest": "api/webapp.py"
+    },
+    {
+      "src": "/api/health",
+      "dest": "api/health.py"
     },
     {
       "src": "/app",

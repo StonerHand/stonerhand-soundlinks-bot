@@ -277,15 +277,6 @@
   .vu i:nth-child(3) { animation-delay: .28s; }
   .vu i:nth-child(4) { animation-delay: .05s; }
 
-  /* tonearm drops onto the record while the preview plays */
-  .tonearm {
-    position: absolute; top: 6px; right: 6px; width: 92px; height: 92px;
-    pointer-events: none; opacity: 0; transition: opacity .4s ease;
-  }
-  .tonearm .arm { transform-origin: 74px 18px; transform: rotate(-24deg); transition: transform .55s cubic-bezier(.34,1.2,.64,1); }
-  .cover-zone.playing .tonearm { opacity: 1; }
-  .cover-zone.playing .tonearm .arm { transform: rotate(4deg); }
-
   .post-body { padding: 12px 14px 0; transition: opacity .5s ease, transform .5s ease; opacity: 0; transform: translateY(6px); }
   .post-body.in { opacity: 1; transform: translateY(0); }
   .post-artist { font-size: 13px; color: var(--muted); margin-bottom: 2px; }
@@ -824,7 +815,6 @@
     clipQ: "Paste the link from your clipboard?", clipGo: "Paste",
     statNames: { posts: "posts", song: "tracks", album: "albums", podcast: "podcasts", videos: "videos", collections: "sets" },
     coach: [
-      ["🎧", "Tap ▶ on the cover — a 30-second preview plays right here."],
       ["🎛", "The Style button holds everything: amp switches, your text, hashtags and platform buttons."],
       ["📌", "The main action is always docked at the bottom — publish is one tap away."],
     ],
@@ -858,7 +848,6 @@
     clipQ: "Вставить ссылку из буфера?", clipGo: "Вставить",
     statNames: { posts: "постов", song: "треков", album: "альбомов", podcast: "подкастов", videos: "видео", collections: "подборок" },
     coach: [
-      ["🎧", "Тапни ▶ на обложке — 30 секунд трека заиграют прямо здесь."],
       ["🎛", "В «Оформлении» всё: амп-тумблеры, свой текст, хэштеги и кнопки платформ."],
       ["📌", "Главное действие всегда закреплено внизу — публикация в один тап."],
     ],
@@ -1010,13 +999,12 @@
     try { tg.CloudStorage.setItem("prefs", JSON.stringify(p)); } catch (e) {}
   }
 
-  /* ── audio + tonearm ── */
+  /* ── audio preview ── */
   const player = $("player");
   function stopAudio() {
     player.pause(); player.removeAttribute("src");
     if (playingBtn) { playingBtn.textContent = "▶"; playingBtn = null; }
     $("led").classList.remove("rec");
-    $("cover-zone").classList.remove("playing");
     document.querySelectorAll(".vu").forEach((v) => v.classList.remove("on"));
     document.querySelectorAll(".play-ring").forEach((r) => { r.style.background = "none"; });
   }
@@ -1030,7 +1018,6 @@
       playingBtn = btn;
       btn.textContent = "⏸";
       $("led").classList.add("rec");
-      $("cover-zone").classList.add("playing");
       if (vu) vu.classList.add("on");
     }).catch(() => { hap.err(); });
     player.ontimeupdate = () => {
@@ -1071,16 +1058,6 @@
     if (hub) { hub.style.borderColor = dynRGB(.3); hub.style.background = dynRGB(.07); }
   }
 
-  const TONEARM_SVG =
-    '<svg class="tonearm" viewBox="0 0 92 92">' +
-    '<g class="arm">' +
-    '<circle cx="74" cy="18" r="9" fill="#17181A" stroke="#46484c" stroke-width="1.5"/>' +
-    '<circle cx="74" cy="18" r="3.2" fill="#C97A1E"/>' +
-    '<path d="M74 18 L38 62" stroke="#9a9b9e" stroke-width="3.4" stroke-linecap="round"/>' +
-    '<path d="M40 60 L30 72" stroke="#c2c3c6" stroke-width="4.6" stroke-linecap="round"/>' +
-    '<rect x="24" y="68" width="12" height="8" rx="2.5" transform="rotate(-50 30 72)" fill="#E5C38A"/>' +
-    "</g></svg>";
-
   /* ── render result card ── */
   function renderCard() {
     const r = state.release, f = state.flags;
@@ -1094,12 +1071,11 @@
       ? '<div class="play-wrap"><div class="play-ring" id="play-ring"></div><button class="btn-play" id="btn-play">▶</button></div>'
       : "";
     const vuHtml = r.preview ? '<div class="vu" id="vu"><i></i><i></i><i></i><i></i></div>' : "";
-    const armHtml = r.preview && mode === "large" ? TONEARM_SVG : "";
 
     const artSrc = safeUrl(r.artwork);
     if (mode === "large") {
       zone.innerHTML = artSrc
-        ? '<img class="cover-large" crossorigin="anonymous" alt="" src="' + artSrc + '">' + playHtml + vuHtml + armHtml
+        ? '<img class="cover-large" crossorigin="anonymous" alt="" src="' + artSrc + '">' + playHtml + vuHtml
         : "";
       body.innerHTML =
         '<div class="post-artist">' + esc(r.emoji) + " · " + esc(r.artist) + "</div>" +
@@ -1963,7 +1939,7 @@
   function maybeCoach() {
     if (coachShown) return;
     coachShown = true;
-    const KEY = "coach2";
+    const KEY = "coach3";
     const start = () => setTimeout(startCoach, 900);
     try {
       tg.CloudStorage.getItem(KEY, (err, value) => {
