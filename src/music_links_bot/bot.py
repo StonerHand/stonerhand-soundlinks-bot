@@ -243,12 +243,12 @@ BOT_DESCRIPTIONS = {
 }
 BOT_SHORT_DESCRIPTIONS = {
     "": (
-        "Музыкальные ссылки → готовые посты с кнопками всех площадок. "
-        "Студия, поиск, inline, подборки и отложка"
+        "Кидай ссылку или название трека → пост с обложкой, хэштегами "
+        "и кнопками всех площадок. Всё в 🎛 Студии"
     ),
     "en": (
-        "Music links → ready posts with buttons for every platform. "
-        "Studio, search, inline, crates and scheduling"
+        "Drop a link or a track name → a post with cover art, hashtags "
+        "and buttons for every platform. All in the 🎛 Studio"
     ),
 }
 
