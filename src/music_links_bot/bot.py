@@ -223,30 +223,32 @@ BOT_DESCRIPTIONS = {
     "": (
         "Превращаю музыкальные ссылки в аккуратные посты: обложка, "
         "автохэштеги и кнопки всех площадок.\n\n"
-        "• Ссылка или просто название трека\n"
+        "• Ссылка, название трека или прослушка прямо в 🎛 Студии\n"
         "• Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
         "Yandex Music, NTS Radio\n"
         "• Inline: @StonerHandBot + запрос в любом чате\n"
-        "• Редактор поста: хэштеги, цитата, публикация в канал"
+        "• Студия: живой предпросмотр, подборки, отложенный постинг, "
+        "фото-режим и публикация в канал"
     ),
     "en": (
         "I turn music links into clean posts: cover art, smart hashtags "
         "and buttons for every platform.\n\n"
-        "• A link or just a track name\n"
+        "• A link, a track name or a preview right in the 🎛 Studio\n"
         "• Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
         "Yandex Music, NTS Radio\n"
         "• Inline: @StonerHandBot + a query in any chat\n"
-        "• Post editor: hashtags, quote, publish-to-channel"
+        "• Studio: live preview, crates, scheduled posting, photo mode "
+        "and publish-to-channel"
     ),
 }
 BOT_SHORT_DESCRIPTIONS = {
     "": (
-        "Музыкальные ссылки → посты с кнопками всех площадок. "
-        "Поиск по названию, inline и редактор"
+        "Музыкальные ссылки → готовые посты с кнопками всех площадок. "
+        "Студия, поиск, inline, подборки и отложка"
     ),
     "en": (
-        "Music links → posts with buttons for every platform. "
-        "Name search, inline mode and a post editor"
+        "Music links → ready posts with buttons for every platform. "
+        "Studio, search, inline, crates and scheduling"
     ),
 }
 
