@@ -23,7 +23,7 @@ jobs:
         run: python -m pyflakes src api tests
 
       - name: Tests
-        run: python -m pytest tests/ -q
+        run: python -m unittest discover -s tests -v
         env:
           PYTHONPATH: src
 
