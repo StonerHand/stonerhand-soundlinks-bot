@@ -53,6 +53,8 @@ A visual post editor: opens from the menu button or the 🎛 button under any po
 - **🕘 History** — recent releases marked "already in the channel" + typeahead
 - **📊 Dashboard** — stats with charts (admin)
 - **🎨 Living accent** — the card takes on the artwork's dominant color
+- **☀️🌙 Light & dark themes** — follows Telegram, with a header toggle
+- **📱 Bottom tab bar** — Home / Crate / Queue / Stats; Unbounded + Golos Text + JetBrains Mono type
 
 ## What the bot itself does
 
