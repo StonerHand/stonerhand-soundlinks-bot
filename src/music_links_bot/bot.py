@@ -33,6 +33,10 @@ from telegram.ext import CallbackQueryHandler, InlineQueryHandler
 
 from music_links_bot.artist import ArtistClient, ArtistLookupError
 from music_links_bot.config import Settings
+from music_links_bot.ephemeral import (
+    ephemeral_group_replies_enabled,
+    send_ephemeral_message,
+)
 from music_links_bot.i18n import get_text, get_texts, resolve_lang
 from music_links_bot.kvstore import KVStore
 from music_links_bot.search import (
@@ -1989,14 +1993,37 @@ async def _send_track_result(
     prefer_large_preview: bool = True,
 ) -> None:
     if message.chat.type in {"group", "supergroup", "channel"}:
+        preview_options = _build_link_preview_options(
+            preview_url,
+            prefer_large_media=prefer_large_preview,
+        )
+        # Invisible reply: in a group the card can be shown only to the person
+        # who dropped the link, leaving the chat clean and their message intact.
+        # Opt-in and best-effort — falls through to the public post if Telegram
+        # does not deliver it.
+        if (
+            message.chat.type in {"group", "supergroup"}
+            and ephemeral_group_replies_enabled()
+            and getattr(message, "from_user", None) is not None
+        ):
+            delivered = await send_ephemeral_message(
+                getattr(bot, "token", None),
+                message.chat_id,
+                message.from_user.id,
+                text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=reply_markup,
+                link_preview_options=preview_options,
+                reply_to_message_id=getattr(message, "message_id", None),
+            )
+            if delivered:
+                return
+
         await bot.send_message(
             chat_id=message.chat_id,
             text=text,
             parse_mode=ParseMode.HTML,
-            link_preview_options=_build_link_preview_options(
-                preview_url,
-                prefer_large_media=prefer_large_preview,
-            ),
+            link_preview_options=preview_options,
             reply_markup=reply_markup,
         )
         await _try_delete_message(message)

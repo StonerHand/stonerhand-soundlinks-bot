@@ -44,7 +44,7 @@ flowchart LR
 - `GET /api/set_webhook` (секрет в query или `Authorization: Bearer $CRON_SECRET`) заново регистрирует webhook (включая производный секрет), синхронизирует команды, описания профиля (RU+EN) и кнопку меню «Студия». Vercel Cron дёргает его ежедневно (`0 3 * * *`).
 - `GET /api/health` — пульс: `getMe`, `getWebhookInfo` (свежие ошибки доставки = red), пинг Redis. Ответ 503 при проблеме — вешается на бесплатный UptimeRobot. Каждый пинг заодно тикает очередь отложки через `/api/webapp`.
 - **Алерты** (`alerts.py`): при падении health-проверки, краше webhook или потерянном отложенном посте владелец получает DM. Дедупликация через Redis `SET NX` — не чаще раза в час на проблему.
-- **CI** (`.github/workflows/ci.yml`): pyflakes + 242 теста + `node --check` JS Студии на каждый пуш и PR.
+- **CI** (`.github/workflows/ci.yml`): pyflakes + 248 тестов + `node --check` JS Студии на каждый пуш и PR.
 
 ## Маршрутизация входящих сообщений
 
@@ -159,6 +159,7 @@ src/music_links_bot/
 ├── bot.py            хендлеры, роутинг, клавиатуры, редактор, inline, черновики
 ├── publish_queue.py  очередь отложенных публикаций (Redis + память, NX-лок)
 ├── alerts.py         DM владельцу о проблемах (дедуп 1 ч через Redis)
+├── ephemeral.py      невидимые ответы в группах (raw Bot API, graceful, опц.)
 ├── webhook_secret.py производный секрет webhook из токена
 ├── webapp_auth.py    проверка подписи initData Mini App
 ├── songlink.py       Song.link client, регионы, обложки, Redis-кеш
@@ -174,7 +175,7 @@ src/music_links_bot/
 ├── phrases.py        фразы CTA и ошибок (голос канала)
 └── config.py         Settings из env
 
-tests/                242 теста: unittest, стабы клиентов, без сети
+tests/                248 тестов: unittest, стабы клиентов, без сети
 ```
 
 ## Принципы

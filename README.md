@@ -65,6 +65,7 @@ A visual post editor: opens from the menu button or the 🎛 button under any po
 - 🏷 **Auto genres** — `#doom`, `#hiphop` straight from iTunes metadata
 - 📚 **Collections** — several links → a numbered playlist post
 - 🤖 **Channel autopilot** — the admin bot silently swaps raw links for clean posts
+- 🫥 **Invisible group replies** — only the person who dropped the link sees the card (opt-in, `EPHEMERAL_GROUP_REPLIES`)
 - ⚡ **Live loading** — "⏳ building the post…" morphs into the card
 - 🌍 **RU/EN** — the interface follows the user's Telegram language
 
@@ -73,7 +74,7 @@ Forwarded posts keep working: the CTA phrase is a live song.link hub link
 
 ## 🩺 Reliability
 
-- **CI** — GitHub Actions runs 242 tests, the linter and a JS check on every push
+- **CI** — GitHub Actions runs 248 tests, the linter and a JS check on every push
 - **`/api/health`** — the bot's pulse: Telegram API, webhook registration, Redis;
   it also delivers due scheduled posts
 - **Owner alerts** — when a health check fails, a scheduled post is dropped or the
@@ -108,6 +109,7 @@ detection, alerts, minute-precise scheduling and warm instances.
 | `PRIMARY_PLATFORM` | which platform goes first: `spotify`, `appleMusic`, `tidal`… |
 | `SONGLINK_USER_COUNTRIES` | Song.link regions, comma-separated, e.g. `US,DE` |
 | `BOT_UI_MODE` | button style: `stonerhand` / `minimal` / `editorial` |
+| `EPHEMERAL_GROUP_REPLIES` | `1` — in groups the bot replies "invisibly" (only the person who dropped the link sees the card). Opt-in; falls back to a normal reply when Telegram doesn't support it |
 | `TELEGRAM_WEBHOOK_SECRET` | signs incoming updates (unset — derived from the bot token automatically) |
 | `WEBAPP_URL`, `WEBHOOK_BASE_URL`, `STATS_PATH`, `LOG_LEVEL` | fine-tuning |
 
@@ -150,7 +152,7 @@ src/music_links_bot/
 Full map: [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
 
 ```bash
-PYTHONPATH=src python -m pytest tests/   # 242 tests, no network
+PYTHONPATH=src python -m pytest tests/   # 248 tests, no network
 ```
 
 ## Your channel instead of StonerHand
