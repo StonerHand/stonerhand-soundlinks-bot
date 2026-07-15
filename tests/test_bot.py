@@ -1016,6 +1016,55 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(message.deleted)
         self.assertEqual(message.replies, [])
 
+    async def test_group_ephemeral_reply_skips_public_post_when_enabled(self) -> None:
+        import os
+        from unittest.mock import patch as env_patch
+
+        import music_links_bot.bot as bot_module
+
+        message = ReplaceableMessageStub()
+        message.message_id = 99
+        message.from_user = type("U", (), {"id": 777})()
+        bot = BotStub()
+        bot.token = "token123"
+
+        async def fake_send(*args, **kwargs):
+            fake_send.called = {"args": args, "kwargs": kwargs}
+            return True
+
+        with env_patch.dict(os.environ, {"EPHEMERAL_GROUP_REPLIES": "1"}, clear=False):
+            with env_patch.object(bot_module, "send_ephemeral_message", fake_send):
+                await _send_track_result(
+                    bot, message, "готовый пост", preview_url=None, reply_markup=None
+                )
+
+        self.assertEqual(bot.sent_messages, [])  # nothing posted publicly
+        self.assertFalse(message.deleted)  # poster's message left intact
+        self.assertEqual(fake_send.called["args"][2], 777)  # receiver_user_id
+
+    async def test_group_ephemeral_falls_back_to_public_when_undelivered(self) -> None:
+        import os
+        from unittest.mock import patch as env_patch
+
+        import music_links_bot.bot as bot_module
+
+        message = ReplaceableMessageStub()
+        message.from_user = type("U", (), {"id": 777})()
+        bot = BotStub()
+        bot.token = "token123"
+
+        async def fake_send(*args, **kwargs):
+            return False
+
+        with env_patch.dict(os.environ, {"EPHEMERAL_GROUP_REPLIES": "1"}, clear=False):
+            with env_patch.object(bot_module, "send_ephemeral_message", fake_send):
+                await _send_track_result(
+                    bot, message, "готовый пост", preview_url=None, reply_markup=None
+                )
+
+        self.assertEqual(len(bot.sent_messages), 1)  # public post as usual
+        self.assertTrue(message.deleted)
+
     async def test_channel_posts_without_supported_urls_do_not_notify_admin(self) -> None:
         message = ChannelMessageStub()
         context = ContextStub()
