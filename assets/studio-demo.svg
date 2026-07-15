@@ -20,7 +20,7 @@
   <rect x="24" y="24" width="40" height="40" rx="12" fill="url(#amber)"/>
   <circle cx="44" cy="44" r="11" fill="none" stroke="#0D0D0E" stroke-width="2.4"/>
   <circle cx="44" cy="44" r="3.4" fill="#0D0D0E"/>
-  <text x="76" y="43" fill="#F4F4F1" font-size="21" font-family="'Unbounded', sans-serif" font-weight="600">Студия</text>
+  <text x="76" y="43" fill="#F4F4F1" font-size="21" font-family="'Unbounded','Golos Text',sans-serif" font-weight="600">Студия</text>
   <circle cx="80" cy="56" r="2.6" fill="#C97A1E">
     <animate attributeName="opacity" values="1;.3;1" dur="1.6s" repeatCount="indefinite"/>
   </circle>
@@ -86,7 +86,7 @@
     </g>
 
     <!-- post text -->
-    <text x="262" y="196" fill="#F4F4F1" font-size="21" font-family="'Unbounded', sans-serif" font-weight="600">Dragonaut</text>
+    <text x="262" y="196" fill="#F4F4F1" font-size="21" font-family="'Unbounded','Golos Text',sans-serif" font-weight="600">Dragonaut</text>
     <text x="262" y="220" fill="#8C8C88" font-size="13">📻 · Sleep · 1992</text>
     <text x="262" y="246" fill="#E5C38A" font-size="12" font-style="italic">кнопки ниже, трек ждет</text>
     <text x="262" y="270" fill="#8C8C88" font-size="11">#stonerhand  #doom  #metal  #1992</text>

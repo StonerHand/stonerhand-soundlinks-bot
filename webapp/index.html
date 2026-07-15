@@ -37,7 +37,7 @@
   .wrap { max-width: 430px; margin: 0 auto; min-height: 100dvh; display: flex; flex-direction: column; position: relative; z-index: 1; }
 
   .mono { font-family: "JetBrains Mono", monospace; }
-  .display { font-family: "Unbounded", sans-serif; }
+  .display { font-family: "Unbounded", "Golos Text", sans-serif; }
   .icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
   .icon.s16 { width: 16px; height: 16px; }
   .icon.s14 { width: 14px; height: 14px; }
@@ -108,7 +108,7 @@
   /* ── empty / notfound ── */
   .center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 18px; padding: 40px 32px; }
   .center .blob { width: 80px; height: 80px; border-radius: 24px; display: flex; align-items: center; justify-content: center; background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
-  .center .t1 { font-family: "Unbounded"; font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+  .center .t1 { font-family: "Unbounded", "Golos Text", sans-serif; font-size: 20px; font-weight: 600; margin-bottom: 6px; }
   .center .t2 { font-size: 13px; color: var(--muted); line-height: 1.5; }
   .btn-solid { padding: 13px 24px; border-radius: 16px; border: none; background: var(--primary); color: var(--primary-fg); font-family: "JetBrains Mono"; font-size: 13px; font-weight: 700; }
   .btn-solid:active { transform: scale(.96); }
@@ -149,7 +149,7 @@
   .compact-cover img { width: 100%; height: 100%; object-fit: cover; }
   .post-inner { padding: 16px; }
   .post-headrow { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
-  .post-title { font-family: "Unbounded"; font-size: 19px; font-weight: 600; line-height: 1.15; }
+  .post-title { font-family: "Unbounded", "Golos Text", sans-serif; font-size: 19px; font-weight: 600; line-height: 1.15; }
   .post-artist { font-size: 13px; color: var(--muted); margin-top: 2px; }
   .genre-badge { font-family: "JetBrains Mono"; font-size: 10px; text-transform: uppercase; padding: 4px 8px; border-radius: 8px; flex-shrink: 0; white-space: nowrap; }
   .post-cta { font-size: 13px; font-style: italic; color: var(--accent); margin-bottom: 12px; line-height: 1.5; }
@@ -214,7 +214,7 @@
   .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
   .kpi { padding: 16px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); }
   .kpi .k-l { font-family: "JetBrains Mono"; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
-  .kpi .k-v { font-family: "Unbounded"; font-size: 24px; font-weight: 700; }
+  .kpi .k-v { font-family: "Unbounded", "Golos Text", sans-serif; font-size: 24px; font-weight: 700; }
   .statcard { border-radius: 16px; background: var(--surface); border: 1px solid var(--border); margin-bottom: 16px; }
   .statcard-head { padding: 14px 16px; border-bottom: 1px solid var(--border); }
   .statcard-body { padding: 16px; }
@@ -238,7 +238,7 @@
   .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 95; max-width: 430px; margin: 0 auto; background: var(--surface); border-radius: 22px 22px 0 0; border-top: 1px solid var(--border); padding: 18px 16px calc(22px + env(safe-area-inset-bottom)); transform: translateY(105%); transition: transform .32s cubic-bezier(.22,1,.36,1); }
   .sheet.open { transform: translateY(0); }
   .sheet .grab { width: 36px; height: 4px; border-radius: 2px; background: var(--border); margin: 0 auto 14px; }
-  .sheet h3 { font-family: "Unbounded"; font-size: 17px; font-weight: 600; margin-bottom: 14px; }
+  .sheet h3 { font-family: "Unbounded", "Golos Text", sans-serif; font-size: 17px; font-weight: 600; margin-bottom: 14px; }
   .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
   .quick-grid button { padding: 13px 0; border-radius: 12px; border: 1px solid var(--border); background: var(--card); color: var(--fg); font-family: "JetBrains Mono"; font-size: 13px; }
   .quick-grid button:active { border-color: var(--primary); }
