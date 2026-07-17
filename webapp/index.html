@@ -268,6 +268,35 @@
 
   .status-note { font-family: "JetBrains Mono"; font-size: 11px; letter-spacing: 1px; color: var(--muted); text-align: center; margin-top: 12px; min-height: 16px; text-transform: uppercase; }
   .hidden { display: none !important; }
+
+  /* ── drag-reorder crate ── */
+  .grip { color: var(--muted); display: flex; align-items: center; touch-action: none; cursor: grab; padding: 4px 2px; flex-shrink: 0; }
+  .row.dragging { opacity: .9; box-shadow: 0 12px 30px var(--shadow); border-color: color-mix(in srgb, var(--primary) 45%, transparent); z-index: 5; position: relative; }
+  .row.drag-shift { transition: transform .18s ease; }
+
+  /* ── illustrated empty state ── */
+  .empty-box { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px; padding: 40px 32px; }
+  .empty-box .eb-ico { width: 68px; height: 68px; border-radius: 20px; display: flex; align-items: center; justify-content: center; background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
+  .empty-box .eb-t { font-family: "Unbounded", "Golos Text", sans-serif; font-size: 17px; font-weight: 600; }
+  .empty-box .eb-s { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+  /* ── share picker + candidate player ── */
+  .picker-item { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 12px 14px; border-radius: 14px; background: var(--card); border: 1px solid var(--border); color: var(--fg); font-family: inherit; font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+  .picker-item:active { border-color: var(--primary); }
+  .picker-badge { width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-family: "JetBrains Mono"; font-size: 11px; font-weight: 800; color: #fff; flex-shrink: 0; }
+  .cand-player {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 45; max-width: 430px; margin: 0 auto;
+    padding: 12px 16px calc(14px + env(safe-area-inset-bottom));
+    background: linear-gradient(to top, var(--bg) 70%, transparent); display: none;
+  }
+  .cand-player.on { display: block; }
+  .cand-player-inner { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 8px 12px; box-shadow: 0 10px 30px var(--shadow); }
+  .cand-player .cp-meta { flex: 1; min-width: 0; }
+  .cand-player .cp-title { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cand-player .cp-sub { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cand-player .cp-btn { width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; border: 1px solid var(--border); background: var(--card); color: var(--fg); display: flex; align-items: center; justify-content: center; }
+  .cand-player .cp-btn.play { background: var(--primary); color: var(--primary-fg); border: none; }
+  .cand-player .cp-btn:active { transform: scale(.92); }
 </style>
 </head>
 <body class="dark">
@@ -296,6 +325,7 @@
   <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.2" y1="4.2" x2="5.6" y2="5.6"/><line x1="18.4" y1="18.4" x2="19.8" y2="19.8"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.2" y1="19.8" x2="5.6" y2="18.4"/><line x1="18.4" y1="5.6" x2="19.8" y2="4.2"/></symbol>
   <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></symbol>
   <symbol id="i-expand" viewBox="0 0 24 24"><path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5"/></symbol>
+  <symbol id="i-grip" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></symbol>
 </defs></svg>
 
 <div class="wrap">
@@ -398,6 +428,13 @@
         <div class="sub"><div class="lbl">Оформление</div></div></div>
       <div class="scroll" style="padding:0 16px 120px">
         <div class="fsec">
+          <div class="fsec-head" style="display:flex;align-items:center;justify-content:space-between">
+            <span class="seclabel" id="t-presets">Пресеты</span>
+            <button id="preset-save" style="background:none;border:none;color:var(--primary);font-family:'JetBrains Mono';font-size:11px">+ <span id="t-preset-save">сохранить</span></button>
+          </div>
+          <div class="fsec-body pad"><div class="chips" id="preset-list"></div></div>
+        </div>
+        <div class="fsec">
           <div class="fsec-head"><span class="seclabel">Содержимое</span></div>
           <div class="fsec-body" id="toggles"></div>
         </div>
@@ -481,6 +518,24 @@
   <div class="dt-row"><input type="datetime-local" id="dt-input"><button id="dt-go">OK</button></div>
 </div>
 
+<!-- Share picker sheet -->
+<div class="mask" id="share-mask"></div>
+<div class="sheet" id="share-sheet">
+  <div class="grab"></div><h3 id="share-title">Куда поделиться?</h3>
+  <div id="share-list"></div>
+</div>
+
+<!-- Candidate mini-player -->
+<div class="cand-player" id="cand-player">
+  <div class="cand-player-inner">
+    <button class="cp-btn" id="cp-prev"><svg class="icon s16"><use href="#i-cl"/></svg></button>
+    <button class="cp-btn play" id="cp-play"><svg class="icon s16"><use href="#i-music"/></svg></button>
+    <button class="cp-btn" id="cp-next"><svg class="icon s16"><use href="#i-cr"/></svg></button>
+    <div class="cp-meta"><div class="cp-title" id="cp-title"></div><div class="cp-sub" id="cp-sub"></div></div>
+    <button class="cp-btn" id="cp-close"><svg class="icon s16"><use href="#i-x"/></svg></button>
+  </div>
+</div>
+
 <!-- Coach -->
 <div class="coach-mask" id="coach-mask"></div>
 <div class="coach" id="coach"><div class="c-emoji" id="coach-emoji"></div><div class="c-text" id="coach-text"></div>
@@ -520,6 +575,12 @@
     stat: { posts: "posts", song: "tracks", album: "albums", podcast: "podcasts", videos: "videos", collections: "sets" },
     coach: [["🎧","Tap ▶ on the cover — a 30-second preview plays right here."],["🎛","The Style screen holds everything: switches, your text, hashtags and platform buttons."],["📌","The main action is always docked at the bottom — publish is one tap away."]],
     gotIt: "Got it", next: "Next",
+    shareTitle: "Share where?", shareAll: "All platforms",
+    presets: "Presets", presetSave: "save", presetEmpty: "Save the current look to reuse it",
+    presetName: "Preset", reschedule: "Reschedule",
+    queueEmptyT: "Queue is empty", queueEmptyS: "Scheduled posts will show up here",
+    statsEmptyT: "No stats yet", statsEmptyS: "Numbers appear once you start posting",
+    nowPlaying: "Preview",
   } : {
     ph: "Ссылка или название…", recent: "НЕДАВНИЕ", popular: "ПОПУЛЯРНЫЕ ЗАПРОСЫ",
     hint: "Введи исполнителя и трек<br>или вставь ссылку на любую платформу",
@@ -542,6 +603,12 @@
     stat: { posts: "постов", song: "треков", album: "альбомов", podcast: "подкастов", videos: "видео", collections: "подборок" },
     coach: [["🎧","Тапни ▶ на обложке — 30 секунд трека заиграют прямо здесь."],["🎛","На экране «Оформление» всё: тумблеры, свой текст, хэштеги и кнопки платформ."],["📌","Главное действие всегда закреплено внизу — публикация в один тап."]],
     gotIt: "Понятно", next: "Дальше",
+    shareTitle: "Куда поделиться?", shareAll: "Все площадки",
+    presets: "Пресеты", presetSave: "сохранить", presetEmpty: "Сохрани текущее оформление, чтобы применять в один тап",
+    presetName: "Пресет", reschedule: "Перенести",
+    queueEmptyT: "Очередь пуста", queueEmptyS: "Отложенные посты появятся здесь",
+    statsEmptyT: "Пока нет статистики", statsEmptyS: "Цифры появятся, как начнёшь постить",
+    nowPlaying: "Превью",
   };
 
   const SUGGESTIONS = ["Black Sabbath – Paranoid","Sleep – Dragonaut","Electric Wizard – Funeralopolis","Kyuss – Green Machine"];
@@ -596,6 +663,9 @@
   $("top-users-lbl").textContent = T.topUsers;
   $("top-chats-lbl").textContent = T.topChats;
   $("toast-cancel").textContent = T.cancel;
+  $("t-presets").textContent = T.presets;
+  $("t-preset-save").textContent = T.presetSave;
+  $("share-title").textContent = T.shareTitle;
   document.querySelector('#tabbar [data-tab="home"] span').textContent = EN?"Home":"Главная";
   document.querySelector('#tabbar [data-tab="crate"] span').textContent = EN?"Crate":"Подборка";
   document.querySelector('#tabbar [data-tab="queue"] span').textContent = EN?"Queue":"Очередь";
@@ -653,10 +723,15 @@
   /* ── audio ── */
   const player = $("player");
   function stopAudio() {
-    player.pause(); player.removeAttribute("src");
+    player.pause(); player.removeAttribute("src"); player.onended = null;
     if (playingBtn) { playingBtn = null; }
     const eq = $("card-eq"); if (eq) eq.classList.remove("on");
     document.querySelectorAll(".play-btn svg").forEach(refreshPlayIcon);
+    if (typeof candPlaying !== "undefined" && candPlaying >= 0) {
+      const b = candPlayBtn(candPlaying); if (b) b.textContent = "▶";
+      candPlaying = -1;
+    }
+    const cp = document.getElementById("cand-player"); if (cp) cp.classList.remove("on");
   }
   function refreshPlayIcon(svg) {
     const ring = svg.querySelector(".ring"); if (ring) ring.setAttribute("stroke-dashoffset", 2*Math.PI*28);
@@ -806,23 +881,56 @@
       if (Object.keys(patch).length) syncDraft(patch, true);
     });
   }
+  let candList = [], candPlaying = -1;
   function renderCandidates(cands) {
+    candList = cands; candPlaying = -1; $("cand-player").classList.remove("on");
     $("cand-count").textContent = cands.length + " " + (cands.length===1?T.release1:T.release2);
     const list = $("cand-list"); list.innerHTML = "";
     cands.forEach((c, i) => {
-      const el = document.createElement("div"); el.className = "cand";
-      const acc = c.accentColor || "var(--primary)";
+      const el = document.createElement("div"); el.className = "cand"; el.dataset.idx = i;
       el.innerHTML =
         '<div class="cand-body"><div class="cand-art">'+(safeUrl(c.artwork)?'<img alt="" src="'+safeUrl(c.artwork)+'" style="width:100%;height:100%;object-fit:cover;border-radius:12px">':"🎵")+
-        (c.preview?'<button class="cand-play">'+ico("music","s18")+"</button>":"")+"</div>"+
+        (c.preview?'<button class="cand-play">▶</button>':"")+"</div>"+
         '<div class="cand-meta"><div class="cand-title">'+esc(c.title)+'</div><div class="cand-artist">'+esc(c.artist)+"</div></div>"+
         '<button class="cand-pick">'+(EN?"Pick":"Выбрать")+"</button></div>";
-      if (c.preview) el.querySelector(".cand-play").addEventListener("click", (e)=>{e.stopPropagation();togglePreview(c.preview, el.querySelector(".cand-play"), null);});
+      if (c.preview) el.querySelector(".cand-play").addEventListener("click", (e)=>{ e.stopPropagation(); playCandidate(i); });
       el.querySelector(".cand-pick").addEventListener("click", () => { hap.pick(); search(c.url); });
       list.appendChild(el);
       setTimeout(() => el.classList.add("in"), 60 + i*90);
     });
   }
+  function candPlayBtn(i) { const el = $("cand-list").querySelector('.cand[data-idx="'+i+'"]'); return el ? el.querySelector(".cand-play") : null; }
+  function previewIndices() { return candList.map((c,i)=>c && c.preview ? i : -1).filter((i)=>i>=0); }
+  function setPlayGlyph(playing) {
+    $("cp-play").textContent = playing ? "⏸" : "▶";
+    const btn = candPlayBtn(candPlaying); if (btn) btn.textContent = playing ? "⏸" : "▶";
+  }
+  function playCandidate(i) {
+    const c = candList[i]; if (!c || !c.preview) return;
+    stopAudio(); hap.tap(); candPlaying = i;
+    player.src = c.preview;
+    player.play().then(() => {
+      $("cp-title").textContent = c.title; $("cp-sub").textContent = c.artist;
+      $("cand-player").classList.add("on"); setPlayGlyph(true);
+    }).catch(() => hap.err());
+    player.onended = () => { advanceCandidate(1, true); };
+    const el = $("cand-list").querySelector('.cand[data-idx="'+i+'"]'); if (el) el.scrollIntoView({ behavior:"smooth", block:"center" });
+  }
+  function advanceCandidate(dir, auto) {
+    const idxs = previewIndices(); if (!idxs.length) { stopAudio(); return; }
+    const pos = idxs.indexOf(candPlaying);
+    if (pos < 0) { playCandidate(idxs[0]); return; }
+    const nextPos = pos + dir;
+    if (auto && nextPos >= idxs.length) { stopAudio(); return; }
+    playCandidate(idxs[(nextPos + idxs.length) % idxs.length]);
+  }
+  $("cp-prev").addEventListener("click", () => { hap.pick(); advanceCandidate(-1, false); });
+  $("cp-next").addEventListener("click", () => { hap.pick(); advanceCandidate(1, false); });
+  $("cp-close").addEventListener("click", () => { hap.tap(); stopAudio(); });
+  $("cp-play").addEventListener("click", () => {
+    if (candPlaying < 0) return; hap.tap();
+    if (player.paused) { player.play(); setPlayGlyph(true); } else { player.pause(); setPlayGlyph(false); }
+  });
   async function loadDraft(id) {
     show("loading");
     try { const res = await api("draft", { draft_id: id }); if (res.ok) { openDraftResult(res, false); return; } } catch(e) {}
@@ -879,8 +987,59 @@
     $("tags-sec").style.display = state.flags.hashtags ? "" : "none";
     pmOrder = state.release.platforms.map((p)=>p.key); pmEnabled = {};
     state.release.platforms.forEach((p)=>{pmEnabled[p.key]=p.enabled!==false;}); drawPm();
+    drawPresets();
     show("format");
   }
+
+  /* ── style presets (CloudStorage) ── */
+  let presets = [];
+  function loadPresets(cb) {
+    try { tg.CloudStorage.getItem("presets", (e,v) => { try { presets = v?JSON.parse(v):[]; } catch(x){ presets=[]; } if(!Array.isArray(presets)) presets=[]; cb&&cb(); }); }
+    catch(e) { presets = []; cb&&cb(); }
+  }
+  function savePresetsStore() { try { tg.CloudStorage.setItem("presets", JSON.stringify(presets.slice(0,4))); } catch(e){} }
+  function drawPresets() {
+    const box = $("preset-list");
+    const render = () => {
+      box.innerHTML = "";
+      if (!presets.length) { box.innerHTML = '<div class="eb-s" style="font-size:12px">'+esc(T.presetEmpty)+"</div>"; return; }
+      presets.forEach((p, i) => {
+        const chip = document.createElement("button"); chip.className = "chip";
+        chip.innerHTML = esc(p.name)+' <span class="x">✕</span>';
+        chip.addEventListener("click", (ev) => {
+          if (ev.target.closest(".x")) { hap.pick(); presets.splice(i,1); savePresetsStore(); render(); return; }
+          applyPreset(p);
+        });
+        box.appendChild(chip);
+      });
+    };
+    if (!presets.length) loadPresets(render); else render();
+  }
+  function applyPreset(p) {
+    hap.ok();
+    if (typeof p.hashtags === "boolean") state.flags.hashtags = p.hashtags;
+    if (typeof p.as_photo === "boolean") state.flags.as_photo = p.as_photo;
+    if (typeof p.large_preview === "boolean") state.flags.large_preview = p.large_preview;
+    const patch = { hashtags: state.flags.hashtags, as_photo: state.flags.as_photo, large_preview: state.flags.large_preview };
+    if (Array.isArray(p.platforms) && p.platforms.length) patch.platforms = p.platforms;
+    if (Array.isArray(p.tags)) patch.tags = p.tags;
+    drawToggles();
+    syncDraft(patch, true);
+    goBack();
+  }
+  $("preset-save").addEventListener("click", () => {
+    hap.tap();
+    loadPresets(() => {
+      const n = presets.length + 1;
+      presets.push({
+        name: T.presetName + " " + n,
+        hashtags: state.flags.hashtags, as_photo: Boolean(state.flags.as_photo),
+        large_preview: state.flags.large_preview,
+        platforms: pmSelection(), tags: editTags.slice(),
+      });
+      savePresetsStore(); drawPresets();
+    });
+  });
   function closeFormat() { if (!$("v-format").classList.contains("hidden")) {} }
   function drawToggles() {
     const box = $("toggles"); box.innerHTML = "";
@@ -988,15 +1147,55 @@
     hap.tap();
     try { const res = await api("crate_add", { draft_id: state.draft_id }); if (res.ok) { hap.ok(); refreshCrateBadge(res); $("status").textContent = T.toCrate.toUpperCase()+" · "+res.count; } else { hap.err(); $("status").textContent = res.error==="crate full"?T.crateFull:T.err; } } catch(e) { hap.err(); }
   });
+  function shareUrl(url) {
+    if (!/^https?:\/\//i.test(String(url||""))) return;
+    closeShare();
+    try { tg.switchInlineQuery(url, ["users","groups","channels"]); } catch(e) { try { tg.switchInlineQuery(url); } catch(x){} }
+  }
+  function closeShare(){ $("share-sheet").classList.remove("open"); $("share-mask").classList.remove("open"); }
+  $("share-mask").addEventListener("click", closeShare);
   $("action-share").addEventListener("click", () => {
     hap.tap();
-    const en = (state.release.platforms||[]).filter((p)=>p.enabled!==false);
-    const url = (en[0]||{}).url || state.release.page_url; if (!url) return;
-    try { tg.switchInlineQuery(url, ["users","groups","channels"]); } catch(e) { try { tg.switchInlineQuery(url); } catch(x){} }
+    const en = (state.release.platforms||[]).filter((p)=>p.enabled!==false && /^https?:\/\//i.test(String(p.url||"")));
+    const list = $("share-list"); list.innerHTML = "";
+    en.forEach((p) => {
+      const m = PLATFORM_META[p.key] || {color:"#8C8C88",letter:"♪",name:p.label};
+      const b = document.createElement("button"); b.className = "picker-item";
+      b.innerHTML = '<span class="picker-badge" style="background:'+m.color+'">'+m.letter+"</span>"+esc(m.name);
+      b.addEventListener("click", () => { hap.pick(); shareUrl(p.url); });
+      list.appendChild(b);
+    });
+    if (/^https?:\/\//i.test(String(state.release.page_url||""))) {
+      const b = document.createElement("button"); b.className = "picker-item";
+      b.innerHTML = '<span class="picker-badge" style="background:var(--primary)">♪</span>'+esc(T.shareAll);
+      b.addEventListener("click", () => { hap.pick(); shareUrl(state.release.page_url); });
+      list.appendChild(b);
+    }
+    $("share-sheet").classList.add("open"); $("share-mask").classList.add("open");
   });
   $("action-schedule").addEventListener("click", openSheet);
 
-  /* ── schedule ── */
+  /* ── illustrated empty state ── */
+  function emptyBox(iconName, title, sub) {
+    return '<div class="empty-box"><div class="eb-ico">'+ico(iconName)+'</div>'+
+      '<div><div class="eb-t">'+esc(title)+'</div><div class="eb-s">'+esc(sub)+"</div></div></div>";
+  }
+
+  /* ── schedule / reschedule ── */
+  let sheetMode = { type: "schedule" };
+  function pickTime(ts) {
+    hap.pick();
+    if (sheetMode.type === "reschedule") rescheduleJob(sheetMode.jobId, ts);
+    else schedule(ts, false);
+  }
+  async function rescheduleJob(jobId, at) {
+    closeSheet();
+    try {
+      const res = await api("reschedule", { job_id: jobId, at });
+      if (res.ok) { hap.ok(); openQueue(); }
+      else { hap.err(); }
+    } catch(e) { hap.err(); }
+  }
   async function schedule(at, force) {
     closeSheet();
     try {
@@ -1007,19 +1206,21 @@
     } catch(e) { hap.err(); $("status").textContent = T.err; }
   }
   function fmtWhen(ts){ return new Intl.DateTimeFormat(EN?"en-GB":"ru-RU",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}).format(new Date(ts*1000)); }
-  function openSheet() {
+  function openSheet(mode) {
     hap.tap();
+    sheetMode = mode || { type: "schedule" };
+    $("sheet-title").textContent = sheetMode.type === "reschedule" ? T.reschedule : T.sheetTitle;
     const grid = $("quick-grid"); grid.innerHTML = "";
     const now = new Date(), tn = new Date(now); tn.setHours(19,0,0,0);
     const tm = new Date(now); tm.setDate(tm.getDate()+1); tm.setHours(10,0,0,0);
     [[T.in1h,Math.floor(Date.now()/1000)+3600],[T.in3h,Math.floor(Date.now()/1000)+10800],[T.tonight,Math.floor(tn/1000)],[T.tomorrow,Math.floor(tm/1000)]]
-      .filter(([,ts])=>ts>Date.now()/1000+60).forEach(([l,ts])=>{const b=document.createElement("button");b.textContent=l;b.addEventListener("click",()=>{hap.pick();schedule(ts,false);});grid.appendChild(b);});
+      .filter(([,ts])=>ts>Date.now()/1000+60).forEach(([l,ts])=>{const b=document.createElement("button");b.textContent=l;b.addEventListener("click",()=>pickTime(ts));grid.appendChild(b);});
     const d = new Date(Date.now()+3600000); d.setMinutes(0,0,0);
     $("dt-input").value = new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
     $("sheet").classList.add("open"); $("sheet-mask").classList.add("open");
   }
   function closeSheet(){ $("sheet").classList.remove("open"); $("sheet-mask").classList.remove("open"); }
-  $("dt-go").addEventListener("click", () => { const v=$("dt-input").value; if(!v)return; const ts=Math.floor(new Date(v).getTime()/1000); if(ts>Date.now()/1000+60){hap.pick();schedule(ts,false);}else hap.err(); });
+  $("dt-go").addEventListener("click", () => { const v=$("dt-input").value; if(!v)return; const ts=Math.floor(new Date(v).getTime()/1000); if(ts>Date.now()/1000+60){pickTime(ts);}else hap.err(); });
   $("sheet-mask").addEventListener("click", closeSheet);
 
   /* ── crate ── */
@@ -1031,17 +1232,17 @@
   function drawCrate() {
     const list = $("crate-list"); list.innerHTML = "";
     $("crate-count").textContent = crateItems.length + " " + T.crateTitle;
-    $("crate-empty").textContent = crateItems.length===0 ? T.crateEmpty : (crateItems.length===1 ? T.needMore : "");
+    if (crateItems.length === 0) { list.innerHTML = emptyBox("layers", EN?"Crate is empty":"Подборка пуста", T.crateEmpty); }
+    $("crate-empty").textContent = crateItems.length===1 ? T.needMore : "";
     crateItems.forEach((it, i) => {
-      const row = document.createElement("div"); row.className = "row"; row.style.opacity = "1";
+      const row = document.createElement("div"); row.className = "row"; row.style.opacity = "1"; row.dataset.i = i;
       row.innerHTML =
-        '<div class="pm-move"><button class="up"'+(i===0?" disabled":"")+">"+ico("up","s14")+'</button><button class="down"'+(i===crateItems.length-1?" disabled":"")+">"+ico("down","s14")+"</button></div>"+
+        '<div class="grip">'+ico("grip","s18")+"</div>"+
         '<span class="crate-idx">'+(i+1)+"</span>"+ artHtml(it.artwork, it.emoji, "row-art sm")+
         '<div class="row-meta"><div class="row-title">'+esc(it.title)+'</div><div class="row-sub">'+esc(it.artist)+"</div></div>"+
         '<button class="rowbtn danger del">'+ico("trash","s14")+"</button>";
-      row.querySelector(".up").addEventListener("click", ()=>crateSwap(i,i-1));
-      row.querySelector(".down").addEventListener("click", ()=>crateSwap(i,i+1));
       row.querySelector(".del").addEventListener("click", async ()=>{ hap.tap(); try{const res=await api("crate_remove",{index:i});if(res.ok){crateItems=res.items;refreshCrateBadge(res);drawCrate();}}catch(e){} });
+      bindDrag(row.querySelector(".grip"), row, i);
       list.appendChild(row);
     });
     const main = $("crate-main"), clear = $("crate-clear"), enough = crateItems.length>=2;
@@ -1051,9 +1252,32 @@
     if (isAdmin) { main.innerHTML = ico("send","s18")+T.cratePublish+" ("+crateItems.length+")"; main.dataset.action="crate_publish"; }
     else { main.innerHTML = ico("send","s18")+T.crateSend; main.dataset.action="crate_send"; }
   }
-  async function crateSwap(a,b) {
-    hap.pick(); const idx = crateItems.map((_,i)=>i); [idx[a],idx[b]]=[idx[b],idx[a]];
-    try { const res = await api("crate_order", { indices: idx }); if (res.ok) { crateItems = res.items; drawCrate(); } } catch(e) {}
+  async function reorderCrate(from, to) {
+    if (from === to) return;
+    hap.pick();
+    const order = crateItems.map((_,i)=>i);
+    const [m] = order.splice(from, 1); order.splice(to, 0, m);
+    try { const res = await api("crate_order", { indices: order }); if (res.ok) { crateItems = res.items; drawCrate(); } else { drawCrate(); } } catch(e) { drawCrate(); }
+  }
+  function bindDrag(handle, row, index) {
+    handle.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      const rows = [...$("crate-list").querySelectorAll(".row")];
+      const startY = e.clientY;
+      row.classList.add("dragging");
+      try { handle.setPointerCapture(e.pointerId); } catch(x) {}
+      const move = (ev) => { row.style.transform = "translateY(" + (ev.clientY - startY) + "px)"; };
+      const up = (ev) => {
+        handle.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+        row.classList.remove("dragging"); row.style.transform = "";
+        let target = 0;
+        rows.forEach((r, i) => { if (i === index) return; const rect = r.getBoundingClientRect(); if (ev.clientY > rect.top + rect.height / 2) target++; });
+        reorderCrate(index, target);
+      };
+      handle.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+    });
   }
   $("crate-main").addEventListener("click", async () => {
     const main = $("crate-main"); main.disabled = true;
@@ -1068,13 +1292,15 @@
     try {
       const res = await api("queue", {}); const items = res.items||[];
       $("queue-count").textContent = items.length + " " + T.queueTitle;
-      if (!items.length) { $("queue-empty").textContent = T.queueEmpty; return; }
+      if (!items.length) { list.innerHTML = emptyBox("clock", T.queueEmptyT, T.queueEmptyS); return; }
       items.forEach((it) => {
         const row = document.createElement("div"); row.className = "row"; row.style.opacity = "1";
         row.innerHTML = artHtml(it.artwork, it.emoji, "row-art") +
           '<div class="row-meta"><div class="row-title">'+esc(it.title)+'</div><div class="row-sub">'+esc(it.artist)+'</div><div class="q-time">'+ico("clock","s14")+"<span>"+fmtWhen(it.publish_at)+"</span></div></div>"+
+          '<button class="rowbtn edit">'+ico("clock","s14")+'</button>'+
           '<button class="rowbtn danger del">'+ico("trash","s14")+"</button>";
-        row.querySelector(".del").addEventListener("click", async ()=>{ hap.tap(); await api("unschedule",{job_id:it.id}); row.remove(); refreshQueueBadge(); if(!list.children.length)$("queue-empty").textContent=T.queueEmpty; });
+        row.querySelector(".edit").addEventListener("click", ()=>{ hap.tap(); openSheet({ type:"reschedule", jobId: it.id }); });
+        row.querySelector(".del").addEventListener("click", async ()=>{ hap.tap(); await api("unschedule",{job_id:it.id}); row.remove(); refreshQueueBadge(); if(!list.children.length) list.innerHTML = emptyBox("clock", T.queueEmptyT, T.queueEmptyS); });
         list.appendChild(row);
       });
     } catch(e) { $("queue-empty").textContent = T.err; }
@@ -1083,8 +1309,16 @@
   /* ── stats ── */
   async function openStats() {
     hap.tap(); show("stats");
+    const scroll = $("v-stats").querySelector(".scroll");
+    if (!scroll.dataset.tpl) scroll.dataset.tpl = scroll.innerHTML;
     try {
       const res = await api("stats", {}); if (!res.ok) return; const s = res.stats;
+      const total = ["posts","song","album","podcast","videos","collections"].reduce((a,k)=>a+(Number(s[k])||0),0);
+      if (total === 0) { scroll.innerHTML = emptyBox("bar", T.statsEmptyT, T.statsEmptyS); return; }
+      if (!$("kpi-grid")) {
+        scroll.innerHTML = scroll.dataset.tpl;
+        $("top-users-lbl").textContent = T.topUsers; $("top-chats-lbl").textContent = T.topChats;
+      }
       const kpi = $("kpi-grid"); kpi.innerHTML = "";
       [["posts",s.posts],["song",s.song],["album",s.album],["podcast",s.podcast]].forEach(([k,v]) => {
         const c = document.createElement("div"); c.className = "kpi";

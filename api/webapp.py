@@ -51,6 +51,7 @@ from music_links_bot.publish_queue import (
     load_jobs,
     process_due_jobs,
     remove_job,
+    reschedule_job,
 )
 from music_links_bot.search import SearchLookupError, normalize_search_query
 from music_links_bot.stats import load_stats, merge_stats
@@ -191,6 +192,9 @@ async def _handle_action(application, settings: Settings, user: dict, payload: d
 
     if action == "unschedule":
         return await _action_unschedule(context, body, is_admin)
+
+    if action == "reschedule":
+        return await _action_reschedule(context, body, is_admin)
 
     if action == "stats":
         return await _action_stats(context, is_admin)
@@ -463,6 +467,28 @@ async def _action_unschedule(context, body: dict, is_admin: bool) -> dict:
     job_id = str(body.get("job_id") or "")
     removed = await remove_job(context, job_id)
     return {"ok": removed, "error": None if removed else "job not found"}
+
+
+async def _action_reschedule(context, body: dict, is_admin: bool) -> dict:
+    if not is_admin:
+        return {"ok": False, "error": "admin only"}
+
+    job_id = str(body.get("job_id") or "")
+    try:
+        publish_at = int(body.get("at") or 0)
+    except (TypeError, ValueError):
+        publish_at = 0
+
+    now_ts = int(time.time())
+    if publish_at <= now_ts or publish_at > now_ts + MAX_DELAY_SECONDS:
+        return {"ok": False, "error": "bad time"}
+
+    moved = await reschedule_job(context, job_id, publish_at)
+    return {
+        "ok": moved,
+        "error": None if moved else "job not found",
+        "publish_at": publish_at if moved else None,
+    }
 
 
 async def _action_stats(context, is_admin: bool) -> dict:
