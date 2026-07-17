@@ -61,6 +61,23 @@ async def remove_job(context, job_id: str) -> bool:
     return True
 
 
+async def reschedule_job(context, job_id: str, publish_at: int) -> bool:
+    jobs = await load_jobs(context)
+    found = False
+    for job in jobs:
+        if job.get("id") == job_id:
+            job["publish_at"] = int(publish_at)
+            found = True
+            break
+
+    if not found:
+        return False
+
+    jobs.sort(key=lambda item: int(item.get("publish_at") or 0))
+    await save_jobs(context, jobs)
+    return True
+
+
 async def process_due_jobs(context, *, now: int | None = None) -> int:
     """Publishes every job whose time has come. Called opportunistically on
     each webhook update and on pings of the Studio API, so delivery precision

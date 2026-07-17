@@ -109,5 +109,23 @@ class PublishQueueTests(unittest.TestCase):
         self.assertEqual(len(jobs), publish_queue.MAX_QUEUE_JOBS)
 
 
+class RescheduleTests(unittest.TestCase):
+    def test_reschedule_moves_job_and_resorts(self) -> None:
+        context = make_context()
+
+        async def scenario():
+            a = await publish_queue.add_job(context, make_draft(), 5000)
+            await publish_queue.add_job(context, make_draft(), 2000)
+            moved = await publish_queue.reschedule_job(context, a["id"], 1000)
+            missing = await publish_queue.reschedule_job(context, "nope", 1000)
+            return moved, missing, await publish_queue.load_jobs(context)
+
+        moved, missing, jobs = asyncio.run(scenario())
+        self.assertTrue(moved)
+        self.assertFalse(missing)
+        self.assertEqual(jobs[0]["publish_at"], 1000)
+        self.assertEqual(jobs[1]["publish_at"], 2000)
+
+
 if __name__ == "__main__":
     unittest.main()
