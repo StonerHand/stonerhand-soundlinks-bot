@@ -74,7 +74,7 @@ Forwarded posts keep working: the CTA phrase is a live song.link hub link
 
 ## 🩺 Reliability
 
-- **CI** — GitHub Actions runs 249 tests, the linter and a JS check on every push
+- **CI** — GitHub Actions runs 252 tests, the linter and a JS check on every push
 - **`/api/health`** — the bot's pulse: Telegram API, webhook registration, Redis;
   it also delivers due scheduled posts
 - **Owner alerts** — when a health check fails, a scheduled post is dropped or the
@@ -103,7 +103,7 @@ detection, alerts, minute-precise scheduling and warm instances.
 | `BOT_TOKEN` ⭐ | token from BotFather |
 | `SET_WEBHOOK_SECRET` ⭐ | protects `/api/set_webhook` |
 | `CRON_SECRET` | daily webhook self-healing via Vercel Cron |
-| `UPSTASH_REDIS_REST_URL/TOKEN` | Redis: shared cache, live `/stats`, persistent drafts, dup guard, Studio history/queue/crate, alert dedup |
+| `UPSTASH_REDIS_REST_URL/TOKEN` | Redis: shared cache, live `/stats`, persistent drafts, dup guard, Studio history/queue, alert dedup (the crate lives client-side in the Mini App, so it works without Redis) |
 | `ADMIN_CHAT_ID` | your chat id (`/id` command): private stats, the 📤 button and alerts |
 | `PUBLISH_CHAT_ID` | where 📤 posts (defaults to `@stonerhand`) |
 | `PRIMARY_PLATFORM` | which platform goes first: `spotify`, `appleMusic`, `tidal`… |
@@ -152,7 +152,7 @@ src/music_links_bot/
 Full map: [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
 
 ```bash
-PYTHONPATH=src python -m pytest tests/   # 249 tests, no network
+PYTHONPATH=src python -m pytest tests/   # 252 tests, no network
 ```
 
 ## Your channel instead of StonerHand

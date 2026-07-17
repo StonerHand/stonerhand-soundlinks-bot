@@ -70,7 +70,7 @@
 
 ## 🩺 Неубиваемость
 
-- **CI** — GitHub Actions гоняет 249 тестов, линтер и проверку JS на каждый пуш
+- **CI** — GitHub Actions гоняет 252 тестов, линтер и проверку JS на каждый пуш
 - **`/api/health`** — пульс бота: Telegram API, регистрация webhook, Redis; заодно
   доставляет созревшие отложенные посты
 - **Алерты владельцу** — если health-проверка падает, отложенный пост не ушёл или
@@ -99,7 +99,7 @@
 | `BOT_TOKEN` ⭐ | токен из BotFather |
 | `SET_WEBHOOK_SECRET` ⭐ | защита `/api/set_webhook` |
 | `CRON_SECRET` | ежедневное самовосстановление webhook через Vercel Cron |
-| `UPSTASH_REDIS_REST_URL/TOKEN` | Redis: общий кеш, живой `/stats`, вечные черновики, антидубль, история/очередь/подборка Студии, дедуп алертов |
+| `UPSTASH_REDIS_REST_URL/TOKEN` | Redis: общий кеш, живой `/stats`, вечные черновики, антидубль, история/очередь Студии, дедуп алертов (подборка хранится на стороне Mini App, поэтому работает и без Redis) |
 | `ADMIN_CHAT_ID` | твой chat id (команда `/id`): приватная статистика, право 📤 и алерты |
 | `PUBLISH_CHAT_ID` | куда постит 📤 (по умолчанию `@stonerhand`) |
 | `PRIMARY_PLATFORM` | какая площадка первая: `spotify`, `appleMusic`, `tidal`… |
@@ -148,7 +148,7 @@ src/music_links_bot/
 Полная карта — в [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
 
 ```bash
-PYTHONPATH=src python -m pytest tests/   # 249 тестов, без сети
+PYTHONPATH=src python -m pytest tests/   # 252 тестов, без сети
 ```
 
 ## Свой канал вместо StonerHand

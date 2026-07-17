@@ -949,7 +949,7 @@
       $("tab-queue").style.display = isAdmin ? "" : "none";
       $("tab-stats").style.display = isAdmin ? "" : "none";
       if (isAdmin) refreshQueueBadge();
-      refreshCrateBadge();
+      loadCrate(refreshCrateBadge);
       historyItems = res.items || [];
       $("home-history").classList.toggle("hidden", historyItems.length===0);
       $("home-empty").classList.toggle("hidden", historyItems.length>0);
@@ -968,13 +968,11 @@
   async function refreshQueueBadge() {
     try { const res = await api("queue", {}); const n=(res.items||[]).length; const b=$("q-queue-n"); b.style.display=n>0?"flex":"none"; b.textContent=n; } catch(e) {}
   }
-  async function refreshCrateBadge(data) {
-    try {
-      const res = data || await api("crate", {});
-      crateCount = res.count || 0;
-      const b=$("q-crate-n"); b.style.display=crateCount>0?"flex":"none"; b.textContent=crateCount;
-      if (!isAdmin) $("quick").classList.toggle("hidden", crateCount===0);
-    } catch(e) {}
+  function refreshCrateBadge(data) {
+    if (data && Array.isArray(data.items)) crateItems = data.items;
+    crateCount = crateItems.length;
+    const b=$("q-crate-n"); b.style.display=crateCount>0?"flex":"none"; b.textContent=crateCount;
+    if (!isAdmin) $("quick").classList.toggle("hidden", crateCount===0);
   }
 
   /* ── formatting screen ── */
@@ -1145,7 +1143,16 @@
   $("action-main").addEventListener("click", () => deliver($("action-main").dataset.action));
   $("action-crate").addEventListener("click", async () => {
     hap.tap();
-    try { const res = await api("crate_add", { draft_id: state.draft_id }); if (res.ok) { hap.ok(); refreshCrateBadge(res); $("status").textContent = T.toCrate.toUpperCase()+" · "+res.count; } else { hap.err(); $("status").textContent = res.error==="crate full"?T.crateFull:T.err; } } catch(e) { hap.err(); }
+    if (!state || !state.release) { hap.err(); return; }
+    const r = state.release;
+    const item = { title:r.title, artist:r.artist, kind:r.kind, genre:r.genre,
+      page_url:r.page_url, release_year:r.year, thumbnail_url:r.artwork };
+    if (!item.page_url) { const p = (r.platforms||[]).find((x)=>/^https?:\/\//i.test(String(x.url||""))); if (p) item.page_url = p.url; }
+    try {
+      const res = await api("crate_add", { item, items: crateItems.map((x)=>x.data), draft_id: state.draft_id });
+      if (res.ok) { hap.ok(); crateItems = res.items||[]; persistCrate(); refreshCrateBadge(); $("status").textContent = T.toCrate.toUpperCase()+" · "+res.count; }
+      else { hap.err(); $("status").textContent = res.error==="crate full"?T.crateFull:T.err; }
+    } catch(e) { hap.err(); }
   });
   function shareUrl(url) {
     if (!/^https?:\/\//i.test(String(url||""))) return;
@@ -1223,11 +1230,28 @@
   $("dt-go").addEventListener("click", () => { const v=$("dt-input").value; if(!v)return; const ts=Math.floor(new Date(v).getTime()/1000); if(ts>Date.now()/1000+60){pickTime(ts);}else hap.err(); });
   $("sheet-mask").addEventListener("click", closeSheet);
 
-  /* ── crate ── */
+  /* ── crate (client-authoritative: the list lives in CloudStorage and rides
+     along with every request, so a serverless cold start can't lose tracks) ── */
+  function crateSerialize() { return JSON.stringify(crateItems.map((x)=>({ d:x.data, e:x.emoji }))); }
+  function crateHydrate(raw) {
+    let arr = []; try { arr = JSON.parse(raw)||[]; } catch(e) { arr = []; }
+    if (!Array.isArray(arr)) return [];
+    return arr.filter((o)=>o && o.d).map((o)=>({ artist:o.d.artist, title:o.d.title, emoji:o.e||"📀", artwork:o.d.thumbnail_url, data:o.d }));
+  }
+  function persistCrate() { try { if (tg.CloudStorage) tg.CloudStorage.setItem("crate1", crateSerialize()); } catch(e) {} }
+  function loadCrate(cb) {
+    try { tg.CloudStorage.getItem("crate1", (err, val) => { if (!err && val) crateItems = crateHydrate(val); cb && cb(); }); }
+    catch(e) { cb && cb(); }
+  }
   async function openCrate() {
     hap.tap(); show("crate");
     $("crate-dock").classList.add("on");
-    try { const res = await api("crate", {}); crateItems = res.items||[]; drawCrate(); } catch(e) { $("crate-empty").textContent = T.err; }
+    loadCrate(async () => {
+      if (!crateItems.length) {
+        try { const res = await api("crate", {}); if (res.items && res.items.length) { crateItems = res.items; persistCrate(); } } catch(e) {}
+      }
+      drawCrate();
+    });
   }
   function drawCrate() {
     const list = $("crate-list"); list.innerHTML = "";
@@ -1241,7 +1265,7 @@
         '<span class="crate-idx">'+(i+1)+"</span>"+ artHtml(it.artwork, it.emoji, "row-art sm")+
         '<div class="row-meta"><div class="row-title">'+esc(it.title)+'</div><div class="row-sub">'+esc(it.artist)+"</div></div>"+
         '<button class="rowbtn danger del">'+ico("trash","s14")+"</button>";
-      row.querySelector(".del").addEventListener("click", async ()=>{ hap.tap(); try{const res=await api("crate_remove",{index:i});if(res.ok){crateItems=res.items;refreshCrateBadge(res);drawCrate();}}catch(e){} });
+      row.querySelector(".del").addEventListener("click", ()=>{ hap.tap(); const snap=crateItems.map((x)=>x.data); crateItems.splice(i,1); persistCrate(); refreshCrateBadge(); drawCrate(); api("crate_remove",{index:i,items:snap}).catch(()=>{}); });
       bindDrag(row.querySelector(".grip"), row, i);
       list.appendChild(row);
     });
@@ -1255,9 +1279,12 @@
   async function reorderCrate(from, to) {
     if (from === to) return;
     hap.pick();
+    const snap = crateItems.map((x)=>x.data);
     const order = crateItems.map((_,i)=>i);
     const [m] = order.splice(from, 1); order.splice(to, 0, m);
-    try { const res = await api("crate_order", { indices: order }); if (res.ok) { crateItems = res.items; drawCrate(); } else { drawCrate(); } } catch(e) { drawCrate(); }
+    const [mi] = crateItems.splice(from, 1); crateItems.splice(to, 0, mi);
+    persistCrate(); drawCrate();
+    api("crate_order", { indices: order, items: snap }).catch(()=>{});
   }
   function bindDrag(handle, row, index) {
     handle.addEventListener("pointerdown", (e) => {
@@ -1281,9 +1308,9 @@
   }
   $("crate-main").addEventListener("click", async () => {
     const main = $("crate-main"); main.disabled = true;
-    try { const res = await api(main.dataset.action, {}); if (res.ok) { hap.ok(); main.classList.add("done"); main.textContent = main.dataset.action==="crate_publish"?T.published:T.sent; if (main.dataset.action==="crate_publish") crateItems=[]; setTimeout(()=>{refreshCrateBadge();drawCrate();},1600); } else { hap.err(); $("crate-empty").textContent = res.error==="need more tracks"?T.needMore:T.err; } } catch(e) { hap.err(); } finally { main.disabled = false; }
+    try { const res = await api(main.dataset.action, { items: crateItems.map((x)=>x.data) }); if (res.ok) { hap.ok(); main.classList.add("done"); main.textContent = main.dataset.action==="crate_publish"?T.published:T.sent; if (main.dataset.action==="crate_publish") { crateItems=[]; persistCrate(); } setTimeout(()=>{refreshCrateBadge();drawCrate();},1600); } else { hap.err(); $("crate-empty").textContent = res.error==="need more tracks"?T.needMore:T.err; } } catch(e) { hap.err(); } finally { main.disabled = false; }
   });
-  $("crate-clear").addEventListener("click", async () => { hap.tap(); try{const res=await api("crate_clear",{});if(res.ok){crateItems=[];refreshCrateBadge({count:0});drawCrate();}}catch(e){} });
+  $("crate-clear").addEventListener("click", () => { hap.tap(); crateItems=[]; persistCrate(); refreshCrateBadge(); drawCrate(); api("crate_clear",{}).catch(()=>{}); });
 
   /* ── queue ── */
   async function openQueue() {
