@@ -625,6 +625,7 @@
   let state = null, isAdmin = false, playingBtn = null, syncTimer = null, undoTimer = null;
   let historyItems = [], crateItems = [], crateCount = 0;
   let navStack = ["home"];
+  let loadSeq = 0, pendingAbort = null;
 
   const hap = {
     tap(){try{tg.HapticFeedback.impactOccurred("light")}catch(e){}},
@@ -699,23 +700,46 @@
   try { tg.BackButton.onClick(() => { hap.tap(); goBack(); }); } catch(e) {}
   function goBack() {
     if ($("sheet").classList.contains("open")) { closeSheet(); return; }
+    cancelPending();
     navStack.pop();
-    const prev = navStack[navStack.length-1] || "home";
+    let prev = navStack[navStack.length-1] || "home";
+    // never return the user to a transient "loading"/"format" step
+    while ((prev === "loading") && navStack.length > 1) { navStack.pop(); prev = navStack[navStack.length-1] || "home"; }
     if (prev === "home") loadHome();
     show(prev, false);
   }
   ["cand-back","nf-back","res-back","fmt-back","crate-back","queue-back","stats-back"].forEach((id) => $(id).addEventListener("click", () => { hap.tap(); goBack(); }));
   document.querySelectorAll("#tabbar button").forEach((b) => b.addEventListener("click", () => {
-    hap.tap(); const t = b.dataset.tab;
+    hap.tap(); cancelPending(); const t = b.dataset.tab;
     if (t === "home") { loadHome(); show("home"); }
     else if (t === "crate") openCrate();
     else if (t === "queue") openQueue();
     else if (t === "stats") openStats();
   }));
 
-  async function api(action, payload) {
-    const r = await fetch("/api/webapp", { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({ init_data: tg.initData, action, payload }) });
-    return r.json();
+  // Every request is bounded: a hung or ice-cold serverless call can never
+  // freeze the UI. Requests flagged `abortable` are cancelled the moment the
+  // user navigates away, so "back" is always instant.
+  async function api(action, payload, opts) {
+    opts = opts || {};
+    const ctrl = new AbortController();
+    if (opts.abortable) pendingAbort = ctrl;
+    const timer = setTimeout(() => { try { ctrl.abort(); } catch(e) {} }, opts.timeout || 20000);
+    try {
+      const r = await fetch("/api/webapp", {
+        method:"POST", headers:{"content-type":"application/json"},
+        body:JSON.stringify({ init_data: tg.initData, action, payload }), signal: ctrl.signal,
+      });
+      try { return await r.json(); }
+      catch(e) { return { ok:false, error: r.ok ? "bad_response" : ("http_"+r.status) }; }
+    } finally {
+      clearTimeout(timer);
+      if (opts.abortable && pendingAbort === ctrl) pendingAbort = null;
+    }
+  }
+  function cancelPending() {
+    loadSeq++;
+    if (pendingAbort) { try { pendingAbort.abort(); } catch(e) {} pendingAbort = null; }
   }
   function loadPrefs(cb){ try{ tg.CloudStorage.getItem("prefs",(e,v)=>{let p=null;try{p=v?JSON.parse(v):null}catch(x){}cb(p)});}catch(e){cb(null);} }
   function savePrefs(p){ try{ tg.CloudStorage.setItem("prefs",JSON.stringify(p)); }catch(e){} }
@@ -863,13 +887,15 @@
   async function search(pick) {
     const q = pick || $("query").value.trim();
     if (!q) return;
+    cancelPending(); const seq = loadSeq;
     closeFormat(); show("loading");
     try {
-      const res = await api("resolve", { query: q, pick: Boolean(pick) });
+      const res = await api("resolve", { query: q, pick: Boolean(pick) }, { abortable: true });
+      if (seq !== loadSeq) return;
       if (!res.ok) { $("nf-query").textContent = "«"+q+"»"; show("notfound"); hap.err(); return; }
       if (res.candidates) { renderCandidates(res.candidates); show("candidates"); hap.pick(); return; }
       openDraftResult(res, true);
-    } catch(e) { $("nf-query").textContent = "«"+q+"»"; show("notfound"); }
+    } catch(e) { if (seq !== loadSeq) return; $("nf-query").textContent = "«"+q+"»"; show("notfound"); hap.err(); }
   }
   function openDraftResult(res, applyDefaults) {
     state = res; show("result"); renderCard(); hap.ok(); maybeCoach();
@@ -932,8 +958,9 @@
     if (player.paused) { player.play(); setPlayGlyph(true); } else { player.pause(); setPlayGlyph(false); }
   });
   async function loadDraft(id) {
+    cancelPending(); const seq = loadSeq;
     show("loading");
-    try { const res = await api("draft", { draft_id: id }); if (res.ok) { openDraftResult(res, false); return; } } catch(e) {}
+    try { const res = await api("draft", { draft_id: id }, { abortable: true }); if (seq !== loadSeq) return; if (res && res.ok) { openDraftResult(res, false); return; } } catch(e) { if (seq !== loadSeq) return; }
     loadHome(); show("home");
   }
 
