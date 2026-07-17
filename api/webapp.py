@@ -216,7 +216,7 @@ async def _handle_action(application, settings: Settings, user: dict, payload: d
         return {"ok": True, "items": []}
 
     if action in {"crate_send", "crate_publish"}:
-        return await _action_crate_deliver(context, action, user_id, is_admin)
+        return await _action_crate_deliver(context, action, user_id, is_admin, body)
 
     return {"ok": False, "error": "unknown action"}
 
@@ -577,6 +577,104 @@ async def _load_history_items(context, user_id: int) -> list[dict]:
     return list(histories.get(user_id) or [])
 
 
+# The crate lives on the client: the Mini App keeps the authoritative list in
+# CloudStorage and sends it with every request. The server still mirrors it into
+# KV / instance memory as a convenience, but never depends on that copy being
+# complete — which is what made collections lose every track but the last one on
+# serverless (each warm instance saw only its own slice of memory).
+_CRATE_ITEM_KEYS = (
+    "title",
+    "artist",
+    "kind",
+    "release_format",
+    "genre",
+    "page_url",
+    "release_year",
+    "thumbnail_url",
+)
+
+
+def _compact_track_data(item: dict) -> dict:
+    """Shrink a track dict to the handful of fields a collection post needs.
+
+    Small enough that a full crate fits in a single CloudStorage value, so the
+    client can persist and resend it without chunking.
+    """
+    links = item.get("links") if isinstance(item.get("links"), dict) else {}
+    page_url = item.get("page_url")
+    if not page_url:
+        for value in links.values():
+            if isinstance(value, str) and value:
+                page_url = value
+                break
+
+    return {
+        "title": str(item.get("title") or ""),
+        "artist": str(item.get("artist") or ""),
+        "kind": str(item.get("kind") or "song"),
+        "release_format": item.get("release_format") or None,
+        "genre": item.get("genre") or None,
+        "page_url": page_url or None,
+        "release_year": item.get("release_year") or None,
+        "thumbnail_url": item.get("thumbnail_url") or None,
+    }
+
+
+def _track_from_item(item: dict) -> TrackMatch:
+    return TrackMatch(
+        title=str(item.get("title") or ""),
+        artist=str(item.get("artist") or ""),
+        links=item.get("links") if isinstance(item.get("links"), dict) else {},
+        page_url=item.get("page_url"),
+        release_year=item.get("release_year"),
+        kind=str(item.get("kind") or "song"),
+        release_format=item.get("release_format"),
+        thumbnail_url=item.get("thumbnail_url"),
+        genre=item.get("genre"),
+    )
+
+
+def _coerce_crate_items(raw: object) -> list[dict]:
+    """Validate a client-provided crate list into deduped, capped track dicts."""
+    items: list[dict] = []
+    if not isinstance(raw, list):
+        return items
+
+    seen: set[str] = set()
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        compact = _compact_track_data(entry)
+        if not (compact["artist"] or compact["title"]):
+            continue
+        fingerprint = _release_fingerprint(compact["artist"], compact["title"])
+        if fingerprint in seen:
+            continue
+        seen.add(fingerprint)
+        items.append(compact)
+        if len(items) >= MAX_CRATE_ITEMS:
+            break
+
+    return items
+
+
+def _crate_view(items: list[dict]) -> dict:
+    views = []
+    for item in items:
+        compact = _compact_track_data(item)
+        views.append(
+            {
+                "artist": compact["artist"],
+                "title": compact["title"],
+                "emoji": pick_track_emoji(_track_from_item(compact)),
+                "artwork": compact["thumbnail_url"],
+                "data": compact,
+            }
+        )
+
+    return {"ok": True, "count": len(items), "max": MAX_CRATE_ITEMS, "items": views}
+
+
 async def _load_crate(context, user_id: int) -> list[dict]:
     kv: KVStore | None = context.application.bot_data.get("kv_store")
     if kv is not None:
@@ -596,48 +694,48 @@ async def _save_crate(context, user_id: int, items: list[dict]) -> None:
         await kv.set_json(f"crate:{user_id}", items, ttl_seconds=CRATE_TTL_SECONDS)
 
 
+async def _crate_base_items(context, body: dict, user_id: int) -> list[dict]:
+    """The authoritative crate for a request: the client's list when it sent one,
+    otherwise the server-side mirror (Redis / instance memory)."""
+    if "items" in body:
+        return _coerce_crate_items(body.get("items"))
+    return [_compact_track_data(item) for item in await _load_crate(context, user_id)]
+
+
 async def _crate_response(context, user_id: int) -> dict:
-    items = await _load_crate(context, user_id)
-    return {
-        "ok": True,
-        "count": len(items),
-        "max": MAX_CRATE_ITEMS,
-        "items": [
-            {
-                "artist": str(item.get("artist") or ""),
-                "title": str(item.get("title") or ""),
-                "emoji": pick_track_emoji(TrackMatch(**item)),
-                "artwork": item.get("thumbnail_url"),
-            }
-            for item in items
-        ],
-    }
+    items = [_compact_track_data(item) for item in await _load_crate(context, user_id)]
+    return _crate_view(items)
 
 
 async def _action_crate_add(context, body: dict, user_id: int) -> dict:
-    draft_id = str(body.get("draft_id") or "")
-    draft = await _load_draft(context, draft_id)
-    if draft is None or draft.get("chat_id") != user_id:
+    raw_item = body.get("item")
+    if isinstance(raw_item, dict):
+        new_item = _compact_track_data(raw_item)
+    else:
+        draft_id = str(body.get("draft_id") or "")
+        draft = await _load_draft(context, draft_id)
+        if draft is None or draft.get("chat_id") != user_id:
+            return {"ok": False, "error": "draft not found"}
+        new_item = _compact_track_data(draft["item"])
+
+    if not (new_item["artist"] or new_item["title"]):
         return {"ok": False, "error": "draft not found"}
 
-    track_item = draft["item"]
-    fingerprint = _release_fingerprint(
-        str(track_item.get("artist") or ""), str(track_item.get("title") or "")
-    )
-    items = await _load_crate(context, user_id)
+    items = await _crate_base_items(context, body, user_id)
+    fingerprint = _release_fingerprint(new_item["artist"], new_item["title"])
     if any(
-        _release_fingerprint(str(item.get("artist") or ""), str(item.get("title") or ""))
-        == fingerprint
+        _release_fingerprint(item["artist"], item["title"]) == fingerprint
         for item in items
     ):
-        return await _crate_response(context, user_id)
+        await _save_crate(context, user_id, items)
+        return _crate_view(items)
 
     if len(items) >= MAX_CRATE_ITEMS:
         return {"ok": False, "error": "crate full"}
 
-    items = [*items, dict(track_item)]
+    items = [*items, new_item]
     await _save_crate(context, user_id, items)
-    return await _crate_response(context, user_id)
+    return _crate_view(items)
 
 
 async def _action_crate_remove(context, body: dict, user_id: int) -> dict:
@@ -646,18 +744,18 @@ async def _action_crate_remove(context, body: dict, user_id: int) -> dict:
     except (TypeError, ValueError):
         return {"ok": False, "error": "bad index"}
 
-    items = await _load_crate(context, user_id)
+    items = await _crate_base_items(context, body, user_id)
     if not 0 <= index < len(items):
         return {"ok": False, "error": "bad index"}
 
     items.pop(index)
     await _save_crate(context, user_id, items)
-    return await _crate_response(context, user_id)
+    return _crate_view(items)
 
 
 async def _action_crate_order(context, body: dict, user_id: int) -> dict:
     indices = body.get("indices")
-    items = await _load_crate(context, user_id)
+    items = await _crate_base_items(context, body, user_id)
     if (
         not isinstance(indices, list)
         or sorted(index for index in indices if isinstance(index, int))
@@ -665,21 +763,24 @@ async def _action_crate_order(context, body: dict, user_id: int) -> dict:
     ):
         return {"ok": False, "error": "bad order"}
 
-    await _save_crate(context, user_id, [items[index] for index in indices])
-    return await _crate_response(context, user_id)
+    items = [items[index] for index in indices]
+    await _save_crate(context, user_id, items)
+    return _crate_view(items)
 
 
-async def _action_crate_deliver(context, action: str, user_id: int, is_admin: bool) -> dict:
+async def _action_crate_deliver(
+    context, action: str, user_id: int, is_admin: bool, body: dict | None = None
+) -> dict:
     from music_links_bot.bot import _build_collection_keyboard, _build_link_preview_options
 
     if action == "crate_publish" and not is_admin:
         return {"ok": False, "error": "admin only"}
 
-    items = await _load_crate(context, user_id)
+    items = await _crate_base_items(context, body or {}, user_id)
     if len(items) < 2:
         return {"ok": False, "error": "need more tracks"}
 
-    tracks = [TrackMatch(**item) for item in items]
+    tracks = [_track_from_item(item) for item in items]
     text = format_collection_message(tracks, include_hashtags=True)
 
     if action == "crate_publish":
@@ -711,6 +812,9 @@ async def _action_crate_deliver(context, action: str, user_id: int, is_admin: bo
         for track in tracks:
             _schedule_mark_posted(context, track)
         await _save_crate(context, user_id, [])
+    else:
+        # keep the server mirror in step with what was just sent
+        await _save_crate(context, user_id, items)
 
     return {"ok": True}
 

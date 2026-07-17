@@ -271,6 +271,50 @@ class CrateApiTests(unittest.TestCase):
         self.assertEqual(context.bot.sent[0]["chat_id"], "@stonerhand")
         self.assertEqual(asyncio.run(_load_crate(context, 7)), [])
 
+    def test_crate_add_accepts_client_item_without_draft(self) -> None:
+        import asyncio
+        from api.webapp import _action_crate_add
+
+        context = _crate_context()
+        body = {"item": _crate_track("Dopesmoker"), "items": []}
+        first = asyncio.run(_action_crate_add(context, body, 7))
+        self.assertEqual(first["count"], 1)
+        self.assertEqual(first["items"][0]["title"], "Dopesmoker")
+        # the response carries a resendable payload so the client can persist it
+        self.assertEqual(first["items"][0]["data"]["artist"], "Sleep")
+
+    def test_crate_deliver_uses_client_items_when_store_empty(self) -> None:
+        # The exact regression: on serverless the server store can be empty
+        # (another warm instance), so delivery must trust the client's list and
+        # send every track — not just the last one.
+        import asyncio
+        from api.webapp import _action_crate_deliver, _load_crate
+
+        context = _crate_context()
+        self.assertEqual(asyncio.run(_load_crate(context, 7)), [])
+
+        body = {"items": [_crate_track("One"), _crate_track("Two"), _crate_track("Three")]}
+        sent = asyncio.run(_action_crate_deliver(context, "crate_send", 7, False, body))
+        self.assertTrue(sent["ok"])
+        self.assertEqual(len(context.bot.sent), 1)
+        text = context.bot.sent[0]["text"]
+        self.assertIn("1.", text)
+        self.assertIn("2.", text)
+        self.assertIn("3.", text)
+        self.assertIn("One", text)
+        self.assertIn("Two", text)
+        self.assertIn("Three", text)
+
+    def test_crate_deliver_client_items_deduped_and_need_two(self) -> None:
+        import asyncio
+        from api.webapp import _action_crate_deliver
+
+        context = _crate_context()
+        # a single unique track (duplicate collapsed) is not enough to deliver
+        body = {"items": [_crate_track("Solo"), _crate_track("Solo")]}
+        too_few = asyncio.run(_action_crate_deliver(context, "crate_send", 7, False, body))
+        self.assertEqual(too_few["error"], "need more tracks")
+
 
 class PhotoPostTests(unittest.TestCase):
     def test_publish_draft_as_photo_uses_send_photo(self) -> None:
