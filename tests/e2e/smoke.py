@@ -39,6 +39,14 @@ RESPONSES = {
     "preview": {"ok": True, "preview": None},
     "crate": {"ok": True, "count": 0, "max": 10, "items": []},
     "queue": {"ok": True, "items": []},
+    "resolve_batch": {"ok": True, "count": 2, "max": 10, "items": [
+        {"artist": "Sleep", "title": "Dopesmoker", "emoji": "📻", "artwork": None,
+         "data": {"artist": "Sleep", "title": "Dopesmoker", "kind": "song",
+                  "page_url": "https://song.link/a", "thumbnail_url": None}},
+        {"artist": "Om", "title": "Advaitic Songs", "emoji": "📻", "artwork": None,
+         "data": {"artist": "Om", "title": "Advaitic Songs", "kind": "song",
+                  "page_url": "https://song.link/b", "thumbnail_url": None}},
+    ]},
 }
 
 INIT = """window.Telegram={WebApp:{initData:"x",initDataUnsafe:{user:{language_code:"ru"}},colorScheme:"dark",
@@ -106,6 +114,20 @@ def main() -> int:
         page.wait_for_timeout(400)
         if page.eval_on_selector("#v-queue", "el => el.classList.contains('hidden')"):
             failures.append("home shortcut #q-queue did not open the queue")
+
+        # 5. pasting multiple links builds a crate automatically
+        page.eval_on_selector('#tabbar [data-tab="home"]', "el => el.click()")
+        page.wait_for_timeout(200)
+        page.evaluate(
+            "document.getElementById('query').value = "
+            "'https://open.spotify.com/track/a https://open.spotify.com/track/b'"
+        )
+        page.eval_on_selector("#query", "el => el.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter'}))")
+        page.wait_for_timeout(700)
+        if page.eval_on_selector("#v-crate", "el => el.classList.contains('hidden')"):
+            failures.append("batch paste did not open the crate")
+        elif "Dopesmoker" not in page.eval_on_selector("#v-crate", "el => el.innerText"):
+            failures.append("batch paste crate is missing items")
 
         if errors:
             failures.append("uncaught page errors: " + " | ".join(errors))

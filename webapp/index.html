@@ -945,6 +945,8 @@
   async function search(pick) {
     const q = pick || $("query").value.trim();
     if (!q) return;
+    // Multiple links pasted at once → build a crate automatically.
+    if (!pick && (q.match(/https?:\/\/\S+/g) || []).length >= 2) { return searchBatch(q); }
     lastQuery = q;
     cancelPending(); const seq = loadSeq;
     closeFormat(); show("loading");
@@ -959,6 +961,33 @@
       if (!res.ok) { $("nf-query").textContent = "«"+q+"»"; show("notfound"); hap.err(); return; }
       if (res.candidates) { renderCandidates(res.candidates); show("candidates"); hap.pick(); return; }
       openDraftResult(res, true);
+    } catch(e) { if (seq !== loadSeq) return; $("nf-query").textContent = "«"+q+"»"; show("notfound"); hap.err(); }
+  }
+  async function searchBatch(q) {
+    lastQuery = q;
+    cancelPending(); const seq = loadSeq;
+    closeFormat(); show("loading");
+    try {
+      const res = await api("resolve_batch", { query: q }, { abortable: true, timeout: 30000 });
+      if (seq !== loadSeq) return;
+      if (res.error === "rate_limited") {
+        hap.err(); flash(EN?"Too many searches — wait a moment":"Слишком часто — подожди пару секунд");
+        navStack.pop(); const prev = navStack[navStack.length-1] || "home";
+        if (prev === "home") loadHome(); show(prev, false); return;
+      }
+      const found = (res.items || []);
+      if (!res.ok || !found.length) { $("nf-query").textContent = "«"+q+"»"; show("notfound"); hap.err(); return; }
+      // merge into the crate, dedupe by artist+title, respect the cap
+      const have = new Set(crateItems.map((x)=>((x.data.artist||"")+"|"+(x.data.title||"")).toLowerCase()));
+      let added = 0;
+      found.forEach((it) => {
+        const key = ((it.data.artist||"")+"|"+(it.data.title||"")).toLowerCase();
+        if (!have.has(key) && crateItems.length < 10) { have.add(key); crateItems.push(it); added++; }
+      });
+      persistCrate(); refreshCrateBadge(); hap.ok();
+      $("query").value = "";
+      openCrate();
+      flash(EN?("Added "+added+" to the crate"):("Добавлено в подборку: "+added));
     } catch(e) { if (seq !== loadSeq) return; $("nf-query").textContent = "«"+q+"»"; show("notfound"); hap.err(); }
   }
   function openDraftResult(res, applyDefaults) {

@@ -19,6 +19,7 @@ SUPPORTED_INPUT_HOSTS = {
     "soundcloud.com",
     "m.soundcloud.com",
     "on.soundcloud.com",
+    "bandcamp.com",
     "nts.live",
     "www.nts.live",
 }
