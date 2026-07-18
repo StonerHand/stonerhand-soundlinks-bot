@@ -123,7 +123,9 @@ class handler(BaseHTTPRequestHandler):
             return
 
         req_id = secrets.token_hex(4)
-        action = str(payload.get("action") or "?")
+        # Sanitize before logging so a crafted action string can't forge log
+        # lines (control chars) or flood them (length).
+        action = str(payload.get("action") or "?").replace("\n", " ").replace("\r", " ")[:48]
         started = time.monotonic()
         try:
             with _STATE_LOCK:
@@ -692,6 +694,10 @@ _CRATE_ITEM_KEYS = (
 )
 
 
+def _is_web_url(value: object) -> bool:
+    return isinstance(value, str) and value.startswith(("http://", "https://"))
+
+
 def _compact_track_data(item: dict) -> dict:
     """Shrink a track dict to the handful of fields a collection post needs.
 
@@ -699,10 +705,14 @@ def _compact_track_data(item: dict) -> dict:
     client can persist and resend it without chunking.
     """
     links = item.get("links") if isinstance(item.get("links"), dict) else {}
+    # Only http(s) URLs may become inline-button destinations — never trust a
+    # client-supplied scheme (defense-in-depth; Telegram also rejects the rest).
     page_url = item.get("page_url")
+    if not _is_web_url(page_url):
+        page_url = None
     if not page_url:
         for value in links.values():
-            if isinstance(value, str) and value:
+            if _is_web_url(value):
                 page_url = value
                 break
 
