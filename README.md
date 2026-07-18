@@ -74,7 +74,7 @@ Forwarded posts keep working: the CTA phrase is a live song.link hub link
 
 ## 🩺 Reliability
 
-- **CI** — GitHub Actions runs 252 tests, the linter and a JS check on every push
+- **CI** — GitHub Actions runs 256 tests, the linter and a JS check on every push
 - **`/api/health`** — the bot's pulse: Telegram API, webhook registration, Redis;
   it also delivers due scheduled posts
 - **Owner alerts** — when a health check fails, a scheduled post is dropped or the
@@ -152,7 +152,7 @@ src/music_links_bot/
 Full map: [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
 
 ```bash
-PYTHONPATH=src python -m pytest tests/   # 252 tests, no network
+PYTHONPATH=src python -m pytest tests/   # 256 tests, no network
 ```
 
 ## Your channel instead of StonerHand

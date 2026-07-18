@@ -109,6 +109,64 @@ class PublishQueueTests(unittest.TestCase):
         self.assertEqual(len(jobs), publish_queue.MAX_QUEUE_JOBS)
 
 
+class FailingBot:
+    """Publishing to the channel fails; DMs to the admin (alerts) succeed."""
+
+    def __init__(self, admin_id: int) -> None:
+        self.sent: list[dict] = []
+        self._admin_id = admin_id
+
+    async def send_message(self, **kwargs):
+        self.sent.append(kwargs)
+        if kwargs.get("chat_id") == self._admin_id:
+            return SimpleNamespace(message_id=1)
+        raise RuntimeError("channel unavailable")
+
+
+class RetryTests(unittest.TestCase):
+    def _context(self, admin_id: int = 42) -> SimpleNamespace:
+        application = SimpleNamespace(
+            bot_data={"admin_chat_id": admin_id}, bot=FailingBot(admin_id)
+        )
+        return SimpleNamespace(application=application, bot=application.bot)
+
+    def test_failed_publish_is_requeued_with_backoff_not_dropped(self) -> None:
+        context = self._context()
+
+        async def scenario():
+            await publish_queue.add_job(context, make_draft(), 100)
+            published = await publish_queue.process_due_jobs(context, now=200)
+            return published, await publish_queue.load_jobs(context)
+
+        published, jobs = asyncio.run(scenario())
+        self.assertEqual(published, 0)
+        # the post is NOT lost — it is put back with an attempt count and backoff
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(jobs[0]["attempts"], 1)
+        self.assertEqual(jobs[0]["publish_at"], 200 + publish_queue.RETRY_BACKOFF_SECONDS[0])
+
+    def test_dropped_and_alerted_after_max_attempts(self) -> None:
+        context = self._context(admin_id=42)
+
+        async def scenario():
+            job = {
+                "id": "j1",
+                "publish_at": 100,
+                "attempts": publish_queue.MAX_JOB_ATTEMPTS - 1,
+                "draft": make_draft(),
+            }
+            context.application.bot_data["publish_queue"] = [job]
+            published = await publish_queue.process_due_jobs(context, now=200)
+            return published, await publish_queue.load_jobs(context)
+
+        published, jobs = asyncio.run(scenario())
+        self.assertEqual(published, 0)
+        self.assertEqual(jobs, [])  # exhausted — dropped
+        alerts = [m for m in context.bot.sent if m.get("chat_id") == 42]
+        self.assertEqual(len(alerts), 1)
+        self.assertIn("Dragonaut", alerts[0]["text"])
+
+
 class RescheduleTests(unittest.TestCase):
     def test_reschedule_moves_job_and_resorts(self) -> None:
         context = make_context()

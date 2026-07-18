@@ -70,7 +70,7 @@
 
 ## 🩺 Неубиваемость
 
-- **CI** — GitHub Actions гоняет 252 тестов, линтер и проверку JS на каждый пуш
+- **CI** — GitHub Actions гоняет 256 тестов, линтер и проверку JS на каждый пуш
 - **`/api/health`** — пульс бота: Telegram API, регистрация webhook, Redis; заодно
   доставляет созревшие отложенные посты
 - **Алерты владельцу** — если health-проверка падает, отложенный пост не ушёл или
@@ -148,7 +148,7 @@ src/music_links_bot/
 Полная карта — в [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
 
 ```bash
-PYTHONPATH=src python -m pytest tests/   # 252 тестов, без сети
+PYTHONPATH=src python -m pytest tests/   # 256 тестов, без сети
 ```
 
 ## Свой канал вместо StonerHand
