@@ -727,6 +727,10 @@
     else if (t === "queue") openQueue();
     else if (t === "stats") openStats();
   }));
+  // Home shortcut cards (mirror the tab bar).
+  $("q-crate").addEventListener("click", () => { hap.tap(); cancelPending(); openCrate(); });
+  $("q-queue").addEventListener("click", () => { hap.tap(); cancelPending(); openQueue(); });
+  $("q-stats").addEventListener("click", () => { hap.tap(); cancelPending(); openStats(); });
 
   // Every request is bounded: a hung or ice-cold serverless call can never
   // freeze the UI. Requests flagged `abortable` are cancelled the moment the
