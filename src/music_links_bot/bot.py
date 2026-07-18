@@ -32,6 +32,12 @@ from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandl
 from telegram.ext import CallbackQueryHandler, InlineQueryHandler
 
 from music_links_bot.artist import ArtistClient, ArtistLookupError
+from music_links_bot.branding import (
+    brand_label,
+    brand_logo_url,
+    build_branded_cover,
+    photo_branding_enabled,
+)
 from music_links_bot.config import Settings
 from music_links_bot.ephemeral import (
     ephemeral_group_replies_enabled,
@@ -919,9 +925,18 @@ async def _publish_draft(
         if draft.get("as_photo") and track.thumbnail_url:
             # Photo posts pin the artwork on top on every Telegram client,
             # at the cost of the preview-size toggle.
+            photo = track.thumbnail_url
+            if photo_branding_enabled():
+                branded = await build_branded_cover(
+                    track.thumbnail_url,
+                    label=brand_label(f"@{CHANNEL_USERNAME}"),
+                    logo_url=brand_logo_url(),
+                )
+                if branded is not None:
+                    photo = branded
             sent = await context.bot.send_photo(
                 chat_id=target,
-                photo=track.thumbnail_url,
+                photo=photo,
                 caption=text,
                 parse_mode=ParseMode.HTML,
                 reply_markup=keyboard,
