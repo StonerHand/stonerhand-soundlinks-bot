@@ -305,6 +305,24 @@ class CrateApiTests(unittest.TestCase):
         self.assertIn("Two", text)
         self.assertIn("Three", text)
 
+    def test_crate_rejects_non_http_button_url(self) -> None:
+        from api.webapp import _compact_track_data
+
+        malicious = _compact_track_data(
+            {"artist": "X", "title": "Y", "page_url": "javascript:alert(1)", "links": {}}
+        )
+        self.assertIsNone(malicious["page_url"])
+
+        with_fallback = _compact_track_data(
+            {
+                "artist": "X",
+                "title": "Y",
+                "page_url": "tg://evil",
+                "links": {"spotify": "https://open.spotify.com/ok"},
+            }
+        )
+        self.assertEqual(with_fallback["page_url"], "https://open.spotify.com/ok")
+
     def test_crate_deliver_client_items_deduped_and_need_two(self) -> None:
         import asyncio
         from api.webapp import _action_crate_deliver
