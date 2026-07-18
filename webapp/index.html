@@ -625,7 +625,7 @@
   let state = null, isAdmin = false, playingBtn = null, syncTimer = null, undoTimer = null;
   let historyItems = [], crateItems = [], crateCount = 0;
   let navStack = ["home"];
-  let loadSeq = 0, pendingAbort = null;
+  let loadSeq = 0, pendingAbort = null, syncSeq = 0;
 
   const hap = {
     tap(){try{tg.HapticFeedback.impactOccurred("light")}catch(e){}},
@@ -635,7 +635,18 @@
   };
   function esc(v){const d=document.createElement("div");d.textContent=v==null?"":String(v);return d.innerHTML;}
   function safeUrl(v){const u=String(v==null?"":v);return /^https?:\/\//i.test(u)?esc(u):"";}
-  function artHtml(url,emoji,cls){const s=safeUrl(url);return s?'<img class="'+cls+'" alt="" src="'+s+'">':'<div class="'+cls+'">'+esc(emoji||"🎵")+"</div>";}
+  function artHtml(url,emoji,cls){const s=safeUrl(url);return s?'<img class="'+cls+'" alt="" loading="lazy" data-emoji="'+esc(emoji||"🎵")+'" src="'+s+'">':'<div class="'+cls+'">'+esc(emoji||"🎵")+"</div>";}
+  // A broken cover must never leave an empty hole: swap it for the emoji tile.
+  window.addEventListener("error", (e) => {
+    const t = e.target;
+    if (!t || t.tagName !== "IMG" || t.dataset.fbk) return;
+    t.dataset.fbk = "1";
+    if (t.dataset.emoji) {
+      const d = document.createElement("div");
+      d.className = t.className; d.textContent = t.dataset.emoji;
+      t.replaceWith(d);
+    } else { t.style.visibility = "hidden"; }
+  }, true);
   function ico(n,c){return '<svg class="icon '+(c||"")+'"><use href="#i-'+n+'"/></svg>';}
 
   /* ── theme ── */
@@ -730,6 +741,7 @@
         method:"POST", headers:{"content-type":"application/json"},
         body:JSON.stringify({ init_data: tg.initData, action, payload }), signal: ctrl.signal,
       });
+      if (r.status === 401) { authExpired(); return { ok:false, error:"unauthorized" }; }
       try { return await r.json(); }
       catch(e) { return { ok:false, error: r.ok ? "bad_response" : ("http_"+r.status) }; }
     } finally {
@@ -743,9 +755,26 @@
   }
   function loadPrefs(cb){ try{ tg.CloudStorage.getItem("prefs",(e,v)=>{let p=null;try{p=v?JSON.parse(v):null}catch(x){}cb(p)});}catch(e){cb(null);} }
   function savePrefs(p){ try{ tg.CloudStorage.setItem("prefs",JSON.stringify(p)); }catch(e){} }
+  // When Telegram's signed initData expires (Studio left open for hours), every
+  // request 401s — tell the user plainly instead of failing silently.
+  let authGone = false;
+  function authExpired() {
+    if (authGone) return; authGone = true;
+    try { hap.err(); } catch(e) {}
+    const el = document.createElement("div");
+    el.style.cssText = "position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:32px;text-align:center;background:var(--bg)";
+    el.innerHTML = '<div style="max-width:280px"><div style="font-size:40px;margin-bottom:14px">🔒</div>'+
+      '<div style="font-family:\'Unbounded\',\'Golos Text\',sans-serif;font-size:17px;margin-bottom:8px">'+(EN?"Session expired":"Сессия истекла")+'</div>'+
+      '<div style="color:var(--muted);font-size:14px;line-height:1.5;margin-bottom:20px">'+(EN?"Reopen the Studio to keep working.":"Переоткрой Студию, чтобы продолжить.")+'</div>'+
+      '<button style="padding:12px 28px;border-radius:12px;border:none;background:var(--primary);color:#fff;font:inherit;font-size:14px">'+(EN?"Close":"Закрыть")+'</button></div>';
+    document.body.appendChild(el);
+    el.querySelector("button").addEventListener("click", () => { try { tg.close(); } catch(e) { location.reload(); } });
+  }
 
   /* ── audio ── */
   const player = $("player");
+  // A dead preview URL must not leave the player stuck "playing".
+  player.addEventListener("error", () => { if (player.src) { stopAudio(); hap.err(); } });
   function stopAudio() {
     player.pause(); player.removeAttribute("src"); player.onended = null;
     if (playingBtn) { playingBtn = null; }
@@ -1128,7 +1157,17 @@
 
   function syncDraft(patch, immediate) {
     clearTimeout(syncTimer);
-    const run = async () => { try { const res = await api("update", { draft_id: state.draft_id, ...patch }); if (res.ok) { state = res; if (!$("v-result").classList.contains("hidden")) renderCard(); } } catch(e) {} };
+    const run = async () => {
+      const seq = ++syncSeq;
+      const draftId = state && state.draft_id;
+      try {
+        const res = await api("update", { draft_id: draftId, ...patch });
+        // a newer edit already fired — don't let this stale response revert it
+        if (seq !== syncSeq || !res || !res.ok) return;
+        state = res;
+        if (!$("v-result").classList.contains("hidden")) renderCard();
+      } catch(e) {}
+    };
     if (immediate) run(); else syncTimer = setTimeout(run, 350);
   }
 

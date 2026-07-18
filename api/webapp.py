@@ -67,6 +67,10 @@ MAX_CUSTOM_CTA_LENGTH = 200
 MAX_CUSTOM_TAGS = 8
 MAX_CRATE_ITEMS = 10
 CRATE_TTL_SECONDS = 14 * 24 * 3600
+# Every event-loop run is time-bounded so one slow upstream call (Song.link,
+# iTunes, Redis) can't hold the shared lock and wedge the warm instance.
+ACTION_TIMEOUT_SECONDS = 25
+QUEUE_TICK_TIMEOUT_SECONDS = 20
 
 _STATE_LOCK = threading.Lock()
 _LOOP: asyncio.AbstractEventLoop | None = None
@@ -83,7 +87,11 @@ class handler(BaseHTTPRequestHandler):
             with _STATE_LOCK:
                 loop, application, _settings = _ensure_application()
                 context = SimpleNamespace(application=application, bot=application.bot)
-                published = loop.run_until_complete(process_due_jobs(context))
+                published = loop.run_until_complete(
+                    asyncio.wait_for(
+                        process_due_jobs(context), timeout=QUEUE_TICK_TIMEOUT_SECONDS
+                    )
+                )
         except Exception:
             LOGGER.exception("Queue tick failed")
 
@@ -124,8 +132,17 @@ class handler(BaseHTTPRequestHandler):
                     return
 
                 result = loop.run_until_complete(
-                    _handle_action(application, settings, user, payload)
+                    asyncio.wait_for(
+                        _handle_action(application, settings, user, payload),
+                        timeout=ACTION_TIMEOUT_SECONDS,
+                    )
                 )
+        except asyncio.TimeoutError:
+            LOGGER.warning("Studio request timed out")
+            self._send_json(
+                {"ok": False, "error": "timeout"}, HTTPStatus.GATEWAY_TIMEOUT
+            )
+            return
         except Exception:
             LOGGER.exception("Studio request failed")
             self._send_json({"ok": False, "error": "internal"}, HTTPStatus.INTERNAL_SERVER_ERROR)

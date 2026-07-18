@@ -5,6 +5,7 @@ import hmac
 import json
 import logging
 import threading
+from collections import OrderedDict
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
@@ -32,6 +33,20 @@ MAX_UPDATE_BYTES = 1024 * 1024
 _STATE_LOCK = threading.Lock()
 _LOOP: asyncio.AbstractEventLoop | None = None
 _APPLICATION = None
+
+# A single hung await must never hold the shared lock forever and wedge the
+# whole warm instance, so every event-loop run is time-bounded.
+PROCESS_TIMEOUT_SECONDS = 25
+QUEUE_TICK_TIMEOUT_SECONDS = 20
+# One bad update shouldn't cold-start the next user: only recycle the cached
+# application after several consecutive failures (a genuinely broken instance).
+_DISPOSE_AFTER_FAILURES = 3
+_consecutive_failures = 0
+# Telegram re-sends an update if it doesn't get a prompt 200, so identical
+# update_ids are ignored to avoid double replies / double publishes.
+UPDATE_DEDUP_TTL_SECONDS = 600
+_SEEN_UPDATE_IDS: "OrderedDict[int, None]" = OrderedDict()
+_SEEN_UPDATE_MAX = 1024
 
 
 class handler(BaseHTTPRequestHandler):
@@ -97,20 +112,84 @@ class handler(BaseHTTPRequestHandler):
 def _process_telegram_update(update_payload: dict[str, object]) -> None:
     with _STATE_LOCK:
         loop, application = _ensure_application()
-        update = Update.de_json(update_payload, application.bot)
+
+        update_id = update_payload.get("update_id")
+        if isinstance(update_id, int) and not loop.run_until_complete(
+            _claim_update(application, update_id)
+        ):
+            LOGGER.info("Skipping duplicate Telegram update %s", update_id)
+            return
+
         try:
-            loop.run_until_complete(application.process_update(update))
+            update = Update.de_json(update_payload, application.bot)
+            loop.run_until_complete(
+                asyncio.wait_for(
+                    application.process_update(update),
+                    timeout=PROCESS_TIMEOUT_SECONDS,
+                )
+            )
         except Exception as exc:
-            _dispose_application_locked()
-            _alert_crash_safely(exc)
+            # Let Telegram redeliver: release the claim so the retry reprocesses.
+            if isinstance(update_id, int):
+                try:
+                    loop.run_until_complete(_release_update(application, update_id))
+                except Exception:
+                    LOGGER.debug("Could not release update claim", exc_info=True)
+            _note_failure_locked(exc)
             raise
+
+        _note_success_locked()
 
         # Opportunistic queue tick: every incoming update also delivers
         # scheduled posts whose time has come.
         try:
-            loop.run_until_complete(_run_queue_tick(application))
+            loop.run_until_complete(
+                asyncio.wait_for(
+                    _run_queue_tick(application), timeout=QUEUE_TICK_TIMEOUT_SECONDS
+                )
+            )
         except Exception:
             LOGGER.warning("Queue tick failed", exc_info=True)
+
+
+async def _claim_update(application, update_id: int) -> bool:
+    """Reserve an update_id so a Telegram retry of the same update is skipped.
+    Returns False when it was already claimed."""
+    kv = application.bot_data.get("kv_store")
+    if kv is not None:
+        return await kv.set(
+            f"seen_update:{update_id}", "1", ttl_seconds=UPDATE_DEDUP_TTL_SECONDS, nx=True
+        )
+
+    if update_id in _SEEN_UPDATE_IDS:
+        return False
+    _SEEN_UPDATE_IDS[update_id] = None
+    while len(_SEEN_UPDATE_IDS) > _SEEN_UPDATE_MAX:
+        _SEEN_UPDATE_IDS.popitem(last=False)
+    return True
+
+
+async def _release_update(application, update_id: int) -> None:
+    kv = application.bot_data.get("kv_store")
+    if kv is not None:
+        await kv.delete(f"seen_update:{update_id}")
+    else:
+        _SEEN_UPDATE_IDS.pop(update_id, None)
+
+
+def _note_success_locked() -> None:
+    global _consecutive_failures
+    _consecutive_failures = 0
+
+
+def _note_failure_locked(exc: Exception) -> None:
+    global _consecutive_failures
+    _consecutive_failures += 1
+    _alert_crash_safely(exc)
+    if _consecutive_failures >= _DISPOSE_AFTER_FAILURES:
+        LOGGER.warning("Recycling application after repeated failures")
+        _dispose_application_locked()
+        _consecutive_failures = 0
 
 
 async def _run_queue_tick(application) -> int:
@@ -126,7 +205,7 @@ def _alert_crash_safely(exc: Exception) -> None:
 
         send_admin_alert(
             f"Webhook update crashed: {type(exc).__name__}. "
-            "The instance was recycled; check the Vercel logs.",
+            "Telegram will retry the update; check the Vercel logs.",
             dedup_key="webhook-crash",
         )
     except Exception:
