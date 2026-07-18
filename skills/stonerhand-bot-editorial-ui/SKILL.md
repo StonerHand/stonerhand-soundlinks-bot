@@ -24,8 +24,9 @@ The bot should feel like a music-channel editor, not a generic utility bot:
 | --- | --- |
 | Post layout | `src/music_links_bot/formatter.py` |
 | Buttons | `src/music_links_bot/bot.py` |
-| Platform names | `src/music_links_bot/constants.py` |
+| Platform names / supported hosts | `src/music_links_bot/constants.py` |
 | CTA phrases | `src/music_links_bot/phrases.py` |
+| Branded photo frame (📸 mode) | `src/music_links_bot/branding.py` |
 | Commands and onboarding | `src/music_links_bot/bot.py` |
 | UI tests | `tests/test_formatter.py`, `tests/test_phrases.py` |
 

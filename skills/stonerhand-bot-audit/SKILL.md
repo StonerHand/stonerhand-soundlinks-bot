@@ -14,9 +14,11 @@ Before changing code, read only what is needed:
 - `ARCHITECTURE.ru.md` for the system map
 - `README.md` and `README.ru.md` for public behavior
 - `src/music_links_bot/bot.py` for Telegram flow
-- `src/music_links_bot/url_utils.py` for link routing
-- `src/music_links_bot/formatter.py` for UI
+- `api/webapp.py` for the Studio API (resolve/draft/crate/queue/preview)
+- `src/music_links_bot/url_utils.py` and `constants.py` for link routing / supported hosts
+- `src/music_links_bot/formatter.py` and `branding.py` for UI / photo frame
 - `src/music_links_bot/songlink.py` for platform lookup
+- `webapp/index.html` for the Mini App; `tests/e2e/smoke.py` for the headless smoke
 
 ## Audit Workflow
 
@@ -25,7 +27,7 @@ Before changing code, read only what is needed:
 3. Search for fragile spots with `rg "TODO|FIXME|print\\(|except Exception|pass$|BOT_TOKEN|ghp_|rapidapi|X-RapidAPI-Key"`.
 4. Verify no secrets, generated junk, local stats, or `.env` content are being committed.
 5. Review message flow: private chat, group, channel, channel replacement, no-link silence, unsupported-link silence.
-6. Review supported link types: music releases, podcasts, SoundCloud, YouTube, NTS, Spotify playlist, Spotify artist.
+6. Review supported link types: music releases (Spotify, Apple Music, Deezer, Tidal, Yandex.Music, Bandcamp via Song.link), podcasts, SoundCloud, YouTube, NTS, Spotify playlist, Spotify artist.
 7. Run focused tests first, then full tests if code changed.
 8. Update `README.md`, `README.ru.md`, and `ARCHITECTURE.ru.md` if behavior changed.
 
