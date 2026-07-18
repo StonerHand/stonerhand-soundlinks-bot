@@ -71,6 +71,11 @@ CRATE_TTL_SECONDS = 14 * 24 * 3600
 # iTunes, Redis) can't hold the shared lock and wedge the warm instance.
 ACTION_TIMEOUT_SECONDS = 25
 QUEUE_TICK_TIMEOUT_SECONDS = 20
+# A cheap per-instance guard against a single user hammering the external
+# search/resolve APIs. Generous enough that normal use never trips it.
+RESOLVE_RATE_LIMIT = 20
+RESOLVE_RATE_WINDOW_SECONDS = 60
+_resolve_calls: dict[int, list[float]] = {}
 
 _STATE_LOCK = threading.Lock()
 _LOOP: asyncio.AbstractEventLoop | None = None
@@ -117,6 +122,9 @@ class handler(BaseHTTPRequestHandler):
             self._send_json({"ok": False, "error": "invalid json"}, HTTPStatus.BAD_REQUEST)
             return
 
+        req_id = secrets.token_hex(4)
+        action = str(payload.get("action") or "?")
+        started = time.monotonic()
         try:
             with _STATE_LOCK:
                 loop, application, settings = _ensure_application()
@@ -125,6 +133,7 @@ class handler(BaseHTTPRequestHandler):
                     settings.bot_token,
                 )
                 if user is None:
+                    LOGGER.info("req=%s action=%s unauthorized", req_id, action)
                     self._send_json(
                         {"ok": False, "error": "unauthorized"},
                         HTTPStatus.UNAUTHORIZED,
@@ -138,16 +147,23 @@ class handler(BaseHTTPRequestHandler):
                     )
                 )
         except asyncio.TimeoutError:
-            LOGGER.warning("Studio request timed out")
+            LOGGER.warning(
+                "req=%s action=%s timed out after %.1fs",
+                req_id, action, time.monotonic() - started,
+            )
             self._send_json(
                 {"ok": False, "error": "timeout"}, HTTPStatus.GATEWAY_TIMEOUT
             )
             return
         except Exception:
-            LOGGER.exception("Studio request failed")
+            LOGGER.exception("req=%s action=%s failed", req_id, action)
             self._send_json({"ok": False, "error": "internal"}, HTTPStatus.INTERNAL_SERVER_ERROR)
             return
 
+        LOGGER.info(
+            "req=%s action=%s ok=%s %.0fms",
+            req_id, action, bool(result.get("ok")), (time.monotonic() - started) * 1000,
+        )
         status = HTTPStatus.OK if result.get("ok") else HTTPStatus.UNPROCESSABLE_ENTITY
         self._send_json(result, status)
 
@@ -175,6 +191,22 @@ def _ensure_application():
     return _LOOP, _APPLICATION, _SETTINGS
 
 
+def _resolve_rate_limited(user_id: int, *, now: float | None = None) -> bool:
+    current = now if now is not None else time.time()
+    calls = [t for t in _resolve_calls.get(user_id, []) if current - t < RESOLVE_RATE_WINDOW_SECONDS]
+    if len(calls) >= RESOLVE_RATE_LIMIT:
+        _resolve_calls[user_id] = calls
+        return True
+
+    calls.append(current)
+    _resolve_calls[user_id] = calls
+    if len(_resolve_calls) > 5000:  # bound memory on a long-lived warm instance
+        for uid in list(_resolve_calls):
+            if all(current - t >= RESOLVE_RATE_WINDOW_SECONDS for t in _resolve_calls[uid]):
+                _resolve_calls.pop(uid, None)
+    return False
+
+
 async def _handle_action(application, settings: Settings, user: dict, payload: dict) -> dict:
     context = SimpleNamespace(application=application, bot=application.bot)
     action = str(payload.get("action") or "")
@@ -184,6 +216,8 @@ async def _handle_action(application, settings: Settings, user: dict, payload: d
     lang = resolve_lang(user.get("language_code"))
 
     if action == "resolve":
+        if _resolve_rate_limited(user_id):
+            return {"ok": False, "error": "rate_limited"}
         return await _action_resolve(context, body, user_id, is_admin, lang)
 
     if action == "draft":
@@ -191,6 +225,9 @@ async def _handle_action(application, settings: Settings, user: dict, payload: d
 
     if action == "update":
         return await _action_update(context, body, user_id, is_admin)
+
+    if action == "preview":
+        return await _action_preview(context, body, user_id)
 
     if action == "history":
         return await _action_history(context, user_id, is_admin)
@@ -295,9 +332,13 @@ async def _action_resolve(context, body: dict, user_id: int, is_admin: bool, lan
         "chat_id": user_id,
         "lang": lang,
         "can_publish": is_admin,
-        "preview": candidate_preview
-        or await _lookup_track_preview(context, track),
+        # Preview lookup is deferred: the card renders immediately and the
+        # client asks for the audio via the "preview" action only if needed,
+        # so search no longer waits on an extra iTunes round-trip.
+        "preview": candidate_preview,
     }
+    if candidate_preview is None and track.kind == "song":
+        draft["preview_pending"] = True
     draft_id = secrets.token_hex(8)
     await _store_draft(context, draft_id, draft)
     await _record_history(context, user_id, track, source_urls[0])
@@ -311,13 +352,33 @@ async def _action_draft(context, body: dict, user_id: int, is_admin: bool) -> di
         return {"ok": False, "error": "draft not found"}
 
     if "preview" not in draft:
-        # Drafts born in the chat editor arrive without an audio preview.
-        draft["preview"] = await _lookup_track_preview(
-            context, TrackMatch(**draft["item"])
-        )
+        # Drafts born in the chat editor arrive without an audio preview; fetch
+        # it lazily via the "preview" action instead of blocking this response.
+        draft["preview"] = None
+        if TrackMatch(**draft["item"]).kind == "song":
+            draft["preview_pending"] = True
         await _store_draft(context, draft_id, draft)
 
     return await _draft_response(context, draft_id, draft, is_admin)
+
+
+async def _action_preview(context, body: dict, user_id: int) -> dict:
+    """On-demand audio-preview lookup: the card is already on screen, so this
+    keeps the initial resolve fast and only pays for iTunes when the user has a
+    track that might be playable."""
+    draft_id = str(body.get("draft_id") or "")
+    draft = await _load_draft(context, draft_id)
+    if draft is None or draft.get("chat_id") != user_id:
+        return {"ok": False, "error": "draft not found"}
+
+    preview = draft.get("preview")
+    if not preview and draft.get("preview_pending"):
+        preview = await _lookup_track_preview(context, TrackMatch(**draft["item"]))
+        draft["preview"] = preview
+        draft["preview_pending"] = False
+        await _store_draft(context, draft_id, draft)
+
+    return {"ok": True, "preview": preview or None}
 
 
 async def _action_update(context, body: dict, user_id: int, is_admin: bool) -> dict:
@@ -556,6 +617,17 @@ async def _action_history(context, user_id: int, is_admin: bool) -> dict:
     }
 
 
+async def _acquire_kv_lock(
+    kv: KVStore, key: str, *, tries: int = 5, delay: float = 0.1, ttl: int = 10
+) -> bool:
+    for attempt in range(tries):
+        if await kv.set(key, "1", ttl_seconds=ttl, nx=True):
+            return True
+        if attempt < tries - 1:
+            await asyncio.sleep(delay)
+    return False
+
+
 async def _record_history(context, user_id: int, track: TrackMatch, source_url: str) -> None:
     entry = {
         "artist": track.artist,
@@ -567,20 +639,29 @@ async def _record_history(context, user_id: int, track: TrackMatch, source_url: 
         "ts": int(time.time()),
     }
     fingerprint = _release_fingerprint(track.artist, track.title)
-    items = await _load_history_items(context, user_id)
-    items = [
-        item
-        for item in items
-        if _release_fingerprint(str(item.get("artist") or ""), str(item.get("title") or ""))
-        != fingerprint
-    ]
-    items = [entry, *items][:MAX_HISTORY_ITEMS]
-
-    histories: dict = context.application.bot_data.setdefault("webapp_history", {})
-    histories[user_id] = items
     kv: KVStore | None = context.application.bot_data.get("kv_store")
-    if kv is not None:
-        await kv.set_json(f"hist:{user_id}", items, ttl_seconds=HISTORY_TTL_SECONDS)
+
+    # Guard the load→modify→save against concurrent requests from the same user
+    # racing on the shared Redis key (fallback: unlocked, single-instance memory).
+    lock_key = f"hist:lock:{user_id}"
+    locked = await _acquire_kv_lock(kv, lock_key) if kv is not None else False
+    try:
+        items = await _load_history_items(context, user_id)
+        items = [
+            item
+            for item in items
+            if _release_fingerprint(str(item.get("artist") or ""), str(item.get("title") or ""))
+            != fingerprint
+        ]
+        items = [entry, *items][:MAX_HISTORY_ITEMS]
+
+        histories: dict = context.application.bot_data.setdefault("webapp_history", {})
+        histories[user_id] = items
+        if kv is not None:
+            await kv.set_json(f"hist:{user_id}", items, ttl_seconds=HISTORY_TTL_SECONDS)
+    finally:
+        if locked:
+            await kv.delete(lock_key)
 
 
 async def _load_history_items(context, user_id: int) -> list[dict]:
@@ -945,6 +1026,7 @@ async def _draft_response(context, draft_id: str, draft: dict, is_admin: bool) -
             "artwork": track.thumbnail_url,
             "page_url": track.page_url,
             "preview": draft.get("preview"),
+            "preview_pending": bool(draft.get("preview_pending")),
             "cta": custom_cta
             or pick_phrase(cta_key, f"{track.artist}:{track.title}:{track.kind}"),
             "cta_custom": bool(custom_cta),

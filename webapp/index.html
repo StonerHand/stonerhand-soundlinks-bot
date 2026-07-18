@@ -625,7 +625,7 @@
   let state = null, isAdmin = false, playingBtn = null, syncTimer = null, undoTimer = null;
   let historyItems = [], crateItems = [], crateCount = 0;
   let navStack = ["home"];
-  let loadSeq = 0, pendingAbort = null, syncSeq = 0;
+  let loadSeq = 0, pendingAbort = null, syncSeq = 0, previewFetching = false, lastQuery = "";
 
   const hap = {
     tap(){try{tg.HapticFeedback.impactOccurred("light")}catch(e){}},
@@ -748,6 +748,17 @@
       clearTimeout(timer);
       if (opts.abortable && pendingAbort === ctrl) pendingAbort = null;
     }
+  }
+  // Small transient toast for non-blocking notices (rate limits, soft errors).
+  function flash(msg) {
+    let el = document.getElementById("flash");
+    if (!el) {
+      el = document.createElement("div"); el.id = "flash";
+      el.style.cssText = "position:fixed;left:50%;bottom:88px;transform:translateX(-50%);z-index:9998;max-width:82%;padding:10px 18px;border-radius:12px;background:var(--card);border:1px solid var(--border);color:var(--fg);font-size:13px;line-height:1.4;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.3);opacity:0;transition:opacity .2s";
+      document.body.appendChild(el);
+    }
+    el.textContent = msg; el.style.opacity = "1";
+    clearTimeout(el._t); el._t = setTimeout(() => { el.style.opacity = "0"; }, 2400);
   }
   function cancelPending() {
     loadSeq++;
@@ -886,6 +897,20 @@
     if (r.preview) {
       const btn = $("play-btn"), eq = $("card-eq");
       if (btn) btn.addEventListener("click", () => togglePreview(r.preview, btn, eq));
+    } else if (r.preview_pending && !previewFetching) {
+      // Card is already visible — fetch the audio preview in the background and
+      // pop the ▶ button in when it arrives.
+      previewFetching = true;
+      const draftId = state.draft_id;
+      api("preview", { draft_id: draftId }).then((res) => {
+        previewFetching = false;
+        if (!state || state.draft_id !== draftId) return;
+        state.release.preview_pending = false;
+        if (res && res.ok && res.preview) {
+          state.release.preview = res.preview;
+          if (!$("v-result").classList.contains("hidden")) renderCard();
+        }
+      }).catch(() => { previewFetching = false; });
     }
     const ctaLine = $("cta-line"); if (ctaLine) ctaLine.addEventListener("click", () => openFormat());
     const tagsLine = $("tags-line"); if (tagsLine) tagsLine.addEventListener("click", () => openFormat());
@@ -916,11 +941,17 @@
   async function search(pick) {
     const q = pick || $("query").value.trim();
     if (!q) return;
+    lastQuery = q;
     cancelPending(); const seq = loadSeq;
     closeFormat(); show("loading");
     try {
       const res = await api("resolve", { query: q, pick: Boolean(pick) }, { abortable: true });
       if (seq !== loadSeq) return;
+      if (res.error === "rate_limited") {
+        hap.err(); flash(EN?"Too many searches — wait a moment":"Слишком часто — подожди пару секунд");
+        navStack.pop(); const prev = navStack[navStack.length-1] || "home";
+        if (prev === "home") loadHome(); show(prev, false); return;
+      }
       if (!res.ok) { $("nf-query").textContent = "«"+q+"»"; show("notfound"); hap.err(); return; }
       if (res.candidates) { renderCandidates(res.candidates); show("candidates"); hap.pick(); return; }
       openDraftResult(res, true);
@@ -1443,7 +1474,7 @@
   $("query").addEventListener("focus", () => $("searchbar").classList.add("focus"));
   $("query").addEventListener("blur", () => { $("searchbar").classList.remove("focus"); setTimeout(()=>$("typeahead").classList.remove("open"),180); });
   $("clear").addEventListener("click", () => { $("query").value=""; $("clear").style.display="none"; $("query").focus(); });
-  $("nf-retry").addEventListener("click", () => { $("query").value=""; loadHome(); show("home"); $("query").focus(); });
+  $("nf-retry").addEventListener("click", () => { hap.tap(); if (lastQuery) { search(lastQuery); } else { $("query").value=""; loadHome(); show("home"); $("query").focus(); } });
   $("toast-cancel").addEventListener("click", () => $("toast").classList.remove("on"));
 
   function renderTypeahead() {

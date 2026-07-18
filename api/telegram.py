@@ -5,6 +5,7 @@ import hmac
 import json
 import logging
 import threading
+import time
 from collections import OrderedDict
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
@@ -120,6 +121,7 @@ def _process_telegram_update(update_payload: dict[str, object]) -> None:
             LOGGER.info("Skipping duplicate Telegram update %s", update_id)
             return
 
+        started = time.monotonic()
         try:
             update = Update.de_json(update_payload, application.bot)
             loop.run_until_complete(
@@ -139,6 +141,9 @@ def _process_telegram_update(update_payload: dict[str, object]) -> None:
             raise
 
         _note_success_locked()
+        LOGGER.info(
+            "update=%s processed in %.0fms", update_id, (time.monotonic() - started) * 1000
+        )
 
         # Opportunistic queue tick: every incoming update also delivers
         # scheduled posts whose time has come.
