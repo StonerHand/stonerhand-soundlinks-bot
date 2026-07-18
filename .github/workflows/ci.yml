@@ -36,3 +36,21 @@ jobs:
           pathlib.Path("studio.js").write_text(js)
           EOF
           node --check studio.js
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Playwright + Chromium
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Studio smoke test
+        run: python tests/e2e/smoke.py

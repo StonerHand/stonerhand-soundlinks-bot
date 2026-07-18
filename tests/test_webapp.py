@@ -316,6 +316,45 @@ class CrateApiTests(unittest.TestCase):
         self.assertEqual(too_few["error"], "need more tracks")
 
 
+class PreviewAndRateLimitTests(unittest.TestCase):
+    def test_action_preview_looks_up_lazily(self) -> None:
+        import asyncio
+        from api.webapp import _action_preview
+
+        class _Search:
+            async def lookup_preview(self, artist, title):
+                return "https://audio.example/p.mp3"
+
+        context = _crate_context()
+        context.application.bot_data["search_client"] = _Search()
+        context.application.bot_data["drafts"]["d1"] = {
+            "type": "track",
+            "item": _crate_track("Dopesmoker"),
+            "chat_id": 7,
+            "preview": None,
+            "preview_pending": True,
+        }
+
+        res = asyncio.run(_action_preview(context, {"draft_id": "d1"}, 7))
+        self.assertTrue(res["ok"])
+        self.assertEqual(res["preview"], "https://audio.example/p.mp3")
+
+    def test_resolve_rate_limiter_trips_then_recovers(self) -> None:
+        from api import webapp
+
+        webapp._resolve_calls.clear()
+        uid = 999001
+        results = [
+            webapp._resolve_rate_limited(uid, now=1000.0)
+            for _ in range(webapp.RESOLVE_RATE_LIMIT + 3)
+        ]
+        self.assertFalse(any(results[: webapp.RESOLVE_RATE_LIMIT]))
+        self.assertTrue(all(results[webapp.RESOLVE_RATE_LIMIT :]))
+        # once the window slides, the user is allowed again
+        later = 1000.0 + webapp.RESOLVE_RATE_WINDOW_SECONDS + 1
+        self.assertFalse(webapp._resolve_rate_limited(uid, now=later))
+
+
 class PhotoPostTests(unittest.TestCase):
     def test_publish_draft_as_photo_uses_send_photo(self) -> None:
         import asyncio

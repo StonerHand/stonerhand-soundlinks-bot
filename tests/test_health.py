@@ -77,6 +77,17 @@ class OverallHealthTests(unittest.TestCase):
         failures = describe_failures(self._checks(webhook=False, redis_ok=False, redis_conf=False))
         self.assertEqual(failures, ["webhook"])
 
+    def test_queue_status_without_redis_is_empty(self) -> None:
+        import os
+        from unittest.mock import patch
+
+        from api.health import _queue_status
+
+        with patch.dict(os.environ, {}, clear=True):
+            status = _queue_status()
+
+        self.assertEqual(status, {"configured": False, "size": 0, "overdue": 0})
+
 
 class AlertHelperTests(unittest.TestCase):
     def test_dedup_digest_is_stable_and_short(self) -> None:

@@ -40,6 +40,9 @@ class handler(BaseHTTPRequestHandler):
         }
         healthy = overall_ok(checks)
         queue_published = _tick_queue(self.headers.get("host"))
+        # Read the queue AFTER the tick: anything still overdue means it isn't
+        # draining (a repeatedly failing publish or a queue nobody is ticking).
+        queue = _queue_status()
 
         if not healthy:
             failing = ", ".join(sorted(describe_failures(checks)))
@@ -47,11 +50,18 @@ class handler(BaseHTTPRequestHandler):
                 f"Health check failed: {failing}. https://{self.headers.get('host')}/api/health",
                 dedup_key=f"health:{failing}",
             )
+        elif queue.get("overdue"):
+            send_admin_alert(
+                f"Очередь не разгружается: {queue['overdue']} просроченных из "
+                f"{queue['size']}. Проверь права бота и логи Vercel.",
+                dedup_key="queue-stuck",
+            )
 
         body = json.dumps(
             {
                 "ok": healthy,
                 "checks": checks,
+                "queue": queue,
                 "queue_published": queue_published,
                 "ts": int(time.time()),
             },
@@ -172,6 +182,41 @@ def _check_redis() -> dict:
         healthy = False
 
     return {"ok": healthy, "configured": True, "detail": "ping" if healthy else "unreachable"}
+
+
+def _queue_status(*, now: float | None = None) -> dict:
+    """Surface the publish queue in the health payload: total jobs and how many
+    are meaningfully overdue, so a stuck queue is visible before a post is missed."""
+    import asyncio
+
+    from music_links_bot.kvstore import KVStore
+    from music_links_bot.publish_queue import QUEUE_KV_KEY
+
+    kv = KVStore.from_env()
+    if kv is None:
+        return {"configured": False, "size": 0, "overdue": 0}
+
+    async def read():
+        try:
+            return await kv.get_json(QUEUE_KV_KEY)
+        finally:
+            await kv.aclose()
+
+    try:
+        jobs = asyncio.run(read())
+    except Exception:
+        return {"configured": True, "size": 0, "overdue": 0, "detail": "unreachable"}
+
+    if not isinstance(jobs, list):
+        jobs = []
+
+    current = now if now is not None else time.time()
+    overdue = sum(
+        1
+        for job in jobs
+        if isinstance(job, dict) and int(job.get("publish_at") or 0) < current - 120
+    )
+    return {"configured": True, "size": len(jobs), "overdue": overdue}
 
 
 def _tick_queue(request_host: str | None) -> int:
