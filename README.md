@@ -43,8 +43,8 @@ A visual post editor: opens from the menu button or the 🎛 button under any po
 - **▶ Audio preview** — 30 seconds of the track right on the cover, with a progress
   ring and an equalizer
 - **Style sheet** — one panel with amp-style rocker switches: hashtags, quote,
-  📸 photo mode, preview size + your own text, custom tags and the platform button
-  set and order
+  📸 photo mode (with an optional branded frame — logo + channel label),
+  preview size + your own text, custom tags and the platform button set and order
 - **Action dock** — publish is always pinned at the bottom; schedule, crate and
   share sit next to it
 - **Undo** — 5 seconds to take a published post back out of the channel
@@ -70,16 +70,22 @@ A visual post editor: opens from the menu button or the 🎛 button under any po
 - ⚡ **Live loading** — "⏳ building the post…" morphs into the card
 - 🌍 **RU/EN** — the interface follows the user's Telegram language
 
+**Sources:** Spotify, Apple Music, YouTube, Deezer, Tidal, Yandex.Music,
+SoundCloud, Bandcamp and NTS Radio — resolved via Song.link/Odesli.
+
 Forwarded posts keep working: the CTA phrase is a live song.link hub link
 (Telegram itself strips buttons on forward — for every bot out there).
 
 ## 🩺 Reliability
 
 - **CI** — GitHub Actions runs 267 tests, the linter, a JS check and a headless Studio smoke test on every push
-- **`/api/health`** — the bot's pulse: Telegram API, webhook registration, Redis;
-  it also delivers due scheduled posts
-- **Owner alerts** — when a health check fails, a scheduled post is dropped or the
-  webhook starts crashing, the bot DMs you (at most once per hour per problem)
+- **`/api/health`** — the bot's pulse: Telegram API, webhook registration, Redis
+  and the queue backlog; it also delivers due scheduled posts
+- **No lost posts** — a scheduled post that fails to send is retried with backoff
+  (not dropped); every request is time-bounded so one hung call can't wedge an instance
+- **No double posts** — Telegram update retries are de-duplicated by `update_id`
+- **Owner alerts** — a failed health check, a stuck queue, a dropped scheduled post
+  or a crashing webhook DMs you (at most once per hour per problem)
 - **Self-healing** — a daily cron re-registers the webhook, menu and descriptions
 - **Secure by default** — the webhook secret is derived from the bot token
   automatically; updates cannot be forged even with zero configuration
@@ -133,7 +139,7 @@ PYTHONPATH=src python -m music_links_bot
 
 ## Under the hood
 
-**Python 3.10+ · python-telegram-bot 21 · httpx · Song.link/Odesli · iTunes Search · Upstash Redis · Vercel**
+**Python 3.10+ · python-telegram-bot 21 · httpx · Song.link/Odesli · iTunes Search · Pillow · Upstash Redis · Vercel**
 
 ```text
 api/telegram.py      webhook: warm reuse, queue tick, crash alert
@@ -146,6 +152,7 @@ src/music_links_bot/
   publish_queue.py   scheduled publications queue
   songlink.py        cross-platform links + artwork + Redis cache
   search.py          search, genres and audio previews (iTunes)
+  branding.py        optional branded photo frame (Pillow)
   alerts.py          owner DMs about problems (deduped via Redis)
   kvstore.py         Redis over REST, graceful fallback
   i18n.py            RU/EN interface
@@ -156,7 +163,7 @@ src/music_links_bot/
 Full map: [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
 
 ```bash
-PYTHONPATH=src python -m pytest tests/   # 267 tests, no network
+PYTHONPATH=src python -m unittest discover -s tests   # 267 tests, no network
 ```
 
 ## Your channel instead of StonerHand
