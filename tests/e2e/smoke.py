@@ -98,6 +98,15 @@ def main() -> int:
         if page.eval_on_selector("#v-crate", "el => el.classList.contains('hidden')"):
             failures.append("crate view not shown after tab click")
 
+        # 4. home shortcut cards are wired (they mirror the tab bar)
+        page.eval_on_selector('#tabbar [data-tab="home"]', "el => el.click()")
+        page.wait_for_timeout(300)
+        page.eval_on_selector("#quick", "el => el.classList.remove('hidden')")
+        page.eval_on_selector("#q-queue", "el => el.click()")
+        page.wait_for_timeout(400)
+        if page.eval_on_selector("#v-queue", "el => el.classList.contains('hidden')"):
+            failures.append("home shortcut #q-queue did not open the queue")
+
         if errors:
             failures.append("uncaught page errors: " + " | ".join(errors))
 
