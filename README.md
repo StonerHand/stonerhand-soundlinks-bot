@@ -38,7 +38,8 @@ out  →  📻 · Black Sabbath
 A visual post editor: opens from the menu button or the 🎛 button under any post.
 
 - **Search** — free text with a candidate picker, a link, or straight from the
-  clipboard (the Studio offers to paste a copied link on open)
+  clipboard (the Studio offers to paste a copied link on open). Paste several
+  links at once → the Studio auto-assembles them into a crate
 - **▶ Audio preview** — 30 seconds of the track right on the cover, with a progress
   ring and an equalizer
 - **Style sheet** — one panel with amp-style rocker switches: hashtags, quote,
@@ -74,7 +75,7 @@ Forwarded posts keep working: the CTA phrase is a live song.link hub link
 
 ## 🩺 Reliability
 
-- **CI** — GitHub Actions runs 259 tests, the linter, a JS check and a headless Studio smoke test on every push
+- **CI** — GitHub Actions runs 262 tests, the linter, a JS check and a headless Studio smoke test on every push
 - **`/api/health`** — the bot's pulse: Telegram API, webhook registration, Redis;
   it also delivers due scheduled posts
 - **Owner alerts** — when a health check fails, a scheduled post is dropped or the
@@ -152,7 +153,7 @@ src/music_links_bot/
 Full map: [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
 
 ```bash
-PYTHONPATH=src python -m pytest tests/   # 259 tests, no network
+PYTHONPATH=src python -m pytest tests/   # 262 tests, no network
 ```
 
 ## Your channel instead of StonerHand

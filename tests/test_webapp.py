@@ -357,6 +357,43 @@ class PreviewAndRateLimitTests(unittest.TestCase):
         self.assertTrue(res["ok"])
         self.assertEqual(res["preview"], "https://audio.example/p.mp3")
 
+    def test_resolve_batch_builds_crate_from_multiple_links(self) -> None:
+        import asyncio
+        from api.webapp import _action_resolve_batch
+        from music_links_bot.models import TrackMatch
+
+        class _Songlink:
+            async def lookup_track(self, url):
+                name = url.rsplit("/", 1)[-1]
+                return TrackMatch(
+                    title=name, artist="Sleep", links={"spotify": url},
+                    page_url="https://song.link/" + name,
+                    thumbnail_url="https://img.example/x.jpg", kind="song",
+                )
+
+        context = _crate_context()
+        context.application.bot_data["songlink_client"] = _Songlink()
+        context.application.bot_data["soundcloud_client"] = None
+        body = {"query": "https://open.spotify.com/track/aaa https://open.spotify.com/track/bbb"}
+
+        res = asyncio.run(_action_resolve_batch(context, body, 7))
+        self.assertTrue(res["ok"])
+        self.assertEqual(res["count"], 2)
+        self.assertEqual(sorted(item["title"] for item in res["items"]), ["aaa", "bbb"])
+        # each item carries a resendable payload for the crate
+        self.assertTrue(all(item.get("data") for item in res["items"]))
+
+    def test_resolve_batch_needs_two_urls(self) -> None:
+        import asyncio
+        from api.webapp import _action_resolve_batch
+
+        context = _crate_context()
+        res = asyncio.run(
+            _action_resolve_batch(context, {"query": "https://open.spotify.com/track/aaa"}, 7)
+        )
+        self.assertFalse(res["ok"])
+        self.assertEqual(res["error"], "need urls")
+
     def test_resolve_rate_limiter_trips_then_recovers(self) -> None:
         from api import webapp
 

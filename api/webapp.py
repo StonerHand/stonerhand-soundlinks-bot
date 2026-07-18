@@ -222,6 +222,11 @@ async def _handle_action(application, settings: Settings, user: dict, payload: d
             return {"ok": False, "error": "rate_limited"}
         return await _action_resolve(context, body, user_id, is_admin, lang)
 
+    if action == "resolve_batch":
+        if _resolve_rate_limited(user_id):
+            return {"ok": False, "error": "rate_limited"}
+        return await _action_resolve_batch(context, body, user_id)
+
     if action == "draft":
         return await _action_draft(context, body, user_id, is_admin)
 
@@ -345,6 +350,38 @@ async def _action_resolve(context, body: dict, user_id: int, is_admin: bool, lan
     await _store_draft(context, draft_id, draft)
     await _record_history(context, user_id, track, source_urls[0])
     return await _draft_response(context, draft_id, draft, is_admin)
+
+
+async def _action_resolve_batch(context, body: dict, user_id: int) -> dict:
+    """Resolve several dropped links at once into a ready-made crate — paste a
+    handful of URLs and the Studio assembles the collection for you."""
+    query = str(body.get("query") or "")
+    source_urls = extract_supported_urls(query)[:MAX_CRATE_ITEMS]
+    if len(source_urls) < 2:
+        return {"ok": False, "error": "need urls"}
+
+    bot_data = context.application.bot_data
+    tracks, _unavailable = await _lookup_tracks(
+        bot_data["songlink_client"],
+        source_urls,
+        soundcloud_client=bot_data["soundcloud_client"],
+        search_client=bot_data.get("search_client"),
+    )
+    tracks = [track for track in tracks if track.links]
+    if not tracks:
+        return {"ok": False, "error": "not found"}
+
+    items: list[dict] = []
+    seen: set[str] = set()
+    for track in tracks:
+        compact = _compact_track_data(asdict(track))
+        fingerprint = _release_fingerprint(compact["artist"], compact["title"])
+        if fingerprint in seen:
+            continue
+        seen.add(fingerprint)
+        items.append(compact)
+
+    return _crate_view(items)
 
 
 async def _action_draft(context, body: dict, user_id: int, is_admin: bool) -> dict:

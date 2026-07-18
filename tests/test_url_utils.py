@@ -36,6 +36,8 @@ class UrlUtilsTests(unittest.TestCase):
         self.assertTrue(is_supported_music_url("https://on.soundcloud.com/abc123"))
         self.assertTrue(is_supported_music_url("https://www.nts.live/shows/example"))
         self.assertTrue(is_supported_music_url("https://nts.live/episodes/example"))
+        self.assertTrue(is_supported_music_url("https://bandcamp.com/track/x"))
+        self.assertTrue(is_supported_music_url("https://sleep.bandcamp.com/album/dopesmoker"))
 
     def test_is_supported_music_url_rejects_other_hosts(self) -> None:
         self.assertFalse(is_supported_music_url("https://example.com/track/123"))
