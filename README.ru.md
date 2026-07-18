@@ -71,7 +71,7 @@
 
 ## 🩺 Неубиваемость
 
-- **CI** — GitHub Actions гоняет 262 тестов, линтер, проверку JS и хедлесс-смоук Студии на каждый пуш
+- **CI** — GitHub Actions гоняет 267 тестов, линтер, проверку JS и хедлесс-смоук Студии на каждый пуш
 - **`/api/health`** — пульс бота: Telegram API, регистрация webhook, Redis; заодно
   доставляет созревшие отложенные посты
 - **Алерты владельцу** — если health-проверка падает, отложенный пост не ушёл или
@@ -106,6 +106,9 @@
 | `PRIMARY_PLATFORM` | какая площадка первая: `spotify`, `appleMusic`, `tidal`… |
 | `SONGLINK_USER_COUNTRIES` | регионы Song.link через запятую, например `US,DE` |
 | `BOT_UI_MODE` | стиль кнопок: `stonerhand` / `minimal` / `editorial` |
+| `BRAND_PHOTO_FRAME` | `1` — в 📸 фото-режиме накладывает брендированную рамку на обложку (нижняя подпись + опц. лого). По умолчанию выкл |
+| `BRAND_LOGO_URL` | лого для угла фото-рамки |
+| `BRAND_LABEL` | подпись на фото-рамке (по умолчанию `@`+канал) |
 | `EPHEMERAL_GROUP_REPLIES` | `1` — в группах бот отвечает «невидимо» (карточку видит только тот, кто кинул ссылку). Опционально; при отсутствии поддержки со стороны Telegram молча откатывается к обычному ответу |
 | `TELEGRAM_WEBHOOK_SECRET` | подпись входящих updates (не задан — выводится из токена автоматически) |
 | `WEBAPP_URL`, `WEBHOOK_BASE_URL`, `STATS_PATH`, `LOG_LEVEL` | тонкая настройка |
@@ -149,7 +152,7 @@ src/music_links_bot/
 Полная карта — в [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
 
 ```bash
-PYTHONPATH=src python -m pytest tests/   # 262 тестов, без сети
+PYTHONPATH=src python -m pytest tests/   # 267 тестов, без сети
 ```
 
 ## Свой канал вместо StonerHand

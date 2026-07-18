@@ -75,7 +75,7 @@ Forwarded posts keep working: the CTA phrase is a live song.link hub link
 
 ## 🩺 Reliability
 
-- **CI** — GitHub Actions runs 262 tests, the linter, a JS check and a headless Studio smoke test on every push
+- **CI** — GitHub Actions runs 267 tests, the linter, a JS check and a headless Studio smoke test on every push
 - **`/api/health`** — the bot's pulse: Telegram API, webhook registration, Redis;
   it also delivers due scheduled posts
 - **Owner alerts** — when a health check fails, a scheduled post is dropped or the
@@ -110,6 +110,9 @@ detection, alerts, minute-precise scheduling and warm instances.
 | `PRIMARY_PLATFORM` | which platform goes first: `spotify`, `appleMusic`, `tidal`… |
 | `SONGLINK_USER_COUNTRIES` | Song.link regions, comma-separated, e.g. `US,DE` |
 | `BOT_UI_MODE` | button style: `stonerhand` / `minimal` / `editorial` |
+| `BRAND_PHOTO_FRAME` | `1` — in 📸 photo mode, composite a branded frame onto the cover (bottom label bar + optional logo). Off by default |
+| `BRAND_LOGO_URL` | logo image for the photo frame's top-right corner |
+| `BRAND_LABEL` | label text on the photo frame (defaults to `@`+channel) |
 | `EPHEMERAL_GROUP_REPLIES` | `1` — in groups the bot replies "invisibly" (only the person who dropped the link sees the card). Opt-in; falls back to a normal reply when Telegram doesn't support it |
 | `TELEGRAM_WEBHOOK_SECRET` | signs incoming updates (unset — derived from the bot token automatically) |
 | `WEBAPP_URL`, `WEBHOOK_BASE_URL`, `STATS_PATH`, `LOG_LEVEL` | fine-tuning |
@@ -153,7 +156,7 @@ src/music_links_bot/
 Full map: [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
 
 ```bash
-PYTHONPATH=src python -m pytest tests/   # 262 tests, no network
+PYTHONPATH=src python -m pytest tests/   # 267 tests, no network
 ```
 
 ## Your channel instead of StonerHand
