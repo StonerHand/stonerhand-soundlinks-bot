@@ -20,6 +20,14 @@
     {
       "src": "webapp/index.html",
       "use": "@vercel/static"
+    },
+    {
+      "src": "webapp/styles.css",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "webapp/app.js",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
@@ -42,6 +50,22 @@
     {
       "src": "/app",
       "dest": "webapp/index.html"
+    },
+    {
+      "src": "/app/styles.css",
+      "dest": "webapp/styles.css"
+    },
+    {
+      "src": "/app/app.js",
+      "dest": "webapp/app.js"
+    },
+    {
+      "src": "/webapp/styles.css",
+      "dest": "webapp/styles.css"
+    },
+    {
+      "src": "/webapp/app.js",
+      "dest": "webapp/app.js"
     }
   ],
   "crons": [

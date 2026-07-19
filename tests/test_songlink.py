@@ -1,3 +1,4 @@
+import asyncio
 import unittest
 from pathlib import Path
 import sys
@@ -187,6 +188,57 @@ class SonglinkClientTests(unittest.TestCase):
 
 
 class SonglinkClientAsyncTests(unittest.IsolatedAsyncioTestCase):
+    async def test_lookup_track_coalesces_concurrent_identical_requests(self) -> None:
+        client = FakeSonglinkClient(
+            {
+                "US": TrackMatch(
+                    title="Song",
+                    artist="Artist",
+                    links={
+                        "spotify": "https://spotify.example",
+                        "appleMusic": "https://apple.example",
+                        "youtubeMusic": "https://youtube.example",
+                        "deezer": "https://deezer.example",
+                    },
+                    kind="song",
+                ),
+            }
+        )
+        try:
+            first, second = await asyncio.gather(
+                client.lookup_track("https://open.spotify.com/track/1"),
+                client.lookup_track("https://open.spotify.com/track/1"),
+            )
+        finally:
+            await client.aclose()
+        self.assertIs(first, second)
+        self.assertEqual(client.calls, 1)
+
+    async def test_lookup_track_skips_extra_regions_when_primary_is_complete(self) -> None:
+        client = FakeSonglinkClient(
+            {
+                "RU": TrackMatch(
+                    title="Song", artist="Artist", kind="song",
+                    links={
+                        "spotify": "https://spotify.example",
+                        "appleMusic": "https://apple.example",
+                        "youtubeMusic": "https://youtube.example",
+                        "yandexMusic": "https://yandex.example",
+                    },
+                ),
+                "US": TrackMatch(
+                    title="Song", artist="Artist", kind="song",
+                    links={"deezer": "https://deezer.example"},
+                ),
+            }
+        )
+        try:
+            track = await client.lookup_track("https://open.spotify.com/track/1")
+        finally:
+            await client.aclose()
+        self.assertEqual(client.calls, 1)
+        self.assertNotIn("deezer", track.links)
+
     async def test_lookup_track_merges_country_results_in_parallel(self) -> None:
         client = FakeSonglinkClient(
             {

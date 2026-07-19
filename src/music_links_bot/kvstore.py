@@ -72,6 +72,22 @@ class KVStore:
     async def delete(self, key: str) -> None:
         await self._command(["DEL", key])
 
+    async def delete_if_value(self, key: str, expected_value: str) -> bool:
+        """Release a lease only when it is still owned by ``expected_value``.
+
+        A plain ``DEL`` can remove a newer owner's lock when the original lease
+        expired while work was still running. The tiny Lua script keeps lock
+        release atomic on Redis and makes delayed serverless invocations safe.
+        """
+        script = (
+            "if redis.call('get', KEYS[1]) == ARGV[1] then "
+            "return redis.call('del', KEYS[1]) else return 0 end"
+        )
+        result = await self._command(
+            ["EVAL", script, "1", key, expected_value]
+        )
+        return result == 1
+
     async def mget(self, keys: list[str]) -> list[str | None]:
         if not keys:
             return []

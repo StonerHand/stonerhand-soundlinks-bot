@@ -21,15 +21,31 @@ MAX_JOB_ATTEMPTS = 3
 RETRY_BACKOFF_SECONDS = (120, 600, 1800)
 
 
-async def _acquire_lock(kv: KVStore, *, tries: int = 6, delay: float = 0.15) -> bool:
+class QueueBusyError(RuntimeError):
+    """Raised when a concurrent queue mutation still owns the Redis lease."""
+
+
+async def _acquire_lock(
+    kv: KVStore, *, tries: int = 6, delay: float = 0.15
+) -> str | None:
     import asyncio
 
+    owner = secrets.token_hex(12)
     for attempt in range(tries):
-        if await kv.set(QUEUE_LOCK_KEY, "1", ttl_seconds=QUEUE_LOCK_TTL_SECONDS, nx=True):
-            return True
+        if await kv.set(
+            QUEUE_LOCK_KEY,
+            owner,
+            ttl_seconds=QUEUE_LOCK_TTL_SECONDS,
+            nx=True,
+        ):
+            return owner
         if attempt < tries - 1:
             await asyncio.sleep(delay)
-    return False
+    return None
+
+
+async def _release_lock(kv: KVStore, owner: str) -> None:
+    await kv.delete_if_value(QUEUE_LOCK_KEY, owner)
 
 
 async def _locked_mutate(context, mutate):
@@ -43,15 +59,16 @@ async def _locked_mutate(context, mutate):
         await save_jobs(context, new_jobs)
         return result
 
-    locked = await _acquire_lock(kv)
+    lock_owner = await _acquire_lock(kv)
+    if lock_owner is None:
+        raise QueueBusyError("publish queue is busy")
     try:
         jobs = await load_jobs(context)
         result, new_jobs = mutate(jobs)
         await save_jobs(context, new_jobs)
         return result
     finally:
-        if locked:
-            await kv.delete(QUEUE_LOCK_KEY)
+        await _release_lock(kv, lock_owner)
 
 
 async def load_jobs(context) -> list[dict]:
@@ -133,16 +150,11 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
         return 0
 
     kv: KVStore | None = context.application.bot_data.get("kv_store")
-    lock_held = False
+    lock_owner: str | None = None
     if kv is not None:
         # Cross-instance guard: only one instance drains the queue at a time.
-        lock_held = await kv.set(
-            QUEUE_LOCK_KEY,
-            str(now_ts),
-            ttl_seconds=QUEUE_LOCK_TTL_SECONDS,
-            nx=True,
-        )
-        if not lock_held:
+        lock_owner = await _acquire_lock(kv, tries=1)
+        if lock_owner is None:
             return 0
 
         # Re-read under the lock: another instance may have already drained.
@@ -153,7 +165,7 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
             if int(job.get("publish_at") or 0) <= now_ts
         }
         if not due_ids:
-            await kv.delete(QUEUE_LOCK_KEY)
+            await _release_lock(kv, lock_owner)
             return 0
 
     try:
@@ -180,7 +192,7 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
 
             if delivered:
                 published += 1
-                _schedule_mark_posted(context, TrackMatch(**draft["item"]))
+                await _schedule_mark_posted(context, TrackMatch(**draft["item"]))
                 continue
 
             attempts = int(job.get("attempts") or 0) + 1
@@ -194,8 +206,8 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
                 job["publish_at"] = now_ts + backoff
                 requeue.append(job)
     finally:
-        if lock_held and kv is not None:
-            await kv.delete(QUEUE_LOCK_KEY)
+        if lock_owner is not None and kv is not None:
+            await _release_lock(kv, lock_owner)
 
     if requeue:
         # Merge the retries back under the lock so a schedule that landed

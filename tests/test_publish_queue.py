@@ -44,6 +44,21 @@ def make_draft() -> dict:
 
 
 class PublishQueueTests(unittest.TestCase):
+    def test_busy_redis_lock_never_falls_back_to_unsafe_mutation(self) -> None:
+        class BusyKV:
+            async def set(self, *args, **kwargs):
+                return False
+
+        context = make_context()
+        context.application.bot_data["kv_store"] = BusyKV()
+
+        async def scenario():
+            with self.assertRaises(publish_queue.QueueBusyError):
+                await publish_queue.add_job(context, make_draft(), 1000)
+
+        asyncio.run(scenario())
+        self.assertNotIn(publish_queue.QUEUE_MEMORY_KEY, context.application.bot_data)
+
     def test_add_and_list_jobs_sorted_by_time(self) -> None:
         context = make_context()
 

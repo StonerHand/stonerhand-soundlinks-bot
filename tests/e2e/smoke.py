@@ -15,6 +15,8 @@ import sys
 from playwright.sync_api import sync_playwright
 
 HTML = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "index.html").read_text()
+CSS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "styles.css").read_text()
+JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "app.js").read_text()
 COVER = "https://cover.local/a.jpg"
 
 RELEASE = {
@@ -80,6 +82,8 @@ def main() -> int:
         page.route("**/cover.local/**", lambda r: r.fulfill(status=404))
         page.route("**/api/webapp", _route_api)
         page.route("https://studio.local/app", lambda r: r.fulfill(body=HTML, content_type="text/html"))
+        page.route("https://studio.local/webapp/styles.css", lambda r: r.fulfill(body=CSS, content_type="text/css"))
+        page.route("https://studio.local/webapp/app.js", lambda r: r.fulfill(body=JS, content_type="application/javascript"))
 
         errors: list[str] = []
         page.on("pageerror", lambda e: errors.append(str(e)))

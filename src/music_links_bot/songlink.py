@@ -15,6 +15,7 @@ from music_links_bot.url_utils import cache_key_for_url
 
 HTTP_HEADERS = {"User-Agent": HTTP_USER_AGENT}
 KV_TTL_SECONDS = 7 * 24 * 3600
+MIN_COMPLETE_PLATFORM_COUNT = 4
 _TRACK_FIELDS = {field.name for field in fields(TrackMatch)}
 
 
@@ -45,6 +46,7 @@ class SonglinkClient:
             timeout=httpx.Timeout(timeout, connect=3.0),
         )
         self._cache: TTLCache[TrackMatch] = TTLCache()
+        self._inflight: dict[str, asyncio.Task[TrackMatch]] = {}
 
     async def aclose(self) -> None:
         await self._client.aclose()
@@ -55,18 +57,48 @@ class SonglinkClient:
         if cached_match is not None:
             return cached_match
 
+        pending = self._inflight.get(cache_key)
+        if pending is not None:
+            return await asyncio.shield(pending)
+
+        task = asyncio.create_task(self._lookup_and_cache(source_url, cache_key))
+        self._inflight[cache_key] = task
+        try:
+            return await asyncio.shield(task)
+        finally:
+            if self._inflight.get(cache_key) is task and task.done():
+                self._inflight.pop(cache_key, None)
+
+    async def _lookup_and_cache(self, source_url: str, cache_key: str) -> TrackMatch:
         shared_match = await self._get_shared_cache(cache_key)
         if shared_match is not None:
             self._cache.set(cache_key, shared_match)
             return shared_match
 
-        results = await asyncio.gather(
-            *(
-                self._lookup_track_for_country(source_url, user_country)
-                for user_country in self._user_countries
-            ),
+        countries = self._user_countries or ("US",)
+        primary_result = await asyncio.gather(
+            self._lookup_track_for_country(source_url, countries[0]),
             return_exceptions=True,
         )
+        results: list[TrackMatch | BaseException] = list(primary_result)
+
+        primary_match = primary_result[0]
+        if len(countries) > 1 and (
+            not isinstance(primary_match, TrackMatch)
+            or len(primary_match.links) < MIN_COMPLETE_PLATFORM_COUNT
+        ):
+            # Most Song.link responses already contain every major platform.
+            # Only fan out to extra regions when the primary response is sparse
+            # or failed; this avoids multiplying upstream calls on cache misses.
+            results.extend(
+                await asyncio.gather(
+                    *(
+                        self._lookup_track_for_country(source_url, country)
+                        for country in countries[1:]
+                    ),
+                    return_exceptions=True,
+                )
+            )
         matches = [result for result in results if isinstance(result, TrackMatch)]
 
         if not matches:

@@ -146,9 +146,12 @@ api/telegram.py      webhook: warm reuse, queue tick, crash alert
 api/webapp.py        Studio API (initData signature, drafts, queue, crate)
 api/health.py        pulse: Telegram/webhook/Redis + alerts + queue tick
 api/set_webhook.py   self-healing: webhook, commands, descriptions, menu button
-webapp/index.html    the Studio Mini App — one file, vanilla JS
+webapp/              the Studio Mini App — separate HTML, CSS and vanilla JS
 src/music_links_bot/
-  bot.py             routing, keyboards, editor, inline, drafts
+  bot.py             routing, editor, inline, drafts
+  keyboards.py       Telegram keyboards and platform buttons
+  studio_models.py   Mini App models and validation
+  studio_storage.py  history and crate mirror
   publish_queue.py   scheduled publications queue
   songlink.py        cross-platform links + artwork + Redis cache
   search.py          search, genres and audio previews (iTunes)
@@ -163,7 +166,7 @@ src/music_links_bot/
 Full map: [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
 
 ```bash
-PYTHONPATH=src python -m unittest discover -s tests   # 267 tests, no network
+PYTHONPATH=src python -m unittest discover -s tests   # 270+ tests, no network
 ```
 
 ## Your channel instead of StonerHand
