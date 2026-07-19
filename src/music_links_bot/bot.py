@@ -538,6 +538,7 @@ async def guide_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             lang=lang,
             crate_count=crate_count,
             include_studio=message.chat.type == "private",
+            active="guide",
         ),
     )
 
@@ -679,6 +680,7 @@ async def _dispatch_menu_action(query, context, action: CallbackAction) -> None:
                     query.message is not None
                     and query.message.chat.type == "private"
                 ),
+                active=None,
             ),
         )
         return
@@ -709,6 +711,7 @@ async def _dispatch_menu_action(query, context, action: CallbackAction) -> None:
             include_studio=(
                 query.message is not None and query.message.chat.type == "private"
             ),
+            active=action.action,
         ),
     )
 
@@ -744,6 +747,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             include_studio=(
                 query.message is not None and query.message.chat.type == "private"
             ),
+            active=menu_key.removeprefix("menu:"),
         )
     try:
         await query.edit_message_text(
@@ -1546,6 +1550,7 @@ async def _reply_with_menu(
             lang=lang,
             crate_count=crate_count,
             include_studio=message.chat.type == "private",
+            active=menu_key.removeprefix("menu:"),
         )
         if message.chat.type == "private":
             session = await runtime.get_session(subject_id, lang=lang)
