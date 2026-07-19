@@ -398,6 +398,7 @@ class BotKeyboardTests(unittest.TestCase):
                 ("platforms", "сервисы и типы ссылок"),
                 ("channel", "канал StonerHand"),
                 ("stats", "статистика бота"),
+                ("crate", "моя подборка"),
             ],
         )
 
@@ -925,17 +926,17 @@ class PostEditorTests(unittest.TestCase):
     def test_editor_rows_show_toggle_states_and_actions(self) -> None:
         rows = _editor_rows("abc123", self._draft(hashtags=True))
 
-        self.assertEqual(rows[0][0].text, "#️⃣ ✓")
-        self.assertEqual(rows[0][0].callback_data, "ed|h|abc123")
-        self.assertEqual(rows[1][0].text, "✅")
-        self.assertEqual(rows[1][1].text, "🗑")
-        self.assertEqual(len(rows[1]), 2)
+        self.assertEqual(rows[0][0].text, "Отправить себе")
+        self.assertEqual(rows[0][0].callback_data, "v2|editor|s|abc123")
+        self.assertEqual(rows[1][0].text, "# Хэштеги ✓")
+        self.assertEqual(rows[1][0].callback_data, "v2|editor|h|abc123")
+        self.assertEqual(rows[2][-1].text, "••• Ещё")
 
     def test_editor_rows_add_publish_button_for_admin(self) -> None:
         rows = _editor_rows("abc123", self._draft(can_publish=True))
 
-        self.assertEqual(rows[1][2].text, "📤 В канал")
-        self.assertEqual(rows[1][2].callback_data, "ed|p|abc123")
+        self.assertEqual(rows[0][1].text, "📤 В канал")
+        self.assertEqual(rows[0][1].callback_data, "v2|editor|p|abc123")
 
     def test_editor_rows_show_quote_toggle_only_with_prefix(self) -> None:
         rows_without_quote = _editor_rows("abc123", self._draft())
@@ -944,11 +945,11 @@ class PostEditorTests(unittest.TestCase):
             self._draft(prefix="<blockquote>интро</blockquote>\n", quote=True),
         )
 
-        self.assertEqual(len(rows_without_quote[0]), 2)
-        self.assertEqual(len(rows_with_quote[0]), 3)
-        self.assertEqual(rows_with_quote[0][1].text, "💬 ✓")
-        self.assertEqual(rows_without_quote[0][1].text, "🖼 ⊞")
-        self.assertEqual(rows_without_quote[0][1].callback_data, "ed|v|abc123")
+        self.assertEqual(len(rows_without_quote[1]), 2)
+        self.assertEqual(len(rows_with_quote[1]), 3)
+        self.assertEqual(rows_with_quote[1][1].text, "💬 Цитата ✓")
+        self.assertEqual(rows_without_quote[1][1].text, "🖼 Обложка большая")
+        self.assertEqual(rows_without_quote[1][1].callback_data, "v2|editor|v|abc123")
 
     def test_editor_rows_add_studio_webapp_button_when_configured(self) -> None:
         import os
@@ -961,7 +962,7 @@ class PostEditorTests(unittest.TestCase):
         ):
             rows = _editor_rows("abc123", self._draft())
 
-        studio = rows[1][0]
+        studio = rows[2][0]
         self.assertEqual(studio.text, "🎛 Студия")
         self.assertEqual(studio.web_app.url, "https://studio.example/app?draft=abc123")
 
@@ -982,7 +983,7 @@ class PostEditorTests(unittest.TestCase):
             for button in row
             if button.callback_data
         ]
-        self.assertIn("ed|h|abc123", editor_buttons)
+        self.assertIn("v2|editor|h|abc123", editor_buttons)
 
         draft["quote"] = False
         draft["hashtags"] = False
@@ -1090,9 +1091,10 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertIn("Ничего не нашел по этому запросу", message.replies[0])
+        self.assertIn("Не получилось собрать пост", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
-        self.assertEqual(keyboard[0][0].text, "Что поддерживается")
+        self.assertEqual(keyboard[0][0].text, "Повторить")
+        self.assertEqual(keyboard[1][0].text, "Что поддерживается")
         self.assertEqual(context.bot.sent_messages, [])
         self.assertEqual(context.bot.chat_actions, [])
 
@@ -1138,7 +1140,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(search_client.queries, ["paranoid"])
 
-    async def test_private_plain_text_searches_and_builds_track_post(self) -> None:
+    async def test_private_plain_text_search_offers_release_selection(self) -> None:
         message = PrivateMessageStub()
         context = ContextStub(search_client=SuccessfulSearchClientStub())
 
@@ -1146,9 +1148,8 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertIn("<b>Youth Code</b>", message.replies[0])
-        # The query itself must not be quoted back into the post.
-        self.assertNotIn("привет", message.replies[0])
+        self.assertIn("Выбери релиз", message.replies[0])
+        self.assertIn("привет", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         callback_data = [
             button.callback_data
@@ -1156,7 +1157,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             for button in row
             if button.callback_data
         ]
-        self.assertTrue(any(data.startswith("ed|") for data in callback_data))
+        self.assertEqual(len([data for data in callback_data if data.startswith("v2|select|pick|")]), 2)
 
     async def test_private_single_track_post_includes_editor_row(self) -> None:
         message = PrivateSpotifyTrackMessageStub()
@@ -1175,7 +1176,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         ]
         self.assertIn(
             True,
-            [data.startswith("ed|h|") for data in callback_data],
+            [data.startswith("v2|editor|h|") for data in callback_data],
         )
         self.assertEqual(len(context.application.bot_data["drafts"]), 1)
 

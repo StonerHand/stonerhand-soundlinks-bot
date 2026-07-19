@@ -42,6 +42,42 @@ TEXT_TUPLES: dict[str, dict[str, tuple[str, ...]]] = {
 }
 
 STRINGS: dict[str, dict[str, str]] = {
+    "start_new": {
+        RU: (
+            "🎧 <b>Соберём музыкальный пост за минуту</b>\n\n"
+            "Пришли ссылку или напиши <i>артист — трек</i>. Я найду релиз, "
+            "соберу площадки и дам отредактировать карточку перед отправкой.\n\n"
+            "Начать можно с короткого знакомства или сразу с поиска 👇"
+        ),
+        EN: (
+            "🎧 <b>Build a music post in a minute</b>\n\n"
+            "Send a link or type <i>artist — track</i>. I will find the release, "
+            "collect its platforms and let you edit the card before sending.\n\n"
+            "Take the quick tour or jump straight into search 👇"
+        ),
+    },
+    "start_returning": {
+        RU: "🎧 <b>Что собираем сегодня?</b>\n\nПришли ссылку, название релиза или открой Студию.",
+        EN: "🎧 <b>What are we building today?</b>\n\nSend a link, a release name or open Studio.",
+    },
+    "onboarding_1": {
+        RU: "<b>1/3 · Найди релиз</b>\n\nПришли ссылку с любой поддерживаемой площадки или напиши название трека.",
+        EN: "<b>1/3 · Find a release</b>\n\nSend a supported link or type a track name.",
+    },
+    "onboarding_2": {
+        RU: "<b>2/3 · Настрой карточку</b>\n\nВключи хэштеги и цитату, выбери размер обложки или открой полный редактор в Студии.",
+        EN: "<b>2/3 · Tune the card</b>\n\nToggle hashtags and quote, choose cover size or open the full Studio editor.",
+    },
+    "onboarding_3": {
+        RU: "<b>3/3 · Отправь куда нужно</b>\n\nГотовый пост можно оставить себе, вставить inline в другой чат, добавить в подборку или опубликовать в канал.",
+        EN: "<b>3/3 · Send it anywhere</b>\n\nKeep the post, insert it inline, add it to a crate or publish it to your channel.",
+    },
+    "quick_tour": {RU: "Как это работает", EN: "How it works"},
+    "quick_search": {RU: "Найти релиз", EN: "Find a release"},
+    "open_studio": {RU: "Открыть Студию", EN: "Open Studio"},
+    "next": {RU: "Дальше", EN: "Next"},
+    "back": {RU: "Назад", EN: "Back"},
+    "start_using": {RU: "Начать", EN: "Start"},
     "tab_start": {RU: "🚀 Быстрый старт", EN: "🚀 Quick start"},
     "tab_help": {RU: "📖 Как пользоваться", EN: "📖 How it works"},
     "tab_platforms": {RU: "🎛 Сервисы", EN: "🎛 Services"},
@@ -214,17 +250,22 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     # Editor toggles use language-free glyphs so the row stays one line
     # on narrow screens: "#️⃣ ✓", "💬 ✗", "🖼 ⊞".
-    "ed_hashtags": {RU: "#️⃣", EN: "#️⃣"},
-    "ed_quote": {RU: "💬", EN: "💬"},
+    "ed_hashtags": {RU: "# Хэштеги", EN: "# Hashtags"},
+    "ed_quote": {RU: "💬 Цитата", EN: "💬 Quote"},
     "ed_on": {RU: "✓", EN: "✓"},
     "ed_off": {RU: "✗", EN: "✗"},
     "ed_studio": {RU: "🎛 Студия", EN: "🎛 Studio"},
     "menu_button_studio": {RU: "Студия", EN: "Studio"},
-    "ed_preview": {RU: "🖼", EN: "🖼"},
-    "ed_preview_small": {RU: "⊟", EN: "⊟"},
-    "ed_preview_large": {RU: "⊞", EN: "⊞"},
-    "ed_done": {RU: "✅", EN: "✅"},
-    "ed_delete": {RU: "🗑", EN: "🗑"},
+    "ed_preview": {RU: "🖼 Обложка", EN: "🖼 Cover"},
+    "ed_preview_small": {RU: "малая", EN: "small"},
+    "ed_preview_large": {RU: "большая", EN: "large"},
+    "ed_done": {RU: "✅ Готово", EN: "✅ Done"},
+    "ed_delete": {RU: "Удалить", EN: "Delete"},
+    "ed_more": {RU: "••• Ещё", EN: "••• More"},
+    "ed_send_self": {RU: "Отправить себе", EN: "Send to me"},
+    "ed_add_crate": {RU: "+ В подборку", EN: "+ Add to crate"},
+    "ed_crate_added": {RU: "Добавлено в подборку", EN: "Added to crate"},
+    "ed_sent": {RU: "Готово — пост отправлен ниже", EN: "Done — the post is below"},
     "ed_publish": {RU: "📤 В канал", EN: "📤 To channel"},
     "ed_expired": {
         RU: "Черновик устарел — пришли ссылку заново",
@@ -243,4 +284,35 @@ STRINGS: dict[str, dict[str, str]] = {
         RU: "Не получилось опубликовать — проверь права бота в канале",
         EN: "Could not publish — check the bot's rights in the channel",
     },
+    "action_busy": {
+        RU: "Это действие уже выполняется. Подожди пару секунд.",
+        EN: "This action is already running. Give it a few seconds.",
+    },
+    "action_duplicate": {
+        RU: "Уже готово — повторно ничего не отправлял.",
+        EN: "Already done — nothing was sent twice.",
+    },
+    "retry": {RU: "Повторить", EN: "Retry"},
+    "error_title": {RU: "Не получилось собрать пост", EN: "Could not build the post"},
+    "error_search": {
+        RU: "Не нашёл точного совпадения. Добавь имя артиста или уточни название релиза.",
+        EN: "No exact match. Add the artist name or refine the release title.",
+    },
+    "error_provider": {
+        RU: "Музыкальный сервис временно не отвечает. Ссылка сохранена — попробуй ещё раз.",
+        EN: "A music provider is temporarily unavailable. The link is saved — try again.",
+    },
+    "search_choose": {
+        RU: "<b>Выбери релиз</b>\n\nНашёл несколько вариантов по запросу «{query}»:",
+        EN: "<b>Choose a release</b>\n\nI found several matches for “{query}”:",
+    },
+    "progress_search": {RU: "1/3 · Ищу релиз…", EN: "1/3 · Finding the release…"},
+    "progress_links": {RU: "2/3 · Собираю площадки…", EN: "2/3 · Collecting platforms…"},
+    "progress_card": {RU: "3/3 · Собираю карточку…", EN: "3/3 · Building the card…"},
+    "crate_empty": {
+        RU: "<b>Подборка пока пустая</b>\n\nДобавляй релизы кнопкой «+ В подборку» под карточкой.",
+        EN: "<b>Your crate is empty</b>\n\nAdd releases with the “+ Add to crate” button under a card.",
+    },
+    "crate_title": {RU: "<b>Моя подборка · {count}/10</b>", EN: "<b>My crate · {count}/10</b>"},
+    "crate_open_studio": {RU: "Собрать сет в Студии", EN: "Build the set in Studio"},
 }

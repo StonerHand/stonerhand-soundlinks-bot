@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from time import monotonic
 from urllib.parse import quote
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -50,6 +51,7 @@ NOT_FOUND_DETAIL = (
     "подкаст, YouTube-видео или NTS Radio"
 )
 _track_result_sender: Callable[..., Awaitable[Any]] | None = None
+_BACKGROUND_TASKS: set[asyncio.Task[Any]] = set()
 
 
 def configure_track_result_sender(sender: Callable[..., Awaitable[Any]]) -> None:
@@ -104,28 +106,34 @@ async def resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBundl
         _split_source_urls(source_urls)
     )
     lookup_result, videos, radios, playlists, artists = await asyncio.gather(
-        _lookup_tracks(
+        _measured_lookup(bot_data, "songlink", _lookup_tracks(
             bot_data["songlink_client"],
             music_urls,
             soundcloud_client=bot_data["soundcloud_client"],
             search_client=bot_data.get("search_client"),
-        )
+        ))
         if music_urls
         else _empty_track_lookup(),
-        _lookup_youtube_videos(bot_data["youtube_client"], youtube_urls)
+        _measured_lookup(bot_data, "youtube", _lookup_youtube_videos(bot_data["youtube_client"], youtube_urls))
         if youtube_urls
         else _empty_video_lookup(),
-        _lookup_nts_radios(bot_data["nts_client"], nts_urls)
+        _measured_lookup(bot_data, "nts", _lookup_nts_radios(bot_data["nts_client"], nts_urls))
         if nts_urls
         else _empty_radio_lookup(),
-        _lookup_playlists(bot_data["playlist_client"], playlist_urls)
+        _measured_lookup(bot_data, "spotify", _lookup_playlists(bot_data["playlist_client"], playlist_urls))
         if playlist_urls
         else _empty_playlist_lookup(),
-        _lookup_artists(bot_data["artist_client"], artist_urls)
+        _measured_lookup(bot_data, "spotify", _lookup_artists(bot_data["artist_client"], artist_urls))
         if artist_urls
         else _empty_artist_lookup(),
     )
     tracks, unavailable_urls = lookup_result
+    if unavailable_urls:
+        runtime = bot_data.get("runtime")
+        if runtime is not None and hasattr(runtime, "record_provider"):
+            runtime.record_provider(
+                "songlink", ok=False, latency_ms=0, error=SonglinkError("lookup failed")
+            )
     return LookupBundle(
         tracks=[track for track in tracks if track.links],
         unavailable_urls=unavailable_urls,
@@ -134,6 +142,30 @@ async def resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBundl
         playlists=playlists,
         artists=artists,
     )
+
+
+async def _measured_lookup(bot_data: dict, provider: str, awaitable):
+    started = monotonic()
+    try:
+        result = await awaitable
+    except BaseException as exc:
+        runtime = bot_data.get("runtime")
+        if runtime is not None and hasattr(runtime, "record_provider"):
+            runtime.record_provider(
+                provider,
+                ok=False,
+                latency_ms=int((monotonic() - started) * 1000),
+                error=exc,
+            )
+        raise
+    runtime = bot_data.get("runtime")
+    if runtime is not None and hasattr(runtime, "record_provider"):
+        runtime.record_provider(
+            provider,
+            ok=True,
+            latency_ms=int((monotonic() - started) * 1000),
+        )
+    return result
 
 def _split_source_urls(
     source_urls: list[str],
@@ -641,8 +673,16 @@ async def _lookup_tracks(
             unavailable_urls.append(source_url)
 
     tracks = [_ensure_spotify_link(track) for track in tracks]
-    if search_client is not None:
-        await _fill_genres(search_client, tracks)
+    if search_client is not None and tracks:
+        enrichment = asyncio.create_task(_fill_genres(search_client, tracks))
+        _BACKGROUND_TASKS.add(enrichment)
+        enrichment.add_done_callback(_BACKGROUND_TASKS.discard)
+        try:
+            # Fast metadata enriches the initial card; a slow provider never
+            # blocks the core link result and can finish in the background.
+            await asyncio.wait_for(asyncio.shield(enrichment), timeout=0.75)
+        except TimeoutError:
+            LOGGER.debug("Genre enrichment continues in background")
 
     return tracks, unavailable_urls
 

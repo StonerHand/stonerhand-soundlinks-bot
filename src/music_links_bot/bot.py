@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
+from collections.abc import Awaitable, Callable
 from dataclasses import asdict
 import hashlib
 import logging
@@ -79,7 +80,7 @@ from music_links_bot.ephemeral import (
     ephemeral_group_replies_enabled,
     send_ephemeral_message,
 )
-from music_links_bot.i18n import get_text, get_texts, resolve_lang
+from music_links_bot.i18n import get_text, resolve_lang
 
 from music_links_bot import keyboards as _keyboards
 
@@ -113,6 +114,28 @@ _url_button = _keyboards._url_button
 _get_platform_order = _keyboards._get_platform_order
 
 from music_links_bot.kvstore import KVStore
+from music_links_bot.bot_crate import (
+    add_to_crate,
+    load_crate,
+    move_crate_item,
+    remove_crate_item,
+)
+from music_links_bot.bot_runtime import (
+    BotErrorCode,
+    BotFlowError,
+    BotRuntime,
+    CallbackAction,
+    decode_callback,
+    detect_action,
+    encode_callback,
+)
+from music_links_bot.bot_ui import (
+    build_onboarding_keyboard as _build_onboarding_keyboard,
+    build_start_keyboard as _build_start_keyboard,
+    editor_more_rows as _editor_more_rows,
+    editor_rows as _editor_rows,
+    render_crate as _render_bot_crate,
+)
 from music_links_bot.search import (
     SearchClient,
     SearchLookupError,
@@ -183,6 +206,9 @@ _PLACEHOLDER_MESSAGE: contextvars.ContextVar[Message | None] = contextvars.Conte
     "placeholder_message",
     default=None,
 )
+_INPUT_OVERRIDE: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "input_override", default=None
+)
 DEFAULT_PLATFORM_ORDER = (
     "spotify",
     "appleMusic",
@@ -200,6 +226,7 @@ PUBLIC_BOT_COMMANDS = (
     BotCommand("platforms", "сервисы и типы ссылок"),
     BotCommand("channel", "канал StonerHand"),
     BotCommand("stats", "статистика бота"),
+    BotCommand("crate", "моя подборка"),
 )
 PRIMARY_PLATFORM_ALIASES = {
     "spotify": "spotify",
@@ -258,6 +285,8 @@ def build_application(settings: Settings) -> Application:
     application.bot_data["admin_chat_id"] = settings.admin_chat_id
     application.bot_data["platform_order"] = _build_platform_order(settings.primary_platform)
     application.bot_data["ui_mode"] = settings.ui_mode
+    application.bot_data["runtime"] = BotRuntime(kv_store)
+    application.bot_data["search_selections"] = {}
 
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
@@ -266,6 +295,8 @@ def build_application(settings: Settings) -> Application:
     application.add_handler(CommandHandler("channel", channel_command))
     application.add_handler(CommandHandler("id", id_command))
     application.add_handler(CommandHandler("stats", stats_command))
+    application.add_handler(CommandHandler("crate", crate_command))
+    application.add_handler(CallbackQueryHandler(bot_callback, pattern=r"^v2\|"))
     application.add_handler(CallbackQueryHandler(menu_callback, pattern=r"^menu:"))
     application.add_handler(CallbackQueryHandler(editor_callback, pattern=r"^ed\|"))
     application.add_handler(InlineQueryHandler(inline_query_handler))
@@ -391,8 +422,14 @@ def _update_lang(update: Update) -> str:
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message:
         return
-
-    await _reply_with_menu(update.message, context, MENU_START, lang=_update_lang(update))
+    lang = _update_lang(update)
+    user_id = update.effective_user.id if update.effective_user else update.message.chat_id
+    session = await _runtime(context).get_session(user_id, lang=lang)
+    await update.message.reply_text(
+        get_text(lang, "start_returning" if session.onboarding_seen else "start_new"),
+        parse_mode=ParseMode.HTML,
+        reply_markup=_build_start_keyboard(context.bot.username, lang=lang),
+    )
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -448,6 +485,91 @@ async def channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     )
 
 
+def _runtime(context: ContextTypes.DEFAULT_TYPE) -> BotRuntime:
+    runtime = context.application.bot_data.get("runtime")
+    if not isinstance(runtime, BotRuntime):
+        runtime = BotRuntime(context.application.bot_data.get("kv_store"))
+        context.application.bot_data["runtime"] = runtime
+    return runtime
+
+
+async def bot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Versioned callback dispatcher for all new interactive bot surfaces."""
+    query = update.callback_query
+    parsed = decode_callback(query.data if query else None)
+    if query is None or parsed is None:
+        return
+
+    runtime = _runtime(context)
+    callback_id = str(getattr(query, "id", "") or hashlib.sha256(query.data.encode()).hexdigest())
+    if not await runtime.claim_callback(callback_id):
+        lang = resolve_lang(query.from_user.language_code if query.from_user else None)
+        await query.answer(get_text(lang, "action_duplicate"))
+        return
+
+    handlers: dict[str, Callable[[object, ContextTypes.DEFAULT_TYPE, CallbackAction], Awaitable[None]]] = {
+        "menu": _dispatch_menu_action,
+        "select": _dispatch_selection_action,
+        "editor": _dispatch_editor_action,
+        "crate": _dispatch_crate_action,
+        "retry": _dispatch_retry_action,
+        "noop": _dispatch_noop_action,
+    }
+    handler = handlers.get(parsed.scope)
+    if handler is None:
+        await query.answer()
+        return
+    await handler(query, context, parsed)
+
+
+async def _dispatch_noop_action(query, context, action: CallbackAction) -> None:
+    del context, action
+    await query.answer()
+
+
+async def _dispatch_menu_action(query, context, action: CallbackAction) -> None:
+    lang = resolve_lang(query.from_user.language_code if query.from_user else None)
+    if action.action.startswith("onboard"):
+        step = action.action.removeprefix("onboard") or "1"
+        if step == "done":
+            session = await _runtime(context).get_session(query.from_user.id, lang=lang)
+            session.onboarding_seen = True
+            await _runtime(context).save_session(session)
+            text = get_text(lang, "start_returning")
+            keyboard = _build_start_keyboard(context.bot.username, lang=lang)
+        else:
+            step_number = max(1, min(3, int(step)))
+            text = get_text(lang, f"onboarding_{step_number}")
+            keyboard = _build_onboarding_keyboard(step_number, lang)
+        await query.answer()
+        await _safe_edit(query, text, keyboard)
+        return
+
+    menu_key = {
+        "start": MENU_START,
+        "help": MENU_HELP,
+        "guide": MENU_GUIDE,
+        "platforms": MENU_PLATFORMS,
+        "demo": MENU_DEMO,
+    }.get(action.action, MENU_START)
+    await query.answer()
+    await _safe_edit(
+        query,
+        _menu_text(menu_key, lang=lang),
+        _build_intro_keyboard(context.bot.username, active=menu_key, lang=lang),
+    )
+
+
+async def _safe_edit(query, text: str, keyboard: InlineKeyboardMarkup | None) -> None:
+    try:
+        await query.edit_message_text(
+            text=text, parse_mode=ParseMode.HTML, reply_markup=keyboard
+        )
+    except BadRequest as exc:
+        if "Message is not modified" not in str(exc):
+            raise
+
+
 async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     if query is None:
@@ -490,7 +612,17 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
         search_client: SearchClient = context.application.bot_data["search_client"]
         try:
-            candidates = await search_client.search_release_candidates(search_query)
+            if hasattr(search_client, "search_release_candidates"):
+                candidates = await search_client.search_release_candidates(search_query)
+            else:
+                source_url = await search_client.search_release_url(search_query)
+                candidates = [
+                    type(
+                        "SearchChoice",
+                        (),
+                        {"url": source_url, "artist": "", "title": search_query},
+                    )()
+                ]
         except SearchLookupError:
             await _answer_inline_hint(
                 inline_query,
@@ -521,9 +653,12 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
     try:
         await inline_query.answer(
-            results,
+            results[:6],
             cache_time=INLINE_CACHE_SECONDS,
             is_personal=False,
+            button=InlineQueryResultsButton(
+                text=get_text(lang, "open_studio"), start_parameter="studio"
+            ),
         )
     except TelegramError:
         LOGGER.debug("Could not answer inline query", exc_info=True)
@@ -754,58 +889,6 @@ def _draft_platform_selection(draft: dict) -> list[str] | None:
     return selection or None
 
 
-def _editor_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
-    lang = draft.get("lang") or "ru"
-    state = lambda flag: get_text(lang, "ed_on" if draft.get(flag) else "ed_off")  # noqa: E731
-    toggle_row = [
-        InlineKeyboardButton(
-            f"{get_text(lang, 'ed_hashtags')} {state('hashtags')}",
-            callback_data=f"ed|h|{draft_id}",
-        )
-    ]
-    if draft.get("prefix"):
-        toggle_row.append(
-            InlineKeyboardButton(
-                f"{get_text(lang, 'ed_quote')} {state('quote')}",
-                callback_data=f"ed|q|{draft_id}",
-            )
-        )
-
-    preview_state = get_text(
-        lang,
-        "ed_preview_large" if draft.get("large_preview") else "ed_preview_small",
-    )
-    toggle_row.append(
-        InlineKeyboardButton(
-            f"{get_text(lang, 'ed_preview')} {preview_state}",
-            callback_data=f"ed|v|{draft_id}",
-        )
-    )
-
-    action_row = [
-        InlineKeyboardButton(get_text(lang, "ed_done"), callback_data=f"ed|f|{draft_id}"),
-        InlineKeyboardButton(get_text(lang, "ed_delete"), callback_data=f"ed|d|{draft_id}"),
-    ]
-    webapp_url = _webapp_url()
-    if webapp_url:
-        action_row.insert(
-            0,
-            InlineKeyboardButton(
-                get_text(lang, "ed_studio"),
-                web_app=WebAppInfo(url=f"{webapp_url}?draft={draft_id}"),
-            ),
-        )
-    if draft.get("can_publish"):
-        action_row.append(
-            InlineKeyboardButton(
-                get_text(lang, "ed_publish"),
-                callback_data=f"ed|p|{draft_id}",
-            )
-        )
-
-    return [toggle_row, action_row]
-
-
 async def _store_draft(
     context: ContextTypes.DEFAULT_TYPE,
     draft_id: str,
@@ -846,17 +929,113 @@ async def _load_draft(
     return None
 
 
-async def editor_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.callback_query
-    if query is None or not query.data:
-        return
+async def _store_search_selection(
+    context: ContextTypes.DEFAULT_TYPE,
+    *,
+    user_id: int,
+    query: str,
+    urls: list[str],
+) -> str:
+    selection_id = secrets.token_hex(5)
+    payload = {"user_id": user_id, "query": query, "urls": urls}
+    selections: dict = context.application.bot_data.setdefault("search_selections", {})
+    while len(selections) >= 300:
+        selections.pop(next(iter(selections)))
+    selections[selection_id] = payload
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    if kv is not None:
+        await kv.set_json(
+            f"selection:v1:{selection_id}", payload, ttl_seconds=15 * 60
+        )
+    return selection_id
 
-    parts = query.data.split("|")
-    if len(parts) != 3:
+
+async def _load_search_selection(
+    context: ContextTypes.DEFAULT_TYPE, selection_id: str
+) -> dict | None:
+    selections: dict = context.application.bot_data.setdefault("search_selections", {})
+    payload = selections.get(selection_id)
+    if isinstance(payload, dict):
+        return payload
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    payload = await kv.get_json(f"selection:v1:{selection_id}") if kv else None
+    if isinstance(payload, dict):
+        selections[selection_id] = payload
+        return payload
+    return None
+
+
+async def _dispatch_selection_action(query, context, action: CallbackAction) -> None:
+    lang = resolve_lang(query.from_user.language_code if query.from_user else None)
+    if action.action != "pick" or ":" not in action.payload:
         await query.answer()
         return
+    selection_id, raw_index = action.payload.rsplit(":", 1)
+    payload = await _load_search_selection(context, selection_id)
+    try:
+        index = int(raw_index)
+        urls = payload["urls"] if payload else []
+        source_url = urls[index]
+    except (IndexError, KeyError, TypeError, ValueError):
+        await query.answer(get_text(lang, "ed_expired"), show_alert=True)
+        return
+    if query.from_user and int(payload.get("user_id") or 0) != query.from_user.id:
+        await query.answer(get_text(lang, "ed_admin_only"), show_alert=True)
+        return
 
-    _, action, draft_id = parts
+    await query.answer(get_text(lang, "progress_links"))
+    if query.message is None:
+        return
+    _PLACEHOLDER_MESSAGE.set(query.message)
+    token = _INPUT_OVERRIDE.set(source_url)
+    try:
+        synthetic = Update(update_id=0, callback_query=query)
+        await track_lookup_message(synthetic, context)
+    finally:
+        _INPUT_OVERRIDE.reset(token)
+
+
+async def _dispatch_retry_action(query, context, action: CallbackAction) -> None:
+    del action
+    if query.from_user is None or query.message is None:
+        await query.answer()
+        return
+    lang = resolve_lang(query.from_user.language_code)
+    session = await _runtime(context).get_session(query.from_user.id, lang=lang)
+    value = str(session.last_action.get("value") or "")
+    if not value:
+        await query.answer(get_text(lang, "ed_expired"), show_alert=True)
+        return
+    await query.answer(get_text(lang, "progress_search"))
+    _PLACEHOLDER_MESSAGE.set(query.message)
+    token = _INPUT_OVERRIDE.set(value)
+    try:
+        await track_lookup_message(Update(update_id=0, callback_query=query), context)
+    finally:
+        _INPUT_OVERRIDE.reset(token)
+
+
+async def editor_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    parsed = decode_callback(query.data if query else None)
+    if query is None or parsed is None or parsed.scope != "editor":
+        return
+    callback_id = str(
+        getattr(query, "id", "")
+        or hashlib.sha256((query.data or "").encode()).hexdigest()
+    )
+    if not await _runtime(context).claim_callback(callback_id):
+        lang = resolve_lang(query.from_user.language_code if query.from_user else None)
+        await query.answer(get_text(lang, "action_duplicate"))
+        return
+    await _handle_editor_action(query, context, parsed.action, parsed.payload)
+
+
+async def _dispatch_editor_action(query, context, action: CallbackAction) -> None:
+    await _handle_editor_action(query, context, action.action, action.payload)
+
+
+async def _handle_editor_action(query, context, action: str, draft_id: str) -> None:
     user_lang = resolve_lang(query.from_user.language_code if query.from_user else None)
     draft = await _load_draft(context, draft_id)
     if draft is None:
@@ -865,43 +1044,41 @@ async def editor_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     lang = draft.get("lang") or user_lang
 
+    if action == "m":
+        await query.answer()
+        text, base_keyboard = _render_track_draft(draft, context, draft_id=None)
+        keyboard = InlineKeyboardMarkup(
+            [*base_keyboard.inline_keyboard, *_editor_more_rows(draft_id, draft)]
+        )
+        await _edit_editor_message(query, context, draft, text, keyboard)
+        return
+    if action == "b":
+        await query.answer()
+        text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
+        await _edit_editor_message(query, context, draft, text, keyboard)
+        return
+
     if action == "d":
         await query.answer()
         if query.message is not None:
             await _try_delete_message(query.message)
         return
 
-    if action == "p":
-        admin_chat_id = context.application.bot_data.get("admin_chat_id")
-        is_admin = (
-            query.from_user is not None
-            and admin_chat_id is not None
-            and query.from_user.id == admin_chat_id
-        )
-        if not is_admin:
-            await query.answer(get_text(lang, "ed_admin_only"), show_alert=True)
+    if action in {"p", "s", "c"}:
+        user_id = query.from_user.id if query.from_user else 0
+        runtime = _runtime(context)
+        lock_key = f"{user_id}:{action}:{draft_id}"
+        token = await runtime.acquire_action(lock_key)
+        if token is None:
+            await query.answer(get_text(lang, "action_busy"), show_alert=True)
             return
-
-        track = TrackMatch(**draft["item"])
-        if not draft.get("dup_ok"):
-            posted_date = await _find_posted_date(context, track)
-            if posted_date:
-                draft["dup_ok"] = True
-                await _store_draft(context, draft_id, draft)
-                await query.answer(
-                    get_text(lang, "ed_duplicate").replace("{date}", posted_date),
-                    show_alert=True,
-                )
-                return
-
-        published = await _publish_draft(context, draft)
-        if published:
-            await _schedule_mark_posted(context, track)
-
-        await query.answer(
-            get_text(lang, "ed_published" if published else "ed_publish_failed"),
-            show_alert=not published,
-        )
+        await _show_action_busy(query, lang)
+        try:
+            await _run_primary_editor_action(
+                query, context, action, draft_id, draft, lang
+            )
+        finally:
+            await runtime.release_action(lock_key, token)
         return
 
     if action == "h":
@@ -918,6 +1095,99 @@ async def editor_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await _store_draft(context, draft_id, draft)
     editor_id = None if action == "f" else draft_id
     text, keyboard = _render_track_draft(draft, context, draft_id=editor_id)
+    await _edit_editor_message(query, context, draft, text, keyboard)
+
+
+async def _run_primary_editor_action(
+    query, context, action: str, draft_id: str, draft: dict, lang: str
+) -> None:
+    user_id = query.from_user.id if query.from_user else 0
+    if action == "c":
+        items, added = await add_to_crate(
+            context.application.bot_data,
+            user_id,
+            draft_id=draft_id,
+            item=draft["item"],
+        )
+        await query.answer(
+            get_text(lang, "ed_crate_added") if added else f"Уже в подборке · {len(items)}/10",
+            show_alert=False,
+        )
+        text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
+        await _edit_editor_message(query, context, draft, text, keyboard)
+        return
+
+    if action == "s":
+        sent = await _deliver_draft(
+            context, draft, target=user_id, channel_style=False
+        )
+        await query.answer(
+            get_text(lang, "ed_sent" if sent else "ed_publish_failed"),
+            show_alert=not bool(sent),
+        )
+        text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
+        await _edit_editor_message(query, context, draft, text, keyboard)
+        return
+
+    admin_chat_id = context.application.bot_data.get("admin_chat_id")
+    if not user_id or admin_chat_id is None or user_id != admin_chat_id:
+        await query.answer(get_text(lang, "ed_admin_only"), show_alert=True)
+        text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
+        await _edit_editor_message(query, context, draft, text, keyboard)
+        return
+
+    track = TrackMatch(**draft["item"])
+    if not draft.get("dup_ok"):
+        posted_date = await _find_posted_date(context, track)
+        if posted_date:
+            draft["dup_ok"] = True
+            await _store_draft(context, draft_id, draft)
+            await query.answer(
+                get_text(lang, "ed_duplicate").replace("{date}", posted_date),
+                show_alert=True,
+            )
+            text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
+            await _edit_editor_message(query, context, draft, text, keyboard)
+            return
+
+    published = await _publish_draft(context, draft)
+    if published:
+        await _schedule_mark_posted(context, track)
+        success_keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        get_text(lang, "ed_published"),
+                        callback_data=encode_callback("noop", "done"),
+                        api_kwargs={"style": "success"},
+                    )
+                ],
+                [_channel_button()],
+            ]
+        )
+        text, _ = _render_track_draft(draft, context, draft_id=None)
+        await _edit_editor_message(query, context, draft, text, success_keyboard)
+    await query.answer(
+        get_text(lang, "ed_published" if published else "ed_publish_failed"),
+        show_alert=not bool(published),
+    )
+    if not published:
+        text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
+        await _edit_editor_message(query, context, draft, text, keyboard)
+
+
+async def _show_action_busy(query, lang: str) -> None:
+    try:
+        await query.edit_message_reply_markup(
+            InlineKeyboardMarkup(
+                [[InlineKeyboardButton("⏳ " + get_text(lang, "progress_card"), callback_data=encode_callback("noop", "busy"))]]
+            )
+        )
+    except (AttributeError, TelegramError):
+        LOGGER.debug("Could not mark editor action busy", exc_info=True)
+
+
+async def _edit_editor_message(query, context, draft: dict, text: str, keyboard) -> None:
     track = TrackMatch(**draft["item"])
     try:
         await query.edit_message_text(
@@ -938,14 +1208,24 @@ async def _publish_draft(
     context: ContextTypes.DEFAULT_TYPE,
     draft: dict,
 ) -> Message | bool | None:
-    """Returns the sent message (so callers can offer undo), a bare True when
-    the transport does not return one, or None on failure."""
     target = context.application.bot_data.get("publish_chat_id") or f"@{CHANNEL_USERNAME}"
+    return await _deliver_draft(context, draft, target=target, channel_style=True)
+
+
+async def _deliver_draft(
+    context: ContextTypes.DEFAULT_TYPE,
+    draft: dict,
+    *,
+    target: int | str,
+    channel_style: bool,
+) -> Message | bool | None:
+    """Single delivery pipeline for self-send, channel publish and API jobs."""
     track = TrackMatch(**draft["item"])
     prefix = draft.get("prefix") or ""
-    # Channel posts always carry hashtags — that is the channel house style —
-    # unless the Studio explicitly replaced or emptied the list.
-    include_hashtags, overrides = _draft_message_overrides(draft, include_hashtags=True)
+    include_hashtags, overrides = _draft_message_overrides(
+        draft,
+        include_hashtags=True if channel_style else bool(draft.get("hashtags")),
+    )
     text = (prefix if draft.get("quote") and prefix else "") + format_track_message(
         track,
         include_hashtags=include_hashtags,
@@ -995,7 +1275,7 @@ async def _publish_draft(
                 reply_markup=keyboard,
             )
     except TelegramError:
-        LOGGER.warning("Could not publish draft to %s", target, exc_info=True)
+        LOGGER.warning("Could not deliver draft to %s", target, exc_info=True)
         return None
 
     return sent if sent is not None else True
@@ -1022,9 +1302,56 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if kv is not None:
         stats_data = merge_stats(stats_data, await kv.get_json(STATS_KV_KEY))
 
-    await message.reply_text(
-        format_stats_message(stats_data, include_private=include_private)
-    )
+    text = format_stats_message(stats_data, include_private=include_private)
+    if include_private:
+        diagnostics = _runtime(context).provider_snapshot()
+        if diagnostics:
+            lines = ["", "Провайдеры"]
+            for item in diagnostics:
+                marker = "✅" if item["ok"] else "⚠️"
+                lines.append(
+                    f"{marker} {item['provider']} · {item['latency_ms']} ms"
+                    + (f" · {item['last_error']}" if item["last_error"] else "")
+                )
+            text += "\n".join(lines)
+    await message.reply_text(text)
+
+
+async def crate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    if message is None:
+        return
+    user_id = update.effective_user.id if update.effective_user else message.chat_id
+    lang = _update_lang(update)
+    items = await load_crate(context.application.bot_data, user_id)
+    text, keyboard = _render_bot_crate(items, lang=lang)
+    await message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+
+
+async def _dispatch_crate_action(query, context, action: CallbackAction) -> None:
+    if query.from_user is None:
+        await query.answer()
+        return
+    lang = resolve_lang(query.from_user.language_code)
+    user_id = query.from_user.id
+    try:
+        index = int(action.payload)
+    except ValueError:
+        index = -1
+    if action.action == "up":
+        items = await move_crate_item(context.application.bot_data, user_id, index, -1)
+    elif action.action == "down":
+        items = await move_crate_item(context.application.bot_data, user_id, index, 1)
+    elif action.action == "remove":
+        items = await remove_crate_item(context.application.bot_data, user_id, index)
+    elif action.action == "open":
+        items = await load_crate(context.application.bot_data, user_id)
+    else:
+        await query.answer()
+        return
+    await query.answer()
+    text, keyboard = _render_bot_crate(items, lang=lang)
+    await _safe_edit(query, text, keyboard)
 
 
 async def _reply_with_menu(
@@ -1064,6 +1391,43 @@ async def _reply_with_error(
     await message.reply_text(text, reply_markup=reply_markup)
 
 
+async def _reply_with_flow_error(
+    message: Message,
+    context: ContextTypes.DEFAULT_TYPE,
+    error: BotFlowError,
+    *,
+    lang: str,
+) -> None:
+    detail_key = {
+        BotErrorCode.SEARCH_NOT_FOUND: "error_search",
+        BotErrorCode.PROVIDER_UNAVAILABLE: "error_provider",
+    }.get(error.code, "no_url_hint")
+    text = f"<b>{get_text(lang, 'error_title')}</b>\n\n{get_text(lang, detail_key)}"
+    rows: list[list[InlineKeyboardButton]] = []
+    if error.retryable:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "retry"),
+                    callback_data=encode_callback("retry", "last"),
+                    api_kwargs={"style": "primary"},
+                )
+            ]
+        )
+    rows.extend(_build_error_keyboard(context.bot.username, lang=lang).inline_keyboard)
+    keyboard = InlineKeyboardMarkup(rows)
+    placeholder = _take_placeholder(message.chat_id)
+    if placeholder is not None:
+        try:
+            await placeholder.edit_text(
+                text, parse_mode=ParseMode.HTML, reply_markup=keyboard
+            )
+            return
+        except TelegramError:
+            LOGGER.debug("Could not edit flow-error placeholder", exc_info=True)
+    await message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+
+
 async def _send_typing_action(bot: Bot, message: Message) -> None:
     if message.chat.type == "channel":
         return
@@ -1078,10 +1442,7 @@ async def _send_loading_placeholder(message: Message, lang: str = "ru") -> None:
     if _PLACEHOLDER_MESSAGE.get() is not None:
         return
 
-    loading_texts = get_texts(lang, "loading")
-    seed = _message_text(message) or str(message.chat_id)
-    digest = hashlib.sha256(seed.encode("utf-8")).digest()
-    loading_text = loading_texts[digest[0] % len(loading_texts)]
+    loading_text = get_text(lang, "progress_search")
     try:
         placeholder = await message.reply_text(loading_text)
     except TelegramError:
@@ -1089,6 +1450,16 @@ async def _send_loading_placeholder(message: Message, lang: str = "ru") -> None:
         return
 
     _PLACEHOLDER_MESSAGE.set(placeholder)
+
+
+async def _update_loading_placeholder(lang: str, key: str) -> None:
+    placeholder = _PLACEHOLDER_MESSAGE.get()
+    if placeholder is None:
+        return
+    try:
+        await placeholder.edit_text(get_text(lang, key))
+    except TelegramError:
+        LOGGER.debug("Could not update loading placeholder", exc_info=True)
 
 
 def _take_placeholder(chat_id: int) -> Message | None:
@@ -1101,6 +1472,17 @@ def _take_placeholder(chat_id: int) -> Message | None:
 
 
 async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    try:
+        await _track_lookup_message_impl(update, context)
+    except asyncio.CancelledError:
+        # A newer private-chat request superseded this one. Treat cancellation
+        # as an expected UX event, not a failed Telegram webhook delivery.
+        LOGGER.debug("Stale lookup cancelled in favor of a newer request")
+
+
+async def _track_lookup_message_impl(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
     message = update.effective_message
     if message is None:
         return
@@ -1111,12 +1493,27 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
     if via_bot is not None and via_bot.id == getattr(context.bot, "id", None):
         return
 
-    message_text = _message_text(message)
+    message_text = _INPUT_OVERRIDE.get() or _message_text(message)
     source_urls = extract_supported_urls(message_text)[:MAX_LINKS_PER_MESSAGE]
     include_channel_button = _should_include_channel_button(message)
     include_hashtags = _should_include_hashtags(message)
     is_private = message.chat.type == "private"
     lang = _update_lang(update) if is_private else "ru"
+    user_id = update.effective_user.id if update.effective_user else message.chat_id
+    runtime = _runtime(context)
+    if is_private:
+        runtime.register_request(user_id)
+        action_kind = detect_action(message_text or "", source_urls, is_private=True)
+        if action_kind == "help":
+            await _reply_with_menu(message, context, MENU_HELP, lang=lang)
+            runtime.finish_request(user_id)
+            return
+        await runtime.remember_action(
+            user_id,
+            kind="resolve" if source_urls else "search",
+            value=(source_urls[0] if source_urls else message_text or ""),
+            lang=lang,
+        )
     found_via_search = False
     if not source_urls:
         if not is_private:
@@ -1137,27 +1534,72 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         await _send_loading_placeholder(message, lang)
         search_client: SearchClient = context.application.bot_data["search_client"]
         try:
-            source_urls = [await search_client.search_release_url(search_query)]
+            if hasattr(search_client, "search_release_candidates"):
+                candidates = await search_client.search_release_candidates(search_query)
+            else:
+                source_url = await search_client.search_release_url(search_query)
+                candidates = [
+                    type(
+                        "SearchChoice",
+                        (),
+                        {"url": source_url, "artist": "", "title": search_query},
+                    )()
+                ]
+            if len(candidates) > 1:
+                selection_id = await _store_search_selection(
+                    context,
+                    user_id=user_id,
+                    query=search_query,
+                    urls=[candidate.url for candidate in candidates[:6]],
+                )
+                placeholder = _take_placeholder(message.chat_id)
+                target = placeholder or message
+                text = get_text(lang, "search_choose").replace("{query}", search_query)
+                keyboard = InlineKeyboardMarkup(
+                    [
+                        [
+                            InlineKeyboardButton(
+                                f"{index + 1}. {candidate.artist} — {candidate.title}"[:64],
+                                callback_data=encode_callback(
+                                    "select", "pick", f"{selection_id}:{index}"
+                                ),
+                            )
+                        ]
+                        for index, candidate in enumerate(candidates[:6])
+                    ]
+                    + [[InlineKeyboardButton(get_text(lang, "retry"), callback_data=encode_callback("retry", "last"))]]
+                )
+                if placeholder is not None:
+                    await placeholder.edit_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+                else:
+                    await target.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+                runtime.finish_request(user_id)
+                return
+            source_urls = [candidates[0].url]
             found_via_search = True
-        except SearchLookupError:
-            await _reply_with_error(
+        except (SearchLookupError, IndexError):
+            await _reply_with_flow_error(
                 message,
                 context,
-                get_text(lang, "search_not_found"),
+                BotFlowError(BotErrorCode.SEARCH_NOT_FOUND, retryable=True),
                 lang=lang,
             )
+            runtime.finish_request(user_id)
             return
 
     # The whole message was the search query, so quoting it back is noise.
     user_prefix = "" if found_via_search else _build_user_prefix(message)
     if is_private:
         await _send_loading_placeholder(message, lang)
+        await _update_loading_placeholder(lang, "progress_links")
     else:
         await _send_typing_action(context.bot, message)
 
     bundle = await _bot_lookup.resolve_sources(
         context.application.bot_data, source_urls
     )
+    if is_private:
+        await _update_loading_placeholder(lang, "progress_card")
     tracks = bundle.tracks
     unavailable_urls = bundle.unavailable_urls
     videos = bundle.videos
@@ -1184,19 +1626,70 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         if message.chat.type == "channel":
             return
 
-        await _reply_with_error(
-            message,
-            context,
-            _format_service_unavailable_message(unavailable_urls[0])
-            if unavailable_urls
-            else _format_not_found_message(source_urls),
-            lang=lang,
-        )
+        if unavailable_urls:
+            await _reply_with_flow_error(
+                message,
+                context,
+                BotFlowError(
+                    BotErrorCode.PROVIDER_UNAVAILABLE,
+                    retryable=True,
+                    provider="songlink",
+                ),
+                lang=lang,
+            )
+        else:
+            await _reply_with_error(
+                message,
+                context,
+                _format_not_found_message(source_urls),
+                lang=lang,
+            )
+        runtime.finish_request(user_id)
         return
 
     content_type_count = bundle.content_type_count
     if content_type_count == 1 and tracks:
         if len(tracks) > 1:
+            collection_keyboard = _build_collection_keyboard(
+                tracks,
+                include_channel_button=include_channel_button,
+            )
+            if is_private:
+                crate_items = await load_crate(context.application.bot_data, user_id)
+                for track in tracks:
+                    draft_id = secrets.token_hex(8)
+                    item = asdict(track)
+                    draft = {
+                        "v": 2,
+                        "type": "track",
+                        "item": item,
+                        "prefix": "",
+                        "hashtags": False,
+                        "quote": False,
+                        "large_preview": True,
+                        "chat_id": message.chat_id,
+                        "lang": lang,
+                        "can_publish": False,
+                    }
+                    await _store_draft(context, draft_id, draft)
+                    crate_items, _ = await add_to_crate(
+                        context.application.bot_data,
+                        user_id,
+                        draft_id=draft_id,
+                        item=item,
+                    )
+                collection_keyboard = InlineKeyboardMarkup(
+                    [
+                        *collection_keyboard.inline_keyboard,
+                        [
+                            InlineKeyboardButton(
+                                f"Подборка · {len(crate_items)}/10",
+                                callback_data=encode_callback("crate", "open"),
+                                api_kwargs={"style": "success"},
+                            )
+                        ],
+                    ]
+                )
             await _send_track_result(
                 context.bot,
                 message,
@@ -1207,10 +1700,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
                 ),
                 preview_url=_select_preview_url(tracks[0].links, context)
                 or tracks[0].thumbnail_url,
-                reply_markup=_build_collection_keyboard(
-                    tracks,
-                    include_channel_button=include_channel_button,
-                ),
+                reply_markup=collection_keyboard,
                 )
             _record_matches_safely(tracks, message, context=context)
             return

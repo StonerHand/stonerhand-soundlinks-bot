@@ -6,6 +6,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from music_links_bot.kvstore import KVStore
 from music_links_bot.search import (
+    SearchClient,
+    SearchLookupError,
     _extract_release_candidates,
     normalize_search_query,
 )
@@ -76,6 +78,40 @@ class SearchQueryTests(unittest.TestCase):
             _extract_release_candidates({"results": [{"trackViewUrl": 5}]}),
             [],
         )
+
+
+class SearchCacheTests(unittest.IsolatedAsyncioTestCase):
+    async def test_known_miss_is_not_requested_twice(self) -> None:
+        class ResponseStub:
+            def raise_for_status(self) -> None:
+                return None
+
+            def json(self) -> dict:
+                return {"results": []}
+
+        class ClientStub:
+            calls = 0
+
+            async def get(self, *args, **kwargs):
+                del args, kwargs
+                self.calls += 1
+                return ResponseStub()
+
+            async def aclose(self) -> None:
+                return None
+
+        search = SearchClient()
+        await search._client.aclose()
+        fake = ClientStub()
+        search._client = fake
+        try:
+            with self.assertRaises(SearchLookupError):
+                await search.search_release_candidates("nothing here")
+            with self.assertRaises(SearchLookupError):
+                await search.search_release_candidates("nothing here")
+            self.assertEqual(fake.calls, 1)
+        finally:
+            await search.aclose()
 
 
 class KVStoreTests(unittest.TestCase):

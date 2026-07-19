@@ -44,6 +44,7 @@ class SearchClient:
             timeout=httpx.Timeout(timeout, connect=3.0),
         )
         self._cache: TTLCache[list[SearchCandidate]] = TTLCache(ttl_seconds=6 * 3600)
+        self._miss_cache: TTLCache[bool] = TTLCache(ttl_seconds=10 * 60)
         self._genre_cache: TTLCache[str] = TTLCache(ttl_seconds=24 * 3600)
         self._preview_cache: TTLCache[str] = TTLCache(ttl_seconds=24 * 3600)
 
@@ -129,6 +130,8 @@ class SearchClient:
         cached_candidates = self._cache.get(cache_key)
         if cached_candidates is not None:
             return cached_candidates
+        if self._miss_cache.get(cache_key):
+            raise SearchLookupError("No release matched the query.")
 
         try:
             response = await self._client.get(
@@ -148,6 +151,7 @@ class SearchClient:
 
         candidates = _extract_release_candidates(payload)
         if not candidates:
+            self._miss_cache.set(cache_key, True)
             raise SearchLookupError("No release matched the query.")
 
         self._cache.set(cache_key, candidates)
@@ -236,4 +240,3 @@ def _extract_release_candidates(payload: object) -> list[SearchCandidate]:
             break
 
     return candidates
-
