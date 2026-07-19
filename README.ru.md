@@ -15,7 +15,7 @@
 ![CI](https://img.shields.io/github/actions/workflow/status/StonerHand/stonerhand-soundlinks-bot/ci.yml?style=for-the-badge&label=CI)
 ![License](https://img.shields.io/badge/License-MIT-2ea44f?style=for-the-badge)
 
-<img src="assets/studio-demo.svg" alt="Демо Студии: поиск → винил → карточка с кнопками платформ" width="100%">
+<img src="assets/studio-demo.gif" alt="Демо Студии: поиск → винил → карточка с кнопками платформ" width="100%">
 
 </div>
 

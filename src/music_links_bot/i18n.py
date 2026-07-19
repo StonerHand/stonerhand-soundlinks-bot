@@ -60,7 +60,8 @@ STRINGS: dict[str, dict[str, str]] = {
             "• Поиск по названию: просто напиши <i>artist - track</i>\n"
             "• Несколько ссылок разом → нумерованная подборка\n"
             "• Подводка над ссылкой → цитата в посте\n"
-            "• Inline: набери @StonerHandBot + ссылку в любом чате\n\n"
+            "• Inline: набери @StonerHandBot + ссылку в любом чате\n"
+            "• 🎛 Студия — визуальный редактор: предпросмотр, подборки, отложка\n\n"
             "Пришли ссылку или название 👇"
         ),
         EN: (
@@ -73,7 +74,8 @@ STRINGS: dict[str, dict[str, str]] = {
             "• Search by name: just type <i>artist - track</i>\n"
             "• Several links at once → a numbered collection\n"
             "• Text above a link → a quote in the post\n"
-            "• Inline: type @StonerHandBot + a link in any chat\n\n"
+            "• Inline: type @StonerHandBot + a link in any chat\n"
+            "• 🎛 The Studio — a visual editor: preview, crates, scheduling\n\n"
             "Send a link or a name 👇"
         ),
     },

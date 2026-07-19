@@ -232,33 +232,35 @@ def build_application(settings: Settings) -> Application:
 BOT_DESCRIPTIONS = {
     "": (
         "Превращаю музыкальные ссылки в аккуратные посты: обложка, "
-        "автохэштеги и кнопки всех площадок.\n\n"
+        "автохэштеги и кнопки всех площадок — в один тап.\n\n"
         "• Ссылка, название трека или прослушка прямо в 🎛 Студии\n"
         "• Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
-        "Yandex Music, NTS Radio\n"
+        "Яндекс.Музыка, Bandcamp, NTS Radio\n"
+        "• Несколько ссылок разом → готовая подборка\n"
         "• Inline: @StonerHandBot + запрос в любом чате\n"
-        "• Студия: живой предпросмотр, подборки, отложенный постинг, "
-        "фото-режим и публикация в канал"
+        "• Студия: живой предпросмотр, подборки, отложка, фото-режим "
+        "с брендрамкой, публикация в канал"
     ),
     "en": (
         "I turn music links into clean posts: cover art, smart hashtags "
-        "and buttons for every platform.\n\n"
+        "and buttons for every platform — in one tap.\n\n"
         "• A link, a track name or a preview right in the 🎛 Studio\n"
         "• Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
-        "Yandex Music, NTS Radio\n"
+        "Yandex Music, Bandcamp, NTS Radio\n"
+        "• Paste several links at once → a ready-made crate\n"
         "• Inline: @StonerHandBot + a query in any chat\n"
-        "• Studio: live preview, crates, scheduled posting, photo mode "
-        "and publish-to-channel"
+        "• Studio: live preview, crates, scheduling, photo mode with a "
+        "branded frame, publish-to-channel"
     ),
 }
 BOT_SHORT_DESCRIPTIONS = {
     "": (
-        "Кидай ссылку или название трека → пост с обложкой, хэштегами "
+        "Ссылка или название трека → пост с обложкой, автохэштегами "
         "и кнопками всех площадок. Всё в 🎛 Студии"
     ),
     "en": (
-        "Drop a link or a track name → a post with cover art, hashtags "
-        "and buttons for every platform. All in the 🎛 Studio"
+        "A link or a track name → a post with cover art, hashtags and "
+        "buttons for every platform. All in the 🎛 Studio"
     ),
 }
 
