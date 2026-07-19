@@ -17,14 +17,14 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   const EN = !((tg.initDataUnsafe?.user?.language_code || "ru").match(/^(ru|uk|be|kk)/));
   const T = EN ? {
     ph: "A link or a name…", recent: "RECENT", popular: "POPULAR QUERIES",
-    hint: "Type an artist and a track<br>or paste a link from any platform",
+    hint: "Paste a link or find a release — Studio will build the rest.",
     loading: "SEARCHING…", found: "found", release1: "release", release2: "releases",
     nf: "Release not found", nfSub: "Try another name", retry: "Try again",
     previewTitle: "Post preview", format: "Style", apply: "Apply",
     send: "Send to me", publish: "Publish", sent: "Sent", published: "Published!",
     undo: "Undo", undone: "POST DELETED", scheduled: "SCHEDULED: ",
     dupA: "⚠️ Already published on ", dupB: ". Publish again?", confirm: "Publish", cancel: "Cancel",
-    err: "SOMETHING BROKE — TRY AGAIN", network: "NO CONNECTION — CHECK YOUR INTERNET", timeout: "THE SERVER TOOK TOO LONG — TRY AGAIN", busy: "REQUEST IS STILL RUNNING — TRY AGAIN", allPlatforms: "All",
+    err: "The signal got noisy. Try again.", network: "No connection. Check your internet and retry.", timeout: "The server needs more time. Try again.", busy: "Still working on it. Try again in a moment.", allPlatforms: "All",
     toCrate: "In crate", crateFull: "CRATE IS FULL",
     secContent: "Content", secText: "Your text", secTags: "Hashtags", secPm: "Platforms & order",
     rHashtags: "Hashtags", rQuote: "Quote / CTA", rPhoto: "Photo mode (no player)", rBig: "Large preview",
@@ -35,7 +35,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     sheetTitle: "When to publish?", in1h: "In 1 hour", in3h: "In 3 hours", tonight: "Tonight 19:00", tomorrow: "Tomorrow 10:00",
     clipQ: "Paste from clipboard?", preview30: "0:30 preview", addTag: "add",
     stat: { posts: "posts", song: "tracks", album: "albums", podcast: "podcasts", videos: "videos", collections: "sets" },
-    coach: [["🎧","Tap ▶ on the cover — a 30-second preview plays right here."],["🎛","The Style screen holds everything: switches, your text, hashtags and platform buttons."],["📌","The main action is always docked at the bottom — publish is one tap away."]],
+    coach: [["🔎","Paste a link or search by artist and title."],["🎧","Preview the track before you build the post."],["🎛","Shape the text, cover and platforms in Style."],["📡","Choose channel, private chat or queue at the final step."]],
     gotIt: "Got it", next: "Next",
     shareTitle: "Share where?", shareAll: "All platforms",
     presets: "Presets", presetSave: "save", presetEmpty: "Save the current look to reuse it",
@@ -45,14 +45,14 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     nowPlaying: "Preview", confirmRemove: "Remove this item?", confirmClear: "Clear the whole crate?",
   } : {
     ph: "Ссылка или название…", recent: "НЕДАВНИЕ", popular: "ПОПУЛЯРНЫЕ ЗАПРОСЫ",
-    hint: "Введи исполнителя и трек<br>или вставь ссылку на любую платформу",
+    hint: "Вставь ссылку или найди релиз — остальное Студия соберёт сама.",
     loading: "ИЩЕМ РЕЛИЗ…", found: "Найдено", release1: "релиз", release2: "релиза",
     nf: "Релиз не найден", nfSub: "Попробуй другое название", retry: "Попробовать снова",
     previewTitle: "Превью поста", format: "Оформление", apply: "Применить",
     send: "Отправить себе", publish: "Опубликовать", sent: "Отправлено", published: "Опубликовано!",
     undo: "Отмена", undone: "ПОСТ УДАЛЁН", scheduled: "В ОЧЕРЕДИ: ",
     dupA: "⚠️ Уже публиковалось ", dupB: ". Опубликовать снова?", confirm: "Опубликовать", cancel: "Отмена",
-    err: "ЧТО-ТО СЛОМАЛОСЬ — ПОПРОБУЙ ЕЩЁ", network: "НЕТ СВЯЗИ — ПРОВЕРЬ ИНТЕРНЕТ", timeout: "СЕРВЕР ДОЛГО ОТВЕЧАЕТ — ПОПРОБУЙ ЕЩЁ", busy: "ЗАПРОС ЕЩЁ ВЫПОЛНЯЕТСЯ — ПОПРОБУЙ ЕЩЁ", allPlatforms: "Все",
+    err: "Связь зашумела. Попробуем ещё раз.", network: "Нет соединения. Проверь интернет и повтори.", timeout: "Серверу нужно больше времени. Попробуй ещё раз.", busy: "Ещё работаем над запросом. Повтори через секунду.", allPlatforms: "Все",
     toCrate: "В подборке", crateFull: "ПОДБОРКА ЗАПОЛНЕНА",
     secContent: "Содержимое", secText: "Свой текст", secTags: "Хэштеги", secPm: "Платформы и порядок",
     rHashtags: "Хэштеги", rQuote: "Цитата / CTA", rPhoto: "Фото-режим (без плеера)", rBig: "Большое превью",
@@ -63,7 +63,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     sheetTitle: "Когда опубликовать?", in1h: "Через час", in3h: "Через 3 часа", tonight: "Сегодня 19:00", tomorrow: "Завтра 10:00",
     clipQ: "Вставить из буфера?", preview30: "0:30 превью", addTag: "тег",
     stat: { posts: "постов", song: "треков", album: "альбомов", podcast: "подкастов", videos: "видео", collections: "подборок" },
-    coach: [["🎧","Тапни ▶ на обложке — 30 секунд трека заиграют прямо здесь."],["🎛","На экране «Оформление» всё: тумблеры, свой текст, хэштеги и кнопки платформ."],["📌","Главное действие всегда закреплено внизу — публикация в один тап."]],
+    coach: [["🔎","Вставь ссылку или найди релиз по артисту и названию."],["🎧","Прослушай отрывок до того, как собирать пост."],["🎛","Настрой текст, обложку и площадки в «Оформлении»."],["📡","На последнем шаге выбери канал, личный чат или очередь."]],
     gotIt: "Понятно", next: "Дальше",
     shareTitle: "Куда поделиться?", shareAll: "Все площадки",
     presets: "Пресеты", presetSave: "сохранить", presetEmpty: "Сохрани текущее оформление, чтобы применять в один тап",
@@ -75,10 +75,10 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
 
   const SUGGESTIONS = ["Black Sabbath – Paranoid","Sleep – Dragonaut","Electric Wizard – Funeralopolis","Kyuss – Green Machine"];
   const PLATFORM_META = {
-    spotify:{color:"#1DB954",letter:"S",name:"Spotify"}, appleMusic:{color:"#FA2D48",letter:"A",name:"Apple Music"},
-    applePodcasts:{color:"#B150E2",letter:"P",name:"Podcasts"}, youtubeMusic:{color:"#FF0000",letter:"Y",name:"YouTube"},
-    soundcloud:{color:"#FF5500",letter:"S",name:"SoundCloud"}, deezer:{color:"#A238FF",letter:"D",name:"Deezer"},
-    tidal:{color:"#3EB3E7",letter:"T",name:"Tidal"}, yandexMusic:{color:"#FC3F1D",letter:"Я",name:EN?"Yandex":"Яндекс"},
+    spotify:{color:"#1DB954",letter:"●",name:"Spotify"}, appleMusic:{color:"#FA2D48",letter:"♪",name:"Apple Music"},
+    applePodcasts:{color:"#B150E2",letter:"◉",name:"Podcasts"}, youtubeMusic:{color:"#FF0000",letter:"▶",name:"YouTube"},
+    soundcloud:{color:"#FF5500",letter:"☁",name:"SoundCloud"}, deezer:{color:"#A238FF",letter:"≋",name:"Deezer"},
+    tidal:{color:"#3EB3E7",letter:"◆",name:"Tidal"}, yandexMusic:{color:"#FC3F1D",letter:"Я",name:EN?"Yandex":"Яндекс"},
   };
 
   const $ = (id) => document.getElementById(id);
@@ -122,7 +122,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     document.body.classList.toggle("light", !dark);
     $("theme-btn").innerHTML = ico(dark ? "sun" : "moon", "s16");
     $("theme-btn").setAttribute("aria-label", dark ? (EN?"Use light theme":"Включить светлую тему") : (EN?"Use dark theme":"Включить тёмную тему"));
-    const bg = dark ? "#0D0D0E" : "#F5F0E8";
+    const bg = dark ? "#0A0908" : "#EEE4D4";
     try { tg.setHeaderColor(bg); tg.setBackgroundColor(bg); } catch (e) {}
     $("dt-input").style.colorScheme = dark ? "dark" : "light";
   }
@@ -148,7 +148,6 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   document.querySelector('#tabbar [data-tab="home"] span').textContent = EN?"Home":"Главная";
   document.querySelector('#tabbar [data-tab="crate"] span').textContent = EN?"Crate":"Подборка";
   document.querySelector('#tabbar [data-tab="queue"] span').textContent = EN?"Queue":"Очередь";
-  document.querySelector('#tabbar [data-tab="stats"] span').textContent = EN?"Stats":"Статистика";
 
   SUGGESTIONS.forEach((s) => {
     const b = document.createElement("button");
@@ -182,6 +181,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   }
   try { tg.BackButton.onClick(() => { hap.tap(); goBack(); }); } catch(e) {}
   function goBack() {
+    if ($("publish-sheet").classList.contains("open")) { closePublish(); return; }
     if ($("sheet").classList.contains("open")) { closeSheet(); return; }
     cancelPending();
     navStack.pop();
@@ -203,6 +203,8 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   $("q-crate").addEventListener("click", () => { hap.tap(); cancelPending(); openCrate(); });
   $("q-queue").addEventListener("click", () => { hap.tap(); cancelPending(); openQueue(); });
   $("q-stats").addEventListener("click", () => { hap.tap(); cancelPending(); openStats(); });
+  $("admin-tools").addEventListener("click", () => { hap.tap(); cancelPending(); openStats(); });
+  $("create-tab").addEventListener("click", () => { hap.tap(); cancelPending(); loadHome(); show("home"); setTimeout(()=>$("query").focus(),80); });
 
   // Every request is bounded: a hung or ice-cold serverless call can never
   // freeze the UI. Requests flagged `abortable` are cancelled the moment the
@@ -274,7 +276,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
       const b = candPlayBtn(candPlaying); if (b) b.textContent = "▶";
       candPlaying = -1;
     }
-    const cp = document.getElementById("cand-player"); if (cp) cp.classList.remove("on");
+    const cp = document.getElementById("cand-player"); if (cp) cp.classList.remove("on", "playing");
   }
   function refreshPlayIcon(svg) {
     const ring = svg.querySelector(".ring"); if (ring) ring.setAttribute("stroke-dashoffset", 2*Math.PI*28);
@@ -516,7 +518,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     player.src = c.preview;
     player.play().then(() => {
       $("cp-title").textContent = c.title; $("cp-sub").textContent = c.artist;
-      $("cand-player").classList.add("on"); setPlayGlyph(true);
+      $("cand-player").classList.add("on", "playing"); setPlayGlyph(true);
     }).catch(() => hap.err());
     player.onended = () => { advanceCandidate(1, true); };
     const el = $("cand-list").querySelector('.cand[data-idx="'+i+'"]'); if (el) el.scrollIntoView({ behavior:"smooth", block:"center" });
@@ -534,7 +536,8 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   $("cp-close").addEventListener("click", () => { hap.tap(); stopAudio(); });
   $("cp-play").addEventListener("click", () => {
     if (candPlaying < 0) return; hap.tap();
-    if (player.paused) { player.play(); setPlayGlyph(true); } else { player.pause(); setPlayGlyph(false); }
+    if (player.paused) { player.play(); $("cand-player").classList.add("playing"); setPlayGlyph(true); }
+    else { player.pause(); $("cand-player").classList.remove("playing"); setPlayGlyph(false); }
   });
   async function loadDraft(id) {
     cancelPending(); const seq = loadSeq;
@@ -551,9 +554,9 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
       if (!res.ok) { $("home-empty").classList.remove("hidden"); return; }
       isAdmin = Boolean(res.is_admin);
       $("admin-badge").classList.toggle("hidden", !isAdmin);
+      $("admin-tools").classList.toggle("hidden", !isAdmin);
       $("quick").classList.toggle("hidden", !isAdmin);
       $("tab-queue").style.display = isAdmin ? "" : "none";
-      $("tab-stats").style.display = isAdmin ? "" : "none";
       if (isAdmin) refreshQueueBadge();
       loadCrate(refreshCrateBadge);
       historyItems = res.items || [];
@@ -585,6 +588,12 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   let editTags = [], pmOrder = [], pmEnabled = {};
   function openFormat() {
     hap.tap();
+    const release = state.release;
+    $("fmt-preview-title").textContent = release.title;
+    $("fmt-preview-sub").textContent = release.artist;
+    const previewArt = $("fmt-preview-art");
+    previewArt.textContent = release.emoji || "♪";
+    previewArt.style.backgroundImage = safeUrl(release.artwork) ? 'url("'+release.artwork.replace(/"/g, "%22")+'")' : "";
     drawToggles();
     $("cta-input").value = state.release.cta; $("cta-count").textContent = state.release.cta.length;
     editTags = (state.release.hashtags||"").split(/\s+/).filter(Boolean); drawTags();
@@ -742,10 +751,10 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
       const res = await api(action, { draft_id: state.draft_id, hashtags: state.flags.hashtags, quote: state.flags.quote, large_preview: state.flags.large_preview, as_photo: Boolean(state.flags.as_photo), ...(extra||{}) });
       if (res.ok) {
         hap.ok();
-        if (action==="send" && !state.can_publish) { tg.close(); return; }
         main.disabled = false;
-        if (action==="publish" && res.message_id) { startUndo(res.message_id); return; }
+        if (action==="publish" && res.message_id) { startUndo(res.message_id); showSuccess(action); return; }
         main.classList.add("done"); main.innerHTML = ico("check","s18")+(action==="publish"?T.published:T.sent);
+        showSuccess(action);
         setTimeout(() => { renderCard(); }, 2400);
       } else if (res.error==="duplicate") {
         hap.err();
@@ -756,7 +765,29 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     } catch(e) { hap.err(); $("status").textContent = errorText("network"); }
     finally { if ($("dock-done").classList.contains("hidden")) $("action-main").disabled = false; }
   }
-  $("action-main").addEventListener("click", () => deliver($("action-main").dataset.action));
+  function closePublish() { setSheetOpen("publish-sheet", "publish-mask", false); }
+  function openPublish() {
+    hap.tap();
+    $("publish-channel").classList.toggle("hidden", !state.can_publish);
+    $("publish-later").classList.toggle("hidden", !state.can_publish);
+    setSheetOpen("publish-sheet", "publish-mask", true, $("action-main"));
+  }
+  function showSuccess(action) {
+    $("success-title").textContent = action === "publish" ? (EN?"Post is live":"Пост вышел в эфир") : (EN?"Post sent":"Пост отправлен");
+    $("success-copy").textContent = action === "publish" ? (EN?"Done. Time to build the next release.":"Готово. Можно собирать следующий релиз.") : (EN?"Check it in your private chat.":"Проверь результат в личном чате.");
+    document.querySelector(".wrap").inert = true;
+    $("success-screen").classList.add("open"); $("success-screen").setAttribute("aria-hidden", "false");
+    requestAnimationFrame(() => $("success-next").focus());
+  }
+  function hideSuccess() { document.querySelector(".wrap").inert = false; $("success-screen").classList.remove("open"); $("success-screen").setAttribute("aria-hidden", "true"); }
+  $("action-main").addEventListener("click", openPublish);
+  $("publish-mask").addEventListener("click", closePublish);
+  $("publish-channel").addEventListener("click", () => { closePublish(); deliver("publish"); });
+  $("publish-self").addEventListener("click", () => { closePublish(); deliver("send"); });
+  $("publish-later").addEventListener("click", () => { closePublish(); openSheet(); });
+  $("publish-copy").addEventListener("click", () => { closePublish(); $("action-share").click(); });
+  $("success-close").addEventListener("click", hideSuccess);
+  $("success-next").addEventListener("click", () => { hideSuccess(); loadHome(); show("home"); setTimeout(()=>$("query").focus(),80); });
   $("action-crate").addEventListener("click", async () => {
     hap.tap();
     if (!state || !state.release) { hap.err(); return; }
@@ -817,6 +848,28 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
       '<div><div class="eb-t">'+esc(title)+'</div><div class="eb-s">'+esc(sub)+"</div></div></div>";
   }
 
+  function bindSwipe(row, onLeft, onRight) {
+    let startX = 0, startY = 0, tracking = false;
+    row.addEventListener("pointerdown", (event) => {
+      if (event.target.closest("button,.grip,a")) return;
+      startX = event.clientX; startY = event.clientY; tracking = true;
+    });
+    row.addEventListener("pointermove", (event) => {
+      if (!tracking) return;
+      const dx = event.clientX - startX, dy = event.clientY - startY;
+      if (Math.abs(dx) < Math.abs(dy) || Math.abs(dx) < 8) return;
+      row.style.transform = "translateX(" + Math.max(-82, Math.min(82, dx)) + "px)";
+    });
+    const finish = (event) => {
+      if (!tracking) return; tracking = false;
+      const dx = event.clientX - startX; row.style.transform = "";
+      if (dx < -64 && onLeft) { hap.pick(); onLeft(); }
+      else if (dx > 64 && onRight) { hap.pick(); onRight(); }
+    };
+    row.addEventListener("pointerup", finish);
+    row.addEventListener("pointercancel", () => { tracking = false; row.style.transform = ""; });
+  }
+
   /* ── schedule / reschedule ── */
   let sheetMode = { type: "schedule" }, schedulePending = false;
   function pickTime(ts) {
@@ -866,12 +919,14 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   $("sheet-mask").addEventListener("click", closeSheet);
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
-      if ($("share-sheet").classList.contains("open")) closeShare();
+      if ($("success-screen").classList.contains("open")) hideSuccess();
+      else if ($("publish-sheet").classList.contains("open")) closePublish();
+      else if ($("share-sheet").classList.contains("open")) closeShare();
       else if ($("sheet").classList.contains("open")) closeSheet();
       return;
     }
     if (e.key !== "Tab") return;
-    const dialog = $("share-sheet").classList.contains("open") ? $("share-sheet") : ($("sheet").classList.contains("open") ? $("sheet") : null);
+    const dialog = $("publish-sheet").classList.contains("open") ? $("publish-sheet") : ($("share-sheet").classList.contains("open") ? $("share-sheet") : ($("sheet").classList.contains("open") ? $("sheet") : null));
     if (!dialog) return;
     const focusable = [...dialog.querySelectorAll('button:not([disabled]),input:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter((el)=>el.offsetParent !== null);
     if (!focusable.length) return;
@@ -905,7 +960,13 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   function drawCrate() {
     const list = $("crate-list"); list.innerHTML = "";
     $("crate-count").textContent = crateItems.length + " " + T.crateTitle;
-    if (crateItems.length === 0) { list.innerHTML = emptyBox("layers", EN?"Crate is empty":"Подборка пуста", T.crateEmpty); }
+    $("crate-cover-count").textContent = crateItems.length + " " + T.crateTitle;
+    const stack = $("crate-stack").querySelectorAll("i");
+    stack.forEach((tile, index) => {
+      const item = crateItems[index];
+      tile.style.backgroundImage = item && safeUrl(item.artwork) ? 'url("'+String(item.artwork).replace(/"/g,"%22")+'")' : "";
+    });
+    if (crateItems.length === 0) { list.innerHTML = emptyBox("layers", EN?"Build your next set":"Собери свой следующий сет", EN?"Add releases from any card":"Добавляй релизы из любой карточки"); }
     $("crate-empty").textContent = crateItems.length===1 ? T.needMore : "";
     crateItems.forEach((it, i) => {
       const row = document.createElement("div"); row.className = "row"; row.style.opacity = "1"; row.dataset.i = i;
@@ -928,6 +989,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
         }
       });
       bindDrag(row.querySelector(".grip"), row, i);
+      bindSwipe(row, () => row.querySelector(".del").click(), () => { if (i > 0) reorderCrate(i, i - 1); });
       list.appendChild(row);
     });
     const main = $("crate-main"), clear = $("crate-clear"), enough = crateItems.length>=2;
@@ -998,7 +1060,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     try {
       const res = await api("queue", {}); const items = res.items||[];
       $("queue-count").textContent = items.length + " " + T.queueTitle;
-      if (!items.length) { list.innerHTML = emptyBox("clock", T.queueEmptyT, T.queueEmptyS); return; }
+      if (!items.length) { list.innerHTML = emptyBox("clock", EN?"Nothing on air yet":"Пока тишина", EN?"Schedule the next post":"Запланируй следующий пост"); return; }
       items.forEach((it) => {
         const row = document.createElement("div"); row.className = "row"; row.style.opacity = "1";
         row.innerHTML = artHtml(it.artwork, it.emoji, "row-art") +
@@ -1019,6 +1081,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
             button.disabled = false; hap.err(); flash(errorText(e.message));
           }
         });
+        bindSwipe(row, () => row.querySelector(".del").click(), () => row.querySelector(".edit").click());
         list.appendChild(row);
       });
     } catch(e) { $("queue-empty").textContent = T.err; }
@@ -1064,6 +1127,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
 
   /* ── search box events ── */
   $("query").addEventListener("keydown", (e) => { if (e.key==="Enter") search(); });
+  $("search-go").addEventListener("click", () => search());
   $("query").addEventListener("input", () => { $("clear").style.display = $("query").value?"block":"none"; renderTypeahead(); });
   $("query").addEventListener("focus", () => $("searchbar").classList.add("focus"));
   $("query").addEventListener("blur", () => { $("searchbar").classList.remove("focus"); setTimeout(()=>$("typeahead").classList.remove("open"),180); });
@@ -1132,5 +1196,16 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   /* ── boot ── */
   const params = new URLSearchParams(window.location.search);
   const draftParam = params.get("draft") || tg.initDataUnsafe?.start_param;
-  if (draftParam) { loadDraft(draftParam); loadHome(); } else { show("home"); loadHome(); }
+  const localDemo = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && params.get("demo");
+  if (localDemo === "result") {
+    openDraftResult({
+      ok:true, draft_id:"demo", can_publish:true,
+      flags:{hashtags:true,quote:false,large_preview:true,as_photo:false,has_prefix:false},
+      release:{artist:"Electric Wizard",title:"Funeralopolis",kind:"song",emoji:"⚡",year:"2000",genre:"Doom Metal",artwork:location.origin+"/assets/studio-demo.svg",page_url:"https://song.link/demo",preview:null,preview_pending:false,cta:"громкость выше — мир тише",hashtags:"#stonerhand #doom #electricwizard",platforms:[{key:"spotify",label:"Spotify",url:"https://open.spotify.com",enabled:true},{key:"appleMusic",label:"Apple Music",url:"https://music.apple.com",enabled:true},{key:"youtubeMusic",label:"YouTube",url:"https://music.youtube.com",enabled:true}]}
+    }, false);
+  } else if (localDemo === "crate") {
+    isAdmin = true;
+    crateItems = ["Funeralopolis","Dragonaut","Green Machine"].map((title,index)=>({title,artist:["Electric Wizard","Sleep","Kyuss"][index],emoji:"⚡",artwork:location.origin+"/assets/studio-demo.svg",data:{title,artist:["Electric Wizard","Sleep","Kyuss"][index],thumbnail_url:location.origin+"/assets/studio-demo.svg",page_url:"https://song.link/demo",kind:"song"}}));
+    show("crate"); $("crate-dock").classList.add("on"); drawCrate();
+  } else if (draftParam) { loadDraft(draftParam); loadHome(); } else { show("home"); loadHome(); }
 })();

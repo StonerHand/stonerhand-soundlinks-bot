@@ -35,6 +35,33 @@ class WebAppAssetTests(unittest.TestCase):
         self.assertIn("prefers-reduced-motion", css)
         self.assertIn("min-height: 48px", css)
 
+    def test_editorial_redesign_contracts_are_present(self) -> None:
+        html = (ROOT / "webapp" / "index.html").read_text()
+        css = (ROOT / "webapp" / "styles.css").read_text()
+        js = (ROOT / "webapp" / "app.js").read_text()
+        for element_id in (
+            "home-title",
+            "search-go",
+            "format-preview",
+            "crate-cover",
+            "create-tab",
+            "publish-sheet",
+            "success-screen",
+            "cp-vinyl",
+        ):
+            self.assertIn(f'id="{element_id}"', html)
+        self.assertNotIn('data-tab="stats"', html)
+        self.assertIn("@media (max-width:360px)", css)
+        self.assertIn("bindSwipe", js)
+        self.assertIn("showSuccess", js)
+
+    def test_html_ids_are_unique(self) -> None:
+        import re
+
+        html = (ROOT / "webapp" / "index.html").read_text()
+        ids = re.findall(r'\bid="([^"]+)"', html)
+        self.assertEqual(len(ids), len(set(ids)))
+
 
 if __name__ == "__main__":
     unittest.main()
