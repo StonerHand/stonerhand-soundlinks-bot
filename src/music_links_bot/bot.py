@@ -336,12 +336,12 @@ BOT_DESCRIPTIONS = {
 }
 BOT_SHORT_DESCRIPTIONS = {
     "": (
-        "Ссылка или название → готовый музыкальный пост. "
-        "Поиск, редактор, подборки и публикация в Studio."
+        "Ссылка или название → точный релиз и готовый пост. "
+        "Обложка, площадки, редактор, подборки и очередь — в 🎛 Студии."
     ),
     "en": (
-        "A link or title → a finished music post. "
-        "Search, editing, crates and publishing in Studio."
+        "A link or title → the exact release and a finished post. "
+        "Cover art, platforms, editing, crates and queue — in 🎛 Studio."
     ),
 }
 

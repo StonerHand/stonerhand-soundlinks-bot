@@ -2,199 +2,240 @@
 
 # 🎧 StonerHand Soundlinks Bot
 
-![Актуальное превью StonerHand Studio](assets/telegram-preview-v2.png)
+![Превью StonerHand Studio](assets/telegram-preview-v2.png)
 
-### Кидаешь ссылку — получаешь идеальный пост
+### Ссылка или название → точный релиз и готовый пост
 
-**Трек, альбом, плейлист, подкаст, YouTube или NTS Radio → карточка с обложкой,
-автохэштегами и кнопками всех стриминговых площадок. В один тап.**
+**Обложка, площадки, редактор, подборки и очередь — в 🎛 Студии.**
 
 [English](README.md) · [Архитектура](ARCHITECTURE.ru.md) · [Бот](https://t.me/StonerHandBot) · [Канал](https://t.me/stonerhand)
 
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![Telegram](https://img.shields.io/badge/Telegram-Bot%20+%20Mini%20App-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)
+![Telegram](https://img.shields.io/badge/Telegram-Bot%20%2B%20Mini%20App-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-Serverless-000000?style=for-the-badge&logo=vercel&logoColor=white)
 ![CI](https://img.shields.io/github/actions/workflow/status/StonerHand/stonerhand-soundlinks-bot/ci.yml?style=for-the-badge&label=CI)
 ![License](https://img.shields.io/badge/License-MIT-2ea44f?style=for-the-badge)
 
-<img src="assets/studio-demo.svg" alt="Демо Студии: поиск → винил → карточка с кнопками платформ" width="100%">
-
 </div>
 
+StonerHand превращает музыкальные ссылки и поисковые запросы в готовые Telegram-посты. Бот работает в личке, группах, каналах и inline-режиме, а Mini App «Студия» даёт визуальный редактор, подборки и отложенную публикацию.
+
 ```text
-вход   →  https://open.spotify.com/track/...   (или просто «black sabbath paranoid»)
+Вход:   https://open.spotify.com/track/…
+        или «black sabbath paranoid»
 
-выход  →  📻 · Black Sabbath
-          Paranoid
-
-          кнопки ниже, трек ждет
-
-          #stonerhand #track #heavymetal
-
-          [🟢 Spotify] [⚪ Apple] [🟦 Deezer] [⚫ Tidal]
-          [🪩 Все платформы]
+Выход:  артист + релиз + обложка + автохэштеги
+        + кнопки Spotify / Apple Music / YouTube / Deezer / Tidal / …
+        + общая ссылка Song.link
 ```
 
-## 🎛 Студия — Mini App внутри Telegram
+## Возможности
 
-Визуальный редактор постов: открывается кнопкой меню или кнопкой 🎛 под любым постом.
+### Бот в Telegram
 
-- **Поиск** — текстом с выбором из нескольких релизов, ссылкой или прямо из буфера
-  (Студия сама предложит вставить скопированную ссылку). Кинь несколько ссылок
-  сразу → Студия соберёт из них подборку автоматически
-- **▶ Прослушка** — 30 секунд трека прямо на обложке, с кольцом прогресса и эквалайзером
-- **Оформление** — один шит с тумблерами в стиле лампового усилителя: хэштеги, цитата,
-  📸 фото-режим (с опц. брендированной рамкой — лого + подпись канала), размер превью +
-  свой текст, свои теги и набор/порядок кнопок платформ
-- **Док действий** — публикация всегда закреплена внизу; рядом отложка, подборка и шаринг
-- **Undo** — после публикации 5 секунд на «Отменить»: пост удаляется из канала
-- **🧺 Конструктор подборок** — накидай треков с любых карточек → один пост-плейлист
-- **🕒 Отложенный постинг** — «через час / вечером / своя дата», очередь видна и отменяема
-- **🕘 История** — недавние релизы с пометкой «уже в канале» + подсказки при вводе
-- **📊 Дашборд** — статистика с графиками (для админа)
-- **🎨 Живой акцент** — карточка подкрашивается доминирующим цветом обложки
-- **☀️🌙 Светлая и тёмная темы** — следует за Telegram, с переключателем в шапке
-- **📱 Нижний таб-бар** — Главная / Подборка / Очередь / Стата; шрифты Unbounded + Golos Text + JetBrains Mono
+- принимает ссылку на трек, альбом, подкаст, Spotify-плейлист или артиста, YouTube-видео, SoundCloud, Bandcamp и NTS Radio;
+- ищет музыку по названию в личном чате и предлагает до шести релизов вместо случайного первого совпадения;
+- показывает один обновляемый progress-экран: поиск → площадки → готовая карточка;
+- создаёт черновик с обложкой, CTA, хэштегами и кнопками площадок;
+- позволяет менять хэштеги, цитату и размер превью прямо под сообщением;
+- отправляет пост себе, добавляет трек в подборку или публикует в канал;
+- собирает несколько ссылок в один нумерованный пост;
+- хранит `/crate`: добавление, удаление и перестановка треков;
+- работает inline: `@StonerHandBot запрос` в любом чате;
+- в канале-источнике может заменить сырую ссылку аккуратным постом;
+- предупреждает о повторной публикации релиза;
+- поддерживает RU/EN, повтор действия после ошибки и защиту от двойных нажатий.
 
-## Что умеет сам бот
+Команды: `/start`, `/help`, `/guide`, `/platforms`, `/channel`, `/crate`, `/stats`, `/id`.
 
-- 🔎 **Поиск без ссылки** — напиши `артист - трек` и выбери точный релиз из найденных вариантов
-- 🪄 **Inline** — `@StonerHandBot запрос` в любом чате → до шести релизов + быстрый вход в Студию
-- 🎚 **Редактор в чате** — понятные настройки, отправка себе, подборка, Студия и 📤 «В канал»
-- 🧭 **Новый `/start`** — короткий онбординг для первого запуска и рабочие действия для постоянных пользователей
-- 📦 **`/crate`** — сохранённая подборка с удалением и перестановкой треков прямо в чате
-- 🛡 **Антидубль** — предупредит, если релиз уже публиковался в канале
-- 🏷 **Жанры сами** — `#doom`, `#hiphop` из метаданных iTunes
-- 📚 **Подборки** — несколько ссылок → нумерованный пост-плейлист
-- 🤖 **Автопилот каналов** — бот-админ молча заменяет сырые ссылки на посты
-- 🫥 **Невидимые ответы в группах** — карточку видит только тот, кто кинул ссылку (опц., `EPHEMERAL_GROUP_REPLIES`)
-- ⚡ **Живая загрузка** — одно сообщение проходит этапы поиска, сбора площадок и карточки; ошибку можно повторить кнопкой
-- 🌍 **RU/EN** — интерфейс подстраивается под язык пользователя
+### 🎛 Mini App «Студия»
 
-**Источники:** Spotify, Apple Music, YouTube, Deezer, Tidal, Яндекс.Музыка,
-SoundCloud, Bandcamp и NTS Radio — резолвятся через Song.link/Odesli.
+- поиск по тексту, одной ссылке или пакетная вставка нескольких ссылок;
+- выбор точного релиза с обложкой и 30-секундной аудиопрослушкой;
+- live-preview будущего Telegram-поста;
+- настройка CTA, хэштегов, цитаты, размера превью, фото-режима, состава и порядка площадок;
+- до четырёх пользовательских пресетов оформления в Telegram CloudStorage;
+- подборка до 10 треков с drag-and-drop и отправкой одним постом;
+- история последних релизов и отметка «уже опубликован»;
+- публикация в канал, отправка себе и undo после публикации;
+- очередь до 50 постов: отложить, перенести или отменить;
+- admin-статистика по типам контента, пользователям и чатам;
+- светлая/тёмная тема, fullscreen, хэптика, clipboard-подсказка и системная кнопка «Назад»;
+- адаптивный mobile-first UI с доступными состояниями загрузки, ошибок и пустых экранов.
 
-Пересланный пост не теряет смысла: CTA-фраза — живая ссылка на song.link со всеми площадками
-(кнопки при пересылке съедает сам Telegram, у всех ботов).
+Публикация в канал, очередь, undo и статистика доступны владельцу из `ADMIN_CHAT_ID`. Обычный пользователь может искать, редактировать, собирать подборки и отправлять готовые посты себе.
 
-## 🩺 Неубиваемость
+## Поддерживаемые источники
 
-- **CI** — GitHub Actions гоняет 295+ тестов, линтер, проверку JS и хедлесс-смоук Студии на каждый пуш
-- **`/api/health`** — пульс бота: Telegram API, регистрация webhook, Redis и бэклог
-  очереди; заодно доставляет созревшие отложенные посты
-- **Посты не теряются** — упавшая отложенная публикация ретраится с backoff (а не
-  дропается); каждый запрос ограничен по времени, зависший вызов не вешает инстанс
-- **Без дублей** — повторные доставки апдейтов Telegram отсекаются по `update_id`
-- **Алерты владельцу** — упавший health, застрявшая очередь, потерянный отложенный пост
-  или крашащийся webhook — бот пишет тебе в личку (не чаще раза в час на проблему)
-- **Самовосстановление** — ежедневный cron заново регистрирует webhook, меню и описания
-- **Авторизация по умолчанию** — секрет webhook выводится из токена автоматически,
-  подделать апдейт нельзя даже без настройки
+| Вход | Получение метаданных | Результат |
+| --- | --- | --- |
+| Spotify, Apple Music, Deezer, Tidal, Яндекс Музыка, Bandcamp и другие музыкальные URL | Song.link / Odesli | единая карточка и ссылки площадок |
+| Название релиза | iTunes Search → Song.link | список кандидатов и карточка выбранного релиза |
+| YouTube / YouTube Music | Song.link или YouTube oEmbed | музыкальная карточка либо видео-пост |
+| SoundCloud | Song.link, затем SoundCloud oEmbed fallback | музыкальная карточка |
+| Spotify playlist / artist | Spotify oEmbed | плейлист или артист |
+| NTS Radio | Open Graph страницы NTS | радио-пост |
 
-**Рекомендация:** заведи бесплатный монитор [UptimeRobot](https://uptimerobot.com) на
-`https://<домен>/api/health` каждые 5 минут — это сразу: детект падений, алерты,
-точность отложки до минуты и тёплые инстансы.
+Song.link API key необязателен. Без него используется публичный endpoint.
 
-## Быстрый старт (Vercel, ~10 минут)
+## Быстрый запуск на Vercel
 
-1. Форкни репозиторий → импортируй в [Vercel](https://vercel.com) (пресет Python, корень `./`)
-2. Добавь env: `BOT_TOKEN`, `SET_WEBHOOK_SECRET` (любая длинная строка), `CRON_SECRET`
-3. Deploy → открой `https://<домен>/api/set_webhook?secret=<твой секрет>`
-4. В [@BotFather](https://t.me/BotFather): `/setinline` → включи inline-режим
-5. Готово. Кидай боту ссылку
+### 1. Создай бота
 
-<details>
-<summary><b>⚙️ Все переменные окружения</b></summary>
+1. Получи токен у [@BotFather](https://t.me/BotFather).
+2. Включи inline-режим командой `/setinline`.
+3. Импортируй репозиторий в Vercel с корневой директорией `./`.
 
-| Переменная | Зачем |
-| --- | --- |
-| `BOT_TOKEN` ⭐ | токен из BotFather |
-| `SET_WEBHOOK_SECRET` ⭐ | защита `/api/set_webhook` |
-| `CRON_SECRET` | ежедневное самовосстановление webhook через Vercel Cron |
-| `UPSTASH_REDIS_REST_URL/TOKEN` | Redis: общий кеш, живой `/stats`, вечные черновики, антидубль, история/очередь Студии, дедуп алертов (подборка хранится на стороне Mini App, поэтому работает и без Redis) |
-| `ADMIN_CHAT_ID` | твой chat id (команда `/id`): приватная статистика, право 📤 и алерты |
-| `PUBLISH_CHAT_ID` | куда постит 📤 (по умолчанию `@stonerhand`) |
-| `PRIMARY_PLATFORM` | какая площадка первая: `spotify`, `appleMusic`, `tidal`… |
-| `SONGLINK_USER_COUNTRIES` | регионы Song.link через запятую, например `US,DE` |
-| `BOT_UI_MODE` | стиль кнопок: `stonerhand` / `minimal` / `editorial` |
-| `BRAND_PHOTO_FRAME` | `1` — в 📸 фото-режиме накладывает брендированную рамку на обложку (нижняя подпись + опц. лого). По умолчанию выкл |
-| `BRAND_LOGO_URL` | лого для угла фото-рамки |
-| `BRAND_LABEL` | подпись на фото-рамке (по умолчанию `@`+канал) |
-| `EPHEMERAL_GROUP_REPLIES` | `1` — в группах бот отвечает «невидимо» (карточку видит только тот, кто кинул ссылку). Опционально; при отсутствии поддержки со стороны Telegram молча откатывается к обычному ответу |
-| `TELEGRAM_WEBHOOK_SECRET` | подпись входящих updates (не задан — выводится из токена автоматически) |
-| `WEBAPP_URL`, `WEBHOOK_BASE_URL`, `STATS_PATH`, `LOG_LEVEL` | тонкая настройка |
+### 2. Настрой окружение
 
-Алиасы Vercel KV (`KV_REST_API_URL/TOKEN`) тоже работают. Без Redis всё живёт в памяти инстанса.
-</details>
+Минимум:
 
-<details>
-<summary><b>🚂 Railway / локально (polling)</b></summary>
+```dotenv
+BOT_TOKEN=123456:telegram-token
+SET_WEBHOOK_SECRET=long-random-secret
+CRON_SECRET=another-long-random-secret
+```
+
+Для production рекомендуется также подключить Upstash Redis и указать владельца/канал:
+
+```dotenv
+ADMIN_CHAT_ID=123456789
+PUBLISH_CHAT_ID=@your_channel
+UPSTASH_REDIS_REST_URL=https://…
+UPSTASH_REDIS_REST_TOKEN=…
+```
+
+Полный шаблон находится в [.env.example](.env.example).
+
+### 3. Зарегистрируй webhook
+
+После первого deploy открой:
+
+```text
+https://<production-domain>/api/set_webhook?secret=<SET_WEBHOOK_SECRET>
+```
+
+Endpoint зарегистрирует `/api/telegram`, команды, RU/EN-описания профиля и кнопку меню Студии. Vercel Cron повторяет синхронизацию ежедневно в `03:00 UTC`.
+
+### 4. Проверь production
+
+```text
+https://<production-domain>/api/health
+```
+
+Здоровый ответ имеет HTTP 200 и `"ok": true`. Для своевременной доставки отложенных постов поставь внешний монитор на `/api/health` с интервалом 5 минут: каждый health-check также запускает обработку очереди.
+
+## Переменные окружения
+
+| Переменная | Обязательность | Назначение |
+| --- | --- | --- |
+| `BOT_TOKEN` | обязательно | токен Telegram-бота |
+| `SET_WEBHOOK_SECRET` | production | защита ручного вызова `/api/set_webhook` |
+| `CRON_SECRET` | рекомендуется | авторизация Vercel Cron через Bearer token |
+| `ADMIN_CHAT_ID` | для админ-функций | владелец: публикация, очередь, undo, статистика и алерты |
+| `PUBLISH_CHAT_ID` | опционально | канал назначения; по умолчанию `@stonerhand` |
+| `WEBAPP_URL` | опционально | явный URL Студии; иначе берётся production URL Vercel |
+| `WEBHOOK_BASE_URL` | опционально | явный базовый URL webhook |
+| `UPSTASH_REDIS_REST_URL` / `TOKEN` | рекомендуется | общий кеш, дедупликация, черновики, история, очередь и статистика |
+| `KV_REST_API_URL` / `TOKEN` | альтернатива | совместимые алиасы Vercel KV |
+| `SONGLINK_API_KEY` | опционально | ключ Song.link/Odesli |
+| `SONGLINK_USER_COUNTRIES` | опционально | регионы Song.link через запятую; по умолчанию `US` |
+| `PRIMARY_PLATFORM` | опционально | первая кнопка площадки; по умолчанию `spotify` |
+| `BOT_UI_MODE` | опционально | `stonerhand`, `minimal` или `editorial` |
+| `EPHEMERAL_GROUP_REPLIES` | опционально | пробовать отправлять персональные ответы в группах |
+| `BRAND_PHOTO_FRAME` | опционально | `1` включает брендированную рамку в фото-режиме |
+| `BRAND_LOGO_URL` / `BRAND_LABEL` | опционально | логотип и подпись рамки |
+| `TELEGRAM_WEBHOOK_SECRET` | опционально | явная подпись webhook; иначе безопасно выводится из `BOT_TOKEN` |
+| `STATS_PATH` | опционально | локальный JSON-файл статистики вне Vercel |
+| `LOG_LEVEL` | опционально | уровень логирования; по умолчанию `INFO` |
+
+Без Redis бот остаётся работоспособным, но serverless-инстансы не разделяют память: долговечная очередь, история, межинстансовый дедуп и полная статистика требуют Redis.
+
+## Локальная разработка
 
 ```bash
-pip install -r requirements.txt
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt pyflakes
+cp .env.example .env
 PYTHONPATH=src python -m music_links_bot
 ```
 
-`railway.toml` уже в репозитории. Не запускай polling одновременно с Vercel-webhook — будут дубли.
-</details>
+Локальный режим использует polling. Не запускай его одновременно с production webhook на том же токене — Telegram начнёт конфликтовать между двумя способами получения updates.
 
-## Под капотом
-
-**Python 3.10+ · python-telegram-bot 21 · httpx · Song.link/Odesli · iTunes Search · Pillow · Upstash Redis · Vercel**
-
-```text
-api/telegram.py      webhook: тёплый reuse, тик очереди, алерт при краше
-api/webapp.py        API Студии (подпись initData, черновики, очередь, подборки)
-api/health.py        пульс: Telegram/webhook/Redis + алерты + тик очереди
-api/set_webhook.py   самовосстановление: webhook, команды, описания, кнопка меню
-webapp/              Mini App «Студия» — раздельные HTML, CSS и vanilla JS
-src/music_links_bot/
-  bot.py             роутинг, редактор, inline, черновики
-  bot_runtime.py     сессии, callback v2, идемпотентность и диагностика
-  bot_crate.py       подборка в чате: дедуп, порядок, Redis/memory
-  bot_ui.py          Telegram-экраны и клавиатуры
-  keyboards.py       Telegram-клавиатуры и кнопки платформ
-  studio_models.py   модели и валидация Mini App
-  studio_storage.py  история и зеркало подборки
-  publish_queue.py   очередь отложенных публикаций
-  songlink.py        кроссплатформенные ссылки + обложки + Redis-кеш
-  search.py          поиск, жанры и аудио-превью (iTunes)
-  branding.py        опц. брендированная рамка обложки (Pillow)
-  alerts.py          DM владельцу о проблемах (дедуп через Redis)
-  kvstore.py         Redis по REST, мягкая деградация
-  i18n.py            RU/EN интерфейс
-  formatter.py       макет постов, хэштеги, CTA
-  …и ещё дюжина маленьких модулей с одной задачей у каждого
-```
-
-Полная карта — в [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
+Проверки:
 
 ```bash
-PYTHONPATH=src python -m unittest discover -s tests   # 270+ тестов, без сети
+python -m pyflakes src api tests
+PYTHONPATH=src python -m unittest discover -s tests -v
+node --check webapp/app.js
+node --check webapp/api-client.js
+node --check webapp/cloud-storage.js
+python tests/e2e/smoke.py
 ```
 
-## Свой канал вместо StonerHand
+E2E smoke требует Playwright и Chromium (`pip install playwright && playwright install chromium`). CI выполняет lint, unit/integration tests, проверку JavaScript и отдельный headless smoke Mini App.
 
-`constants.py` (канал, площадки) → `phrases.py` (голос) → `formatter.py` (макет) →
-`.env` (`PUBLISH_CHAT_ID`, `PRIMARY_PLATFORM`). Всё брендовое собрано в этих файлах.
+## Архитектура в одном экране
 
-<details>
-<summary><b>🚑 Если что-то не работает</b></summary>
+```mermaid
+flowchart LR
+    TG["Telegram: bot / group / channel / inline"] --> WH["POST /api/telegram"]
+    APP["Mini App /app"] --> API["POST /api/webapp"]
+    WH --> BOT["Bot handlers + runtime"]
+    API --> BOT
+    BOT --> LOOKUP["Search + provider adapters"]
+    LOOKUP --> FORMAT["Normalized models + formatter"]
+    FORMAT --> TG
+    BOT <--> KV[("Upstash Redis\ncache · drafts · queue · history")]
+    HEALTH["GET /api/health"] --> QUEUE["Publish queue tick"]
+    QUEUE --> TG
+```
 
-| Симптом | Лечение |
+Основные границы:
+
+- `api/` — serverless transport: Telegram webhook, Studio API, health и настройка webhook;
+- `src/music_links_bot/bot.py` — композиция приложения и Telegram handlers;
+- `bot_lookup.py`, `songlink.py`, `search.py` и provider-модули — получение и нормализация метаданных;
+- `bot_runtime.py`, `request_guard.py` — сессии, callback v2, leases, rate limit и идемпотентность;
+- `formatter.py`, `keyboards.py`, `bot_ui.py`, `i18n.py` — представление Telegram;
+- `studio_models.py`, `studio_storage.py`, `publish_queue.py` — состояние Студии и публикаций;
+- `webapp/` — Mini App без build-step: HTML, CSS и ES modules.
+
+Подробно: [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
+
+## Надёжность и безопасность
+
+- Telegram webhook проверяется через `X-Telegram-Bot-Api-Secret-Token`;
+- Mini App `initData` проверяется HMAC-SHA256 и считается просроченным через 24 часа;
+- входной update ограничен 1 MiB, Studio request — 64 KiB;
+- внешние вызовы ограничены таймаутами, lookup выполняется параллельно;
+- повторные Telegram updates, callback и Studio mutations дедуплицируются;
+- очередь использует межинстансовый lock, job lease, три попытки и backoff;
+- CSP, запрет опасных browser permissions, экранирование HTML и проверка внешних URL;
+- ошибки Redis приводят к мягкому memory fallback, а критические сбои — к DM владельцу.
+
+## Адаптация под свой канал
+
+1. Задай `PUBLISH_CHAT_ID` и `ADMIN_CHAT_ID`.
+2. Измени канал/бренд в `constants.py`, `keyboards.py` и `phrases.py`.
+3. При необходимости настрой `PRIMARY_PLATFORM`, `BOT_UI_MODE` и фото-рамку.
+4. Обнови тексты профиля в `BOT_DESCRIPTIONS` и `BOT_SHORT_DESCRIPTIONS`.
+5. Вызови `/api/set_webhook`, чтобы синхронизировать Telegram.
+
+## Диагностика
+
+| Симптом | Что проверить |
 | --- | --- |
-| Бот молчит | Открой `/api/health` — он скажет, что сломано |
-| Кнопки меню не реагируют | Открой `/api/set_webhook?secret=…` (или дождись ночного cron) |
-| Посты дублируются | Работают и polling, и webhook — выключи один |
-| В канале не заменяет ссылку | Дай боту право удалять сообщения |
-| `/stats` по нулям | Подключи Redis (Upstash, бесплатно) |
-| Inline не работает | `/setinline` в BotFather + один вызов `/api/set_webhook` |
-| Отложенный пост опаздывает | Пингуй `/api/health` каждые 5 мин (UptimeRobot) — очередь тикает с каждым пингом |
-| Не приходят алерты | Проверь `ADMIN_CHAT_ID` (команда `/id`) |
-| Корень сайта отдаёт 404 | Так и задумано: живые пути — `/app`, `/api/health` и `/api/*` |
-
-</details>
+| Бот молчит | `/api/health`, `BOT_TOKEN`, webhook URL и последние ошибки Telegram |
+| Меню или описание устарели | `/api/set_webhook?secret=…` |
+| Inline не работает | `/setinline` у BotFather и повторная регистрация webhook |
+| Нельзя публиковать | `ADMIN_CHAT_ID`, `PUBLISH_CHAT_ID` и права бота в канале |
+| Очередь опаздывает | Redis и внешний ping `/api/health` каждые 5 минут |
+| Статистика сбрасывается | подключение Upstash Redis |
+| Дубли | не запущены ли polling и webhook одновременно |
+| `/` возвращает 404 | это нормально; публичные пути — `/app` и `/api/*` |
 
 ## Лицензия
 
-[MIT](LICENSE) — форкай, переделывай, запускай для своего канала. 🤘
+[MIT](LICENSE)
