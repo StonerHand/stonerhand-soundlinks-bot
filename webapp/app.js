@@ -40,6 +40,17 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     flow: ["Find","Style","Send"], support: "All music platforms", batch: "Several links → crate",
     quick: { crate:["Crate","Build a set"], inline:["Inline search","In any chat"], queue:["Queue","Publishing plan"], stats:["Analytics","Channel pulse"] },
     readyCover: "Artwork", readyNoCover: "No artwork", readyHashtags: "Hashtags", readyClean: "Clean text", readyPlatforms: "platforms",
+    ui: {
+      heroKicker:"MUSIC POST WORKSHOP", heroTitle:"Build a post,<br><em>that sounds.</em>",
+      homeError:"Could not refresh", homeErrorCopy:"Check your connection and retry", loadError:"Could not load data", retry:"Retry",
+      cancelSearch:"Cancel search", notFoundHead:"Nothing found", notFoundTitle:"Release not found", notFoundCopy:"Refine the artist and title or paste a direct link", editQuery:"Edit query",
+      resultKicker:"READY TO AIR", resultCopy:"This is what your audience will see", format:"Style", livePreview:"LIVE PREVIEW", ctaPlaceholder:"Add your own caption…", publishedStamp:"PUBLISHED", sentStamp:"SENT",
+      saved:"Saved", saving:"Saving…", saveError:"Not saved", onePlatform:"Keep at least one platform", done:"Done", content:"Content", ownText:"Your text", hashtags:"Hashtags", platforms:"Platforms & order",
+      crate:"Crate", crateKicker:"CURATED BY STONERHAND", crateHero:"Your next set", queue:"Queue", stats:"Analytics", period:"All time", breakdown:"Breakdown", create:"Create",
+      close:"Close", publishKicker:"FINAL STEP", publishTitle:"Where should the post go?",
+      destinations:[["To channel","Publish for everyone"],["Send to me","Check in your private chat"],["Add to queue","Choose a date and time"],["Share a link","Choose a music platform"]],
+      successNext:"Create another", successClose:"Back to the post",
+    },
     shareTitle: "Share where?", shareAll: "All platforms",
     presets: "Presets", presetSave: "save", presetEmpty: "Save the current look to reuse it",
     presetName: "Preset", reschedule: "Reschedule",
@@ -71,6 +82,17 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     flow: ["Найти","Оформить","Отправить"], support: "Все музыкальные сервисы", batch: "Несколько ссылок → подборка",
     quick: { crate:["Подборка","Собрать сет"], inline:["Inline-поиск","В любом чате"], queue:["Очередь","Планы на эфир"], stats:["Статистика","Ритм канала"] },
     readyCover: "Обложка", readyNoCover: "Без обложки", readyHashtags: "Хэштеги", readyClean: "Чистый текст", readyPlatforms: "площадок",
+    ui: {
+      heroKicker:"МУЗЫКАЛЬНАЯ МАСТЕРСКАЯ", heroTitle:"Собери пост,<br><em>который звучит.</em>",
+      homeError:"Не удалось обновить", homeErrorCopy:"Проверь соединение и повтори", loadError:"Не удалось загрузить данные", retry:"Ещё раз",
+      cancelSearch:"Отменить поиск", notFoundHead:"Ничего не найдено", notFoundTitle:"Релиз не найден", notFoundCopy:"Уточни исполнителя и название или вставь прямую ссылку", editQuery:"Изменить запрос",
+      resultKicker:"ГОТОВО К ЭФИРУ", resultCopy:"Так пост увидит аудитория", format:"Оформление", livePreview:"ЖИВОЕ ПРЕВЬЮ", ctaPlaceholder:"Добавь свой комментарий…", publishedStamp:"ОПУБЛИКОВАНО", sentStamp:"ОТПРАВЛЕНО",
+      saved:"Сохранено", saving:"Сохраняю…", saveError:"Не сохранено", onePlatform:"Оставь хотя бы одну площадку", done:"Готово", content:"Содержимое", ownText:"Свой текст", hashtags:"Хэштеги", platforms:"Площадки и порядок",
+      crate:"Подборка", crateKicker:"СОБРАНО STONERHAND", crateHero:"Следующий сет", queue:"Очередь", stats:"Статистика", period:"За всё время", breakdown:"Разбивка", create:"Создать",
+      close:"Закрыть", publishKicker:"ФИНАЛЬНЫЙ ШАГ", publishTitle:"Куда отправить пост?",
+      destinations:[["В канал","Опубликовать для всех"],["Отправить себе","Проверить в личном чате"],["Добавить в очередь","Выбрать дату и время"],["Поделиться ссылкой","Выбрать музыкальную площадку"]],
+      successNext:"Создать следующий", successClose:"Вернуться к посту",
+    },
     shareTitle: "Куда поделиться?", shareAll: "Все площадки",
     presets: "Пресеты", presetSave: "сохранить", presetEmpty: "Сохрани текущее оформление, чтобы применять в один тап",
     presetName: "Пресет", reschedule: "Перенести",
@@ -106,6 +128,14 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     err(){try{tg.HapticFeedback.notificationOccurred("error")}catch(e){}},
   };
   function esc(v){const d=document.createElement("div");d.textContent=v==null?"":String(v);return d.innerHTML;}
+  function plural(n, enOne, enMany, ruOne, ruFew, ruMany) {
+    if (EN) return Number(n) === 1 ? enOne : enMany;
+    const v=Math.abs(Number(n))%100, d=v%10;
+    if (v>10 && v<20) return ruMany;
+    if (d===1) return ruOne;
+    if (d>=2 && d<=4) return ruFew;
+    return ruMany;
+  }
   function safeUrl(v){const u=String(v==null?"":v);return /^https?:\/\//i.test(u)?esc(u):"";}
   function artHtml(url,emoji,cls){const s=safeUrl(url);return s?'<img class="'+cls+'" alt="" loading="lazy" data-emoji="'+esc(emoji||"🎵")+'" src="'+s+'">':'<div class="'+cls+'">'+esc(emoji||"🎵")+"</div>";}
   // A broken cover must never leave an empty hole: swap it for the emoji tile.
@@ -123,6 +153,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
 
   /* ── theme ── */
   let dark = (tg.colorScheme || "dark") !== "light";
+  let themePinned = false;
   function applyTheme() {
     document.body.classList.toggle("dark", dark);
     document.body.classList.toggle("light", !dark);
@@ -132,9 +163,46 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     try { tg.setHeaderColor(bg); tg.setBackgroundColor(bg); } catch (e) {}
     $("dt-input").style.colorScheme = dark ? "dark" : "light";
   }
-  $("theme-btn").addEventListener("click", () => { hap.tap(); dark = !dark; applyTheme(); cloud.set("theme", dark?"d":"l"); });
-  cloud.get("theme", (e,v) => { if (v==="l") dark=false; else if (v==="d") dark=true; applyTheme(); });
+  $("theme-btn").addEventListener("click", () => { hap.tap(); dark = !dark; themePinned = true; applyTheme(); cloud.set("theme", dark?"d":"l"); });
+  cloud.get("theme", (e,v) => { if (v==="l") { dark=false; themePinned=true; } else if (v==="d") { dark=true; themePinned=true; } applyTheme(); });
+  try { tg.onEvent?.("themeChanged", () => { if (!themePinned) { dark = tg.colorScheme !== "light"; applyTheme(); } }); } catch(e) {}
   applyTheme();
+
+  /* Telegram can reserve more space than CSS env(safe-area-inset-*),
+     especially in fullscreen mode. Keep every fixed control inside it. */
+  function syncSafeArea() {
+    const inset = tg.contentSafeAreaInset || tg.safeAreaInset || {};
+    const root = document.documentElement.style;
+    root.setProperty("--tg-safe-top", Math.max(0, Number(inset.top)||0)+"px");
+    root.setProperty("--tg-safe-right", Math.max(0, Number(inset.right)||0)+"px");
+    root.setProperty("--tg-safe-bottom", Math.max(0, Number(inset.bottom)||0)+"px");
+    root.setProperty("--tg-safe-left", Math.max(0, Number(inset.left)||0)+"px");
+  }
+  syncSafeArea();
+  try { tg.onEvent?.("safeAreaChanged", syncSafeArea); tg.onEvent?.("contentSafeAreaChanged", syncSafeArea); tg.onEvent?.("viewportChanged", syncSafeArea); } catch(e) {}
+
+  /* Prefer Telegram's native primary action where it exists. Browsers and
+     older clients keep the custom dock, so the flow never loses its CTA. */
+  const nativeMain = tg.MainButton && typeof tg.MainButton.show === "function" ? tg.MainButton : null;
+  let nativeMainHandler = null;
+  function hideNativeMain() {
+    document.body.classList.remove("native-main-active");
+    if (!nativeMain) return;
+    try { if (nativeMainHandler) nativeMain.offClick?.(nativeMainHandler); nativeMainHandler=null; nativeMain.hideProgress?.(); nativeMain.hide(); } catch(e) {}
+  }
+  function showNativeMain(text, handler) {
+    if (!nativeMain) return false;
+    try {
+      if (nativeMainHandler) nativeMain.offClick?.(nativeMainHandler);
+      nativeMainHandler = handler; nativeMain.setText?.(text); nativeMain.enable?.(); nativeMain.onClick?.(handler); nativeMain.show();
+      document.body.classList.add("native-main-active");
+      return true;
+    } catch(e) { document.body.classList.remove("native-main-active"); return false; }
+  }
+  function setNativeMainBusy(busy) {
+    if (!nativeMain) return;
+    try { if (busy) { nativeMain.disable?.(); nativeMain.showProgress?.(false); } else { nativeMain.hideProgress?.(); nativeMain.enable?.(); } } catch(e) {}
+  }
 
   /* static texts */
   $("query").placeholder = T.ph;
@@ -160,6 +228,22 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   $("q-inline-title").textContent = T.quick.inline[0]; $("q-inline-sub").textContent = T.quick.inline[1];
   $("q-queue-title").textContent = T.quick.queue[0]; $("q-queue-sub").textContent = T.quick.queue[1];
   $("q-stats-title").textContent = T.quick.stats[0]; $("q-stats-sub").textContent = T.quick.stats[1];
+  $("hero-kicker").textContent = T.ui.heroKicker; $("home-title").innerHTML = T.ui.heroTitle;
+  $("home-alert-title").textContent = T.ui.homeError; $("home-alert-copy").textContent = T.ui.homeErrorCopy; $("home-retry").textContent = T.ui.retry;
+  $("loading-cancel").setAttribute("aria-label", T.ui.cancelSearch);
+  $("cand-label").textContent = T.found; $("result-label").textContent = T.previewTitle;
+  $("nf-head").textContent = T.ui.notFoundHead; $("nf-title").textContent = T.ui.notFoundTitle; $("nf-copy").textContent = T.ui.notFoundCopy; $("nf-retry").textContent = T.ui.editQuery;
+  $("result-kicker").textContent = T.ui.resultKicker; $("result-copy").textContent = T.ui.resultCopy;
+  $("format-title").textContent = T.ui.format; $("format-kicker").textContent = T.ui.livePreview; $("fmt-sync").textContent = T.ui.saved;
+  $("cta-input").placeholder = T.ui.ctaPlaceholder;
+  $("format-content").textContent = T.ui.content; $("format-text").textContent = T.ui.ownText; $("format-tags").textContent = T.ui.hashtags; $("format-platforms").textContent = T.ui.platforms;
+  $("crate-label").textContent = T.ui.crate; $("crate-kicker").textContent = T.ui.crateKicker; $("crate-hero-title").textContent = T.ui.crateHero;
+  $("queue-label").textContent = T.ui.queue; $("stats-title").textContent = T.ui.stats; $("stats-period").textContent = T.ui.period; $("stats-breakdown-label").textContent = T.ui.breakdown;
+  $("create-label").textContent = T.ui.create; $("fmt-apply").textContent = T.ui.done;
+  $("publish-kicker").textContent = T.ui.publishKicker; $("publish-title").textContent = T.ui.publishTitle;
+  [["publish-channel",0],["publish-self",1],["publish-later",2],["publish-copy",3]].forEach(([prefix,index]) => { $(prefix+"-title").textContent=T.ui.destinations[index][0]; $(prefix+"-copy").textContent=T.ui.destinations[index][1]; });
+  $("success-next").textContent = T.ui.successNext; $("success-close").textContent = T.ui.successClose;
+  document.querySelectorAll(".sheet-close").forEach((button) => button.setAttribute("aria-label", T.ui.close));
   document.querySelector('#tabbar [data-tab="home"] span').textContent = EN?"Home":"Главная";
   document.querySelector('#tabbar [data-tab="crate"] span').textContent = EN?"Crate":"Подборка";
   document.querySelector('#tabbar [data-tab="queue"] span').textContent = EN?"Queue":"Очередь";
@@ -175,6 +259,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   /* ── navigation ── */
   function show(view, push) {
     stopAudio(); clearUndo();
+    if (view !== "result") hideNativeMain();
     $("typeahead").classList.remove("open");
     VIEWS.forEach((v) => {
       const el = $("v-" + v), active = v === view;
@@ -191,11 +276,13 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
       if (active) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
     });
     if (push !== false && navStack[navStack.length-1] !== view) navStack.push(view);
+    if (view === "result" && state) showNativeMain(state.can_publish ? T.publish : T.send, openPublish);
     try { if (view === "home") { navStack = ["home"]; tg.BackButton.hide(); } else tg.BackButton.show(); } catch(e) {}
   }
   try { tg.BackButton.onClick(() => { hap.tap(); goBack(); }); } catch(e) {}
   function goBack() {
     if ($("publish-sheet").classList.contains("open")) { closePublish(); return; }
+    if ($("share-sheet").classList.contains("open")) { closeShare(); return; }
     if ($("sheet").classList.contains("open")) { closeSheet(); return; }
     cancelPending();
     navStack.pop();
@@ -206,6 +293,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     show(prev, false);
   }
   ["cand-back","nf-back","res-back","fmt-back","crate-back","queue-back","stats-back"].forEach((id) => $(id).addEventListener("click", () => { hap.tap(); goBack(); }));
+  $("loading-cancel").addEventListener("click", () => { hap.tap(); goBack(); });
   document.querySelectorAll("#tabbar button").forEach((b) => b.addEventListener("click", () => {
     hap.tap(); cancelPending(); const t = b.dataset.tab;
     if (t === "home") { loadHome(); show("home"); }
@@ -439,8 +527,10 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     const main = $("action-main"), sch = $("action-schedule");
     $("dock-default").classList.remove("hidden"); $("dock-done").classList.add("hidden");
     main.classList.remove("done"); main.disabled = false;
-    if (state.can_publish) { main.innerHTML = ico("send","s18")+esc(T.publish); main.dataset.action="publish"; sch.classList.remove("hidden"); }
-    else { main.innerHTML = ico("send","s18")+esc(T.send); main.dataset.action="send"; sch.classList.add("hidden"); }
+    sch.classList.add("hidden");
+    if (state.can_publish) { main.innerHTML = ico("send","s18")+esc(T.publish); main.dataset.action="publish"; }
+    else { main.innerHTML = ico("send","s18")+esc(T.send); main.dataset.action="send"; }
+    showNativeMain(state.can_publish ? T.publish : T.send, openPublish);
     $("status").textContent = "";
   }
 
@@ -466,10 +556,10 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
         navStack.pop(); const prev = navStack[navStack.length-1] || "home";
         if (prev === "home") loadHome(); show(prev, false); return;
       }
-      if (!res.ok) { $("nf-query").textContent = "«"+q+"»"; show("notfound"); hap.err(); return; }
+      if (!res.ok) { $("nf-query").textContent = q; show("notfound"); hap.err(); return; }
       if (res.candidates) { renderCandidates(res.candidates); show("candidates"); hap.pick(); return; }
       openDraftResult(res, true);
-    } catch(e) { if (seq !== loadSeq) return; $("nf-query").textContent = "«"+q+"»"; show("notfound"); hap.err(); }
+    } catch(e) { if (seq !== loadSeq) return; $("nf-query").textContent = q; show("notfound"); hap.err(); }
   }
   async function searchBatch(q) {
     lastQuery = q;
@@ -489,7 +579,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
         if (prev === "home") loadHome(); show(prev, false); return;
       }
       const found = (res.items || []);
-      if (!res.ok || !found.length) { $("nf-query").textContent = "«"+q+"»"; show("notfound"); hap.err(); return; }
+      if (!res.ok || !found.length) { $("nf-query").textContent = q; show("notfound"); hap.err(); return; }
       // merge into the crate, dedupe by artist+title, respect the cap
       const have = new Set(crateItems.map((x)=>((x.data.artist||"")+"|"+(x.data.title||"")).toLowerCase()));
       let added = 0;
@@ -501,7 +591,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
       $("query").value = "";
       openCrate();
       flash(EN?("Added "+added+" to the crate"):("Добавлено в подборку: "+added));
-    } catch(e) { if (seq !== loadSeq) return; $("nf-query").textContent = "«"+q+"»"; show("notfound"); hap.err(); }
+    } catch(e) { if (seq !== loadSeq) return; $("nf-query").textContent = q; show("notfound"); hap.err(); }
   }
   function openDraftResult(res, applyDefaults) {
     state = res; show("result"); renderCard(); hap.ok(); maybeCoach();
@@ -516,15 +606,15 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   let candList = [], candPlaying = -1;
   function renderCandidates(cands) {
     candList = cands; candPlaying = -1; $("cand-player").classList.remove("on");
-    $("cand-count").textContent = cands.length + " " + (cands.length===1?T.release1:T.release2);
+    $("cand-count").textContent = cands.length + " " + plural(cands.length,"release","releases","релиз","релиза","релизов");
     const list = $("cand-list"); list.innerHTML = "";
     cands.forEach((c, i) => {
       const el = document.createElement("div"); el.className = "cand"; el.dataset.idx = i;
       el.innerHTML =
         '<div class="cand-body"><div class="cand-art">'+(safeUrl(c.artwork)?'<img alt="" src="'+safeUrl(c.artwork)+'" style="width:100%;height:100%;object-fit:cover;border-radius:12px">':"🎵")+
         (c.preview?'<button class="cand-play" aria-label="'+(EN?"Play preview":"Воспроизвести отрывок")+'">▶</button>':"")+"</div>"+
-        '<div class="cand-meta"><div class="cand-title">'+esc(c.title)+'</div><div class="cand-artist">'+esc(c.artist)+"</div></div>"+
-        '<button class="cand-pick">'+(EN?"Pick":"Выбрать")+"</button></div>";
+        '<div class="cand-meta"><div class="cand-title">'+esc(c.title)+'</div><div class="cand-details"><span class="cand-artist">'+esc(c.artist)+'</span>'+(c.year?'<span class="cand-year">'+esc(c.year)+"</span>":"")+"</div></div>"+
+        '<button class="cand-pick" aria-label="'+esc((EN?"Choose ":"Выбрать ")+c.artist+" — "+c.title)+'">'+(EN?"Choose":"Выбрать")+"</button></div>";
       if (c.preview) el.querySelector(".cand-play").addEventListener("click", (e)=>{ e.stopPropagation(); playCandidate(i); });
       el.querySelector(".cand-pick").addEventListener("click", () => { hap.pick(); search(c.url); });
       list.appendChild(el);
@@ -573,11 +663,18 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   }
 
   /* ── home ── */
+  function setHomeError(open) {
+    $("home-alert").classList.toggle("hidden", !open);
+    $("home-alert").setAttribute("aria-hidden", String(!open));
+  }
   async function loadHome() {
+    $("quick").classList.remove("hidden");
+    if (!isAdmin) { $("q-queue").classList.add("hidden"); $("q-stats").classList.add("hidden"); }
     try {
       const res = await api("history", {});
       $("home-skel").classList.add("hidden");
-      if (!res.ok) { $("home-empty").classList.remove("hidden"); return; }
+      if (!res.ok) { setHomeError(true); $("home-empty").classList.remove("hidden"); return; }
+      setHomeError(false);
       isAdmin = Boolean(res.is_admin);
       $("admin-badge").classList.toggle("hidden", !isAdmin);
       $("admin-tools").classList.toggle("hidden", !isAdmin);
@@ -600,10 +697,15 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
         b.addEventListener("click", () => { hap.tap(); search(it.source_url); });
         list.appendChild(b); setTimeout(() => b.classList.add("in"), 40 + i*50);
       });
-    } catch(e) { $("home-skel").classList.add("hidden"); $("home-empty").classList.remove("hidden"); }
+    } catch(e) { setHomeError(true); $("home-skel").classList.add("hidden"); $("home-empty").classList.remove("hidden"); }
   }
+  $("home-retry").addEventListener("click", () => { hap.tap(); setHomeError(false); $("home-skel").classList.remove("hidden"); loadHome(); });
   async function refreshQueueBadge() {
-    try { const res = await api("queue", {}); const n=(res.items||[]).length; const b=$("q-queue-n"); b.style.display=n>0?"flex":"none"; b.textContent=n; } catch(e) {}
+    try {
+      const res = await api("queue", {}), items=res.items||[], n=items.length, b=$("q-queue-n");
+      b.style.display=n>0?"flex":"none"; b.textContent=n;
+      $("q-queue-sub").textContent = n && items[0].publish_at ? fmtWhen(items[0].publish_at) : T.quick.queue[1];
+    } catch(e) { $("q-queue-sub").textContent = T.quick.queue[1]; }
   }
   function refreshCrateBadge(data) {
     if (data && Array.isArray(data.items)) crateItems = data.items;
@@ -613,6 +715,11 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
 
   /* ── formatting screen ── */
   let editTags = [], pmOrder = [], pmEnabled = {};
+  function setFormatSync(mode) {
+    const el = $("fmt-sync"); if (!el) return;
+    el.className = "sync-state "+mode;
+    el.textContent = mode === "saving" ? T.ui.saving : (mode === "error" ? T.ui.saveError : T.ui.saved);
+  }
   function openFormat() {
     hap.tap();
     const release = state.release;
@@ -627,7 +734,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     $("tags-sec").style.display = state.flags.hashtags ? "" : "none";
     pmOrder = state.release.platforms.map((p)=>p.key); pmEnabled = {};
     state.release.platforms.forEach((p)=>{pmEnabled[p.key]=p.enabled!==false;}); drawPm();
-    drawPresets();
+    drawPresets(); setFormatSync("saved");
     show("format");
   }
 
@@ -701,11 +808,11 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     editTags.forEach((t, i) => {
       const p = document.createElement("button"); p.className = "chip";
       p.innerHTML = esc(t)+'<span class="x">✕</span>';
-      p.addEventListener("click", () => { hap.pick(); editTags.splice(i,1); drawTags(); });
+      p.addEventListener("click", () => { hap.pick(); editTags.splice(i,1); drawTags(); syncDraft({tags:editTags.slice()}); });
       cloud.appendChild(p);
     });
     const inp = document.createElement("input"); inp.className = "chip-input"; inp.placeholder = "+ "+T.addTag;
-    inp.addEventListener("keydown", (e) => { if (e.key==="Enter" && inp.value.trim()) { hap.pick(); editTags.push(inp.value.trim()); drawTags(); } });
+    inp.addEventListener("keydown", (e) => { if (e.key==="Enter" && inp.value.trim()) { e.preventDefault(); hap.pick(); editTags.push(inp.value.trim()); drawTags(); syncDraft({tags:editTags.slice()}); } });
     cloud.appendChild(inp);
   }
   function drawPm() {
@@ -720,13 +827,19 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
         '<button class="pm-check'+(pmEnabled[key]?" on":"")+'" aria-label="'+esc((EN?"Toggle ":"Включить или выключить ")+m.name)+'" aria-pressed="'+String(Boolean(pmEnabled[key]))+'">'+(pmEnabled[key]?ico("check","s14"):"")+"</button>";
       row.querySelector(".up").addEventListener("click", ()=>{ if(i===0)return; hap.pick(); [pmOrder[i-1],pmOrder[i]]=[pmOrder[i],pmOrder[i-1]]; drawPm(); applyPm(); });
       row.querySelector(".down").addEventListener("click", ()=>{ if(i===pmOrder.length-1)return; hap.pick(); [pmOrder[i+1],pmOrder[i]]=[pmOrder[i],pmOrder[i+1]]; drawPm(); applyPm(); });
-      row.querySelector(".pm-check").addEventListener("click", ()=>{ hap.pick(); pmEnabled[key]=!pmEnabled[key]; drawPm(); applyPm(); });
+      row.querySelector(".pm-check").addEventListener("click", ()=>{
+        if (pmEnabled[key] && pmSelection().length <= 1) { hap.err(); flash(T.ui.onePlatform); return; }
+        hap.pick(); pmEnabled[key]=!pmEnabled[key]; drawPm(); applyPm();
+      });
       list.appendChild(row);
     });
   }
   function pmSelection(){ return pmOrder.filter((k)=>pmEnabled[k]); }
   function applyPm(){ const s=pmSelection(); if (s.length) syncDraft({platforms:s}); }
-  $("cta-input").addEventListener("input", () => $("cta-count").textContent = $("cta-input").value.length);
+  $("cta-input").addEventListener("input", () => {
+    $("cta-count").textContent = $("cta-input").value.length;
+    syncDraft({cta:$("cta-input").value.trim() || null});
+  });
   $("open-format").addEventListener("click", openFormat);
   $("fmt-apply").addEventListener("click", () => {
     hap.ok();
@@ -746,13 +859,16 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     const run = async () => {
       const seq = ++syncSeq;
       const draftId = state && state.draft_id;
+      if (!$("v-format").classList.contains("hidden")) setFormatSync("saving");
       try {
         const res = await api("update", { draft_id: draftId, ...patch });
         // a newer edit already fired — don't let this stale response revert it
-        if (seq !== syncSeq || !res || !res.ok) return;
+        if (seq !== syncSeq) return;
+        if (!res || !res.ok) { setFormatSync("error"); return; }
         state = res;
+        setFormatSync("saved");
         if (!$("v-result").classList.contains("hidden")) renderCard();
-      } catch(e) {}
+      } catch(e) { if (seq === syncSeq) { setFormatSync("error"); flash(errorText(e.message)); } }
     };
     if (immediate) run(); else syncTimer = setTimeout(run, 350);
   }
@@ -773,7 +889,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     try { const res = await api("unpublish", { draft_id: state.draft_id, message_id: Number($("action-undo").dataset.messageId||0) }); if (res.ok) { hap.ok(); renderCard(); $("status").textContent = T.undone; } else { hap.err(); renderCard(); } } catch(e) { hap.err(); renderCard(); }
   });
   async function deliver(action, extra) {
-    const main = $("action-main"); main.disabled = true;
+    const main = $("action-main"); main.disabled = true; setNativeMainBusy(true);
     try {
       const res = await api(action, { draft_id: state.draft_id, hashtags: state.flags.hashtags, quote: state.flags.quote, large_preview: state.flags.large_preview, as_photo: Boolean(state.flags.as_photo), ...(extra||{}) });
       if (res.ok) {
@@ -790,7 +906,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
         $("toast-confirm").onclick = () => { setToastOpen(false); deliver("publish", {force:true}); };
       } else { hap.err(); $("status").textContent = errorText(res.error); }
     } catch(e) { hap.err(); $("status").textContent = errorText("network"); }
-    finally { if ($("dock-done").classList.contains("hidden")) $("action-main").disabled = false; }
+    finally { setNativeMainBusy(false); if ($("dock-done").classList.contains("hidden")) $("action-main").disabled = false; }
   }
   function closePublish() { setSheetOpen("publish-sheet", "publish-mask", false); }
   function openPublish() {
@@ -800,15 +916,17 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     setSheetOpen("publish-sheet", "publish-mask", true, $("action-main"));
   }
   function showSuccess(action) {
+    $("success-stamp").textContent = action === "publish" ? T.ui.publishedStamp : T.ui.sentStamp;
     $("success-title").textContent = action === "publish" ? (EN?"Post is live":"Пост вышел в эфир") : (EN?"Post sent":"Пост отправлен");
     $("success-copy").textContent = action === "publish" ? (EN?"Done. Time to build the next release.":"Готово. Можно собирать следующий релиз.") : (EN?"Check it in your private chat.":"Проверь результат в личном чате.");
-    document.querySelector(".wrap").inert = true;
+    hideNativeMain(); document.querySelector(".wrap").inert = true;
     $("success-screen").classList.add("open"); $("success-screen").setAttribute("aria-hidden", "false");
     requestAnimationFrame(() => $("success-next").focus());
   }
-  function hideSuccess() { document.querySelector(".wrap").inert = false; $("success-screen").classList.remove("open"); $("success-screen").setAttribute("aria-hidden", "true"); }
+  function hideSuccess() { document.querySelector(".wrap").inert = false; $("success-screen").classList.remove("open"); $("success-screen").setAttribute("aria-hidden", "true"); if (!$("v-result").classList.contains("hidden") && state) renderCard(); }
   $("action-main").addEventListener("click", openPublish);
   $("publish-mask").addEventListener("click", closePublish);
+  $("publish-close").addEventListener("click", closePublish);
   $("publish-channel").addEventListener("click", () => { closePublish(); deliver("publish"); });
   $("publish-self").addEventListener("click", () => { closePublish(); deliver("send"); });
   $("publish-later").addEventListener("click", () => { closePublish(); openSheet(); });
@@ -836,18 +954,21 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   let lastSheetTrigger = null;
   function setSheetOpen(sheetId, maskId, open, trigger) {
     const sheet = $(sheetId), mask = $(maskId);
+    if (open) hideNativeMain();
     sheet.classList.toggle("open", open); mask.classList.toggle("open", open);
     sheet.setAttribute("aria-hidden", String(!open)); mask.setAttribute("aria-hidden", String(!open));
     sheet.inert = !open;
     if (open) {
       lastSheetTrigger = trigger || document.activeElement;
-      requestAnimationFrame(() => sheet.querySelector("button, input")?.focus());
+      requestAnimationFrame(() => sheet.querySelector(".publish-options button,.quick-grid button,.picker-item,input,button")?.focus());
     } else if (lastSheetTrigger && typeof lastSheetTrigger.focus === "function") {
       lastSheetTrigger.focus(); lastSheetTrigger = null;
     }
+    if (!open && !$("v-result").classList.contains("hidden") && state) showNativeMain(state.can_publish ? T.publish : T.send, openPublish);
   }
   function closeShare(){ setSheetOpen("share-sheet", "share-mask", false); }
   $("share-mask").addEventListener("click", closeShare);
+  $("share-close").addEventListener("click", closeShare);
   $("action-share").addEventListener("click", () => {
     hap.tap();
     const en = (state.release.platforms||[]).filter((p)=>p.enabled!==false && /^https?:\/\//i.test(String(p.url||"")));
@@ -870,10 +991,15 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   $("action-schedule").addEventListener("click", openSheet);
 
   /* ── illustrated empty state ── */
-  function emptyBox(iconName, title, sub) {
+  function emptyBox(iconName, title, sub, action) {
     return '<div class="empty-box"><div class="eb-ico">'+ico(iconName)+'</div>'+
-      '<div><div class="eb-t">'+esc(title)+'</div><div class="eb-s">'+esc(sub)+"</div></div></div>";
+      '<div><div class="eb-t">'+esc(title)+'</div><div class="eb-s">'+esc(sub)+"</div></div>"+
+      (action?'<button class="state-action">'+esc(action)+"</button>":"")+"</div>";
   }
+  function loadingRows(count) {
+    return Array.from({length:count||3}, () => '<div class="row loading-row" style="opacity:1"><div class="skel row-art"></div><div style="flex:1"><div class="skel loading-line wide"></div><div class="skel loading-line"></div></div></div>').join("");
+  }
+  function bindStateAction(scope, handler) { scope.querySelector(".state-action")?.addEventListener("click", () => { hap.tap(); handler(); }); }
 
   function bindSwipe(row, onLeft, onRight) {
     let startX = 0, startY = 0, tracking = false;
@@ -942,6 +1068,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     setSheetOpen("sheet", "sheet-mask", true, document.activeElement);
   }
   function closeSheet(){ setSheetOpen("sheet", "sheet-mask", false); }
+  $("sheet-close").addEventListener("click", closeSheet);
   $("dt-go").addEventListener("click", () => { const v=$("dt-input").value; if(!v)return; const ts=Math.floor(new Date(v).getTime()/1000); if(ts>Date.now()/1000+60){pickTime(ts);}else hap.err(); });
   $("sheet-mask").addEventListener("click", closeSheet);
   document.addEventListener("keydown", (e) => {
@@ -979,16 +1106,21 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     hap.tap(); show("crate");
     $("crate-dock").classList.add("on");
     loadCrate(async () => {
+      let loadFailed = false;
       if (!crateItems.length) {
-        try { const res = await api("crate", {}); if (res.items && res.items.length) { crateItems = res.items; persistCrate(); } } catch(e) {}
+        try { const res = await api("crate", {}); if (!res.ok) throw new Error(res.error || "network"); if (res.items && res.items.length) { crateItems = res.items; persistCrate(); } } catch(e) { loadFailed = true; }
       }
       drawCrate();
+      if (loadFailed && !crateItems.length) {
+        const list = $("crate-list"); list.innerHTML = emptyBox("undo", T.ui.loadError, T.network, T.ui.retry); bindStateAction(list, openCrate);
+      }
     });
   }
   function drawCrate() {
     const list = $("crate-list"); list.innerHTML = "";
-    $("crate-count").textContent = crateItems.length + " " + T.crateTitle;
-    $("crate-cover-count").textContent = crateItems.length + " " + T.crateTitle;
+    const crateWord = plural(crateItems.length,"track","tracks","трек","трека","треков");
+    $("crate-count").textContent = crateItems.length + " " + crateWord;
+    $("crate-cover-count").textContent = crateItems.length + " " + crateWord;
     const stack = $("crate-stack").querySelectorAll("i");
     stack.forEach((tile, index) => {
       const item = crateItems[index];
@@ -1084,10 +1216,11 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   /* ── queue ── */
   async function openQueue() {
     hap.tap(); show("queue");
-    const list = $("queue-list"); list.innerHTML = ""; $("queue-empty").textContent = "";
+    const list = $("queue-list"); list.innerHTML = loadingRows(2); $("queue-empty").textContent = "";
     try {
-      const res = await api("queue", {}); const items = res.items||[];
-      $("queue-count").textContent = items.length + " " + T.queueTitle;
+      const res = await api("queue", {}); if (!res.ok) throw new Error(res.error || "network"); const items = res.items||[];
+      list.innerHTML = "";
+      $("queue-count").textContent = items.length + " " + plural(items.length,"post","posts","пост","поста","постов");
       if (!items.length) { list.innerHTML = emptyBox("clock", EN?"Nothing on air yet":"Пока тишина", EN?"Schedule the next post":"Запланируй следующий пост"); return; }
       items.forEach((it) => {
         const row = document.createElement("div"); row.className = "row"; row.style.opacity = "1";
@@ -1112,7 +1245,10 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
         bindSwipe(row, () => row.querySelector(".del").click(), () => row.querySelector(".edit").click());
         list.appendChild(row);
       });
-    } catch(e) { $("queue-empty").textContent = T.err; }
+    } catch(e) {
+      list.innerHTML = emptyBox("undo", T.ui.loadError, errorText(e.message), T.ui.retry);
+      bindStateAction(list, openQueue);
+    }
   }
 
   /* ── stats ── */
@@ -1120,8 +1256,9 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     hap.tap(); show("stats");
     const scroll = $("v-stats").querySelector(".scroll");
     if (!scroll.dataset.tpl) scroll.dataset.tpl = scroll.innerHTML;
+    scroll.innerHTML = '<div class="list stats-loading">'+loadingRows(4)+"</div>";
     try {
-      const res = await api("stats", {}); if (!res.ok) return; const s = res.stats;
+      const res = await api("stats", {}); if (!res.ok || !res.stats) throw new Error(res.error || "network"); const s = res.stats;
       const total = ["posts","song","album","podcast","videos","collections"].reduce((a,k)=>a+(Number(s[k])||0),0);
       if (total === 0) { scroll.innerHTML = emptyBox("bar", T.statsEmptyT, T.statsEmptyS); return; }
       if (!$("kpi-grid")) {
@@ -1143,7 +1280,10 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
       requestAnimationFrame(() => { let i=0; $("stat-breakdown").querySelectorAll(".bar-fill").forEach((el)=>{el.style.width=((Number(bd[i][1])||0)/bmax*100)+"%";i++;}); });
       drawTopBars("stat-users", s.top_users||[]);
       drawTopBars("stat-chats", s.top_chats||[]);
-    } catch(e) {}
+    } catch(e) {
+      scroll.innerHTML = emptyBox("undo", T.ui.loadError, errorText(e.message), T.ui.retry);
+      bindStateAction(scroll, openStats);
+    }
   }
   function drawTopBars(id, entries) {
     const box = $(id);
@@ -1172,7 +1312,11 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
       hap.ok();
     });
   });
-  $("nf-retry").addEventListener("click", () => { hap.tap(); if (lastQuery) { search(lastQuery); } else { $("query").value=""; loadHome(); show("home"); $("query").focus(); } });
+  $("nf-retry").addEventListener("click", () => {
+    hap.tap(); loadHome(); show("home");
+    $("query").value = lastQuery || ""; $("clear").style.display = lastQuery ? "block" : "none";
+    setTimeout(() => { $("query").focus(); $("query").select(); }, 80);
+  });
   $("toast-cancel").addEventListener("click", () => setToastOpen(false));
 
   function renderTypeahead() {
@@ -1246,6 +1390,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   /* ── boot ── */
   const params = new URLSearchParams(window.location.search);
   const draftParam = params.get("draft") || tg.initDataUnsafe?.start_param;
+  const viewParam = params.get("view");
   const localDemo = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && params.get("demo");
   if (localDemo === "result") {
     openDraftResult({
@@ -1257,5 +1402,13 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     isAdmin = true;
     crateItems = ["Funeralopolis","Dragonaut","Green Machine"].map((title,index)=>({title,artist:["Electric Wizard","Sleep","Kyuss"][index],emoji:"⚡",artwork:location.origin+"/assets/studio-demo.svg",data:{title,artist:["Electric Wizard","Sleep","Kyuss"][index],thumbnail_url:location.origin+"/assets/studio-demo.svg",page_url:"https://song.link/demo",kind:"song"}}));
     show("crate"); $("crate-dock").classList.add("on"); drawCrate();
-  } else if (draftParam) { loadDraft(draftParam); loadHome(); } else { show("home"); loadHome(); }
+  } else if (draftParam) { loadDraft(draftParam); loadHome(); }
+  else if (["crate","queue","stats"].includes(viewParam)) {
+    show("home");
+    loadHome().then(() => {
+      if (viewParam === "crate") openCrate();
+      else if (viewParam === "queue") openQueue();
+      else openStats();
+    });
+  } else { show("home"); loadHome(); }
 })();
