@@ -126,6 +126,7 @@ from music_links_bot.bot_runtime import (
     BotFlowError,
     BotRuntime,
     CallbackAction,
+    UserSession,
     decode_callback,
     detect_action,
     encode_callback,
@@ -429,26 +430,85 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
     lang = _update_lang(update)
     user_id = update.effective_user.id if update.effective_user else update.message.chat_id
-    session = await _runtime(context).get_session(user_id, lang=lang)
-    crate_count, is_admin = await _home_state(context, user_id)
-    await update.message.reply_text(
-        _build_home_text(
+    runtime = _runtime(context)
+    action_key = f"home:{update.message.chat_id}:{user_id}"
+    action_token = await runtime.acquire_action(action_key)
+    if action_token is None:
+        return
+
+    try:
+        session = await runtime.get_session(user_id, lang=lang)
+        crate_count, is_admin = await _home_state(context, user_id)
+        text = _build_home_text(
             lang=lang,
             first_name=update.effective_user.first_name if update.effective_user else "",
             crate_count=crate_count,
             is_admin=is_admin,
             first_visit=not session.onboarding_seen,
-        ),
-        parse_mode=ParseMode.HTML,
-        reply_markup=_build_start_keyboard(
+        )
+        keyboard = _build_start_keyboard(
             context.bot.username,
             lang=lang,
             crate_count=crate_count,
             is_admin=is_admin,
             show_tour=not session.onboarding_seen,
             include_studio=update.message.chat.type == "private",
-        ),
-    )
+        )
+
+        is_private = update.message.chat.type == "private"
+        if is_private:
+            had_home_pointer = bool(session.home_message_id)
+            if await _refresh_home_message(
+                context,
+                session,
+                chat_id=update.message.chat_id,
+                text=text,
+                keyboard=keyboard,
+            ):
+                return
+            if had_home_pointer:
+                await runtime.save_session(session)
+
+        sent = await update.message.reply_text(
+            text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=keyboard,
+        )
+        message_id = getattr(sent, "message_id", None)
+        if is_private and isinstance(message_id, int) and message_id > 0:
+            session.home_chat_id = update.message.chat_id
+            session.home_message_id = message_id
+            await runtime.save_session(session)
+    finally:
+        await runtime.release_action(action_key, action_token)
+
+
+async def _refresh_home_message(
+    context: ContextTypes.DEFAULT_TYPE,
+    session: UserSession,
+    *,
+    chat_id: int,
+    text: str,
+    keyboard: InlineKeyboardMarkup,
+) -> bool:
+    if session.home_chat_id != chat_id or not session.home_message_id:
+        return False
+    try:
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=session.home_message_id,
+            text=text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=keyboard,
+        )
+        return True
+    except BadRequest as exc:
+        if "Message is not modified" in str(exc):
+            return True
+        LOGGER.info("Could not refresh home menu; sending a new one: %s", exc)
+        session.home_chat_id = None
+        session.home_message_id = None
+        return False
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -464,6 +524,10 @@ async def guide_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     lang = _update_lang(update)
+    if message.chat.type == "private":
+        await _reply_with_menu(message, context, MENU_GUIDE, lang=lang)
+        return
+
     user_id = update.effective_user.id if update.effective_user else message.chat_id
     crate_count, _is_admin = await _home_state(context, user_id)
     sent_message = await message.reply_text(
@@ -1467,17 +1531,52 @@ async def _reply_with_menu(
     *,
     lang: str = "ru",
 ) -> None:
-    crate_count, _is_admin = await _home_state(context, message.chat_id)
-    await message.reply_text(
-        _menu_text(menu_key, lang=lang),
-        parse_mode=ParseMode.HTML,
-        reply_markup=_build_section_keyboard(
+    runtime = _runtime(context)
+    subject_id = message.from_user.id if message.from_user else message.chat_id
+    action_key = f"home:{message.chat_id}:{subject_id}"
+    action_token = await runtime.acquire_action(action_key)
+    if action_token is None:
+        return
+
+    try:
+        crate_count, _is_admin = await _home_state(context, message.chat_id)
+        text = _menu_text(menu_key, lang=lang)
+        keyboard = _build_section_keyboard(
             context.bot.username,
             lang=lang,
             crate_count=crate_count,
             include_studio=message.chat.type == "private",
-        ),
-    )
+        )
+        if message.chat.type == "private":
+            session = await runtime.get_session(subject_id, lang=lang)
+            had_home_pointer = bool(session.home_message_id)
+            if await _refresh_home_message(
+                context,
+                session,
+                chat_id=message.chat_id,
+                text=text,
+                keyboard=keyboard,
+            ):
+                return
+            if had_home_pointer:
+                await runtime.save_session(session)
+
+        sent = await message.reply_text(
+            text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=keyboard,
+        )
+        message_id = getattr(sent, "message_id", None)
+        if (
+            message.chat.type == "private"
+            and isinstance(message_id, int)
+            and message_id > 0
+        ):
+            session.home_chat_id = message.chat_id
+            session.home_message_id = message_id
+            await runtime.save_session(session)
+    finally:
+        await runtime.release_action(action_key, action_token)
 
 
 async def _reply_with_error(

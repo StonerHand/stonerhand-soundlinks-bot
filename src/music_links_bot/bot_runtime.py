@@ -100,6 +100,8 @@ class UserSession:
     onboarding_seen: bool = False
     last_query: str = ""
     last_action: dict[str, Any] = field(default_factory=dict)
+    home_chat_id: int | None = None
+    home_message_id: int | None = None
     updated_at: int = field(default_factory=lambda: int(time()))
 
     @classmethod
@@ -115,10 +117,19 @@ class UserSession:
                     if isinstance(payload.get("last_action"), dict)
                     else {}
                 ),
+                home_chat_id=_optional_int(payload.get("home_chat_id")),
+                home_message_id=_optional_int(payload.get("home_message_id")),
                 updated_at=int(payload.get("updated_at") or time()),
             )
         except (KeyError, TypeError, ValueError):
             return None
+
+
+def _optional_int(value: object) -> int | None:
+    if value is None or value == "":
+        return None
+    parsed = int(value)
+    return parsed if parsed > 0 else None
 
 
 @dataclass(slots=True)

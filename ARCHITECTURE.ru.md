@@ -346,7 +346,7 @@ Queue tick запускается после Telegram update, при `GET /api/w
 | --- | --- | --- |
 | Song.link cache keys | нормализованные provider responses | 7 дней |
 | `draft:<id>` | Telegram/Studio draft | 48 часов |
-| `session:v1:<user>` | onboarding, язык, last/retry action | 30 дней |
+| `session:v1:<user>` | onboarding, язык, last/retry action, указатель на живое меню | 30 дней |
 | `callback:v2:<id>` | дедуп callback query | 15 минут |
 | `action:v1:<key>` | lease долгого Telegram action | 45 секунд |
 | `seen_update:<id>` | дедуп webhook update | 10 минут |

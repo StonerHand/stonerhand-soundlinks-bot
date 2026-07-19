@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import sys
 from unittest.mock import patch
+from telegram.error import BadRequest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -43,6 +44,8 @@ from music_links_bot.bot import (
     _editor_rows,
     _render_track_draft,
     track_lookup_message,
+    help_command,
+    start_command,
 )
 from music_links_bot.artist import ArtistLookupError
 from music_links_bot.models import (
@@ -195,6 +198,8 @@ class BotStub:
     def __init__(self) -> None:
         self.sent_messages: list[dict[str, object]] = []
         self.chat_actions: list[dict[str, object]] = []
+        self.edited_messages: list[dict[str, object]] = []
+        self.edit_error: Exception | None = None
         self.username = "StonerHandBot"
         self.id = 424242
 
@@ -203,6 +208,11 @@ class BotStub:
 
     async def send_chat_action(self, **kwargs: object) -> None:
         self.chat_actions.append(kwargs)
+
+    async def edit_message_text(self, **kwargs: object) -> None:
+        self.edited_messages.append(kwargs)
+        if self.edit_error is not None:
+            raise self.edit_error
 
 
 class ContextStub:
@@ -245,6 +255,7 @@ class EditableReplyStub:
 
     def __init__(self, owner: "ChannelMessageStub", index: int) -> None:
         self.chat_id = owner.chat_id
+        self.message_id = 1000 + index
         self._owner = owner
         self._index = index
 
@@ -371,6 +382,71 @@ class UpdateStub:
     def __init__(self, message: ChannelMessageStub) -> None:
         self.effective_message = message
         self.effective_user = None
+
+
+class StartUpdateStub:
+    def __init__(self, message: PrivateMessageStub) -> None:
+        self.message = message
+        self.effective_message = message
+        self.effective_user = type(
+            "UserStub",
+            (),
+            {"id": message.chat_id, "first_name": "Артём", "language_code": "ru"},
+        )()
+
+
+class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
+    async def test_repeated_start_refreshes_one_home_message(self) -> None:
+        message = PrivateMessageStub()
+        update = StartUpdateStub(message)
+        context = ContextStub()
+
+        await start_command(update, context)
+        await start_command(update, context)
+
+        self.assertEqual(len(message.replies), 1)
+        self.assertEqual(len(context.bot.edited_messages), 1)
+        self.assertEqual(context.bot.edited_messages[0]["message_id"], 1000)
+        self.assertIn("Твоя музыкальная мастерская", message.replies[0])
+
+    async def test_help_reuses_the_live_home_message(self) -> None:
+        message = PrivateMessageStub()
+        update = StartUpdateStub(message)
+        context = ContextStub()
+
+        await start_command(update, context)
+        await help_command(update, context)
+
+        self.assertEqual(len(message.replies), 1)
+        self.assertEqual(len(context.bot.edited_messages), 1)
+        self.assertEqual(context.bot.edited_messages[0]["message_id"], 1000)
+        self.assertIn("Как пользоваться", context.bot.edited_messages[0]["text"])
+
+    async def test_unchanged_home_is_not_sent_again(self) -> None:
+        message = PrivateMessageStub()
+        update = StartUpdateStub(message)
+        context = ContextStub()
+
+        await start_command(update, context)
+        context.bot.edit_error = BadRequest("Message is not modified")
+        await start_command(update, context)
+
+        self.assertEqual(len(message.replies), 1)
+        self.assertEqual(len(context.bot.edited_messages), 1)
+
+    async def test_missing_old_home_is_replaced_and_pointer_is_updated(self) -> None:
+        message = PrivateMessageStub()
+        update = StartUpdateStub(message)
+        context = ContextStub()
+
+        await start_command(update, context)
+        context.bot.edit_error = BadRequest("Message to edit not found")
+        await start_command(update, context)
+
+        runtime = context.application.bot_data["runtime"]
+        session = await runtime.get_session(message.chat_id)
+        self.assertEqual(len(message.replies), 2)
+        self.assertEqual(session.home_message_id, 1001)
 
 
 class BotKeyboardTests(unittest.TestCase):
