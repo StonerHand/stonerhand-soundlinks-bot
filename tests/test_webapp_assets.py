@@ -42,12 +42,16 @@ class WebAppAssetTests(unittest.TestCase):
         for element_id in (
             "home-title",
             "search-go",
+            "paste-btn",
+            "q-inline",
+            "result-readiness",
             "format-preview",
             "crate-cover",
             "create-tab",
             "publish-sheet",
             "success-screen",
             "cp-vinyl",
+            "coach-skip",
         ):
             self.assertIn(f'id="{element_id}"', html)
         self.assertNotIn('data-tab="stats"', html)

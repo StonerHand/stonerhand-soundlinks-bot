@@ -57,14 +57,21 @@
         <span class="hero-kicker">MUSIC POST WORKSHOP</span>
         <h1 id="home-title">Собери пост,<br><em>который звучит.</em></h1>
         <p id="home-hint">Вставь ссылку или найди релиз — остальное Студия соберёт сама.</p>
+        <div class="hero-flow" aria-label="Три шага создания поста">
+          <span><b>01</b><small id="flow-find">Найти</small></span><i>→</i>
+          <span><b>02</b><small id="flow-style">Оформить</small></span><i>→</i>
+          <span><b>03</b><small id="flow-send">Отправить</small></span>
+        </div>
       </section>
       <div class="searchbox home-search">
         <div class="searchbar" id="searchbar">
           <svg class="icon s18" style="color:var(--muted)"><use href="#i-search"/></svg>
           <input id="query" aria-label="Ссылка или название релиза" placeholder="Ссылка или название…" autocomplete="off" enterkeyhint="search">
+          <button class="paste-btn" id="paste-btn" type="button" aria-label="Вставить из буфера" title="Вставить из буфера"><svg class="icon s16"><use href="#i-clipboard"/></svg></button>
           <button class="clear" id="clear" type="button" aria-label="Очистить поиск"><svg class="icon s16"><use href="#i-x"/></svg></button>
           <button class="search-go" id="search-go" type="button" aria-label="Найти релиз"><svg class="icon s18"><use href="#i-cr"/></svg></button>
         </div>
+        <div class="search-support"><span><i></i><span id="support-label">Все музыкальные сервисы</span></span><small id="batch-label">Несколько ссылок → подборка</small></div>
         <button class="clip-banner" id="clip-banner">
           <svg class="icon s16 cb-ico"><use href="#i-clipboard"/></svg>
           <span class="cb-text" id="clip-text"></span>
@@ -73,9 +80,10 @@
         <div class="typeahead" id="typeahead"></div>
       </div>
       <div class="quick hidden" id="quick">
-        <button id="q-crate"><span class="quick-icon"><svg class="icon s18"><use href="#i-layers"/></svg></span><span><b>Подборка</b><small>Собрать сет</small></span><span class="qn" id="q-crate-n"></span></button>
-        <button id="q-queue"><span class="quick-icon"><svg class="icon s18"><use href="#i-clock"/></svg></span><span><b>Очередь</b><small>Планы на эфир</small></span><span class="qn" id="q-queue-n"></span></button>
-        <button id="q-stats"><span class="quick-icon"><svg class="icon s18"><use href="#i-bar"/></svg></span><span><b>Статистика</b><small>Ритм канала</small></span></button>
+        <button id="q-crate"><span class="quick-icon"><svg class="icon s18"><use href="#i-layers"/></svg></span><span><b id="q-crate-title">Подборка</b><small id="q-crate-sub">Собрать сет</small></span><span class="qn" id="q-crate-n"></span></button>
+        <button id="q-inline"><span class="quick-icon"><svg class="icon s18"><use href="#i-send"/></svg></span><span><b id="q-inline-title">Inline-поиск</b><small id="q-inline-sub">В любом чате</small></span></button>
+        <button id="q-queue"><span class="quick-icon"><svg class="icon s18"><use href="#i-clock"/></svg></span><span><b id="q-queue-title">Очередь</b><small id="q-queue-sub">Планы на эфир</small></span><span class="qn" id="q-queue-n"></span></button>
+        <button id="q-stats"><span class="quick-icon"><svg class="icon s18"><use href="#i-bar"/></svg></span><span><b id="q-stats-title">Статистика</b><small id="q-stats-sub">Ритм канала</small></span></button>
       </div>
       <div class="scroll">
         <div id="home-skel">
@@ -127,9 +135,10 @@
     <div class="view hidden" id="v-result">
       <div class="head"><button class="back" id="res-back" aria-label="Назад"><svg class="icon s18"><use href="#i-cl"/></svg></button>
         <div class="sub"><span class="seclabel">Превью поста</span></div>
-        <button style="display:flex;align-items:center;gap:6px;padding:9px 12px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--primary);font-family:'JetBrains Mono';font-size:12px" id="open-format"><svg class="icon s14"><use href="#i-sliders"/></svg>Оформление</button></div>
+        <button class="format-pill" id="open-format"><svg class="icon s14"><use href="#i-sliders"/></svg>Оформление</button></div>
       <div class="result-scroll">
         <div class="result-intro"><span>READY TO AIR</span><strong>Так пост увидит аудитория</strong></div>
+        <div class="result-readiness" id="result-readiness" aria-label="Готовность поста"></div>
         <div class="post-card" id="post-card"></div>
         <div class="status-note" id="status"></div>
       </div>
@@ -276,9 +285,12 @@
 </div>
 
 <!-- Coach -->
-<div class="coach-mask" id="coach-mask"></div>
-<div class="coach" id="coach" role="dialog" aria-modal="true" aria-live="polite"><div class="c-emoji" id="coach-emoji"></div><div class="c-text" id="coach-text"></div>
-  <div class="c-row"><div class="c-dots" id="coach-dots"></div><button class="c-next" id="coach-next"></button></div></div>
+<div class="coach-mask" id="coach-mask" aria-hidden="true"></div>
+<div class="coach" id="coach" role="dialog" aria-modal="true" aria-labelledby="coach-title" aria-hidden="true" inert>
+  <div class="c-top"><span class="c-step" id="coach-step"></span><button class="c-skip" id="coach-skip" type="button"></button></div>
+  <div class="c-main"><div class="c-emoji" id="coach-emoji"></div><div><h3 id="coach-title"></h3><div class="c-text" id="coach-text"></div></div></div>
+  <div class="c-row"><div class="c-dots" id="coach-dots"></div><button class="c-next" id="coach-next"></button></div>
+</div>
 
 <!-- Toast -->
 <div class="toast" id="toast" role="status" aria-live="polite" aria-hidden="true"><div class="msg" id="toast-msg"></div>

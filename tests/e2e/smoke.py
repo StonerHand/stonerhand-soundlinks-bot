@@ -58,7 +58,8 @@ ACTION_ATTEMPTS: dict[str, int] = {}
 INIT = """window.Telegram={WebApp:{initData:"x",initDataUnsafe:{user:{language_code:"ru"}},colorScheme:"dark",
 ready(){},expand(){},close(){},setHeaderColor(){},setBackgroundColor(){},BackButton:{show(){},hide(){},onClick(){}},
 HapticFeedback:{impactOccurred(){},selectionChanged(){},notificationOccurred(){}},
-CloudStorage:{getItem(k,cb){cb(null,null)},setItem(){}},isVersionAtLeast(){return false},switchInlineQuery(){},readTextFromClipboard(){}}};"""
+CloudStorage:{getItem(k,cb){cb(null,null)},setItem(){}},isVersionAtLeast(){return false},
+switchInlineQuery(q){window.__inlineQuery=q},readTextFromClipboard(cb){cb("https://open.spotify.com/track/pasted")}}};"""
 
 
 def _launch(p):
@@ -112,6 +113,19 @@ def main() -> int:
             failures.append("home view not shown on boot")
         if page.evaluate("document.documentElement.scrollWidth > window.innerWidth"):
             failures.append("home view has horizontal overflow at 390px")
+        if page.eval_on_selector("#quick", "el => el.classList.contains('hidden')"):
+            failures.append("quick actions are hidden for an ordinary user")
+        if not page.eval_on_selector("#q-queue", "el => el.classList.contains('hidden')"):
+            failures.append("admin queue shortcut is visible to an ordinary user")
+
+        # Clipboard paste and inline mode are first-class shortcuts on home.
+        page.eval_on_selector("#paste-btn", "el => el.click()")
+        if "open.spotify.com" not in page.eval_on_selector("#query", "el => el.value"):
+            failures.append("paste button did not fill the search input")
+        page.eval_on_selector("#clear", "el => el.click()")
+        page.eval_on_selector("#q-inline", "el => el.click()")
+        if page.evaluate("window.__inlineQuery") != "":
+            failures.append("inline shortcut did not open Telegram inline mode")
 
         # Popular cards must keep their title clear of the decorative music
         # icon, including the narrowest Telegram viewport we support.
@@ -140,6 +154,13 @@ def main() -> int:
             failures.append("result view not shown after search")
         elif "Dopesmoker" not in page.eval_on_selector("#v-result", "el => el.innerText"):
             failures.append("result card missing track title")
+        if page.locator("#result-readiness span").count() != 3:
+            failures.append("result readiness summary is incomplete")
+        if not page.eval_on_selector("#coach", "el => el.classList.contains('open')"):
+            failures.append("first-run coach did not open")
+        page.keyboard.press("Escape")
+        if page.eval_on_selector("#coach", "el => el.classList.contains('open')"):
+            failures.append("first-run coach cannot be dismissed with Escape")
 
         # 3. publication uses a destination sheet and a success state
         page.eval_on_selector("#action-main", "el => el.click()")
@@ -161,7 +182,7 @@ def main() -> int:
         # 5. home shortcut cards are wired (they mirror the tab bar)
         page.eval_on_selector('#tabbar [data-tab="home"]', "el => el.click()")
         page.wait_for_timeout(300)
-        page.eval_on_selector("#quick", "el => el.classList.remove('hidden')")
+        page.eval_on_selector("#q-queue", "el => el.classList.remove('hidden')")
         page.eval_on_selector("#q-queue", "el => el.click()")
         page.wait_for_timeout(400)
         if page.eval_on_selector("#v-queue", "el => el.classList.contains('hidden')"):
