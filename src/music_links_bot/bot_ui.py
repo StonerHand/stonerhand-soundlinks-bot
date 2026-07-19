@@ -128,6 +128,7 @@ def build_section_keyboard(
     lang: str,
     crate_count: int = 0,
     include_studio: bool = True,
+    active: str | None = None,
 ) -> InlineKeyboardMarkup:
     del bot_username
     rows: list[list[InlineKeyboardButton]] = []
@@ -142,27 +143,49 @@ def build_section_keyboard(
                 )
             ]
         )
-    rows.extend(
+    rows.append(
         [
-            [
-                InlineKeyboardButton(
-                    get_text(lang, "quick_search"),
-                    switch_inline_query_current_chat="",
-                    api_kwargs={"style": "primary"},
+            InlineKeyboardButton(
+                get_text(lang, "quick_search"),
+                switch_inline_query_current_chat="",
+                api_kwargs={"style": "primary"},
+            ),
+            InlineKeyboardButton(
+                get_text(lang, "home_crate").format(
+                    count=max(0, min(10, crate_count))
                 ),
-                InlineKeyboardButton(
-                    get_text(lang, "home_crate").format(
-                        count=max(0, min(10, crate_count))
-                    ),
-                    callback_data=encode_callback("crate", "open"),
-                ),
-            ],
-            [
-                InlineKeyboardButton(
-                    get_text(lang, "home_back"),
-                    callback_data=encode_callback("menu", "start"),
-                )
-            ],
+                callback_data=encode_callback("crate", "open"),
+            ),
+        ]
+    )
+
+    related_actions = {
+        "help": ("platforms", "guide"),
+        "platforms": ("help", "demo"),
+        "guide": ("help", "platforms"),
+        "demo": ("help", "platforms"),
+    }.get(active, ("help", "platforms"))
+    label_keys = {
+        "help": "tab_help",
+        "platforms": "tab_platforms",
+        "guide": "tab_guide",
+        "demo": "tab_demo",
+    }
+    rows.append(
+        [
+            InlineKeyboardButton(
+                get_text(lang, label_keys[action]),
+                callback_data=encode_callback("menu", action),
+            )
+            for action in related_actions
+        ]
+    )
+    rows.append(
+        [
+            InlineKeyboardButton(
+                get_text(lang, "home_back"),
+                callback_data=encode_callback("menu", "start"),
+            )
         ]
     )
     return InlineKeyboardMarkup(rows)
@@ -178,18 +201,23 @@ def build_onboarding_keyboard(step: int, lang: str) -> InlineKeyboardMarkup:
                 api_kwargs={"style": "primary"},
             )
         ]
-        if step > 1:
-            row.insert(
-                0,
-                InlineKeyboardButton(
-                    get_text(lang, "back"),
-                    callback_data=encode_callback("menu", f"onboard{step - 1}"),
+        row.insert(
+            0,
+            InlineKeyboardButton(
+                get_text(lang, "back"),
+                callback_data=encode_callback(
+                    "menu", f"onboard{step - 1}" if step > 1 else "start"
                 ),
-            )
+            ),
+        )
         rows.append(row)
     else:
         rows.append(
             [
+                InlineKeyboardButton(
+                    get_text(lang, "back"),
+                    callback_data=encode_callback("menu", "onboard2"),
+                ),
                 InlineKeyboardButton(
                     get_text(lang, "start_using"),
                     callback_data=encode_callback("menu", "onboarddone"),
@@ -303,11 +331,10 @@ def render_crate(items: list[dict], *, lang: str) -> tuple[str, InlineKeyboardMa
         for index, entry in enumerate(items, 1):
             item = entry.get("item") or {}
             lines.append(
-                f"<b>{index}.</b> {item.get('artist') or '—'} — {item.get('title') or '—'}"
+                f"<b>{index}.</b> {escape(str(item.get('artist') or '—'))} — "
+                f"{escape(str(item.get('title') or '—'))}"
             )
-        lines.extend(
-            ["", "Меняй порядок стрелками; изменения сохраняются автоматически."]
-        )
+        lines.extend(["", get_text(lang, "crate_hint")])
         text = "\n".join(lines)
 
     rows: list[list[InlineKeyboardButton]] = []
@@ -325,19 +352,22 @@ def render_crate(items: list[dict], *, lang: str) -> tuple[str, InlineKeyboardMa
         if index > 0:
             controls.append(
                 InlineKeyboardButton(
-                    "↑", callback_data=encode_callback("crate", "up", str(index))
+                    get_text(lang, "crate_up"),
+                    callback_data=encode_callback("crate", "up", str(index)),
                 )
             )
         if index < len(items) - 1:
             controls.append(
                 InlineKeyboardButton(
-                    "↓", callback_data=encode_callback("crate", "down", str(index))
+                    get_text(lang, "crate_down"),
+                    callback_data=encode_callback("crate", "down", str(index)),
                 )
             )
         controls.append(
             InlineKeyboardButton(
-                "Удалить",
+                get_text(lang, "crate_remove"),
                 callback_data=encode_callback("crate", "remove", str(index)),
+                api_kwargs={"style": "danger"},
             )
         )
         rows.append(controls)
@@ -352,4 +382,12 @@ def render_crate(items: list[dict], *, lang: str) -> tuple[str, InlineKeyboardMa
                 )
             ]
         )
+    rows.append(
+        [
+            InlineKeyboardButton(
+                get_text(lang, "home_back"),
+                callback_data=encode_callback("menu", "start"),
+            )
+        ]
+    )
     return text, InlineKeyboardMarkup(rows)

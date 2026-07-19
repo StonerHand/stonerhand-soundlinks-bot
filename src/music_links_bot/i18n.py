@@ -67,15 +67,17 @@ STRINGS: dict[str, dict[str, str]] = {
     "home_body": {
         RU: (
             "{greeting}\n\n"
-            "Ссылка или название → точный релиз → готовый Telegram-пост.\n\n"
-            "<blockquote>🧺 Подборка: {crate_count}/10\n{mode}</blockquote>\n"
-            "Пришли ссылку прямо сюда или выбери действие ниже."
+            "<i>Ссылка или название → точный релиз → готовый Telegram-пост.</i>\n\n"
+            "<blockquote>🧺 <b>Подборка:</b> {crate_count}/10\n{mode}</blockquote>\n"
+            "<b>Начни здесь:</b> пришли ссылку или напиши\n"
+            "<code>артист — название трека</code>"
         ),
         EN: (
             "{greeting}\n\n"
-            "A link or title → the exact release → a finished Telegram post.\n\n"
-            "<blockquote>🧺 Crate: {crate_count}/10\n{mode}</blockquote>\n"
-            "Send a link here or choose an action below."
+            "<i>A link or title → the exact release → a finished Telegram post.</i>\n\n"
+            "<blockquote>🧺 <b>Crate:</b> {crate_count}/10\n{mode}</blockquote>\n"
+            "<b>Start here:</b> send a link or type\n"
+            "<code>artist — track title</code>"
         ),
     },
     "home_mode_admin": {
@@ -92,50 +94,56 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "onboarding_1": {
         RU: (
-            "<b>● ○ ○  Найди точный релиз</b>\n\n"
-            "Пришли ссылку с музыкальной площадки или напиши "
-            "<i>артист — трек</i>. Если совпадений несколько, выберешь нужное."
+            "🔎 <b>Шаг 1 из 3 · Найди релиз</b>\n\n"
+            "<blockquote>Пришли ссылку с музыкальной площадки или напиши\n"
+            "<code>артист — название трека</code></blockquote>\n"
+            "Если совпадений несколько, бот покажет варианты — останется выбрать точный."
         ),
         EN: (
-            "<b>● ○ ○  Find the exact release</b>\n\n"
-            "Send a music link or type <i>artist — track</i>. "
-            "If there are several matches, you will choose the right one."
+            "🔎 <b>Step 1 of 3 · Find the release</b>\n\n"
+            "<blockquote>Send a music-platform link or type\n"
+            "<code>artist — track title</code></blockquote>\n"
+            "If several releases match, the bot will show options for you to choose from."
         ),
     },
     "onboarding_2": {
         RU: (
-            "<b>● ● ○  Собери карточку</b>\n\n"
-            "Бот найдёт обложку и площадки. В чате можно быстро поменять "
-            "хэштеги и превью, а в Студии — настроить весь пост."
+            "🎛 <b>Шаг 2 из 3 · Настрой карточку</b>\n\n"
+            "<blockquote>Бот найдёт обложку, площадки и подготовит хэштеги.</blockquote>\n"
+            "В чате можно быстро изменить цитату и превью. В <b>Студии</b> — "
+            "полностью настроить текст, обложку и порядок кнопок."
         ),
         EN: (
-            "<b>● ● ○  Build the card</b>\n\n"
-            "The bot finds artwork and platforms. Tune hashtags and preview "
-            "in chat, or customize the whole post in Studio."
+            "🎛 <b>Step 2 of 3 · Shape the card</b>\n\n"
+            "<blockquote>The bot finds artwork, platforms and prepares hashtags.</blockquote>\n"
+            "Quickly change the quote and preview in chat. Use <b>Studio</b> to "
+            "customize the text, cover and button order."
         ),
     },
     "onboarding_3": {
         RU: (
-            "<b>● ● ●  Выпусти пост</b>\n\n"
-            "Отправь его себе, добавь в подборку или опубликуй в канал. "
-            "Для любого чата есть inline: <code>@StonerHandBot запрос</code>."
+            "📡 <b>Шаг 3 из 3 · Отправь пост</b>\n\n"
+            "<blockquote>Отправь пост себе, добавь трек в подборку или опубликуй в канал.</blockquote>\n"
+            "А в любом другом чате используй inline:\n"
+            "<code>@StonerHandBot артист — трек</code>"
         ),
         EN: (
-            "<b>● ● ●  Release the post</b>\n\n"
-            "Send it to yourself, add it to a crate or publish to the channel. "
-            "Inline works anywhere: <code>@StonerHandBot query</code>."
+            "📡 <b>Step 3 of 3 · Send the post</b>\n\n"
+            "<blockquote>Send it to yourself, add the track to a crate or publish to the channel.</blockquote>\n"
+            "In any other chat, use inline mode:\n"
+            "<code>@StonerHandBot artist — track</code>"
         ),
     },
-    "quick_tour": {RU: "▶ Быстрый тур", EN: "▶ Quick tour"},
-    "quick_search": {RU: "🔎 Новый пост", EN: "🔎 New post"},
+    "quick_tour": {RU: "▶ Как всё работает", EN: "▶ How it works"},
+    "quick_search": {RU: "🔎 Найти релиз", EN: "🔎 Find a release"},
     "open_studio": {RU: "🎛 Открыть Студию", EN: "🎛 Open Studio"},
     "home_crate": {RU: "🧺 Подборка · {count}", EN: "🧺 Crate · {count}"},
     "home_stats": {RU: "📊 Статистика канала", EN: "📊 Channel stats"},
-    "home_result": {RU: "✨ Что получится", EN: "✨ See the result"},
+    "home_result": {RU: "✨ Пример поста", EN: "✨ Example post"},
     "home_back": {RU: "← Главное меню", EN: "← Main menu"},
     "next": {RU: "Дальше →", EN: "Next →"},
     "back": {RU: "← Назад", EN: "← Back"},
-    "start_using": {RU: "Готово — открыть меню", EN: "Done — open menu"},
+    "start_using": {RU: "Готово ✓", EN: "Done ✓"},
     "tab_start": {RU: "🚀 Быстрый старт", EN: "🚀 Quick start"},
     "tab_help": {RU: "❓ Помощь", EN: "❓ Help"},
     "tab_platforms": {RU: "🎛 Сервисы", EN: "🎛 Services"},
@@ -173,115 +181,126 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "menu_help": {
         RU: (
-            "<b>Как пользоваться</b>\n\n"
-            "1️⃣ Пришли ссылку на релиз, видео или эфир — "
-            "или просто название трека\n"
-            "2️⃣ Хочешь подводку — напиши текст над ссылкой, он станет цитатой\n"
-            "3️⃣ Получи чистый пост: preview, хэштеги и кнопки площадок\n\n"
-            "💡 Несколько ссылок одним сообщением превращаются в нумерованную "
-            "подборку с кнопкой на каждый релиз\n\n"
-            "⚡ В любом другом чате набери <code>@StonerHandBot ссылка</code> — "
-            "вставишь готовый пост, не выходя из разговора\n\n"
-            "🎚 Под постом в личке есть редактор: хэштеги, цитата, "
-            "публикация в канал\n\n"
-            "Разметка в подводке сохраняется: жирный, курсив, спойлеры, ссылки"
+            "❓ <b>Как собрать пост</b>\n"
+            "<i>Три шага — и карточка готова.</i>\n\n"
+            "<blockquote><b>1 · Найди релиз</b>\n"
+            "Пришли ссылку или напиши <code>артист — трек</code>.\n\n"
+            "<b>2 · Проверь карточку</b>\n"
+            "Бот добавит обложку, хэштеги и кнопки площадок.\n\n"
+            "<b>3 · Отправь</b>\n"
+            "Себе, в подборку, очередь или канал.</blockquote>\n\n"
+            "<b>Полезные приёмы</b>\n"
+            "• Текст над ссылкой станет <i>цитатой</i>.\n"
+            "• Несколько ссылок превратятся в нумерованную подборку.\n"
+            "• Форматирование подводки сохранится.\n\n"
+            "<blockquote>⚡ Inline в любом чате:\n"
+            "<code>@StonerHandBot Black Sabbath — Paranoid</code></blockquote>"
         ),
         EN: (
-            "<b>How it works</b>\n\n"
-            "1️⃣ Send a link to a release, video or show — "
-            "or just type a track name\n"
-            "2️⃣ Want an intro? Write text above the link, it becomes a quote\n"
-            "3️⃣ Get a clean post: preview, hashtags and platform buttons\n\n"
-            "💡 Several links in one message become a numbered collection "
-            "with a button per release\n\n"
-            "⚡ In any other chat type <code>@StonerHandBot link</code> — "
-            "insert a finished post without leaving the conversation\n\n"
-            "🎚 Posts in DM come with an editor: hashtags, quote, "
-            "publish-to-channel\n\n"
-            "Formatting in the intro is preserved: bold, italic, spoilers, links"
+            "❓ <b>How to build a post</b>\n"
+            "<i>Three steps and the card is ready.</i>\n\n"
+            "<blockquote><b>1 · Find a release</b>\n"
+            "Send a link or type <code>artist — track</code>.\n\n"
+            "<b>2 · Check the card</b>\n"
+            "The bot adds artwork, hashtags and platform buttons.\n\n"
+            "<b>3 · Send it</b>\n"
+            "To yourself, a crate, the queue or your channel.</blockquote>\n\n"
+            "<b>Useful shortcuts</b>\n"
+            "• Text above a link becomes a <i>quote</i>.\n"
+            "• Several links become a numbered collection.\n"
+            "• Intro formatting is preserved.\n\n"
+            "<blockquote>⚡ Inline in any chat:\n"
+            "<code>@StonerHandBot Black Sabbath — Paranoid</code></blockquote>"
         ),
     },
     "menu_guide": {
         RU: (
-            "<b>Для групп и каналов</b>\n\n"
-            "1️⃣ Добавь бота в группу или канал\n"
-            "2️⃣ Сделай его админом с правом удалять сообщения\n"
-            "3️⃣ Кидай ссылки как обычно — бот заменит их готовыми постами\n\n"
-            "💡 Текст над ссылкой станет цитатой с подписью автора, "
-            "хэштеги добавятся автоматически\n\n"
-            "Пост публикуется до удаления исходного сообщения, "
-            "так что контент не теряется"
+            "📣 <b>Бот для групп и каналов</b>\n"
+            "<i>Настрой один раз — дальше просто присылай музыку.</i>\n\n"
+            "<blockquote><b>1 · Добавь бота</b>\n"
+            "В группу или канал как администратора.\n\n"
+            "<b>2 · Выдай права</b>\n"
+            "На публикацию; в группе — ещё и на удаление сообщений.\n\n"
+            "<b>3 · Пришли ссылку</b>\n"
+            "Бот заменит её готовым музыкальным постом.</blockquote>\n\n"
+            "<b>Автоматически</b>\n"
+            "• подводка становится цитатой с автором;\n"
+            "• добавляются хэштеги и площадки;\n"
+            "• несколько ссылок собираются в подборку.\n\n"
+            "<blockquote>🛡 Сначала публикуется готовый пост — и только потом удаляется исходное сообщение.</blockquote>"
         ),
         EN: (
-            "<b>For groups and channels</b>\n\n"
-            "1️⃣ Add the bot to a group or channel\n"
-            "2️⃣ Make it an admin with the delete-messages right\n"
-            "3️⃣ Drop links as usual — the bot swaps them for finished posts\n\n"
-            "💡 Text above a link becomes a quote with the author's name, "
-            "hashtags are added automatically\n\n"
-            "The post is published before the original message is deleted, "
-            "so nothing is ever lost"
+            "📣 <b>The bot for groups and channels</b>\n"
+            "<i>Set it up once, then just send music.</i>\n\n"
+            "<blockquote><b>1 · Add the bot</b>\n"
+            "To a group or channel as an administrator.\n\n"
+            "<b>2 · Grant permissions</b>\n"
+            "To publish; in groups, also to delete messages.\n\n"
+            "<b>3 · Send a link</b>\n"
+            "The bot replaces it with a finished music post.</blockquote>\n\n"
+            "<b>Automatic touches</b>\n"
+            "• intro text becomes a quote with attribution;\n"
+            "• hashtags and platforms are added;\n"
+            "• several links become a collection.\n\n"
+            "<blockquote>🛡 The finished post is published before the original message is removed.</blockquote>"
         ),
     },
     "menu_platforms": {
         RU: (
-            "<b>Что можно присылать</b>\n\n"
-            "🟢 Spotify — треки, альбомы, плейлисты, артисты, подкасты\n"
-            "⚪ Apple Music и Apple Podcasts\n"
-            "🔴 YouTube и YouTube Music\n"
-            "🟠 SoundCloud\n"
-            "🟦 Deezer · ⚫ Tidal · 🟡 Yandex Music\n"
-            "📡 NTS Radio\n\n"
-            "<b>Что получится</b>\n"
-            "Карточка релиза с кнопками всех площадок, где он нашелся. "
-            "YouTube оформится как видео-пост, NTS — как радио-эфир, "
-            "несколько ссылок — как подборка\n\n"
-            "Нет ссылки под рукой — просто напиши название трека"
+            "🎛 <b>Поддерживаемые источники</b>\n"
+            "<i>Пришли ссылку — бот сам найдёт остальные площадки.</i>\n\n"
+            "<b>Музыка и подкасты</b>\n"
+            "🟢 Spotify · ⚪ Apple Music / Podcasts\n"
+            "🟠 SoundCloud · 🟦 Deezer\n"
+            "⚫ Tidal · 🟡 Yandex Music\n\n"
+            "<b>Видео и эфиры</b>\n"
+            "🔴 YouTube / YouTube Music · 📡 NTS Radio\n\n"
+            "<b>Типы материалов</b>\n"
+            "Треки, альбомы, плейлисты, артисты, подкасты, видео и радио-шоу.\n\n"
+            "<blockquote>✨ На выходе: обложка, название, автохэштеги и кнопки всех найденных площадок.</blockquote>\n\n"
+            "Нет ссылки? Напиши <code>артист — трек</code>."
         ),
         EN: (
-            "<b>What you can send</b>\n\n"
-            "🟢 Spotify — tracks, albums, playlists, artists, podcasts\n"
-            "⚪ Apple Music and Apple Podcasts\n"
-            "🔴 YouTube and YouTube Music\n"
-            "🟠 SoundCloud\n"
-            "🟦 Deezer · ⚫ Tidal · 🟡 Yandex Music\n"
-            "📡 NTS Radio\n\n"
-            "<b>What you get</b>\n"
-            "A release card with buttons for every platform where it was found. "
-            "YouTube becomes a video post, NTS a radio show, "
-            "several links a collection\n\n"
-            "No link at hand? Just type the track name"
+            "🎛 <b>Supported sources</b>\n"
+            "<i>Send one link — the bot finds the other platforms.</i>\n\n"
+            "<b>Music and podcasts</b>\n"
+            "🟢 Spotify · ⚪ Apple Music / Podcasts\n"
+            "🟠 SoundCloud · 🟦 Deezer\n"
+            "⚫ Tidal · 🟡 Yandex Music\n\n"
+            "<b>Video and radio</b>\n"
+            "🔴 YouTube / YouTube Music · 📡 NTS Radio\n\n"
+            "<b>Content types</b>\n"
+            "Tracks, albums, playlists, artists, podcasts, videos and radio shows.\n\n"
+            "<blockquote>✨ The result: artwork, title, smart hashtags and buttons for every matched platform.</blockquote>\n\n"
+            "No link? Type <code>artist — track</code>."
         ),
     },
     "menu_demo": {
         RU: (
-            "<b>Пример поста</b>\n\n"
-            "Присылаешь ссылку — получаешь такое:\n\n"
-            "<blockquote>📻 · The Soft Moon\n"
-            "Criminal\n\n"
-            "кнопки ниже, трек ждет\n\n"
-            "#stonerhand #track\n\n"
+            "✨ <b>Так выглядит готовый пост</b>\n"
+            "<i>Ты присылаешь ссылку — бот собирает остальное.</i>\n\n"
+            "<blockquote>📻 · <b>The Soft Moon</b>\n"
+            "<i>Criminal</i>\n\n"
+            "громкость выше — мир тише\n\n"
+            "<code>#stonerhand #track</code>\n\n"
             "[🟢 Spotify] [⚪ Apple]\n"
             "[🟦 Deezer] [⚫ Tidal]\n"
             "[🪩 Все платформы]</blockquote>\n\n"
-            "Сверху — обложка релиза, снизу — живые кнопки всех площадок, "
-            "где нашелся релиз\n\n"
-            "Попробуй: пришли ссылку из Spotify, Apple Music, YouTube — "
-            "или просто название трека 👇"
+            "<b>Внутри карточки:</b> обложка, подводка, хэштеги и живые кнопки площадок.\n\n"
+            "Попробуй прямо сейчас: пришли ссылку или <code>название трека</code>."
         ),
         EN: (
-            "<b>Example post</b>\n\n"
-            "You send a link — you get this:\n\n"
-            "<blockquote>📻 · The Soft Moon\n"
-            "Criminal\n\n"
-            "buttons below, the track is waiting\n\n"
-            "#stonerhand #track\n\n"
+            "✨ <b>This is a finished post</b>\n"
+            "<i>You send a link — the bot builds the rest.</i>\n\n"
+            "<blockquote>📻 · <b>The Soft Moon</b>\n"
+            "<i>Criminal</i>\n\n"
+            "volume up — world down\n\n"
+            "<code>#stonerhand #track</code>\n\n"
             "[🟢 Spotify] [⚪ Apple]\n"
             "[🟦 Deezer] [⚫ Tidal]\n"
             "[🪩 All platforms]</blockquote>\n\n"
-            "Cover art on top, live buttons for every matched platform below\n\n"
-            "Try it: send a Spotify, Apple Music or YouTube link — "
-            "or just type a track name 👇"
+            "<b>Inside the card:</b> artwork, intro, hashtags and live platform buttons.\n\n"
+            "Try it now: send a link or a <code>track title</code>."
         ),
     },
     "no_url_hint": {
@@ -368,9 +387,24 @@ STRINGS: dict[str, dict[str, str]] = {
     "progress_links": {RU: "2/3 · Собираю площадки…", EN: "2/3 · Collecting platforms…"},
     "progress_card": {RU: "3/3 · Собираю карточку…", EN: "3/3 · Building the card…"},
     "crate_empty": {
-        RU: "<b>Подборка пока пустая</b>\n\nДобавляй релизы кнопкой «+ В подборку» под карточкой.",
-        EN: "<b>Your crate is empty</b>\n\nAdd releases with the “+ Add to crate” button under a card.",
+        RU: (
+            "🧺 <b>Подборка пока пустая</b>\n"
+            "<i>Собери до десяти релизов в один музыкальный сет.</i>\n\n"
+            "<blockquote>Добавляй треки кнопкой «+ В подборку» под готовой карточкой.</blockquote>"
+        ),
+        EN: (
+            "🧺 <b>Your crate is empty</b>\n"
+            "<i>Collect up to ten releases into one music set.</i>\n\n"
+            "<blockquote>Add tracks with the “+ Add to crate” button under a finished card.</blockquote>"
+        ),
     },
-    "crate_title": {RU: "<b>Моя подборка · {count}/10</b>", EN: "<b>My crate · {count}/10</b>"},
-    "crate_open_studio": {RU: "Собрать сет в Студии", EN: "Build the set in Studio"},
+    "crate_title": {RU: "🧺 <b>Моя подборка · {count}/10</b>", EN: "🧺 <b>My crate · {count}/10</b>"},
+    "crate_hint": {
+        RU: "<blockquote>↕️ Меняй порядок стрелками — всё сохраняется автоматически.</blockquote>",
+        EN: "<blockquote>↕️ Reorder with the arrows — every change is saved automatically.</blockquote>",
+    },
+    "crate_up": {RU: "↑ Выше", EN: "↑ Up"},
+    "crate_down": {RU: "↓ Ниже", EN: "↓ Down"},
+    "crate_remove": {RU: "✕ Удалить", EN: "✕ Remove"},
+    "crate_open_studio": {RU: "🎛 Собрать сет в Студии", EN: "🎛 Build the set in Studio"},
 }

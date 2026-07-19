@@ -18,6 +18,8 @@ from music_links_bot.bot import (
     _build_error_keyboard,
     _build_intro_keyboard,
     _build_home_text,
+    _build_onboarding_keyboard,
+    _build_section_keyboard,
     _build_start_keyboard,
     _build_link_keyboard,
     _build_mixed_collection_keyboard,
@@ -42,12 +44,14 @@ from music_links_bot.bot import (
     _strip_bot_mention,
     _release_fingerprint,
     _editor_rows,
+    _render_bot_crate,
     _render_track_draft,
     track_lookup_message,
     help_command,
     start_command,
 )
 from music_links_bot.artist import ArtistLookupError
+from music_links_bot.i18n import get_text
 from music_links_bot.models import (
     ArtistMatch,
     PlaylistMatch,
@@ -420,7 +424,7 @@ class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 1)
         self.assertEqual(len(context.bot.edited_messages), 1)
         self.assertEqual(context.bot.edited_messages[0]["message_id"], 1000)
-        self.assertIn("Как пользоваться", context.bot.edited_messages[0]["text"])
+        self.assertIn("Как собрать пост", context.bot.edited_messages[0]["text"])
 
     async def test_unchanged_home_is_not_sent_again(self) -> None:
         message = PrivateMessageStub()
@@ -735,11 +739,53 @@ class BotKeyboardTests(unittest.TestCase):
         keyboard = _build_intro_keyboard("StonerHandBot")
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(len(rows), 2)
-        self.assertEqual(rows[0][0].text, "🔎 Новый пост")
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(rows[0][0].text, "🔎 Найти релиз")
         self.assertEqual(rows[0][1].text, "🧺 Подборка · 0")
-        self.assertEqual(rows[1][0].text, "← Главное меню")
+        self.assertEqual([button.text for button in rows[1]], ["❓ Помощь", "🎛 Сервисы"])
+        self.assertEqual(rows[2][0].text, "← Главное меню")
         self.assertEqual(rows[0][0].api_kwargs, {"style": "primary"})
+
+    def test_section_keyboard_offers_related_pages_and_back_last(self) -> None:
+        keyboard = _build_section_keyboard(
+            "StonerHandBot",
+            lang="ru",
+            active="help",
+            include_studio=False,
+        )
+
+        rows = keyboard.inline_keyboard
+        self.assertEqual([button.text for button in rows[1]], ["🎛 Сервисы", "📣 Для каналов"])
+        self.assertEqual(rows[-1][0].text, "← Главное меню")
+        self.assertEqual(rows[-1][0].callback_data, "v2|menu|start")
+
+    def test_onboarding_always_has_a_back_button(self) -> None:
+        first = _build_onboarding_keyboard(1, "ru").inline_keyboard[0]
+        middle = _build_onboarding_keyboard(2, "ru").inline_keyboard[0]
+        last = _build_onboarding_keyboard(3, "ru").inline_keyboard[0]
+
+        self.assertEqual(first[0].callback_data, "v2|menu|start")
+        self.assertEqual(middle[0].callback_data, "v2|menu|onboard1")
+        self.assertEqual(last[0].callback_data, "v2|menu|onboard2")
+        self.assertTrue(all(row[0].text == "← Назад" for row in (first, middle, last)))
+
+    def test_crate_has_safe_text_clear_controls_and_back(self) -> None:
+        text, keyboard = _render_bot_crate(
+            [
+                {"item": {"artist": "Sleep <b>", "title": "Dragonaut & friends"}},
+                {"item": {"artist": "Kyuss", "title": "Green Machine"}},
+            ],
+            lang="ru",
+        )
+
+        self.assertIn("Sleep &lt;b&gt;", text)
+        self.assertIn("Dragonaut &amp; friends", text)
+        labels = [button.text for row in keyboard.inline_keyboard for button in row]
+        self.assertIn("↓ Ниже", labels)
+        self.assertIn("↑ Выше", labels)
+        self.assertIn("✕ Удалить", labels)
+        self.assertEqual(keyboard.inline_keyboard[-1][0].text, "← Главное меню")
+        self.assertEqual(keyboard.inline_keyboard[-1][0].callback_data, "v2|menu|start")
 
     def test_home_keyboard_prioritizes_studio_and_reflects_state(self) -> None:
         with patch.dict(os.environ, {"WEBAPP_URL": "https://studio.example/app"}):
@@ -754,10 +800,10 @@ class BotKeyboardTests(unittest.TestCase):
         rows = keyboard.inline_keyboard
         self.assertEqual(rows[0][0].text, "🎛 Открыть Студию")
         self.assertEqual(rows[0][0].api_kwargs, {"style": "success"})
-        self.assertEqual(rows[1][0].text, "🔎 Новый пост")
+        self.assertEqual(rows[1][0].text, "🔎 Найти релиз")
         self.assertEqual(rows[1][1].text, "🧺 Подборка · 3")
         self.assertEqual(rows[2][0].text, "📊 Статистика канала")
-        self.assertEqual(rows[3][0].text, "▶ Быстрый тур")
+        self.assertEqual(rows[3][0].text, "▶ Как всё работает")
         self.assertEqual(rows[-1][0].text, "↗ Поделиться ботом")
 
     def test_home_text_is_personal_and_escapes_telegram_html(self) -> None:
@@ -769,8 +815,10 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         self.assertIn("Студия готова, &lt;Артём&gt;", text)
-        self.assertIn("Подборка: 4/10", text)
+        self.assertIn("<b>Подборка:</b> 4/10", text)
         self.assertIn("Канал, очередь и статистика доступны", text)
+        self.assertIn("<i>", text)
+        self.assertIn("<code>артист — название трека</code>", text)
 
     def test_home_keyboard_omits_webapp_button_outside_private_chat(self) -> None:
         with patch.dict(os.environ, {"WEBAPP_URL": "https://studio.example/app"}):
@@ -787,12 +835,43 @@ class BotKeyboardTests(unittest.TestCase):
 
     def test_menu_text_uses_compact_html_headings(self) -> None:
         self.assertTrue(_menu_text("menu:start").startswith("🎧 <b>"))
-        self.assertTrue(_menu_text("menu:help").startswith("<b>Как пользоваться</b>"))
+        self.assertTrue(_menu_text("menu:help").startswith("❓ <b>Как собрать пост</b>"))
+
+    def test_menu_sections_use_semantic_telegram_formatting(self) -> None:
+        for menu in ("menu:help", "menu:guide", "menu:platforms", "menu:demo"):
+            with self.subTest(menu=menu):
+                text = _menu_text(menu)
+                self.assertIn("<b>", text)
+                self.assertIn("<i>", text)
+                self.assertIn("<blockquote>", text)
+        for menu in ("menu:help", "menu:platforms", "menu:demo"):
+            with self.subTest(code_menu=menu):
+                self.assertIn("<code>", _menu_text(menu))
+
+    def test_menu_html_tags_are_balanced_in_both_languages(self) -> None:
+        keys = (
+            "home_body",
+            "onboarding_1",
+            "onboarding_2",
+            "onboarding_3",
+            "menu_help",
+            "menu_guide",
+            "menu_platforms",
+            "menu_demo",
+            "crate_empty",
+            "crate_hint",
+        )
+        for lang in ("ru", "en"):
+            for key in keys:
+                with self.subTest(lang=lang, key=key):
+                    text = get_text(lang, key)
+                    for tag in ("b", "i", "code", "blockquote"):
+                        self.assertEqual(text.count(f"<{tag}>"), text.count(f"</{tag}>"))
 
     def test_demo_menu_shows_example_post_and_cta(self) -> None:
         demo_text = _menu_text("menu:demo")
 
-        self.assertTrue(demo_text.startswith("<b>Пример поста</b>"))
+        self.assertTrue(demo_text.startswith("✨ <b>Так выглядит готовый пост</b>"))
         self.assertIn("<blockquote>", demo_text)
         self.assertIn("#stonerhand", demo_text)
         self.assertIn("пришли", demo_text.casefold())
