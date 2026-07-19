@@ -22,17 +22,18 @@ from music_links_bot.bot import (
     CHANNEL_USERNAME,
     DRAFT_TTL_SECONDS,
     STATS_KV_KEY,
-    _find_posted_date,
     _load_draft,
     _lookup_tracks,
     _publish_draft,
-    _release_fingerprint,
     _render_track_draft,
-    _schedule_mark_posted,
     _select_preview_url,
     _store_draft,
     build_application,
-    normalize_hashtag,
+)
+from music_links_bot.publication_state import (
+    find_posted_date as _find_posted_date,
+    mark_posted as _schedule_mark_posted,
+    release_fingerprint as _release_fingerprint,
 )
 from music_links_bot.config import Settings
 from music_links_bot.constants import PLATFORM_BUTTON_STYLES, PLATFORM_LABELS
@@ -43,18 +44,45 @@ from music_links_bot.formatter import (
 )
 from music_links_bot.i18n import resolve_lang
 from music_links_bot.kvstore import KVStore
+from music_links_bot.loop_runner import (
+    run_on_loop,
+    start_background_loop,
+    stop_background_loop,
+)
 from music_links_bot.models import TrackMatch
 from music_links_bot.phrases import pick_phrase
 from music_links_bot.publish_queue import (
     MAX_DELAY_SECONDS,
+    QueueBusyError,
     add_job,
     load_jobs,
     process_due_jobs,
     remove_job,
     reschedule_job,
 )
+from music_links_bot.request_guard import rate_limited, run_idempotent
 from music_links_bot.search import SearchLookupError, normalize_search_query
 from music_links_bot.stats import load_stats, merge_stats
+from music_links_bot.studio_models import (
+    MAX_CRATE_ITEMS,
+    apply_draft_patch as _apply_draft_patch,
+    compact_track_data as _compact_track_data,
+    crate_view as _crate_view,
+    top_entries as _top_entries,
+    track_from_item as _track_from_item,
+    upscale_artwork as _upscale_artwork,
+)
+
+from music_links_bot import studio_storage as _studio_storage
+
+_acquire_kv_lock = _studio_storage._acquire_kv_lock
+_record_history = _studio_storage._record_history
+_load_history_items = _studio_storage._load_history_items
+_load_crate = _studio_storage._load_crate
+_save_crate = _studio_storage._save_crate
+_crate_base_items = _studio_storage._crate_base_items
+_crate_response = _studio_storage._crate_response
+
 from music_links_bot.url_utils import extract_supported_urls
 from music_links_bot.webapp_auth import validate_init_data
 from telegram.constants import ParseMode
@@ -63,22 +91,33 @@ LOGGER = logging.getLogger(__name__)
 MAX_BODY_BYTES = 64 * 1024
 MAX_HISTORY_ITEMS = 10
 HISTORY_TTL_SECONDS = 90 * 24 * 3600
-MAX_CUSTOM_CTA_LENGTH = 200
-MAX_CUSTOM_TAGS = 8
-MAX_CRATE_ITEMS = 10
 CRATE_TTL_SECONDS = 14 * 24 * 3600
 # Every event-loop run is time-bounded so one slow upstream call (Song.link,
 # iTunes, Redis) can't hold the shared lock and wedge the warm instance.
 ACTION_TIMEOUT_SECONDS = 25
 QUEUE_TICK_TIMEOUT_SECONDS = 20
-# A cheap per-instance guard against a single user hammering the external
-# search/resolve APIs. Generous enough that normal use never trips it.
 RESOLVE_RATE_LIMIT = 20
 RESOLVE_RATE_WINDOW_SECONDS = 60
-_resolve_calls: dict[int, list[float]] = {}
+IDEMPOTENT_ACTIONS = frozenset(
+    {
+        "send",
+        "publish",
+        "unpublish",
+        "schedule",
+        "unschedule",
+        "reschedule",
+        "crate_add",
+        "crate_remove",
+        "crate_order",
+        "crate_clear",
+        "crate_send",
+        "crate_publish",
+    }
+)
 
 _STATE_LOCK = threading.Lock()
 _LOOP: asyncio.AbstractEventLoop | None = None
+_LOOP_THREAD: threading.Thread | None = None
 _APPLICATION = None
 _SETTINGS: Settings | None = None
 
@@ -89,14 +128,13 @@ class handler(BaseHTTPRequestHandler):
         # browser) delivers scheduled posts whose time has come.
         published = 0
         try:
-            with _STATE_LOCK:
-                loop, application, _settings = _ensure_application()
-                context = SimpleNamespace(application=application, bot=application.bot)
-                published = loop.run_until_complete(
-                    asyncio.wait_for(
-                        process_due_jobs(context), timeout=QUEUE_TICK_TIMEOUT_SECONDS
-                    )
-                )
+            loop, application, _settings = _ensure_application()
+            context = SimpleNamespace(application=application, bot=application.bot)
+            published = run_on_loop(
+                loop,
+                process_due_jobs(context),
+                timeout=QUEUE_TICK_TIMEOUT_SECONDS,
+            )
         except Exception:
             LOGGER.exception("Queue tick failed")
 
@@ -128,38 +166,40 @@ class handler(BaseHTTPRequestHandler):
         action = str(payload.get("action") or "?").replace("\n", " ").replace("\r", " ")[:48]
         started = time.monotonic()
         try:
-            with _STATE_LOCK:
-                loop, application, settings = _ensure_application()
-                user = validate_init_data(
-                    str(payload.get("init_data") or ""),
-                    settings.bot_token,
+            loop, application, settings = _ensure_application()
+            user = validate_init_data(
+                str(payload.get("init_data") or ""),
+                settings.bot_token,
+            )
+            if user is None:
+                LOGGER.info("req=%s action=%s unauthorized", req_id, action)
+                self._send_json(
+                    {"ok": False, "error": "unauthorized", "request_id": req_id},
+                    HTTPStatus.UNAUTHORIZED,
                 )
-                if user is None:
-                    LOGGER.info("req=%s action=%s unauthorized", req_id, action)
-                    self._send_json(
-                        {"ok": False, "error": "unauthorized"},
-                        HTTPStatus.UNAUTHORIZED,
-                    )
-                    return
+                return
 
-                result = loop.run_until_complete(
-                    asyncio.wait_for(
-                        _handle_action(application, settings, user, payload),
-                        timeout=ACTION_TIMEOUT_SECONDS,
-                    )
-                )
+            result = run_on_loop(
+                loop,
+                _handle_action(application, settings, user, payload),
+                timeout=ACTION_TIMEOUT_SECONDS,
+            )
+            result.setdefault("request_id", req_id)
         except asyncio.TimeoutError:
             LOGGER.warning(
                 "req=%s action=%s timed out after %.1fs",
                 req_id, action, time.monotonic() - started,
             )
             self._send_json(
-                {"ok": False, "error": "timeout"}, HTTPStatus.GATEWAY_TIMEOUT
+                {"ok": False, "error": "timeout", "retryable": True, "request_id": req_id}, HTTPStatus.GATEWAY_TIMEOUT
             )
             return
         except Exception:
             LOGGER.exception("req=%s action=%s failed", req_id, action)
-            self._send_json({"ok": False, "error": "internal"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            self._send_json(
+                {"ok": False, "error": "internal", "retryable": True, "request_id": req_id},
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+            )
             return
 
         LOGGER.info(
@@ -179,34 +219,25 @@ class handler(BaseHTTPRequestHandler):
 
 
 def _ensure_application():
-    global _LOOP, _APPLICATION, _SETTINGS
-    if _APPLICATION is None:
-        settings = Settings.from_env()
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        application = build_application(settings)
-        loop.run_until_complete(application.initialize())
-        _LOOP = loop
-        _APPLICATION = application
-        _SETTINGS = settings
+    global _LOOP, _LOOP_THREAD, _APPLICATION, _SETTINGS
+    with _STATE_LOCK:
+        if _APPLICATION is None:
+            settings = Settings.from_env()
+            loop, thread = start_background_loop("studio-runtime")
+            try:
+                application = build_application(settings)
+                run_on_loop(
+                    loop, application.initialize(), timeout=ACTION_TIMEOUT_SECONDS
+                )
+            except Exception:
+                stop_background_loop(loop, thread)
+                raise
+            _LOOP = loop
+            _LOOP_THREAD = thread
+            _APPLICATION = application
+            _SETTINGS = settings
 
     return _LOOP, _APPLICATION, _SETTINGS
-
-
-def _resolve_rate_limited(user_id: int, *, now: float | None = None) -> bool:
-    current = now if now is not None else time.time()
-    calls = [t for t in _resolve_calls.get(user_id, []) if current - t < RESOLVE_RATE_WINDOW_SECONDS]
-    if len(calls) >= RESOLVE_RATE_LIMIT:
-        _resolve_calls[user_id] = calls
-        return True
-
-    calls.append(current)
-    _resolve_calls[user_id] = calls
-    if len(_resolve_calls) > 5000:  # bound memory on a long-lived warm instance
-        for uid in list(_resolve_calls):
-            if all(current - t >= RESOLVE_RATE_WINDOW_SECONDS for t in _resolve_calls[uid]):
-                _resolve_calls.pop(uid, None)
-    return False
 
 
 async def _handle_action(application, settings: Settings, user: dict, payload: dict) -> dict:
@@ -217,69 +248,58 @@ async def _handle_action(application, settings: Settings, user: dict, payload: d
     is_admin = settings.admin_chat_id is not None and user_id == settings.admin_chat_id
     lang = resolve_lang(user.get("language_code"))
 
-    if action == "resolve":
-        if _resolve_rate_limited(user_id):
-            return {"ok": False, "error": "rate_limited"}
-        return await _action_resolve(context, body, user_id, is_admin, lang)
+    if action in {"resolve", "resolve_batch"} and await rate_limited(
+        context,
+        scope="studio_resolve",
+        subject=user_id,
+        limit=RESOLVE_RATE_LIMIT,
+        window_seconds=RESOLVE_RATE_WINDOW_SECONDS,
+    ):
+        return {"ok": False, "error": "rate_limited", "retryable": True}
 
-    if action == "resolve_batch":
-        if _resolve_rate_limited(user_id):
-            return {"ok": False, "error": "rate_limited"}
-        return await _action_resolve_batch(context, body, user_id)
-
-    if action == "draft":
-        return await _action_draft(context, body, user_id, is_admin)
-
-    if action == "update":
-        return await _action_update(context, body, user_id, is_admin)
-
-    if action == "preview":
-        return await _action_preview(context, body, user_id)
-
-    if action == "history":
-        return await _action_history(context, user_id, is_admin)
-
-    if action in {"send", "publish"}:
-        return await _action_deliver(context, action, body, user_id, is_admin)
-
-    if action == "unpublish":
-        return await _action_unpublish(context, body, user_id, is_admin)
-
-    if action == "schedule":
-        return await _action_schedule(context, body, user_id, is_admin)
-
-    if action == "queue":
-        return await _action_queue(context, is_admin)
-
-    if action == "unschedule":
-        return await _action_unschedule(context, body, is_admin)
-
-    if action == "reschedule":
-        return await _action_reschedule(context, body, is_admin)
-
-    if action == "stats":
-        return await _action_stats(context, is_admin)
-
-    if action == "crate":
-        return await _crate_response(context, user_id)
-
-    if action == "crate_add":
-        return await _action_crate_add(context, body, user_id)
-
-    if action == "crate_remove":
-        return await _action_crate_remove(context, body, user_id)
-
-    if action == "crate_order":
-        return await _action_crate_order(context, body, user_id)
-
-    if action == "crate_clear":
+    async def clear_crate() -> dict:
         await _save_crate(context, user_id, [])
         return {"ok": True, "items": []}
 
-    if action in {"crate_send", "crate_publish"}:
-        return await _action_crate_deliver(context, action, user_id, is_admin, body)
-
-    return {"ok": False, "error": "unknown action"}
+    handlers = {
+        "resolve": lambda: _action_resolve(context, body, user_id, is_admin, lang),
+        "resolve_batch": lambda: _action_resolve_batch(context, body, user_id),
+        "draft": lambda: _action_draft(context, body, user_id, is_admin),
+        "update": lambda: _action_update(context, body, user_id, is_admin),
+        "preview": lambda: _action_preview(context, body, user_id),
+        "history": lambda: _action_history(context, user_id, is_admin),
+        "send": lambda: _action_deliver(context, action, body, user_id, is_admin),
+        "publish": lambda: _action_deliver(context, action, body, user_id, is_admin),
+        "unpublish": lambda: _action_unpublish(context, body, user_id, is_admin),
+        "schedule": lambda: _action_schedule(context, body, user_id, is_admin),
+        "queue": lambda: _action_queue(context, is_admin),
+        "unschedule": lambda: _action_unschedule(context, body, is_admin),
+        "reschedule": lambda: _action_reschedule(context, body, is_admin),
+        "stats": lambda: _action_stats(context, is_admin),
+        "crate": lambda: _crate_response(context, user_id),
+        "crate_add": lambda: _action_crate_add(context, body, user_id),
+        "crate_remove": lambda: _action_crate_remove(context, body, user_id),
+        "crate_order": lambda: _action_crate_order(context, body, user_id),
+        "crate_clear": clear_crate,
+        "crate_send": lambda: _action_crate_deliver(
+            context, action, user_id, is_admin, body
+        ),
+        "crate_publish": lambda: _action_crate_deliver(
+            context, action, user_id, is_admin, body
+        ),
+    }
+    execute = handlers.get(action)
+    if execute is None:
+        return {"ok": False, "error": "unknown_action", "retryable": False}
+    if action in IDEMPOTENT_ACTIONS:
+        return await run_idempotent(
+            context,
+            user_id=user_id,
+            action=action,
+            request_key=payload.get("request_id"),
+            execute=execute,
+        )
+    return await execute()
 
 
 async def _action_resolve(context, body: dict, user_id: int, is_admin: bool, lang: str) -> dict:
@@ -452,7 +472,7 @@ async def _action_deliver(context, action: str, body: dict, user_id: int, is_adm
 
         published = await _publish_draft(context, draft)
         if published:
-            _schedule_mark_posted(context, track)
+            await _schedule_mark_posted(context, track)
 
         return {
             "ok": bool(published),
@@ -547,7 +567,10 @@ async def _action_schedule(context, body: dict, user_id: int, is_admin: bool) ->
         if posted_date:
             return {"ok": False, "error": "duplicate", "posted_date": posted_date}
 
-    job = await add_job(context, draft, publish_at)
+    try:
+        job = await add_job(context, draft, publish_at)
+    except QueueBusyError:
+        return {"ok": False, "error": "queue_busy", "retryable": True}
     return {"ok": True, "job_id": job["id"], "publish_at": job["publish_at"]}
 
 
@@ -582,7 +605,10 @@ async def _action_unschedule(context, body: dict, is_admin: bool) -> dict:
         return {"ok": False, "error": "admin only"}
 
     job_id = str(body.get("job_id") or "")
-    removed = await remove_job(context, job_id)
+    try:
+        removed = await remove_job(context, job_id)
+    except QueueBusyError:
+        return {"ok": False, "error": "queue_busy", "retryable": True}
     return {"ok": removed, "error": None if removed else "job not found"}
 
 
@@ -600,7 +626,10 @@ async def _action_reschedule(context, body: dict, is_admin: bool) -> dict:
     if publish_at <= now_ts or publish_at > now_ts + MAX_DELAY_SECONDS:
         return {"ok": False, "error": "bad time"}
 
-    moved = await reschedule_job(context, job_id, publish_at)
+    try:
+        moved = await reschedule_job(context, job_id, publish_at)
+    except QueueBusyError:
+        return {"ok": False, "error": "queue_busy", "retryable": True}
     return {
         "ok": moved,
         "error": None if moved else "job not found",
@@ -654,202 +683,6 @@ async def _action_history(context, user_id: int, is_admin: bool) -> dict:
             for index, item in enumerate(items)
         ],
     }
-
-
-async def _acquire_kv_lock(
-    kv: KVStore, key: str, *, tries: int = 5, delay: float = 0.1, ttl: int = 10
-) -> bool:
-    for attempt in range(tries):
-        if await kv.set(key, "1", ttl_seconds=ttl, nx=True):
-            return True
-        if attempt < tries - 1:
-            await asyncio.sleep(delay)
-    return False
-
-
-async def _record_history(context, user_id: int, track: TrackMatch, source_url: str) -> None:
-    entry = {
-        "artist": track.artist,
-        "title": track.title,
-        "kind": track.kind,
-        "emoji": pick_track_emoji(track),
-        "artwork": track.thumbnail_url,
-        "source_url": source_url,
-        "ts": int(time.time()),
-    }
-    fingerprint = _release_fingerprint(track.artist, track.title)
-    kv: KVStore | None = context.application.bot_data.get("kv_store")
-
-    # Guard the load→modify→save against concurrent requests from the same user
-    # racing on the shared Redis key (fallback: unlocked, single-instance memory).
-    lock_key = f"hist:lock:{user_id}"
-    locked = await _acquire_kv_lock(kv, lock_key) if kv is not None else False
-    try:
-        items = await _load_history_items(context, user_id)
-        items = [
-            item
-            for item in items
-            if _release_fingerprint(str(item.get("artist") or ""), str(item.get("title") or ""))
-            != fingerprint
-        ]
-        items = [entry, *items][:MAX_HISTORY_ITEMS]
-
-        histories: dict = context.application.bot_data.setdefault("webapp_history", {})
-        histories[user_id] = items
-        if kv is not None:
-            await kv.set_json(f"hist:{user_id}", items, ttl_seconds=HISTORY_TTL_SECONDS)
-    finally:
-        if locked:
-            await kv.delete(lock_key)
-
-
-async def _load_history_items(context, user_id: int) -> list[dict]:
-    kv: KVStore | None = context.application.bot_data.get("kv_store")
-    if kv is not None:
-        items = await kv.get_json(f"hist:{user_id}")
-        if isinstance(items, list):
-            return [item for item in items if isinstance(item, dict)][:MAX_HISTORY_ITEMS]
-
-    histories: dict = context.application.bot_data.setdefault("webapp_history", {})
-    return list(histories.get(user_id) or [])
-
-
-# The crate lives on the client: the Mini App keeps the authoritative list in
-# CloudStorage and sends it with every request. The server still mirrors it into
-# KV / instance memory as a convenience, but never depends on that copy being
-# complete — which is what made collections lose every track but the last one on
-# serverless (each warm instance saw only its own slice of memory).
-_CRATE_ITEM_KEYS = (
-    "title",
-    "artist",
-    "kind",
-    "release_format",
-    "genre",
-    "page_url",
-    "release_year",
-    "thumbnail_url",
-)
-
-
-def _is_web_url(value: object) -> bool:
-    return isinstance(value, str) and value.startswith(("http://", "https://"))
-
-
-def _compact_track_data(item: dict) -> dict:
-    """Shrink a track dict to the handful of fields a collection post needs.
-
-    Small enough that a full crate fits in a single CloudStorage value, so the
-    client can persist and resend it without chunking.
-    """
-    links = item.get("links") if isinstance(item.get("links"), dict) else {}
-    # Only http(s) URLs may become inline-button destinations — never trust a
-    # client-supplied scheme (defense-in-depth; Telegram also rejects the rest).
-    page_url = item.get("page_url")
-    if not _is_web_url(page_url):
-        page_url = None
-    if not page_url:
-        for value in links.values():
-            if _is_web_url(value):
-                page_url = value
-                break
-
-    return {
-        "title": str(item.get("title") or ""),
-        "artist": str(item.get("artist") or ""),
-        "kind": str(item.get("kind") or "song"),
-        "release_format": item.get("release_format") or None,
-        "genre": item.get("genre") or None,
-        "page_url": page_url or None,
-        "release_year": item.get("release_year") or None,
-        "thumbnail_url": item.get("thumbnail_url") or None,
-    }
-
-
-def _track_from_item(item: dict) -> TrackMatch:
-    return TrackMatch(
-        title=str(item.get("title") or ""),
-        artist=str(item.get("artist") or ""),
-        links=item.get("links") if isinstance(item.get("links"), dict) else {},
-        page_url=item.get("page_url"),
-        release_year=item.get("release_year"),
-        kind=str(item.get("kind") or "song"),
-        release_format=item.get("release_format"),
-        thumbnail_url=item.get("thumbnail_url"),
-        genre=item.get("genre"),
-    )
-
-
-def _coerce_crate_items(raw: object) -> list[dict]:
-    """Validate a client-provided crate list into deduped, capped track dicts."""
-    items: list[dict] = []
-    if not isinstance(raw, list):
-        return items
-
-    seen: set[str] = set()
-    for entry in raw:
-        if not isinstance(entry, dict):
-            continue
-        compact = _compact_track_data(entry)
-        if not (compact["artist"] or compact["title"]):
-            continue
-        fingerprint = _release_fingerprint(compact["artist"], compact["title"])
-        if fingerprint in seen:
-            continue
-        seen.add(fingerprint)
-        items.append(compact)
-        if len(items) >= MAX_CRATE_ITEMS:
-            break
-
-    return items
-
-
-def _crate_view(items: list[dict]) -> dict:
-    views = []
-    for item in items:
-        compact = _compact_track_data(item)
-        views.append(
-            {
-                "artist": compact["artist"],
-                "title": compact["title"],
-                "emoji": pick_track_emoji(_track_from_item(compact)),
-                "artwork": compact["thumbnail_url"],
-                "data": compact,
-            }
-        )
-
-    return {"ok": True, "count": len(items), "max": MAX_CRATE_ITEMS, "items": views}
-
-
-async def _load_crate(context, user_id: int) -> list[dict]:
-    kv: KVStore | None = context.application.bot_data.get("kv_store")
-    if kv is not None:
-        items = await kv.get_json(f"crate:{user_id}")
-        if isinstance(items, list):
-            return [item for item in items if isinstance(item, dict)][:MAX_CRATE_ITEMS]
-
-    crates: dict = context.application.bot_data.setdefault("webapp_crate", {})
-    return list(crates.get(user_id) or [])
-
-
-async def _save_crate(context, user_id: int, items: list[dict]) -> None:
-    crates: dict = context.application.bot_data.setdefault("webapp_crate", {})
-    crates[user_id] = items
-    kv: KVStore | None = context.application.bot_data.get("kv_store")
-    if kv is not None:
-        await kv.set_json(f"crate:{user_id}", items, ttl_seconds=CRATE_TTL_SECONDS)
-
-
-async def _crate_base_items(context, body: dict, user_id: int) -> list[dict]:
-    """The authoritative crate for a request: the client's list when it sent one,
-    otherwise the server-side mirror (Redis / instance memory)."""
-    if "items" in body:
-        return _coerce_crate_items(body.get("items"))
-    return [_compact_track_data(item) for item in await _load_crate(context, user_id)]
-
-
-async def _crate_response(context, user_id: int) -> dict:
-    items = [_compact_track_data(item) for item in await _load_crate(context, user_id)]
-    return _crate_view(items)
 
 
 async def _action_crate_add(context, body: dict, user_id: int) -> dict:
@@ -955,7 +788,7 @@ async def _action_crate_deliver(
 
     if action == "crate_publish":
         for track in tracks:
-            _schedule_mark_posted(context, track)
+            await _schedule_mark_posted(context, track)
         await _save_crate(context, user_id, [])
     else:
         # keep the server mirror in step with what was just sent
@@ -977,42 +810,6 @@ async def _lookup_track_preview(context, track: TrackMatch) -> str | None:
     except Exception:
         LOGGER.debug("Preview lookup crashed", exc_info=True)
         return None
-
-
-def _apply_draft_patch(draft: dict, body: dict) -> None:
-    for flag in ("hashtags", "quote", "large_preview", "as_photo"):
-        if isinstance(body.get(flag), bool):
-            draft[flag] = body[flag]
-
-    if "cta" in body:
-        cta = body.get("cta")
-        if isinstance(cta, str) and cta.strip():
-            draft["custom_cta"] = " ".join(cta.split())[:MAX_CUSTOM_CTA_LENGTH]
-        else:
-            draft.pop("custom_cta", None)
-
-    if "tags" in body:
-        tags = body.get("tags")
-        if isinstance(tags, list):
-            draft["custom_tags"] = [
-                tag
-                for tag in (normalize_hashtag(value) for value in tags[:MAX_CUSTOM_TAGS])
-                if tag
-            ]
-        else:
-            draft.pop("custom_tags", None)
-
-    if "platforms" in body:
-        platforms = body.get("platforms")
-        selection = [
-            key
-            for key in (platforms if isinstance(platforms, list) else [])
-            if isinstance(key, str) and key in PLATFORM_LABELS
-        ]
-        if selection:
-            draft["platforms"] = selection
-        else:
-            draft.pop("platforms", None)
 
 
 async def _draft_response(context, draft_id: str, draft: dict, is_admin: bool) -> dict:
@@ -1083,22 +880,3 @@ async def _draft_response(context, draft_id: str, draft: dict, is_admin: bool) -
             "platforms": platforms,
         },
     }
-
-
-def _top_entries(value: object, *, limit: int = 8) -> list[dict]:
-    if not isinstance(value, dict):
-        return []
-
-    entries = [entry for entry in value.values() if isinstance(entry, dict)]
-    entries.sort(key=lambda item: int(item.get("count") or 0), reverse=True)
-    return [
-        {"label": str(entry.get("label") or "?"), "count": int(entry.get("count") or 0)}
-        for entry in entries[:limit]
-    ]
-
-
-def _upscale_artwork(url: str | None) -> str | None:
-    if not url:
-        return None
-
-    return url.replace("100x100", "300x300").replace("60x60", "300x300")

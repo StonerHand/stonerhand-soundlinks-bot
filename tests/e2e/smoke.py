@@ -15,6 +15,10 @@ import sys
 from playwright.sync_api import sync_playwright
 
 HTML = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "index.html").read_text()
+CSS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "styles.css").read_text()
+JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "app.js").read_text()
+API_JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "api-client.js").read_text()
+CLOUD_JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "cloud-storage.js").read_text()
 COVER = "https://cover.local/a.jpg"
 
 RELEASE = {
@@ -48,6 +52,8 @@ RESPONSES = {
                   "page_url": "https://song.link/b", "thumbnail_url": None}},
     ]},
 }
+REQUEST_BODIES: list[dict] = []
+ACTION_ATTEMPTS: dict[str, int] = {}
 
 INIT = """window.Telegram={WebApp:{initData:"x",initDataUnsafe:{user:{language_code:"ru"}},colorScheme:"dark",
 ready(){},expand(){},close(){},setHeaderColor(){},setBackgroundColor(){},BackButton:{show(){},hide(){},onClick(){}},
@@ -66,7 +72,17 @@ def _launch(p):
 
 
 def _route_api(route):
-    action = (route.request.post_data_json or {}).get("action")
+    body = route.request.post_data_json or {}
+    REQUEST_BODIES.append(body)
+    action = body.get("action")
+    ACTION_ATTEMPTS[action] = ACTION_ATTEMPTS.get(action, 0) + 1
+    if action == "history" and ACTION_ATTEMPTS[action] == 1:
+        route.fulfill(
+            status=503,
+            json={"ok": False, "error": "internal", "retryable": True},
+            content_type="application/json",
+        )
+        return
     route.fulfill(json=RESPONSES.get(action, {"ok": True}), content_type="application/json")
 
 
@@ -80,6 +96,10 @@ def main() -> int:
         page.route("**/cover.local/**", lambda r: r.fulfill(status=404))
         page.route("**/api/webapp", _route_api)
         page.route("https://studio.local/app", lambda r: r.fulfill(body=HTML, content_type="text/html"))
+        page.route("https://studio.local/webapp/styles.css", lambda r: r.fulfill(body=CSS, content_type="text/css"))
+        page.route("https://studio.local/webapp/app.js", lambda r: r.fulfill(body=JS, content_type="application/javascript"))
+        page.route("https://studio.local/webapp/api-client.js", lambda r: r.fulfill(body=API_JS, content_type="application/javascript"))
+        page.route("https://studio.local/webapp/cloud-storage.js", lambda r: r.fulfill(body=CLOUD_JS, content_type="application/javascript"))
 
         errors: list[str] = []
         page.on("pageerror", lambda e: errors.append(str(e)))
@@ -90,6 +110,8 @@ def main() -> int:
         # 1. boots to home
         if page.eval_on_selector("#v-home", "el => el.classList.contains('hidden')"):
             failures.append("home view not shown on boot")
+        if page.evaluate("document.documentElement.scrollWidth > window.innerWidth"):
+            failures.append("home view has horizontal overflow at 390px")
 
         # 2. a search renders the result card with the track title
         page.evaluate("document.getElementById('query').value = 'sleep dopesmoker'")
@@ -131,6 +153,11 @@ def main() -> int:
 
         if errors:
             failures.append("uncaught page errors: " + " | ".join(errors))
+        if not REQUEST_BODIES or any(not body.get("request_id") for body in REQUEST_BODIES):
+            failures.append("API requests are missing request_id")
+        history_requests = [body for body in REQUEST_BODIES if body.get("action") == "history"]
+        if len(history_requests) < 2 or history_requests[0]["request_id"] != history_requests[1]["request_id"]:
+            failures.append("retry did not reuse the original request_id")
 
         browser.close()
 

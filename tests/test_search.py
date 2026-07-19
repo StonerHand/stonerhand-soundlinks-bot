@@ -133,6 +133,36 @@ class PreviewExtractionTests(unittest.TestCase):
 
 
 class KVStoreShapeTests(unittest.TestCase):
+    def test_increment_window_sets_ttl_atomically(self) -> None:
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        store = KVStore("https://kv.example", "token")
+        store._command = AsyncMock(return_value=3)
+        try:
+            self.assertEqual(
+                asyncio.run(store.increment_window("rate:key", ttl_seconds=62)), 3
+            )
+            command = store._command.await_args.args[0]
+            self.assertEqual(command[0], "EVAL")
+            self.assertEqual(command[-2:], ["rate:key", "62"])
+        finally:
+            asyncio.run(store.aclose())
+
+    def test_delete_if_value_uses_atomic_compare_and_delete(self) -> None:
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        store = KVStore("https://kv.example", "token")
+        store._command = AsyncMock(return_value=1)
+        try:
+            self.assertTrue(asyncio.run(store.delete_if_value("lock", "owner")))
+            command = store._command.await_args.args[0]
+            self.assertEqual(command[0], "EVAL")
+            self.assertEqual(command[-2:], ["lock", "owner"])
+        finally:
+            asyncio.run(store.aclose())
+
     def test_mget_with_no_keys_returns_empty_list(self) -> None:
         import asyncio
 

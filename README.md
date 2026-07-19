@@ -142,13 +142,19 @@ PYTHONPATH=src python -m music_links_bot
 **Python 3.10+ · python-telegram-bot 21 · httpx · Song.link/Odesli · iTunes Search · Pillow · Upstash Redis · Vercel**
 
 ```text
-api/telegram.py      webhook: warm reuse, queue tick, crash alert
-api/webapp.py        Studio API (initData signature, drafts, queue, crate)
+api/telegram.py      webhook: warm reuse, concurrent loop, queue tick, crash alert
+api/webapp.py        Studio API (initData, idempotency, drafts, queue, crate)
 api/health.py        pulse: Telegram/webhook/Redis + alerts + queue tick
 api/set_webhook.py   self-healing: webhook, commands, descriptions, menu button
-webapp/index.html    the Studio Mini App — one file, vanilla JS
+webapp/              Studio Mini App — HTML/CSS + API/storage/UI JS modules
 src/music_links_bot/
-  bot.py             routing, keyboards, editor, inline, drafts
+  bot.py             routing, editor, inline, drafts
+  bot_lookup.py      parallel source lookup and fallback pipeline
+  loop_runner.py     persistent concurrent asyncio runtime for serverless handlers
+  request_guard.py   Redis-backed rate limits and idempotency
+  keyboards.py       Telegram keyboards and platform buttons
+  studio_models.py   Mini App models and validation
+  studio_storage.py  history and crate mirror
   publish_queue.py   scheduled publications queue
   songlink.py        cross-platform links + artwork + Redis cache
   search.py          search, genres and audio previews (iTunes)
@@ -163,7 +169,7 @@ src/music_links_bot/
 Full map: [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
 
 ```bash
-PYTHONPATH=src python -m unittest discover -s tests   # 267 tests, no network
+PYTHONPATH=src python -m unittest discover -s tests   # 280+ tests, no network
 ```
 
 ## Your channel instead of StonerHand

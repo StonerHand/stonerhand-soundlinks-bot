@@ -6,7 +6,7 @@ import time
 import unittest
 from pathlib import Path
 import sys
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 from urllib.parse import urlencode
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -99,6 +99,32 @@ if __name__ == "__main__":
 
 
 class StudioApiHelperTests(unittest.TestCase):
+    def test_mutation_request_id_executes_action_once(self) -> None:
+        import asyncio
+        from types import SimpleNamespace
+        from api.webapp import _handle_action
+
+        application = SimpleNamespace(bot_data={}, bot=SimpleNamespace())
+        settings = SimpleNamespace(admin_chat_id=None)
+        user = {"id": 42, "language_code": "ru"}
+        payload = {
+            "action": "crate_clear",
+            "payload": {},
+            "request_id": "same-clear-request",
+        }
+        save = AsyncMock()
+
+        async def scenario():
+            with patch("api.webapp._save_crate", save):
+                first = await _handle_action(application, settings, user, payload)
+                second = await _handle_action(application, settings, user, payload)
+                return first, second
+
+        first, second = asyncio.run(scenario())
+        self.assertEqual(first, second)
+        self.assertTrue(first["ok"])
+        save.assert_awaited_once()
+
     def test_apply_draft_patch_normalizes_everything(self) -> None:
         from api.webapp import _apply_draft_patch
 
@@ -393,22 +419,6 @@ class PreviewAndRateLimitTests(unittest.TestCase):
         )
         self.assertFalse(res["ok"])
         self.assertEqual(res["error"], "need urls")
-
-    def test_resolve_rate_limiter_trips_then_recovers(self) -> None:
-        from api import webapp
-
-        webapp._resolve_calls.clear()
-        uid = 999001
-        results = [
-            webapp._resolve_rate_limited(uid, now=1000.0)
-            for _ in range(webapp.RESOLVE_RATE_LIMIT + 3)
-        ]
-        self.assertFalse(any(results[: webapp.RESOLVE_RATE_LIMIT]))
-        self.assertTrue(all(results[webapp.RESOLVE_RATE_LIMIT :]))
-        # once the window slides, the user is allowed again
-        later = 1000.0 + webapp.RESOLVE_RATE_WINDOW_SECONDS + 1
-        self.assertFalse(webapp._resolve_rate_limited(uid, now=later))
-
 
 class PhotoPostTests(unittest.TestCase):
     def test_publish_draft_as_photo_uses_send_photo(self) -> None:

@@ -21,6 +21,11 @@ from telegram import Update
 
 from music_links_bot.bot import build_application, close_application_resources
 from music_links_bot.config import Settings
+from music_links_bot.loop_runner import (
+    run_on_loop,
+    start_background_loop,
+    stop_background_loop,
+)
 from music_links_bot.publish_queue import process_due_jobs
 
 LOGGER = logging.getLogger(__name__)
@@ -33,6 +38,7 @@ MAX_UPDATE_BYTES = 1024 * 1024
 # a failed update disposes the cached application to start clean next time.
 _STATE_LOCK = threading.Lock()
 _LOOP: asyncio.AbstractEventLoop | None = None
+_LOOP_THREAD: threading.Thread | None = None
 _APPLICATION = None
 
 # A single hung await must never hold the shared lock forever and wedge the
@@ -43,6 +49,9 @@ QUEUE_TICK_TIMEOUT_SECONDS = 20
 # application after several consecutive failures (a genuinely broken instance).
 _DISPOSE_AFTER_FAILURES = 3
 _consecutive_failures = 0
+_active_updates = 0
+_recycle_requested = False
+_FAILURE_LOCK = threading.Lock()
 # Telegram re-sends an update if it doesn't get a prompt 200, so identical
 # update_ids are ignored to avoid double replies / double publishes.
 UPDATE_DEDUP_TTL_SECONDS = 600
@@ -111,50 +120,57 @@ class handler(BaseHTTPRequestHandler):
 
 
 def _process_telegram_update(update_payload: dict[str, object]) -> None:
-    with _STATE_LOCK:
-        loop, application = _ensure_application()
+    loop, application = _ensure_application()
+    _note_update_started()
 
-        update_id = update_payload.get("update_id")
-        if isinstance(update_id, int) and not loop.run_until_complete(
-            _claim_update(application, update_id)
-        ):
-            LOGGER.info("Skipping duplicate Telegram update %s", update_id)
-            return
+    try:
+        _process_claimed_update(loop, application, update_payload)
+    finally:
+        if _note_update_finished():
+            LOGGER.warning("Recycling application after repeated failures")
+            _dispose_application_locked()
 
-        started = time.monotonic()
-        try:
-            update = Update.de_json(update_payload, application.bot)
-            loop.run_until_complete(
-                asyncio.wait_for(
-                    application.process_update(update),
-                    timeout=PROCESS_TIMEOUT_SECONDS,
-                )
-            )
-        except Exception as exc:
-            # Let Telegram redeliver: release the claim so the retry reprocesses.
-            if isinstance(update_id, int):
-                try:
-                    loop.run_until_complete(_release_update(application, update_id))
-                except Exception:
-                    LOGGER.debug("Could not release update claim", exc_info=True)
-            _note_failure_locked(exc)
-            raise
 
-        _note_success_locked()
-        LOGGER.info(
-            "update=%s processed in %.0fms", update_id, (time.monotonic() - started) * 1000
+def _process_claimed_update(loop, application, update_payload: dict[str, object]) -> None:
+    update_id = update_payload.get("update_id")
+    if isinstance(update_id, int) and not run_on_loop(
+        loop, _claim_update(application, update_id), timeout=5
+    ):
+        LOGGER.info("Skipping duplicate Telegram update %s", update_id)
+        return
+
+    started = time.monotonic()
+    try:
+        update = Update.de_json(update_payload, application.bot)
+        run_on_loop(
+            loop,
+            application.process_update(update),
+            timeout=PROCESS_TIMEOUT_SECONDS,
         )
-
-        # Opportunistic queue tick: every incoming update also delivers
-        # scheduled posts whose time has come.
-        try:
-            loop.run_until_complete(
-                asyncio.wait_for(
-                    _run_queue_tick(application), timeout=QUEUE_TICK_TIMEOUT_SECONDS
+    except Exception as exc:
+        if isinstance(update_id, int):
+            try:
+                run_on_loop(
+                    loop, _release_update(application, update_id), timeout=5
                 )
-            )
-        except Exception:
-            LOGGER.warning("Queue tick failed", exc_info=True)
+            except Exception:
+                LOGGER.debug("Could not release update claim", exc_info=True)
+        _note_failure_locked(exc)
+        raise
+
+    _note_success_locked()
+    LOGGER.info(
+        "update=%s processed in %.0fms", update_id, (time.monotonic() - started) * 1000
+    )
+
+    try:
+        run_on_loop(
+            loop,
+            _run_queue_tick(application),
+            timeout=QUEUE_TICK_TIMEOUT_SECONDS,
+        )
+    except Exception:
+        LOGGER.warning("Queue tick failed", exc_info=True)
 
 
 async def _claim_update(application, update_id: int) -> bool:
@@ -184,17 +200,34 @@ async def _release_update(application, update_id: int) -> None:
 
 def _note_success_locked() -> None:
     global _consecutive_failures
-    _consecutive_failures = 0
+    with _FAILURE_LOCK:
+        _consecutive_failures = 0
 
 
 def _note_failure_locked(exc: Exception) -> None:
-    global _consecutive_failures
-    _consecutive_failures += 1
+    global _consecutive_failures, _recycle_requested
+    with _FAILURE_LOCK:
+        _consecutive_failures += 1
+        if _consecutive_failures >= _DISPOSE_AFTER_FAILURES:
+            _recycle_requested = True
     _alert_crash_safely(exc)
-    if _consecutive_failures >= _DISPOSE_AFTER_FAILURES:
-        LOGGER.warning("Recycling application after repeated failures")
-        _dispose_application_locked()
-        _consecutive_failures = 0
+
+
+def _note_update_started() -> None:
+    global _active_updates
+    with _FAILURE_LOCK:
+        _active_updates += 1
+
+
+def _note_update_finished() -> bool:
+    global _active_updates, _consecutive_failures, _recycle_requested
+    with _FAILURE_LOCK:
+        _active_updates = max(0, _active_updates - 1)
+        should_recycle = _recycle_requested and _active_updates == 0
+        if should_recycle:
+            _recycle_requested = False
+            _consecutive_failures = 0
+        return should_recycle
 
 
 async def _run_queue_tick(application) -> int:
@@ -218,38 +251,47 @@ def _alert_crash_safely(exc: Exception) -> None:
 
 
 def _ensure_application():
-    global _LOOP, _APPLICATION
-    if _APPLICATION is None:
-        settings = Settings.from_env()
-        logging.basicConfig(
-            level=getattr(logging, settings.log_level, logging.INFO),
-            format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-        )
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        application = build_application(settings)
-        loop.run_until_complete(application.initialize())
-        _LOOP = loop
-        _APPLICATION = application
+    global _LOOP, _LOOP_THREAD, _APPLICATION
+    with _STATE_LOCK:
+        if _APPLICATION is None:
+            settings = Settings.from_env()
+            logging.basicConfig(
+                level=getattr(logging, settings.log_level, logging.INFO),
+                format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+            )
+            loop, thread = start_background_loop("telegram-runtime")
+            try:
+                application = build_application(settings)
+                run_on_loop(
+                    loop, application.initialize(), timeout=PROCESS_TIMEOUT_SECONDS
+                )
+            except Exception:
+                stop_background_loop(loop, thread)
+                raise
+            _LOOP = loop
+            _LOOP_THREAD = thread
+            _APPLICATION = application
 
     return _LOOP, _APPLICATION
 
 
 def _dispose_application_locked() -> None:
-    global _LOOP, _APPLICATION
-    loop, application = _LOOP, _APPLICATION
-    _LOOP = None
-    _APPLICATION = None
+    global _LOOP, _LOOP_THREAD, _APPLICATION
+    with _STATE_LOCK:
+        loop, thread, application = _LOOP, _LOOP_THREAD, _APPLICATION
+        _LOOP = None
+        _LOOP_THREAD = None
+        _APPLICATION = None
     if loop is None or application is None:
         return
 
     try:
-        loop.run_until_complete(application.shutdown())
-        loop.run_until_complete(close_application_resources(application))
+        run_on_loop(loop, application.shutdown(), timeout=10)
+        run_on_loop(loop, close_application_resources(application), timeout=10)
     except Exception:
         LOGGER.warning("Could not dispose Telegram application cleanly")
     finally:
-        loop.close()
+        stop_background_loop(loop, thread)
 
 
 def _decode_update_payload(payload: bytes) -> dict[str, object]:

@@ -29,13 +29,9 @@ jobs:
 
       - name: Mini App JS syntax
         run: |
-          python - <<'EOF'
-          import re, pathlib
-          html = pathlib.Path("webapp/index.html").read_text()
-          js = "\n".join(re.findall(r"<script>(.*?)</script>", html, re.S))
-          pathlib.Path("studio.js").write_text(js)
-          EOF
-          node --check studio.js
+          node --check webapp/app.js
+          node --check webapp/api-client.js
+          node --check webapp/cloud-storage.js
 
   e2e:
     runs-on: ubuntu-latest
