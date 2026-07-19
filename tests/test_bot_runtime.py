@@ -9,6 +9,7 @@ from music_links_bot.bot_crate import (
 )
 from music_links_bot.bot_runtime import (
     BotRuntime,
+    UserSession,
     decode_callback,
     detect_action,
     encode_callback,
@@ -40,6 +41,19 @@ class CallbackContractTests(unittest.TestCase):
         self.assertEqual(detect_action("links", ["a", "b"], is_private=True), "crate")
         self.assertEqual(detect_action("помощь", [], is_private=True), "help")
         self.assertEqual(detect_action("artist track", [], is_private=True), "search")
+
+    def test_session_restores_home_message_pointer(self) -> None:
+        session = UserSession.from_dict(
+            {
+                "user_id": 7,
+                "home_chat_id": 7,
+                "home_message_id": 321,
+            }
+        )
+
+        self.assertIsNotNone(session)
+        assert session is not None
+        self.assertEqual((session.home_chat_id, session.home_message_id), (7, 321))
 
 
 class RuntimeSafetyTests(unittest.IsolatedAsyncioTestCase):
