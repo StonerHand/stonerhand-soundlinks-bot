@@ -28,7 +28,10 @@ jobs:
           PYTHONPATH: src
 
       - name: Mini App JS syntax
-        run: node --check webapp/app.js
+        run: |
+          node --check webapp/app.js
+          node --check webapp/api-client.js
+          node --check webapp/cloud-storage.js
 
   e2e:
     runs-on: ubuntu-latest

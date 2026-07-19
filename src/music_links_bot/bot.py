@@ -26,7 +26,7 @@ from telegram.error import BadRequest, Forbidden, TelegramError
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 from telegram.ext import CallbackQueryHandler, InlineQueryHandler
 
-from music_links_bot.artist import ArtistClient, ArtistLookupError
+from music_links_bot.artist import ArtistClient
 from music_links_bot.branding import (
     brand_label,
     brand_logo_url,
@@ -43,6 +43,37 @@ from music_links_bot.bot_stats import (
     record_tracks as _record_matches_safely,
     record_video_items as _record_videos_safely,
 )
+
+from music_links_bot import bot_lookup as _bot_lookup
+
+_split_source_urls = _bot_lookup._split_source_urls
+_format_not_found_message = _bot_lookup._format_not_found_message
+_strip_bot_mention = _bot_lookup._strip_bot_mention
+_format_no_url_message = _bot_lookup._format_no_url_message
+_format_service_unavailable_message = _bot_lookup._format_service_unavailable_message
+_has_recovery_hint = _bot_lookup._has_recovery_hint
+_lookup_playlists = _bot_lookup._lookup_playlists
+_lookup_artists = _bot_lookup._lookup_artists
+_empty_track_lookup = _bot_lookup._empty_track_lookup
+_empty_video_lookup = _bot_lookup._empty_video_lookup
+_empty_radio_lookup = _bot_lookup._empty_radio_lookup
+_empty_playlist_lookup = _bot_lookup._empty_playlist_lookup
+_empty_artist_lookup = _bot_lookup._empty_artist_lookup
+_lookup_youtube_videos = _bot_lookup._lookup_youtube_videos
+_lookup_nts_radios = _bot_lookup._lookup_nts_radios
+_send_youtube_result = _bot_lookup._send_youtube_result
+_send_nts_result = _bot_lookup._send_nts_result
+_send_playlist_result = _bot_lookup._send_playlist_result
+_send_artist_result = _bot_lookup._send_artist_result
+_send_mixed_result = _bot_lookup._send_mixed_result
+_select_mixed_preview_url = _bot_lookup._select_mixed_preview_url
+_lookup_tracks = _bot_lookup._lookup_tracks
+_fill_genres = _bot_lookup._fill_genres
+_ensure_spotify_link = _bot_lookup._ensure_spotify_link
+_build_lookup_fallback = _bot_lookup._build_lookup_fallback
+_songlink_page_url = _bot_lookup._songlink_page_url
+_build_podcast_fallback = _bot_lookup._build_podcast_fallback
+
 from music_links_bot.config import Settings
 from music_links_bot.ephemeral import (
     ephemeral_group_replies_enabled,
@@ -89,39 +120,27 @@ from music_links_bot.search import (
 )
 from music_links_bot.constants import PLATFORM_LABELS
 from music_links_bot.formatter import (
-    format_artist_collection_message,
     format_artist_message,
     format_collection_message,
-    format_mixed_collection_message,
-    format_playlist_collection_message,
     format_playlist_message,
-    format_radio_collection_message,
     format_radio_message,
     format_track_message,
-    format_video_collection_message,
     format_video_message,
 )
 from music_links_bot.models import (
-    ArtistMatch,
-    PlaylistMatch,
-    RadioMatch,
     TrackMatch,
-    VideoMatch,
 )
-from music_links_bot.nts import NTSClient, NTSLookupError, build_nts_fallback
-from music_links_bot.phrases import pick_phrase
+from music_links_bot.nts import NTSClient
 from music_links_bot.publication_state import (
     find_posted_date as _find_posted_date,
     mark_posted as _schedule_mark_posted,
     release_fingerprint as _release_fingerprint,
     webapp_url as _webapp_url,
 )
-from music_links_bot.playlist import PlaylistClient, PlaylistLookupError
-from music_links_bot.songlink import SonglinkClient, SonglinkError, SonglinkLookupError
+from music_links_bot.playlist import PlaylistClient
+from music_links_bot.songlink import SonglinkClient
 from music_links_bot.soundcloud import (
     SoundCloudClient,
-    SoundCloudLookupError,
-    build_soundcloud_fallback,
 )
 from music_links_bot.stats import (
     format_stats_message,
@@ -130,15 +149,13 @@ from music_links_bot.stats import (
 )
 from music_links_bot.text_utils import normalize_hashtag
 from music_links_bot.url_utils import (
-    apple_podcasts_url_type,
     extract_supported_urls,
     is_nts_url,
     is_spotify_artist_url,
     is_spotify_playlist_url,
     is_youtube_video_url,
-    spotify_url_type,
 )
-from music_links_bot.youtube import YouTubeClient, YouTubeLookupError
+from music_links_bot.youtube import YouTubeClient
 
 LOGGER = logging.getLogger(__name__)
 __all__ = ["_release_fingerprint"]
@@ -1138,46 +1155,15 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         await _send_typing_action(context.bot, message)
 
-    (
-        artist_urls,
-        playlist_urls,
-        youtube_urls,
-        nts_urls,
-        music_urls,
-    ) = _split_source_urls(source_urls)
-    client: SonglinkClient = context.application.bot_data["songlink_client"]
-    youtube_client: YouTubeClient = context.application.bot_data["youtube_client"]
-    nts_client: NTSClient = context.application.bot_data["nts_client"]
-    soundcloud_client: SoundCloudClient = context.application.bot_data[
-        "soundcloud_client"
-    ]
-    playlist_client: PlaylistClient = context.application.bot_data["playlist_client"]
-    artist_client: ArtistClient = context.application.bot_data["artist_client"]
-
-    lookup_result, videos, radios, playlists, artists = await asyncio.gather(
-        _lookup_tracks(
-            client,
-            music_urls,
-            soundcloud_client=soundcloud_client,
-            search_client=context.application.bot_data.get("search_client"),
-        )
-        if music_urls
-        else _empty_track_lookup(),
-        _lookup_youtube_videos(youtube_client, youtube_urls)
-        if youtube_urls
-        else _empty_video_lookup(),
-        _lookup_nts_radios(nts_client, nts_urls)
-        if nts_urls
-        else _empty_radio_lookup(),
-        _lookup_playlists(playlist_client, playlist_urls)
-        if playlist_urls
-        else _empty_playlist_lookup(),
-        _lookup_artists(artist_client, artist_urls)
-        if artist_urls
-        else _empty_artist_lookup(),
+    bundle = await _bot_lookup.resolve_sources(
+        context.application.bot_data, source_urls
     )
-    tracks, unavailable_urls = lookup_result
-    tracks = [track for track in tracks if track.links]
+    tracks = bundle.tracks
+    unavailable_urls = bundle.unavailable_urls
+    videos = bundle.videos
+    radios = bundle.radios
+    playlists = bundle.playlists
+    artists = bundle.artists
 
     if unavailable_urls:
         await _notify_admin(
@@ -1186,10 +1172,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
             only_for_channel_message=message,
         )
 
-    item_count = sum(
-        len(items) for items in (tracks, videos, radios, playlists, artists)
-    )
-    if item_count == 0:
+    if bundle.item_count == 0:
         if not unavailable_urls:
             await _notify_admin(
                 context,
@@ -1211,9 +1194,7 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return
 
-    content_type_count = sum(
-        bool(items) for items in (tracks, videos, radios, playlists, artists)
-    )
+    content_type_count = bundle.content_type_count
     if content_type_count == 1 and tracks:
         if len(tracks) > 1:
             await _send_track_result(
@@ -1338,630 +1319,6 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
     )
 
 
-def _split_source_urls(
-    source_urls: list[str],
-) -> tuple[list[str], list[str], list[str], list[str], list[str]]:
-    artist_urls: list[str] = []
-    playlist_urls: list[str] = []
-    youtube_urls: list[str] = []
-    nts_urls: list[str] = []
-    music_urls: list[str] = []
-
-    for source_url in source_urls:
-        if is_spotify_artist_url(source_url):
-            artist_urls.append(source_url)
-        elif is_spotify_playlist_url(source_url):
-            playlist_urls.append(source_url)
-        elif is_youtube_video_url(source_url):
-            youtube_urls.append(source_url)
-        elif is_nts_url(source_url):
-            nts_urls.append(source_url)
-        else:
-            music_urls.append(source_url)
-
-    return artist_urls, playlist_urls, youtube_urls, nts_urls, music_urls
-
-
-def _format_not_found_message(source_urls: list[str]) -> str:
-    seed = ",".join(source_urls)
-    phrase = pick_phrase("not_found", seed)
-    if _has_recovery_hint(phrase):
-        return phrase
-
-    return f"{phrase}\n\n{NOT_FOUND_DETAIL}"
-
-
-def _strip_bot_mention(text: str, bot_username: str | None) -> str:
-    if not bot_username:
-        return text
-
-    mention = f"@{bot_username}"
-    cleaned = " ".join(
-        word for word in text.split() if word.casefold() != mention.casefold()
-    )
-    return cleaned
-
-
-def _format_no_url_message(
-    message_text: str | None,
-    chat_id: int,
-    *,
-    lang: str = "ru",
-) -> str:
-    hint = get_text(lang, "no_url_hint")
-    if lang != "ru":
-        return hint
-
-    seed = message_text or str(chat_id)
-    return f"{pick_phrase('no_url', seed)}\n\n{hint}"
-
-
-def _format_service_unavailable_message(seed: str) -> str:
-    return (
-        f"{pick_phrase('service_unavailable', seed)}\n\n"
-        "Попробуй еще раз чуть позже или пришли другую ссылку на этот же релиз"
-    )
-
-
-def _has_recovery_hint(text: str) -> bool:
-    lowered = text.casefold()
-    return any(
-        marker in lowered
-        for marker in (
-            "проверь",
-            "попробуй",
-            "похоже",
-            "не трек",
-            "не альбом",
-        )
-    )
-
-
-async def _lookup_playlists(
-    client: PlaylistClient,
-    source_urls: list[str],
-) -> list[PlaylistMatch]:
-    results = await asyncio.gather(
-        *(client.lookup_playlist(source_url) for source_url in source_urls),
-        return_exceptions=True,
-    )
-
-    playlists: list[PlaylistMatch] = []
-    for source_url, result in zip(source_urls, results, strict=False):
-        if isinstance(result, PlaylistMatch):
-            playlists.append(result)
-            continue
-
-        if isinstance(result, PlaylistLookupError):
-            LOGGER.info("Could not fetch playlist metadata for %s", source_url)
-        elif isinstance(result, Exception):
-            LOGGER.error(
-                "Unexpected error while fetching playlist metadata for %s",
-                source_url,
-                exc_info=(type(result), result, result.__traceback__),
-            )
-
-        playlists.append(
-            PlaylistMatch(title="Spotify playlist", platform="Spotify", url=source_url)
-        )
-
-    return playlists
-
-
-async def _lookup_artists(
-    client: ArtistClient,
-    source_urls: list[str],
-) -> list[ArtistMatch]:
-    results = await asyncio.gather(
-        *(client.lookup_artist(source_url) for source_url in source_urls),
-        return_exceptions=True,
-    )
-
-    artists: list[ArtistMatch] = []
-    for source_url, result in zip(source_urls, results, strict=False):
-        if isinstance(result, ArtistMatch):
-            artists.append(result)
-            continue
-
-        if isinstance(result, ArtistLookupError):
-            LOGGER.info("Could not fetch artist metadata for %s", source_url)
-        elif isinstance(result, Exception):
-            LOGGER.error(
-                "Unexpected error while fetching artist metadata for %s",
-                source_url,
-                exc_info=(type(result), result, result.__traceback__),
-            )
-
-        artists.append(
-            ArtistMatch(title="Spotify artist", platform="Spotify", url=source_url)
-        )
-
-    return artists
-
-
-async def _empty_track_lookup() -> tuple[list[TrackMatch], list[str]]:
-    return [], []
-
-
-async def _empty_video_lookup() -> list[VideoMatch]:
-    return []
-
-
-async def _empty_radio_lookup() -> list[RadioMatch]:
-    return []
-
-
-async def _empty_playlist_lookup() -> list[PlaylistMatch]:
-    return []
-
-
-async def _empty_artist_lookup() -> list[ArtistMatch]:
-    return []
-
-
-async def _lookup_youtube_videos(
-    client: YouTubeClient,
-    source_urls: list[str],
-) -> list[VideoMatch]:
-    results = await asyncio.gather(
-        *(client.lookup_video(source_url) for source_url in source_urls),
-        return_exceptions=True,
-    )
-
-    videos: list[VideoMatch] = []
-    for source_url, result in zip(source_urls, results, strict=False):
-        if isinstance(result, VideoMatch):
-            videos.append(result)
-            continue
-
-        if isinstance(result, YouTubeLookupError):
-            LOGGER.info("Could not fetch YouTube metadata for %s", source_url)
-        elif isinstance(result, Exception):
-            LOGGER.error(
-                "Unexpected error while fetching YouTube metadata for %s",
-                source_url,
-                exc_info=(type(result), result, result.__traceback__),
-            )
-
-        videos.append(VideoMatch(title="YouTube video", author="YouTube", url=source_url))
-
-    return videos
-
-
-async def _lookup_nts_radios(
-    client: NTSClient,
-    source_urls: list[str],
-) -> list[RadioMatch]:
-    results = await asyncio.gather(
-        *(client.lookup_radio(source_url) for source_url in source_urls),
-        return_exceptions=True,
-    )
-
-    radios: list[RadioMatch] = []
-    for source_url, result in zip(source_urls, results, strict=False):
-        if isinstance(result, RadioMatch):
-            radios.append(result)
-            continue
-
-        if isinstance(result, NTSLookupError):
-            LOGGER.info("Could not fetch NTS metadata for %s", source_url)
-        elif isinstance(result, Exception):
-            LOGGER.error(
-                "Unexpected error while fetching NTS metadata for %s",
-                source_url,
-                exc_info=(type(result), result, result.__traceback__),
-            )
-
-        fallback_radio = build_nts_fallback(source_url)
-        if fallback_radio is not None:
-            radios.append(fallback_radio)
-
-    return radios
-
-
-async def _send_youtube_result(
-    bot: Bot,
-    message: Message,
-    videos: list[VideoMatch],
-    *,
-    user_prefix: str,
-    include_channel_button: bool,
-    include_hashtags: bool,
-) -> None:
-    if not videos:
-        return
-
-    if len(videos) == 1:
-        video = videos[0]
-        await _send_track_result(
-            bot,
-            message,
-            user_prefix + format_video_message(video, include_hashtags=include_hashtags),
-            preview_url=video.url,
-            reply_markup=_build_youtube_keyboard(
-                video.url,
-                include_channel_button=include_channel_button,
-            ),
-        )
-        return
-
-    await _send_track_result(
-        bot,
-        message,
-        user_prefix
-        + format_video_collection_message(videos, include_hashtags=include_hashtags),
-        preview_url=videos[0].url,
-        reply_markup=_build_youtube_collection_keyboard(
-            videos,
-            include_channel_button=include_channel_button,
-        ),
-    )
-
-
-async def _send_nts_result(
-    bot: Bot,
-    message: Message,
-    radios: list[RadioMatch],
-    *,
-    user_prefix: str,
-    include_channel_button: bool,
-    include_hashtags: bool,
-) -> None:
-    if not radios:
-        return
-
-    if len(radios) == 1:
-        radio = radios[0]
-        await _send_track_result(
-            bot,
-            message,
-            user_prefix + format_radio_message(radio, include_hashtags=include_hashtags),
-            preview_url=radio.url,
-            reply_markup=_build_nts_keyboard(
-                radio.url,
-                include_channel_button=include_channel_button,
-            ),
-        )
-        return
-
-    await _send_track_result(
-        bot,
-        message,
-        user_prefix
-        + format_radio_collection_message(radios, include_hashtags=include_hashtags),
-        preview_url=radios[0].url,
-        reply_markup=_build_nts_collection_keyboard(
-            radios,
-            include_channel_button=include_channel_button,
-        ),
-    )
-
-
-async def _send_playlist_result(
-    bot: Bot,
-    message: Message,
-    playlists: list[PlaylistMatch],
-    *,
-    user_prefix: str,
-    include_channel_button: bool,
-    include_hashtags: bool,
-) -> None:
-    if not playlists:
-        return
-
-    if len(playlists) == 1:
-        playlist = playlists[0]
-        await _send_track_result(
-            bot,
-            message,
-            user_prefix
-            + format_playlist_message(playlist, include_hashtags=include_hashtags),
-            preview_url=playlist.url,
-            reply_markup=_build_playlist_keyboard(
-                playlist.url,
-                include_channel_button=include_channel_button,
-            ),
-        )
-        return
-
-    await _send_track_result(
-        bot,
-        message,
-        user_prefix
-        + format_playlist_collection_message(
-            playlists,
-            include_hashtags=include_hashtags,
-        ),
-        preview_url=playlists[0].url,
-        reply_markup=_build_playlist_collection_keyboard(
-            playlists,
-            include_channel_button=include_channel_button,
-        ),
-    )
-
-
-async def _send_artist_result(
-    bot: Bot,
-    message: Message,
-    artists: list[ArtistMatch],
-    *,
-    user_prefix: str,
-    include_channel_button: bool,
-    include_hashtags: bool,
-) -> None:
-    if not artists:
-        return
-
-    if len(artists) == 1:
-        artist = artists[0]
-        await _send_track_result(
-            bot,
-            message,
-            user_prefix + format_artist_message(artist, include_hashtags=include_hashtags),
-            preview_url=artist.url,
-            reply_markup=_build_artist_keyboard(
-                artist.url,
-                include_channel_button=include_channel_button,
-            ),
-        )
-        return
-
-    await _send_track_result(
-        bot,
-        message,
-        user_prefix
-        + format_artist_collection_message(
-            artists,
-            include_hashtags=include_hashtags,
-        ),
-        preview_url=artists[0].url,
-        reply_markup=_build_artist_collection_keyboard(
-            artists,
-            include_channel_button=include_channel_button,
-        ),
-    )
-
-
-async def _send_mixed_result(
-    bot: Bot,
-    message: Message,
-    tracks: list[TrackMatch],
-    videos: list[VideoMatch],
-    radios: list[RadioMatch],
-    playlists: list[PlaylistMatch],
-    artists: list[ArtistMatch],
-    *,
-    user_prefix: str,
-    include_channel_button: bool,
-    include_hashtags: bool,
-    context: ContextTypes.DEFAULT_TYPE,
-) -> None:
-    preview_url = _select_mixed_preview_url(
-        tracks,
-        playlists,
-        artists,
-        radios,
-        videos,
-        context,
-    )
-    await _send_track_result(
-        bot,
-        message,
-        user_prefix
-        + format_mixed_collection_message(
-            tracks,
-            videos,
-            playlists,
-            artists,
-            radios,
-            include_hashtags=include_hashtags,
-        ),
-        preview_url=preview_url,
-        reply_markup=_build_mixed_collection_keyboard(
-            tracks,
-            videos,
-            playlists,
-            artists,
-            radios,
-            include_channel_button=include_channel_button,
-        ),
-    )
-
-
-def _select_mixed_preview_url(
-    tracks: list[TrackMatch],
-    playlists: list[PlaylistMatch],
-    artists: list[ArtistMatch],
-    radios: list[RadioMatch],
-    videos: list[VideoMatch],
-    context: ContextTypes.DEFAULT_TYPE,
-) -> str | None:
-    if tracks:
-        return _select_preview_url(tracks[0].links, context)
-
-    if playlists:
-        return playlists[0].url
-
-    if artists:
-        return artists[0].url
-
-    if radios:
-        return radios[0].url
-
-    if videos:
-        return videos[0].url
-
-    return None
-
-
-async def _lookup_tracks(
-    client: SonglinkClient,
-    source_urls: list[str],
-    *,
-    soundcloud_client: SoundCloudClient | None = None,
-    search_client: SearchClient | None = None,
-) -> tuple[list[TrackMatch], list[str]]:
-    results = await asyncio.gather(
-        *(client.lookup_track(source_url) for source_url in source_urls),
-        return_exceptions=True,
-    )
-
-    tracks: list[TrackMatch] = []
-    unavailable_urls: list[str] = []
-
-    for source_url, result in zip(source_urls, results, strict=False):
-        if isinstance(result, TrackMatch):
-            tracks.append(result)
-            continue
-
-        if isinstance(result, SonglinkError):
-            fallback_track = await _build_lookup_fallback(
-                source_url,
-                soundcloud_client=soundcloud_client,
-            )
-            if fallback_track:
-                tracks.append(fallback_track)
-                continue
-
-            if isinstance(result, SonglinkLookupError):
-                LOGGER.info("Song.link could not resolve %s", source_url)
-                continue
-
-            LOGGER.error(
-                "Song.link request failed for %s",
-                source_url,
-                exc_info=(type(result), result, result.__traceback__),
-            )
-            unavailable_urls.append(source_url)
-            continue
-
-        if isinstance(result, Exception):
-            LOGGER.error(
-                "Unexpected error while resolving %s",
-                source_url,
-                exc_info=(type(result), result, result.__traceback__),
-            )
-            unavailable_urls.append(source_url)
-
-    tracks = [_ensure_spotify_link(track) for track in tracks]
-    if search_client is not None:
-        await _fill_genres(search_client, tracks)
-
-    return tracks, unavailable_urls
-
-
-async def _fill_genres(search_client: SearchClient, tracks: list[TrackMatch]) -> None:
-    pending = [
-        track
-        for track in tracks
-        if track.genre is None and track.kind in {"song", "album"}
-    ]
-    if not pending:
-        return
-
-    genres = await asyncio.gather(
-        *(search_client.lookup_genre(track.artist, track.title) for track in pending),
-        return_exceptions=True,
-    )
-    for track, genre in zip(pending, genres, strict=False):
-        if isinstance(genre, str):
-            track.genre = genre
-
-
-SPOTIFY_SEARCH_URL = "https://open.spotify.com/search/"
-
-
-def _ensure_spotify_link(track: TrackMatch) -> TrackMatch:
-    """Every music card must have a Spotify button. When Song.link has no
-    direct link, fall back to a Spotify search deep link for the release."""
-    if track.links.get("spotify"):
-        return track
-
-    query = " ".join(part for part in (track.artist, track.title) if part).strip()
-    if not query:
-        return track
-
-    track.links["spotify"] = SPOTIFY_SEARCH_URL + quote(query, safe="")
-    return track
-
-
-async def _build_lookup_fallback(
-    source_url: str,
-    *,
-    soundcloud_client: SoundCloudClient | None,
-) -> TrackMatch | None:
-    podcast_fallback = _build_podcast_fallback(source_url)
-    if podcast_fallback:
-        return podcast_fallback
-
-    generic_soundcloud_fallback = build_soundcloud_fallback(source_url)
-    if generic_soundcloud_fallback is None:
-        return None
-
-    if soundcloud_client is None:
-        return generic_soundcloud_fallback
-
-    try:
-        return await soundcloud_client.lookup_track(source_url)
-    except SoundCloudLookupError:
-        LOGGER.info("Could not fetch SoundCloud metadata for %s", source_url)
-    except Exception:
-        LOGGER.exception(
-            "Unexpected error while fetching SoundCloud metadata for %s",
-            source_url,
-        )
-
-    return generic_soundcloud_fallback
-
-
-def _songlink_page_url(source_url: str) -> str:
-    return f"https://song.link/{source_url}"
-
-
-def _build_podcast_fallback(source_url: str) -> TrackMatch | None:
-    spotify_type = spotify_url_type(source_url)
-    if spotify_type == "episode":
-        return TrackMatch(
-            title="Podcast episode",
-            artist="Spotify",
-            links={"spotify": source_url},
-            page_url=_songlink_page_url(source_url),
-            kind="podcast",
-        )
-
-    if spotify_type == "show":
-        return TrackMatch(
-            title="Podcast show",
-            artist="Spotify",
-            links={"spotify": source_url},
-            page_url=_songlink_page_url(source_url),
-            kind="podcast",
-            release_format="show",
-        )
-
-    apple_podcast_type = apple_podcasts_url_type(source_url)
-    if apple_podcast_type == "episode":
-        return TrackMatch(
-            title="Podcast episode",
-            artist="Apple Podcasts",
-            links={"applePodcasts": source_url},
-            page_url=_songlink_page_url(source_url),
-            kind="podcast",
-        )
-
-    if apple_podcast_type == "show":
-        return TrackMatch(
-            title="Podcast show",
-            artist="Apple Podcasts",
-            links={"applePodcasts": source_url},
-            page_url=_songlink_page_url(source_url),
-            kind="podcast",
-            release_format="show",
-        )
-
-    return None
-
-
 async def _send_track_result(
     bot: Bot,
     message: Message,
@@ -2047,6 +1404,9 @@ async def _reply_with_track(
         link_preview_options=link_preview_options,
         reply_markup=reply_markup,
     )
+
+
+_bot_lookup.configure_track_result_sender(_send_track_result)
 
 
 def _build_intro_keyboard(

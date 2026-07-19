@@ -44,6 +44,59 @@ def make_draft() -> dict:
 
 
 class PublishQueueTests(unittest.TestCase):
+    def test_claim_keeps_job_durable_until_publish_finishes(self) -> None:
+        context = make_context()
+
+        async def scenario():
+            job = await publish_queue.add_job(context, make_draft(), 100)
+            claimed = await publish_queue._claim_due_jobs(
+                context, now=200, owner="worker-a"
+            )
+            stored = await publish_queue.load_jobs(context)
+            return job, claimed, stored
+
+        job, claimed, stored = asyncio.run(scenario())
+        self.assertEqual([item["id"] for item in claimed], [job["id"]])
+        self.assertEqual(len(stored), 1)
+        self.assertEqual(stored[0]["status"], publish_queue.JOB_PROCESSING)
+        self.assertEqual(stored[0]["lease_owner"], "worker-a")
+
+    def test_expired_processing_lease_is_reclaimed(self) -> None:
+        context = make_context()
+
+        async def scenario():
+            await publish_queue.add_job(context, make_draft(), 100)
+            await publish_queue._claim_due_jobs(context, now=200, owner="dead-worker")
+            before = await publish_queue.process_due_jobs(
+                context, now=200 + publish_queue.PROCESSING_LEASE_SECONDS - 1
+            )
+            after = await publish_queue.process_due_jobs(
+                context, now=200 + publish_queue.PROCESSING_LEASE_SECONDS
+            )
+            return before, after, await publish_queue.load_jobs(context)
+
+        before, after, jobs = asyncio.run(scenario())
+        self.assertEqual(before, 0)
+        self.assertEqual(after, 1)
+        self.assertEqual(jobs, [])
+        self.assertEqual(len(context.bot.sent), 1)
+
+    def test_memory_queue_mutations_are_serialized(self) -> None:
+        context = make_context()
+
+        async def scenario():
+            await asyncio.gather(
+                *(
+                    publish_queue.add_job(context, make_draft(), 1000 + index)
+                    for index in range(20)
+                )
+            )
+            return await publish_queue.load_jobs(context)
+
+        jobs = asyncio.run(scenario())
+        self.assertEqual(len(jobs), 20)
+        self.assertEqual(len({job["id"] for job in jobs}), 20)
+
     def test_busy_redis_lock_never_falls_back_to_unsafe_mutation(self) -> None:
         class BusyKV:
             async def set(self, *args, **kwargs):

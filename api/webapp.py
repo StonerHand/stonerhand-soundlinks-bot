@@ -44,6 +44,11 @@ from music_links_bot.formatter import (
 )
 from music_links_bot.i18n import resolve_lang
 from music_links_bot.kvstore import KVStore
+from music_links_bot.loop_runner import (
+    run_on_loop,
+    start_background_loop,
+    stop_background_loop,
+)
 from music_links_bot.models import TrackMatch
 from music_links_bot.phrases import pick_phrase
 from music_links_bot.publish_queue import (
@@ -55,6 +60,7 @@ from music_links_bot.publish_queue import (
     remove_job,
     reschedule_job,
 )
+from music_links_bot.request_guard import rate_limited, run_idempotent
 from music_links_bot.search import SearchLookupError, normalize_search_query
 from music_links_bot.stats import load_stats, merge_stats
 from music_links_bot.studio_models import (
@@ -90,14 +96,28 @@ CRATE_TTL_SECONDS = 14 * 24 * 3600
 # iTunes, Redis) can't hold the shared lock and wedge the warm instance.
 ACTION_TIMEOUT_SECONDS = 25
 QUEUE_TICK_TIMEOUT_SECONDS = 20
-# A cheap per-instance guard against a single user hammering the external
-# search/resolve APIs. Generous enough that normal use never trips it.
 RESOLVE_RATE_LIMIT = 20
 RESOLVE_RATE_WINDOW_SECONDS = 60
-_resolve_calls: dict[int, list[float]] = {}
+IDEMPOTENT_ACTIONS = frozenset(
+    {
+        "send",
+        "publish",
+        "unpublish",
+        "schedule",
+        "unschedule",
+        "reschedule",
+        "crate_add",
+        "crate_remove",
+        "crate_order",
+        "crate_clear",
+        "crate_send",
+        "crate_publish",
+    }
+)
 
 _STATE_LOCK = threading.Lock()
 _LOOP: asyncio.AbstractEventLoop | None = None
+_LOOP_THREAD: threading.Thread | None = None
 _APPLICATION = None
 _SETTINGS: Settings | None = None
 
@@ -108,14 +128,13 @@ class handler(BaseHTTPRequestHandler):
         # browser) delivers scheduled posts whose time has come.
         published = 0
         try:
-            with _STATE_LOCK:
-                loop, application, _settings = _ensure_application()
-                context = SimpleNamespace(application=application, bot=application.bot)
-                published = loop.run_until_complete(
-                    asyncio.wait_for(
-                        process_due_jobs(context), timeout=QUEUE_TICK_TIMEOUT_SECONDS
-                    )
-                )
+            loop, application, _settings = _ensure_application()
+            context = SimpleNamespace(application=application, bot=application.bot)
+            published = run_on_loop(
+                loop,
+                process_due_jobs(context),
+                timeout=QUEUE_TICK_TIMEOUT_SECONDS,
+            )
         except Exception:
             LOGGER.exception("Queue tick failed")
 
@@ -147,38 +166,40 @@ class handler(BaseHTTPRequestHandler):
         action = str(payload.get("action") or "?").replace("\n", " ").replace("\r", " ")[:48]
         started = time.monotonic()
         try:
-            with _STATE_LOCK:
-                loop, application, settings = _ensure_application()
-                user = validate_init_data(
-                    str(payload.get("init_data") or ""),
-                    settings.bot_token,
+            loop, application, settings = _ensure_application()
+            user = validate_init_data(
+                str(payload.get("init_data") or ""),
+                settings.bot_token,
+            )
+            if user is None:
+                LOGGER.info("req=%s action=%s unauthorized", req_id, action)
+                self._send_json(
+                    {"ok": False, "error": "unauthorized", "request_id": req_id},
+                    HTTPStatus.UNAUTHORIZED,
                 )
-                if user is None:
-                    LOGGER.info("req=%s action=%s unauthorized", req_id, action)
-                    self._send_json(
-                        {"ok": False, "error": "unauthorized"},
-                        HTTPStatus.UNAUTHORIZED,
-                    )
-                    return
+                return
 
-                result = loop.run_until_complete(
-                    asyncio.wait_for(
-                        _handle_action(application, settings, user, payload),
-                        timeout=ACTION_TIMEOUT_SECONDS,
-                    )
-                )
+            result = run_on_loop(
+                loop,
+                _handle_action(application, settings, user, payload),
+                timeout=ACTION_TIMEOUT_SECONDS,
+            )
+            result.setdefault("request_id", req_id)
         except asyncio.TimeoutError:
             LOGGER.warning(
                 "req=%s action=%s timed out after %.1fs",
                 req_id, action, time.monotonic() - started,
             )
             self._send_json(
-                {"ok": False, "error": "timeout"}, HTTPStatus.GATEWAY_TIMEOUT
+                {"ok": False, "error": "timeout", "retryable": True, "request_id": req_id}, HTTPStatus.GATEWAY_TIMEOUT
             )
             return
         except Exception:
             LOGGER.exception("req=%s action=%s failed", req_id, action)
-            self._send_json({"ok": False, "error": "internal"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            self._send_json(
+                {"ok": False, "error": "internal", "retryable": True, "request_id": req_id},
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+            )
             return
 
         LOGGER.info(
@@ -198,34 +219,25 @@ class handler(BaseHTTPRequestHandler):
 
 
 def _ensure_application():
-    global _LOOP, _APPLICATION, _SETTINGS
-    if _APPLICATION is None:
-        settings = Settings.from_env()
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        application = build_application(settings)
-        loop.run_until_complete(application.initialize())
-        _LOOP = loop
-        _APPLICATION = application
-        _SETTINGS = settings
+    global _LOOP, _LOOP_THREAD, _APPLICATION, _SETTINGS
+    with _STATE_LOCK:
+        if _APPLICATION is None:
+            settings = Settings.from_env()
+            loop, thread = start_background_loop("studio-runtime")
+            try:
+                application = build_application(settings)
+                run_on_loop(
+                    loop, application.initialize(), timeout=ACTION_TIMEOUT_SECONDS
+                )
+            except Exception:
+                stop_background_loop(loop, thread)
+                raise
+            _LOOP = loop
+            _LOOP_THREAD = thread
+            _APPLICATION = application
+            _SETTINGS = settings
 
     return _LOOP, _APPLICATION, _SETTINGS
-
-
-def _resolve_rate_limited(user_id: int, *, now: float | None = None) -> bool:
-    current = now if now is not None else time.time()
-    calls = [t for t in _resolve_calls.get(user_id, []) if current - t < RESOLVE_RATE_WINDOW_SECONDS]
-    if len(calls) >= RESOLVE_RATE_LIMIT:
-        _resolve_calls[user_id] = calls
-        return True
-
-    calls.append(current)
-    _resolve_calls[user_id] = calls
-    if len(_resolve_calls) > 5000:  # bound memory on a long-lived warm instance
-        for uid in list(_resolve_calls):
-            if all(current - t >= RESOLVE_RATE_WINDOW_SECONDS for t in _resolve_calls[uid]):
-                _resolve_calls.pop(uid, None)
-    return False
 
 
 async def _handle_action(application, settings: Settings, user: dict, payload: dict) -> dict:
@@ -236,69 +248,58 @@ async def _handle_action(application, settings: Settings, user: dict, payload: d
     is_admin = settings.admin_chat_id is not None and user_id == settings.admin_chat_id
     lang = resolve_lang(user.get("language_code"))
 
-    if action == "resolve":
-        if _resolve_rate_limited(user_id):
-            return {"ok": False, "error": "rate_limited"}
-        return await _action_resolve(context, body, user_id, is_admin, lang)
+    if action in {"resolve", "resolve_batch"} and await rate_limited(
+        context,
+        scope="studio_resolve",
+        subject=user_id,
+        limit=RESOLVE_RATE_LIMIT,
+        window_seconds=RESOLVE_RATE_WINDOW_SECONDS,
+    ):
+        return {"ok": False, "error": "rate_limited", "retryable": True}
 
-    if action == "resolve_batch":
-        if _resolve_rate_limited(user_id):
-            return {"ok": False, "error": "rate_limited"}
-        return await _action_resolve_batch(context, body, user_id)
-
-    if action == "draft":
-        return await _action_draft(context, body, user_id, is_admin)
-
-    if action == "update":
-        return await _action_update(context, body, user_id, is_admin)
-
-    if action == "preview":
-        return await _action_preview(context, body, user_id)
-
-    if action == "history":
-        return await _action_history(context, user_id, is_admin)
-
-    if action in {"send", "publish"}:
-        return await _action_deliver(context, action, body, user_id, is_admin)
-
-    if action == "unpublish":
-        return await _action_unpublish(context, body, user_id, is_admin)
-
-    if action == "schedule":
-        return await _action_schedule(context, body, user_id, is_admin)
-
-    if action == "queue":
-        return await _action_queue(context, is_admin)
-
-    if action == "unschedule":
-        return await _action_unschedule(context, body, is_admin)
-
-    if action == "reschedule":
-        return await _action_reschedule(context, body, is_admin)
-
-    if action == "stats":
-        return await _action_stats(context, is_admin)
-
-    if action == "crate":
-        return await _crate_response(context, user_id)
-
-    if action == "crate_add":
-        return await _action_crate_add(context, body, user_id)
-
-    if action == "crate_remove":
-        return await _action_crate_remove(context, body, user_id)
-
-    if action == "crate_order":
-        return await _action_crate_order(context, body, user_id)
-
-    if action == "crate_clear":
+    async def clear_crate() -> dict:
         await _save_crate(context, user_id, [])
         return {"ok": True, "items": []}
 
-    if action in {"crate_send", "crate_publish"}:
-        return await _action_crate_deliver(context, action, user_id, is_admin, body)
-
-    return {"ok": False, "error": "unknown action"}
+    handlers = {
+        "resolve": lambda: _action_resolve(context, body, user_id, is_admin, lang),
+        "resolve_batch": lambda: _action_resolve_batch(context, body, user_id),
+        "draft": lambda: _action_draft(context, body, user_id, is_admin),
+        "update": lambda: _action_update(context, body, user_id, is_admin),
+        "preview": lambda: _action_preview(context, body, user_id),
+        "history": lambda: _action_history(context, user_id, is_admin),
+        "send": lambda: _action_deliver(context, action, body, user_id, is_admin),
+        "publish": lambda: _action_deliver(context, action, body, user_id, is_admin),
+        "unpublish": lambda: _action_unpublish(context, body, user_id, is_admin),
+        "schedule": lambda: _action_schedule(context, body, user_id, is_admin),
+        "queue": lambda: _action_queue(context, is_admin),
+        "unschedule": lambda: _action_unschedule(context, body, is_admin),
+        "reschedule": lambda: _action_reschedule(context, body, is_admin),
+        "stats": lambda: _action_stats(context, is_admin),
+        "crate": lambda: _crate_response(context, user_id),
+        "crate_add": lambda: _action_crate_add(context, body, user_id),
+        "crate_remove": lambda: _action_crate_remove(context, body, user_id),
+        "crate_order": lambda: _action_crate_order(context, body, user_id),
+        "crate_clear": clear_crate,
+        "crate_send": lambda: _action_crate_deliver(
+            context, action, user_id, is_admin, body
+        ),
+        "crate_publish": lambda: _action_crate_deliver(
+            context, action, user_id, is_admin, body
+        ),
+    }
+    execute = handlers.get(action)
+    if execute is None:
+        return {"ok": False, "error": "unknown_action", "retryable": False}
+    if action in IDEMPOTENT_ACTIONS:
+        return await run_idempotent(
+            context,
+            user_id=user_id,
+            action=action,
+            request_key=payload.get("request_id"),
+            execute=execute,
+        )
+    return await execute()
 
 
 async def _action_resolve(context, body: dict, user_id: int, is_admin: bool, lang: str) -> dict:
@@ -569,7 +570,7 @@ async def _action_schedule(context, body: dict, user_id: int, is_admin: bool) ->
     try:
         job = await add_job(context, draft, publish_at)
     except QueueBusyError:
-        return {"ok": False, "error": "queue_busy"}
+        return {"ok": False, "error": "queue_busy", "retryable": True}
     return {"ok": True, "job_id": job["id"], "publish_at": job["publish_at"]}
 
 
@@ -607,7 +608,7 @@ async def _action_unschedule(context, body: dict, is_admin: bool) -> dict:
     try:
         removed = await remove_job(context, job_id)
     except QueueBusyError:
-        return {"ok": False, "error": "queue_busy"}
+        return {"ok": False, "error": "queue_busy", "retryable": True}
     return {"ok": removed, "error": None if removed else "job not found"}
 
 
@@ -628,7 +629,7 @@ async def _action_reschedule(context, body: dict, is_admin: bool) -> dict:
     try:
         moved = await reschedule_job(context, job_id, publish_at)
     except QueueBusyError:
-        return {"ok": False, "error": "queue_busy"}
+        return {"ok": False, "error": "queue_busy", "retryable": True}
     return {
         "ok": moved,
         "error": None if moved else "job not found",

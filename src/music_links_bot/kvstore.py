@@ -88,6 +88,16 @@ class KVStore:
         )
         return result == 1
 
+    async def increment_window(self, key: str, *, ttl_seconds: int) -> int | None:
+        """Atomically increment a fixed-window counter and set its first TTL."""
+        script = (
+            "local n = redis.call('incr', KEYS[1]); "
+            "if n == 1 then redis.call('expire', KEYS[1], ARGV[1]) end; "
+            "return n"
+        )
+        result = await self._command(["EVAL", script, "1", key, str(ttl_seconds)])
+        return result if isinstance(result, int) else None
+
     async def mget(self, keys: list[str]) -> list[str | None]:
         if not keys:
             return []

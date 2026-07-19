@@ -801,7 +801,7 @@ class BotKeyboardTests(unittest.TestCase):
 
     def test_not_found_message_does_not_repeat_recovery_hint(self) -> None:
         with patch(
-            "music_links_bot.bot.pick_phrase",
+            "music_links_bot.bot_lookup.pick_phrase",
             return_value="ссылки не собрались - проверь, что это трек или альбом",
         ):
             message = _format_not_found_message(["https://example.com/release"])
@@ -813,7 +813,7 @@ class BotKeyboardTests(unittest.TestCase):
 
     def test_not_found_message_adds_detail_when_phrase_has_no_hint(self) -> None:
         with patch(
-            "music_links_bot.bot.pick_phrase",
+            "music_links_bot.bot_lookup.pick_phrase",
             return_value="ничего подходящего не собралось",
         ):
             message = _format_not_found_message(["https://example.com/release"])

@@ -1,3 +1,6 @@
+import { createApiClient } from "/webapp/api-client.js";
+import { createCloudStorage } from "/webapp/cloud-storage.js";
+
 (function () {
   const tg = window.Telegram?.WebApp || {
     initData: "", initDataUnsafe: {}, colorScheme: "dark",
@@ -8,6 +11,7 @@
       setItem(key, value, cb){ try { localStorage.setItem(key, value); if (cb) cb(null, true); } catch(e) { if (cb) cb(e); } },
     },
   };
+  const cloud = createCloudStorage(tg.CloudStorage);
   tg.ready(); tg.expand();
 
   const EN = !((tg.initDataUnsafe?.user?.language_code || "ru").match(/^(ru|uk|be|kk)/));
@@ -20,7 +24,7 @@
     send: "Send to me", publish: "Publish", sent: "Sent", published: "Published!",
     undo: "Undo", undone: "POST DELETED", scheduled: "SCHEDULED: ",
     dupA: "⚠️ Already published on ", dupB: ". Publish again?", confirm: "Publish", cancel: "Cancel",
-    err: "SOMETHING BROKE — TRY AGAIN", network: "NO CONNECTION — CHECK YOUR INTERNET", timeout: "THE SERVER TOOK TOO LONG — TRY AGAIN", allPlatforms: "All",
+    err: "SOMETHING BROKE — TRY AGAIN", network: "NO CONNECTION — CHECK YOUR INTERNET", timeout: "THE SERVER TOOK TOO LONG — TRY AGAIN", busy: "REQUEST IS STILL RUNNING — TRY AGAIN", allPlatforms: "All",
     toCrate: "In crate", crateFull: "CRATE IS FULL",
     secContent: "Content", secText: "Your text", secTags: "Hashtags", secPm: "Platforms & order",
     rHashtags: "Hashtags", rQuote: "Quote / CTA", rPhoto: "Photo mode (no player)", rBig: "Large preview",
@@ -38,7 +42,7 @@
     presetName: "Preset", reschedule: "Reschedule",
     queueEmptyT: "Queue is empty", queueEmptyS: "Scheduled posts will show up here",
     statsEmptyT: "No stats yet", statsEmptyS: "Numbers appear once you start posting",
-    nowPlaying: "Preview",
+    nowPlaying: "Preview", confirmRemove: "Remove this item?", confirmClear: "Clear the whole crate?",
   } : {
     ph: "Ссылка или название…", recent: "НЕДАВНИЕ", popular: "ПОПУЛЯРНЫЕ ЗАПРОСЫ",
     hint: "Введи исполнителя и трек<br>или вставь ссылку на любую платформу",
@@ -48,7 +52,7 @@
     send: "Отправить себе", publish: "Опубликовать", sent: "Отправлено", published: "Опубликовано!",
     undo: "Отмена", undone: "ПОСТ УДАЛЁН", scheduled: "В ОЧЕРЕДИ: ",
     dupA: "⚠️ Уже публиковалось ", dupB: ". Опубликовать снова?", confirm: "Опубликовать", cancel: "Отмена",
-    err: "ЧТО-ТО СЛОМАЛОСЬ — ПОПРОБУЙ ЕЩЁ", network: "НЕТ СВЯЗИ — ПРОВЕРЬ ИНТЕРНЕТ", timeout: "СЕРВЕР ДОЛГО ОТВЕЧАЕТ — ПОПРОБУЙ ЕЩЁ", allPlatforms: "Все",
+    err: "ЧТО-ТО СЛОМАЛОСЬ — ПОПРОБУЙ ЕЩЁ", network: "НЕТ СВЯЗИ — ПРОВЕРЬ ИНТЕРНЕТ", timeout: "СЕРВЕР ДОЛГО ОТВЕЧАЕТ — ПОПРОБУЙ ЕЩЁ", busy: "ЗАПРОС ЕЩЁ ВЫПОЛНЯЕТСЯ — ПОПРОБУЙ ЕЩЁ", allPlatforms: "Все",
     toCrate: "В подборке", crateFull: "ПОДБОРКА ЗАПОЛНЕНА",
     secContent: "Содержимое", secText: "Свой текст", secTags: "Хэштеги", secPm: "Платформы и порядок",
     rHashtags: "Хэштеги", rQuote: "Цитата / CTA", rPhoto: "Фото-режим (без плеера)", rBig: "Большое превью",
@@ -66,7 +70,7 @@
     presetName: "Пресет", reschedule: "Перенести",
     queueEmptyT: "Очередь пуста", queueEmptyS: "Отложенные посты появятся здесь",
     statsEmptyT: "Пока нет статистики", statsEmptyS: "Цифры появятся, как начнёшь постить",
-    nowPlaying: "Превью",
+    nowPlaying: "Превью", confirmRemove: "Удалить этот элемент?", confirmClear: "Очистить всю подборку?",
   };
 
   const SUGGESTIONS = ["Black Sabbath – Paranoid","Sleep – Dragonaut","Electric Wizard – Funeralopolis","Kyuss – Green Machine"];
@@ -83,7 +87,11 @@
   let state = null, isAdmin = false, playingBtn = null, syncTimer = null, undoTimer = null;
   let historyItems = [], crateItems = [], crateCount = 0;
   let navStack = ["home"];
-  let loadSeq = 0, pendingAbort = null, syncSeq = 0, previewFetching = false, lastQuery = "";
+  let loadSeq = 0, syncSeq = 0, previewFetching = false, lastQuery = "";
+  const apiTransport = createApiClient({
+    getInitData: () => tg.initData,
+    onUnauthorized: authExpired,
+  });
 
   const hap = {
     tap(){try{tg.HapticFeedback.impactOccurred("light")}catch(e){}},
@@ -118,8 +126,8 @@
     try { tg.setHeaderColor(bg); tg.setBackgroundColor(bg); } catch (e) {}
     $("dt-input").style.colorScheme = dark ? "dark" : "light";
   }
-  $("theme-btn").addEventListener("click", () => { hap.tap(); dark = !dark; applyTheme(); try{tg.CloudStorage.setItem("theme", dark?"d":"l")}catch(e){} });
-  try { tg.CloudStorage.getItem("theme", (e,v) => { if (v==="l") dark=false; else if (v==="d") dark=true; applyTheme(); }); } catch(e) { applyTheme(); }
+  $("theme-btn").addEventListener("click", () => { hap.tap(); dark = !dark; applyTheme(); cloud.set("theme", dark?"d":"l"); });
+  cloud.get("theme", (e,v) => { if (v==="l") dark=false; else if (v==="d") dark=true; applyTheme(); });
   applyTheme();
 
   /* static texts */
@@ -200,24 +208,7 @@
   // freeze the UI. Requests flagged `abortable` are cancelled the moment the
   // user navigates away, so "back" is always instant.
   async function api(action, payload, opts) {
-    opts = opts || {};
-    const ctrl = new AbortController();
-    if (opts.abortable) pendingAbort = ctrl;
-    const timer = setTimeout(() => { try { ctrl.abort(); } catch(e) {} }, opts.timeout || 20000);
-    try {
-      const r = await fetch("/api/webapp", {
-        method:"POST", headers:{"content-type":"application/json"},
-        body:JSON.stringify({ init_data: tg.initData, action, payload }), signal: ctrl.signal,
-      });
-      if (r.status === 401) { authExpired(); return { ok:false, error:"unauthorized" }; }
-      try { return await r.json(); }
-      catch(e) { return { ok:false, error: r.ok ? "bad_response" : ("http_"+r.status) }; }
-    } catch(e) {
-      return { ok:false, error: e?.name === "AbortError" ? "timeout" : "network" };
-    } finally {
-      clearTimeout(timer);
-      if (opts.abortable && pendingAbort === ctrl) pendingAbort = null;
-    }
+    return apiTransport.request(action, payload, opts);
   }
   // Small transient toast for non-blocking notices (rate limits, soft errors).
   function flash(msg) {
@@ -233,7 +224,16 @@
   function errorText(error) {
     if (error === "network") return T.network;
     if (error === "timeout") return T.timeout;
+    if (error === "request_in_progress" || error === "queue_busy") return T.busy;
     return T.err;
+  }
+  function confirmAction(message) {
+    return new Promise((resolve) => {
+      try {
+        if (typeof tg.showConfirm === "function") { tg.showConfirm(message, resolve); return; }
+      } catch (e) {}
+      resolve(typeof globalThis.confirm === "function" ? globalThis.confirm(message) : true);
+    });
   }
   function setToastOpen(open) {
     $("toast").classList.toggle("on", open);
@@ -241,10 +241,10 @@
   }
   function cancelPending() {
     loadSeq++;
-    if (pendingAbort) { try { pendingAbort.abort(); } catch(e) {} pendingAbort = null; }
+    apiTransport.cancelPending();
   }
-  function loadPrefs(cb){ try{ tg.CloudStorage.getItem("prefs",(e,v)=>{let p=null;try{p=v?JSON.parse(v):null}catch(x){}cb(p)});}catch(e){cb(null);} }
-  function savePrefs(p){ try{ tg.CloudStorage.setItem("prefs",JSON.stringify(p)); }catch(e){} }
+  function loadPrefs(cb){ cloud.get("prefs",(e,v)=>{let p=null;try{p=v?JSON.parse(v):null}catch(x){}cb(p)}); }
+  function savePrefs(p){ cloud.set("prefs",JSON.stringify(p)); }
   // When Telegram's signed initData expires (Studio left open for hours), every
   // request 401s — tell the user plainly instead of failing silently.
   let authGone = false;
@@ -598,10 +598,9 @@
   /* ── style presets (CloudStorage) ── */
   let presets = [];
   function loadPresets(cb) {
-    try { tg.CloudStorage.getItem("presets", (e,v) => { try { presets = v?JSON.parse(v):[]; } catch(x){ presets=[]; } if(!Array.isArray(presets)) presets=[]; cb&&cb(); }); }
-    catch(e) { presets = []; cb&&cb(); }
+    cloud.get("presets", (e,v) => { try { presets = v?JSON.parse(v):[]; } catch(x){ presets=[]; } if(!Array.isArray(presets)) presets=[]; cb&&cb(); });
   }
-  function savePresetsStore() { try { tg.CloudStorage.setItem("presets", JSON.stringify(presets.slice(0,4))); } catch(e){} }
+  function savePresetsStore() { cloud.set("presets", JSON.stringify(presets.slice(0,4))); }
   function drawPresets() {
     const box = $("preset-list");
     const render = () => {
@@ -819,21 +818,26 @@
   }
 
   /* ── schedule / reschedule ── */
-  let sheetMode = { type: "schedule" };
+  let sheetMode = { type: "schedule" }, schedulePending = false;
   function pickTime(ts) {
     hap.pick();
     if (sheetMode.type === "reschedule") rescheduleJob(sheetMode.jobId, ts);
     else schedule(ts, false);
   }
   async function rescheduleJob(jobId, at) {
+    if (schedulePending) return;
+    schedulePending = true;
     closeSheet();
     try {
       const res = await api("reschedule", { job_id: jobId, at });
       if (res.ok) { hap.ok(); openQueue(); }
-      else { hap.err(); }
-    } catch(e) { hap.err(); }
+      else { hap.err(); flash(errorText(res.error)); }
+    } catch(e) { hap.err(); flash(errorText("network")); }
+    finally { schedulePending = false; }
   }
   async function schedule(at, force) {
+    if (schedulePending) return;
+    schedulePending = true;
     closeSheet();
     try {
       const res = await api("schedule", { draft_id: state.draft_id, at, force: Boolean(force), hashtags: state.flags.hashtags, quote: state.flags.quote, large_preview: state.flags.large_preview, as_photo: Boolean(state.flags.as_photo) });
@@ -841,6 +845,7 @@
       else if (res.error==="duplicate") { hap.err(); $("toast-msg").innerHTML=T.dupA+"<b>"+esc(res.posted_date)+"</b>"+T.dupB; setToastOpen(true); $("toast-confirm").textContent=T.confirm; $("toast-confirm").onclick=()=>{setToastOpen(false);schedule(at,true);}; }
       else { hap.err(); $("status").textContent = errorText(res.error); }
     } catch(e) { hap.err(); $("status").textContent = errorText("network"); }
+    finally { schedulePending = false; }
   }
   function fmtWhen(ts){ return new Intl.DateTimeFormat(EN?"en-GB":"ru-RU",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}).format(new Date(ts*1000)); }
   function openSheet(mode) {
@@ -860,9 +865,19 @@
   $("dt-go").addEventListener("click", () => { const v=$("dt-input").value; if(!v)return; const ts=Math.floor(new Date(v).getTime()/1000); if(ts>Date.now()/1000+60){pickTime(ts);}else hap.err(); });
   $("sheet-mask").addEventListener("click", closeSheet);
   document.addEventListener("keydown", (e) => {
-    if (e.key !== "Escape") return;
-    if ($("share-sheet").classList.contains("open")) closeShare();
-    else if ($("sheet").classList.contains("open")) closeSheet();
+    if (e.key === "Escape") {
+      if ($("share-sheet").classList.contains("open")) closeShare();
+      else if ($("sheet").classList.contains("open")) closeSheet();
+      return;
+    }
+    if (e.key !== "Tab") return;
+    const dialog = $("share-sheet").classList.contains("open") ? $("share-sheet") : ($("sheet").classList.contains("open") ? $("sheet") : null);
+    if (!dialog) return;
+    const focusable = [...dialog.querySelectorAll('button:not([disabled]),input:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter((el)=>el.offsetParent !== null);
+    if (!focusable.length) return;
+    const first = focusable[0], last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   });
 
   /* ── crate (client-authoritative: the list lives in CloudStorage and rides
@@ -873,10 +888,9 @@
     if (!Array.isArray(arr)) return [];
     return arr.filter((o)=>o && o.d).map((o)=>({ artist:o.d.artist, title:o.d.title, emoji:o.e||"📀", artwork:o.d.thumbnail_url, data:o.d }));
   }
-  function persistCrate() { try { if (tg.CloudStorage) tg.CloudStorage.setItem("crate1", crateSerialize()); } catch(e) {} }
+  function persistCrate() { cloud.set("crate1", crateSerialize()); }
   function loadCrate(cb) {
-    try { tg.CloudStorage.getItem("crate1", (err, val) => { if (!err && val) crateItems = crateHydrate(val); cb && cb(); }); }
-    catch(e) { cb && cb(); }
+    cloud.get("crate1", (err, val) => { if (!err && val) crateItems = crateHydrate(val); cb && cb(); });
   }
   async function openCrate() {
     hap.tap(); show("crate");
@@ -900,7 +914,19 @@
         '<span class="crate-idx">'+(i+1)+"</span>"+ artHtml(it.artwork, it.emoji, "row-art sm")+
         '<div class="row-meta"><div class="row-title">'+esc(it.title)+'</div><div class="row-sub">'+esc(it.artist)+"</div></div>"+
         '<button class="rowbtn danger del" aria-label="'+(EN?"Remove track":"Удалить трек")+'">'+ico("trash","s14")+"</button>";
-      row.querySelector(".del").addEventListener("click", ()=>{ hap.tap(); const snap=crateItems.map((x)=>x.data); crateItems.splice(i,1); persistCrate(); refreshCrateBadge(); drawCrate(); api("crate_remove",{index:i,items:snap}).catch(()=>{}); });
+      row.querySelector(".del").addEventListener("click", async () => {
+        if (!await confirmAction(T.confirmRemove)) return;
+        hap.tap();
+        const before = crateItems.slice(), snap = before.map((x)=>x.data);
+        crateItems.splice(i, 1); persistCrate(); refreshCrateBadge(); drawCrate();
+        try {
+          const res = await api("crate_remove", { index:i, items:snap });
+          if (!res.ok) throw new Error(res.error || "save_failed");
+        } catch (e) {
+          crateItems = before; persistCrate(); refreshCrateBadge(); drawCrate();
+          hap.err(); flash(errorText(e.message));
+        }
+      });
       bindDrag(row.querySelector(".grip"), row, i);
       list.appendChild(row);
     });
@@ -914,12 +940,18 @@
   async function reorderCrate(from, to) {
     if (from === to) return;
     hap.pick();
-    const snap = crateItems.map((x)=>x.data);
+    const before = crateItems.slice(), snap = before.map((x)=>x.data);
     const order = crateItems.map((_,i)=>i);
     const [m] = order.splice(from, 1); order.splice(to, 0, m);
     const [mi] = crateItems.splice(from, 1); crateItems.splice(to, 0, mi);
     persistCrate(); drawCrate();
-    api("crate_order", { indices: order, items: snap }).catch(()=>{});
+    try {
+      const res = await api("crate_order", { indices: order, items: snap });
+      if (!res.ok) throw new Error(res.error || "save_failed");
+    } catch (e) {
+      crateItems = before; persistCrate(); refreshCrateBadge(); drawCrate();
+      hap.err(); flash(errorText(e.message));
+    }
   }
   function bindDrag(handle, row, index) {
     handle.addEventListener("pointerdown", (e) => {
@@ -945,7 +977,19 @@
     const main = $("crate-main"); main.disabled = true;
     try { const res = await api(main.dataset.action, { items: crateItems.map((x)=>x.data) }); if (res.ok) { hap.ok(); main.classList.add("done"); main.textContent = main.dataset.action==="crate_publish"?T.published:T.sent; if (main.dataset.action==="crate_publish") { crateItems=[]; persistCrate(); } setTimeout(()=>{refreshCrateBadge();drawCrate();},1600); } else { hap.err(); $("crate-empty").textContent = res.error==="need more tracks"?T.needMore:T.err; } } catch(e) { hap.err(); } finally { main.disabled = false; }
   });
-  $("crate-clear").addEventListener("click", () => { hap.tap(); crateItems=[]; persistCrate(); refreshCrateBadge(); drawCrate(); api("crate_clear",{}).catch(()=>{}); });
+  $("crate-clear").addEventListener("click", async () => {
+    if (!await confirmAction(T.confirmClear)) return;
+    hap.tap();
+    const before = crateItems.slice();
+    crateItems=[]; persistCrate(); refreshCrateBadge(); drawCrate();
+    try {
+      const res = await api("crate_clear", {});
+      if (!res.ok) throw new Error(res.error || "save_failed");
+    } catch (e) {
+      crateItems = before; persistCrate(); refreshCrateBadge(); drawCrate();
+      hap.err(); flash(errorText(e.message));
+    }
+  });
 
   /* ── queue ── */
   async function openQueue() {
@@ -962,7 +1006,19 @@
           '<button class="rowbtn edit" aria-label="'+(EN?"Reschedule":"Перенести публикацию")+'">'+ico("clock","s14")+'</button>'+
           '<button class="rowbtn danger del" aria-label="'+(EN?"Remove from queue":"Удалить из очереди")+'">'+ico("trash","s14")+"</button>";
         row.querySelector(".edit").addEventListener("click", ()=>{ hap.tap(); openSheet({ type:"reschedule", jobId: it.id }); });
-        row.querySelector(".del").addEventListener("click", async ()=>{ hap.tap(); await api("unschedule",{job_id:it.id}); row.remove(); refreshQueueBadge(); if(!list.children.length) list.innerHTML = emptyBox("clock", T.queueEmptyT, T.queueEmptyS); });
+        row.querySelector(".del").addEventListener("click", async () => {
+          if (!await confirmAction(T.confirmRemove)) return;
+          hap.tap();
+          const button = row.querySelector(".del"); button.disabled = true;
+          try {
+            const res = await api("unschedule", { job_id:it.id });
+            if (!res.ok) throw new Error(res.error || "save_failed");
+            row.remove(); refreshQueueBadge();
+            if (!list.children.length) list.innerHTML = emptyBox("clock", T.queueEmptyT, T.queueEmptyS);
+          } catch (e) {
+            button.disabled = false; hap.err(); flash(errorText(e.message));
+          }
+        });
         list.appendChild(row);
       });
     } catch(e) { $("queue-empty").textContent = T.err; }
@@ -1051,7 +1107,7 @@
   function maybeCoach() {
     if (coachShown) return; coachShown = true;
     const KEY = "coach4", start = () => setTimeout(startCoach, 800);
-    try { tg.CloudStorage.getItem(KEY,(e,v)=>{ if(e||v)return; start(); tg.CloudStorage.setItem(KEY,"1"); }); }
+    try { cloud.get(KEY,(e,v)=>{ if(e||v)return; start(); cloud.set(KEY,"1"); }); }
     catch(e) { try{ if(!localStorage.getItem(KEY)){start();localStorage.setItem(KEY,"1");} }catch(x){} }
   }
   function startCoach() {
