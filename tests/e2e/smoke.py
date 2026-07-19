@@ -113,6 +113,25 @@ def main() -> int:
         if page.evaluate("document.documentElement.scrollWidth > window.innerWidth"):
             failures.append("home view has horizontal overflow at 390px")
 
+        # Popular cards must keep their title clear of the decorative music
+        # icon, including the narrowest Telegram viewport we support.
+        for width in (390, 320):
+            page.set_viewport_size({"width": width, "height": 800})
+            overlaps = page.eval_on_selector_all(
+                "#suggestions .row",
+                """cards => cards.some(card => {
+                  const a = card.querySelector('.row-title').getBoundingClientRect();
+                  const b = card.querySelector('.suggestion-note').getBoundingClientRect();
+                  return a.left < b.right && a.right > b.left &&
+                         a.top < b.bottom && a.bottom > b.top;
+                })""",
+            )
+            if overlaps:
+                failures.append(f"popular card title overlaps its icon at {width}px")
+            if page.evaluate("document.documentElement.scrollWidth > window.innerWidth"):
+                failures.append(f"home view has horizontal overflow at {width}px")
+        page.set_viewport_size({"width": 390, "height": 800})
+
         # 2. a search renders the result card with the track title
         page.evaluate("document.getElementById('query').value = 'sleep dopesmoker'")
         page.eval_on_selector("#query", "el => el.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter'}))")

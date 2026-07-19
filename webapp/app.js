@@ -152,8 +152,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   SUGGESTIONS.forEach((s) => {
     const b = document.createElement("button");
     b.className = "row"; b.style.opacity = "1";
-    b.innerHTML = '<div class="row-art">🎵</div><div class="row-meta"><div class="row-title">'+esc(s)+"</div></div>"+ico("cr","s16");
-    b.querySelector(".icon").style.color = "var(--primary)";
+    b.innerHTML = '<div class="row-art">'+ico("music","suggestion-note")+'</div><div class="row-meta"><div class="row-title">'+esc(s)+"</div></div>"+ico("cr","s16 suggestion-arrow");
     b.addEventListener("click", () => { $("query").value = s; search(); });
     $("suggestions").appendChild(b);
   });
