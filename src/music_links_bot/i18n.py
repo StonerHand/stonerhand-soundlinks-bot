@@ -56,34 +56,92 @@ STRINGS: dict[str, dict[str, str]] = {
             "Take the quick tour or jump straight into search 👇"
         ),
     },
+    "home_title_new": {
+        RU: "🎧 <b>Твоя музыкальная мастерская</b>",
+        EN: "🎧 <b>Your music post workshop</b>",
+    },
+    "home_title": {
+        RU: "🎛 <b>Студия готова{name}</b>",
+        EN: "🎛 <b>Studio is ready{name}</b>",
+    },
+    "home_body": {
+        RU: (
+            "{greeting}\n\n"
+            "Ссылка или название → точный релиз → готовый Telegram-пост.\n\n"
+            "<blockquote>🧺 Подборка: {crate_count}/10\n{mode}</blockquote>\n"
+            "Пришли ссылку прямо сюда или выбери действие ниже."
+        ),
+        EN: (
+            "{greeting}\n\n"
+            "A link or title → the exact release → a finished Telegram post.\n\n"
+            "<blockquote>🧺 Crate: {crate_count}/10\n{mode}</blockquote>\n"
+            "Send a link here or choose an action below."
+        ),
+    },
+    "home_mode_admin": {
+        RU: "📡 Канал, очередь и статистика доступны",
+        EN: "📡 Channel, queue and stats are available",
+    },
+    "home_mode_user": {
+        RU: "✉️ Готовые посты можно отправлять себе",
+        EN: "✉️ Finished posts can be sent to your chat",
+    },
     "start_returning": {
         RU: "🎧 <b>Что собираем сегодня?</b>\n\nПришли ссылку, название релиза или открой Студию.",
         EN: "🎧 <b>What are we building today?</b>\n\nSend a link, a release name or open Studio.",
     },
     "onboarding_1": {
-        RU: "<b>1/3 · Найди релиз</b>\n\nПришли ссылку с любой поддерживаемой площадки или напиши название трека.",
-        EN: "<b>1/3 · Find a release</b>\n\nSend a supported link or type a track name.",
+        RU: (
+            "<b>● ○ ○  Найди точный релиз</b>\n\n"
+            "Пришли ссылку с музыкальной площадки или напиши "
+            "<i>артист — трек</i>. Если совпадений несколько, выберешь нужное."
+        ),
+        EN: (
+            "<b>● ○ ○  Find the exact release</b>\n\n"
+            "Send a music link or type <i>artist — track</i>. "
+            "If there are several matches, you will choose the right one."
+        ),
     },
     "onboarding_2": {
-        RU: "<b>2/3 · Настрой карточку</b>\n\nВключи хэштеги и цитату, выбери размер обложки или открой полный редактор в Студии.",
-        EN: "<b>2/3 · Tune the card</b>\n\nToggle hashtags and quote, choose cover size or open the full Studio editor.",
+        RU: (
+            "<b>● ● ○  Собери карточку</b>\n\n"
+            "Бот найдёт обложку и площадки. В чате можно быстро поменять "
+            "хэштеги и превью, а в Студии — настроить весь пост."
+        ),
+        EN: (
+            "<b>● ● ○  Build the card</b>\n\n"
+            "The bot finds artwork and platforms. Tune hashtags and preview "
+            "in chat, or customize the whole post in Studio."
+        ),
     },
     "onboarding_3": {
-        RU: "<b>3/3 · Отправь куда нужно</b>\n\nГотовый пост можно оставить себе, вставить inline в другой чат, добавить в подборку или опубликовать в канал.",
-        EN: "<b>3/3 · Send it anywhere</b>\n\nKeep the post, insert it inline, add it to a crate or publish it to your channel.",
+        RU: (
+            "<b>● ● ●  Выпусти пост</b>\n\n"
+            "Отправь его себе, добавь в подборку или опубликуй в канал. "
+            "Для любого чата есть inline: <code>@StonerHandBot запрос</code>."
+        ),
+        EN: (
+            "<b>● ● ●  Release the post</b>\n\n"
+            "Send it to yourself, add it to a crate or publish to the channel. "
+            "Inline works anywhere: <code>@StonerHandBot query</code>."
+        ),
     },
-    "quick_tour": {RU: "Как это работает", EN: "How it works"},
-    "quick_search": {RU: "Найти релиз", EN: "Find a release"},
-    "open_studio": {RU: "Открыть Студию", EN: "Open Studio"},
-    "next": {RU: "Дальше", EN: "Next"},
-    "back": {RU: "Назад", EN: "Back"},
-    "start_using": {RU: "Начать", EN: "Start"},
+    "quick_tour": {RU: "▶ Быстрый тур", EN: "▶ Quick tour"},
+    "quick_search": {RU: "🔎 Новый пост", EN: "🔎 New post"},
+    "open_studio": {RU: "🎛 Открыть Студию", EN: "🎛 Open Studio"},
+    "home_crate": {RU: "🧺 Подборка · {count}", EN: "🧺 Crate · {count}"},
+    "home_stats": {RU: "📊 Статистика канала", EN: "📊 Channel stats"},
+    "home_result": {RU: "✨ Что получится", EN: "✨ See the result"},
+    "home_back": {RU: "← Главное меню", EN: "← Main menu"},
+    "next": {RU: "Дальше →", EN: "Next →"},
+    "back": {RU: "← Назад", EN: "← Back"},
+    "start_using": {RU: "Готово — открыть меню", EN: "Done — open menu"},
     "tab_start": {RU: "🚀 Быстрый старт", EN: "🚀 Quick start"},
-    "tab_help": {RU: "📖 Как пользоваться", EN: "📖 How it works"},
+    "tab_help": {RU: "❓ Помощь", EN: "❓ Help"},
     "tab_platforms": {RU: "🎛 Сервисы", EN: "🎛 Services"},
     "tab_guide": {RU: "📣 Для каналов", EN: "📣 For channels"},
     "tab_demo": {RU: "🧪 Пример поста", EN: "🧪 Example post"},
-    "share_button": {RU: "Поделиться ботом", EN: "Share the bot"},
+    "share_button": {RU: "↗ Поделиться ботом", EN: "↗ Share the bot"},
     "error_platforms_button": {RU: "Что поддерживается", EN: "What is supported"},
     "menu_start": {
         RU: (

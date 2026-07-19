@@ -5,6 +5,7 @@ import contextvars
 from collections.abc import Awaitable, Callable
 from dataclasses import asdict
 import hashlib
+from html import escape
 import logging
 import secrets
 from urllib.parse import quote
@@ -130,7 +131,9 @@ from music_links_bot.bot_runtime import (
     encode_callback,
 )
 from music_links_bot.bot_ui import (
+    build_home_text as _build_home_text,
     build_onboarding_keyboard as _build_onboarding_keyboard,
+    build_section_keyboard as _build_section_keyboard,
     build_start_keyboard as _build_start_keyboard,
     editor_more_rows as _editor_more_rows,
     editor_rows as _editor_rows,
@@ -427,10 +430,24 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     lang = _update_lang(update)
     user_id = update.effective_user.id if update.effective_user else update.message.chat_id
     session = await _runtime(context).get_session(user_id, lang=lang)
+    crate_count, is_admin = await _home_state(context, user_id)
     await update.message.reply_text(
-        get_text(lang, "start_returning" if session.onboarding_seen else "start_new"),
+        _build_home_text(
+            lang=lang,
+            first_name=update.effective_user.first_name if update.effective_user else "",
+            crate_count=crate_count,
+            is_admin=is_admin,
+            first_visit=not session.onboarding_seen,
+        ),
         parse_mode=ParseMode.HTML,
-        reply_markup=_build_start_keyboard(context.bot.username, lang=lang),
+        reply_markup=_build_start_keyboard(
+            context.bot.username,
+            lang=lang,
+            crate_count=crate_count,
+            is_admin=is_admin,
+            show_tour=not session.onboarding_seen,
+            include_studio=update.message.chat.type == "private",
+        ),
     )
 
 
@@ -447,13 +464,16 @@ async def guide_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     lang = _update_lang(update)
+    user_id = update.effective_user.id if update.effective_user else message.chat_id
+    crate_count, _is_admin = await _home_state(context, user_id)
     sent_message = await message.reply_text(
         _menu_text(MENU_GUIDE, lang=lang),
         parse_mode=ParseMode.HTML,
-        reply_markup=_build_intro_keyboard(
+        reply_markup=_build_section_keyboard(
             context.bot.username,
-            active=MENU_GUIDE,
             lang=lang,
+            crate_count=crate_count,
+            include_studio=message.chat.type == "private",
         ),
     )
 
@@ -493,6 +513,36 @@ def _runtime(context: ContextTypes.DEFAULT_TYPE) -> BotRuntime:
         runtime = BotRuntime(context.application.bot_data.get("kv_store"))
         context.application.bot_data["runtime"] = runtime
     return runtime
+
+
+async def _home_state(
+    context: ContextTypes.DEFAULT_TYPE, user_id: int
+) -> tuple[int, bool]:
+    items = await load_crate(context.application.bot_data, user_id)
+    admin_chat_id = context.application.bot_data.get("admin_chat_id")
+    return len(items), admin_chat_id is not None and user_id == admin_chat_id
+
+
+async def _home_view(query, context, *, lang: str) -> tuple[str, InlineKeyboardMarkup]:
+    user = query.from_user
+    user_id = user.id if user else 0
+    crate_count, is_admin = await _home_state(context, user_id)
+    text = _build_home_text(
+        lang=lang,
+        first_name=user.first_name if user else "",
+        crate_count=crate_count,
+        is_admin=is_admin,
+    )
+    keyboard = _build_start_keyboard(
+        context.bot.username,
+        lang=lang,
+        crate_count=crate_count,
+        is_admin=is_admin,
+        include_studio=(
+            query.message is not None and query.message.chat.type == "private"
+        ),
+    )
+    return text, keyboard
 
 
 async def bot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -537,12 +587,40 @@ async def _dispatch_menu_action(query, context, action: CallbackAction) -> None:
             session = await _runtime(context).get_session(query.from_user.id, lang=lang)
             session.onboarding_seen = True
             await _runtime(context).save_session(session)
-            text = get_text(lang, "start_returning")
-            keyboard = _build_start_keyboard(context.bot.username, lang=lang)
+            text, keyboard = await _home_view(query, context, lang=lang)
         else:
             step_number = max(1, min(3, int(step)))
             text = get_text(lang, f"onboarding_{step_number}")
             keyboard = _build_onboarding_keyboard(step_number, lang)
+        await query.answer()
+        await _safe_edit(query, text, keyboard)
+        return
+
+    if action.action == "stats":
+        user_id = query.from_user.id if query.from_user else 0
+        crate_count, is_admin = await _home_state(context, user_id)
+        if not is_admin:
+            await query.answer(get_text(lang, "ed_admin_only"), show_alert=True)
+            return
+        text = escape(await _stats_text(context, include_private=True))
+        await query.answer()
+        await _safe_edit(
+            query,
+            text,
+            _build_section_keyboard(
+                context.bot.username,
+                lang=lang,
+                crate_count=crate_count,
+                include_studio=(
+                    query.message is not None
+                    and query.message.chat.type == "private"
+                ),
+            ),
+        )
+        return
+
+    if action.action == "start":
+        text, keyboard = await _home_view(query, context, lang=lang)
         await query.answer()
         await _safe_edit(query, text, keyboard)
         return
@@ -555,10 +633,19 @@ async def _dispatch_menu_action(query, context, action: CallbackAction) -> None:
         "demo": MENU_DEMO,
     }.get(action.action, MENU_START)
     await query.answer()
+    user_id = query.from_user.id if query.from_user else 0
+    crate_count, _is_admin = await _home_state(context, user_id)
     await _safe_edit(
         query,
         _menu_text(menu_key, lang=lang),
-        _build_intro_keyboard(context.bot.username, active=menu_key, lang=lang),
+        _build_section_keyboard(
+            context.bot.username,
+            lang=lang,
+            crate_count=crate_count,
+            include_studio=(
+                query.message is not None and query.message.chat.type == "private"
+            ),
+        ),
     )
 
 
@@ -580,15 +667,25 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     await query.answer()
     lang = resolve_lang(query.from_user.language_code if query.from_user else None)
     menu_key = query.data if query.data in MENU_KEYS else MENU_START
+    if menu_key == MENU_START:
+        text, keyboard = await _home_view(query, context, lang=lang)
+    else:
+        user_id = query.from_user.id if query.from_user else 0
+        crate_count, _is_admin = await _home_state(context, user_id)
+        text = _menu_text(menu_key, lang=lang)
+        keyboard = _build_section_keyboard(
+            context.bot.username,
+            lang=lang,
+            crate_count=crate_count,
+            include_studio=(
+                query.message is not None and query.message.chat.type == "private"
+            ),
+        )
     try:
         await query.edit_message_text(
-            text=_menu_text(menu_key, lang=lang),
+            text=text,
             parse_mode=ParseMode.HTML,
-            reply_markup=_build_intro_keyboard(
-                context.bot.username,
-                active=menu_key,
-                lang=lang,
-            ),
+            reply_markup=keyboard,
         )
     except BadRequest as exc:
         if "Message is not modified" in str(exc):
@@ -1299,6 +1396,13 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     admin_chat_id: int | None = context.application.bot_data.get("admin_chat_id")
     include_private = admin_chat_id is not None and message.chat_id == admin_chat_id
+    text = await _stats_text(context, include_private=include_private)
+    await message.reply_text(text)
+
+
+async def _stats_text(
+    context: ContextTypes.DEFAULT_TYPE, *, include_private: bool
+) -> str:
     stats_data = load_stats()
     kv: KVStore | None = context.application.bot_data.get("kv_store")
     if kv is not None:
@@ -1316,7 +1420,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                     + (f" · {item['last_error']}" if item["last_error"] else "")
                 )
             text += "\n".join(lines)
-    await message.reply_text(text)
+    return text
 
 
 async def crate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1363,13 +1467,15 @@ async def _reply_with_menu(
     *,
     lang: str = "ru",
 ) -> None:
+    crate_count, _is_admin = await _home_state(context, message.chat_id)
     await message.reply_text(
         _menu_text(menu_key, lang=lang),
         parse_mode=ParseMode.HTML,
-        reply_markup=_build_intro_keyboard(
+        reply_markup=_build_section_keyboard(
             context.bot.username,
-            active=menu_key,
             lang=lang,
+            crate_count=crate_count,
+            include_studio=message.chat.type == "private",
         ),
     )
 
@@ -1907,26 +2013,8 @@ def _build_intro_keyboard(
     active: str | None = None,
     lang: str = "ru",
 ) -> InlineKeyboardMarkup:
-    menu_rows = [
-        [
-            _menu_button(get_text(lang, "tab_start"), MENU_START, active),
-            _menu_button(get_text(lang, "tab_help"), MENU_HELP, active),
-        ],
-        [
-            _menu_button(get_text(lang, "tab_platforms"), MENU_PLATFORMS, active),
-            _menu_button(get_text(lang, "tab_guide"), MENU_GUIDE, active),
-        ],
-        [_menu_button(get_text(lang, "tab_demo"), MENU_DEMO, active)],
-    ]
-    action_row = [_channel_button()]
-    if bot_username:
-        bot_url = f"https://t.me/{bot_username}"
-        share_url = "https://t.me/share/url?url=" + quote(bot_url, safe="")
-        action_row.append(
-            _url_button(get_text(lang, "share_button"), url=share_url, style="primary")
-        )
-
-    return InlineKeyboardMarkup([*menu_rows, action_row])
+    del active
+    return _build_section_keyboard(bot_username, lang=lang)
 
 
 def _build_error_keyboard(

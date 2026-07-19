@@ -45,6 +45,7 @@ Output:  artist + release + artwork + automatic hashtags
 - can replace raw links in a source channel with formatted posts;
 - warns about duplicate releases;
 - supports RU/EN, actionable retries and double-tap protection.
+- turns `/start` into a personal workspace with crate status, a primary Studio entry, new-post action, quick tour and admin stats instead of a maze of help tabs;
 
 Commands: `/start`, `/help`, `/guide`, `/platforms`, `/channel`, `/crate`, `/stats`, `/id`.
 
