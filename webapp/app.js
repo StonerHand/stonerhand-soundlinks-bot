@@ -35,8 +35,11 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     sheetTitle: "When to publish?", in1h: "In 1 hour", in3h: "In 3 hours", tonight: "Tonight 19:00", tomorrow: "Tomorrow 10:00",
     clipQ: "Paste from clipboard?", preview30: "0:30 preview", addTag: "add",
     stat: { posts: "posts", song: "tracks", album: "albums", podcast: "podcasts", videos: "videos", collections: "sets" },
-    coach: [["🔎","Paste a link or search by artist and title."],["🎧","Preview the track before you build the post."],["🎛","Shape the text, cover and platforms in Style."],["📡","Choose channel, private chat or queue at the final step."]],
-    gotIt: "Got it", next: "Next",
+    coach: [["🔎","Find the release","Paste a link or search by artist and title."],["🎧","Check the sound","Preview the track before you build the post."],["🎛","Shape the card","Tune the text, cover and platforms in Style."],["📡","Choose a destination","Send to yourself, a channel or the publishing queue."]],
+    gotIt: "Start creating", next: "Next", skip: "Skip", step: "STEP",
+    flow: ["Find","Style","Send"], support: "All music platforms", batch: "Several links → crate",
+    quick: { crate:["Crate","Build a set"], inline:["Inline search","In any chat"], queue:["Queue","Publishing plan"], stats:["Analytics","Channel pulse"] },
+    readyCover: "Artwork", readyNoCover: "No artwork", readyHashtags: "Hashtags", readyClean: "Clean text", readyPlatforms: "platforms",
     shareTitle: "Share where?", shareAll: "All platforms",
     presets: "Presets", presetSave: "save", presetEmpty: "Save the current look to reuse it",
     presetName: "Preset", reschedule: "Reschedule",
@@ -63,8 +66,11 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     sheetTitle: "Когда опубликовать?", in1h: "Через час", in3h: "Через 3 часа", tonight: "Сегодня 19:00", tomorrow: "Завтра 10:00",
     clipQ: "Вставить из буфера?", preview30: "0:30 превью", addTag: "тег",
     stat: { posts: "постов", song: "треков", album: "альбомов", podcast: "подкастов", videos: "видео", collections: "подборок" },
-    coach: [["🔎","Вставь ссылку или найди релиз по артисту и названию."],["🎧","Прослушай отрывок до того, как собирать пост."],["🎛","Настрой текст, обложку и площадки в «Оформлении»."],["📡","На последнем шаге выбери канал, личный чат или очередь."]],
-    gotIt: "Понятно", next: "Дальше",
+    coach: [["🔎","Найди точный релиз","Вставь ссылку или найди музыку по артисту и названию."],["🎧","Проверь звучание","Прослушай отрывок до того, как собирать пост."],["🎛","Настрой карточку","Измени текст, обложку и площадки в «Оформлении»."],["📡","Выбери назначение","Отправь себе, опубликуй в канал или поставь в очередь."]],
+    gotIt: "Начать", next: "Дальше", skip: "Пропустить", step: "ШАГ",
+    flow: ["Найти","Оформить","Отправить"], support: "Все музыкальные сервисы", batch: "Несколько ссылок → подборка",
+    quick: { crate:["Подборка","Собрать сет"], inline:["Inline-поиск","В любом чате"], queue:["Очередь","Планы на эфир"], stats:["Статистика","Ритм канала"] },
+    readyCover: "Обложка", readyNoCover: "Без обложки", readyHashtags: "Хэштеги", readyClean: "Чистый текст", readyPlatforms: "площадок",
     shareTitle: "Куда поделиться?", shareAll: "Все площадки",
     presets: "Пресеты", presetSave: "сохранить", presetEmpty: "Сохрани текущее оформление, чтобы применять в один тап",
     presetName: "Пресет", reschedule: "Перенести",
@@ -145,6 +151,15 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   $("t-presets").textContent = T.presets;
   $("t-preset-save").textContent = T.presetSave;
   $("share-title").textContent = T.shareTitle;
+  $("flow-find").textContent = T.flow[0];
+  $("flow-style").textContent = T.flow[1];
+  $("flow-send").textContent = T.flow[2];
+  $("support-label").textContent = T.support;
+  $("batch-label").textContent = T.batch;
+  $("q-crate-title").textContent = T.quick.crate[0]; $("q-crate-sub").textContent = T.quick.crate[1];
+  $("q-inline-title").textContent = T.quick.inline[0]; $("q-inline-sub").textContent = T.quick.inline[1];
+  $("q-queue-title").textContent = T.quick.queue[0]; $("q-queue-sub").textContent = T.quick.queue[1];
+  $("q-stats-title").textContent = T.quick.stats[0]; $("q-stats-sub").textContent = T.quick.stats[1];
   document.querySelector('#tabbar [data-tab="home"] span').textContent = EN?"Home":"Главная";
   document.querySelector('#tabbar [data-tab="crate"] span').textContent = EN?"Crate":"Подборка";
   document.querySelector('#tabbar [data-tab="queue"] span').textContent = EN?"Queue":"Очередь";
@@ -200,6 +215,11 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   }));
   // Home shortcut cards (mirror the tab bar).
   $("q-crate").addEventListener("click", () => { hap.tap(); cancelPending(); openCrate(); });
+  $("q-inline").addEventListener("click", () => {
+    hap.tap();
+    try { tg.switchInlineQuery("", ["users","groups","channels"]); }
+    catch(e) { try { tg.switchInlineQuery(""); } catch(x) { flash(EN?"Inline mode is unavailable":"Inline-режим недоступен"); } }
+  });
   $("q-queue").addEventListener("click", () => { hap.tap(); cancelPending(); openQueue(); });
   $("q-stats").addEventListener("click", () => { hap.tap(); cancelPending(); openStats(); });
   $("admin-tools").addEventListener("click", () => { hap.tap(); cancelPending(); openStats(); });
@@ -353,6 +373,13 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
       : "";
 
     const enabled = r.platforms.filter((p)=>p.enabled!==false);
+    const readiness = $("result-readiness");
+    const readyItems = [
+      [Boolean(artSrc), Boolean(artSrc) ? T.readyCover : T.readyNoCover, "disc"],
+      [enabled.length > 0, enabled.length+" "+T.readyPlatforms, "check"],
+      [Boolean(f.hashtags && r.hashtags), f.hashtags && r.hashtags ? T.readyHashtags : T.readyClean, "sliders"],
+    ];
+    readiness.innerHTML = readyItems.map(([ok,label,icon]) => '<span class="'+(ok?'ok':'muted')+'">'+ico(icon,"s14")+esc(label)+"</span>").join("");
     let plats = "";
     enabled.forEach((p) => {
       if (!/^https?:\/\//i.test(String(p.url||""))) return;
@@ -554,7 +581,9 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
       isAdmin = Boolean(res.is_admin);
       $("admin-badge").classList.toggle("hidden", !isAdmin);
       $("admin-tools").classList.toggle("hidden", !isAdmin);
-      $("quick").classList.toggle("hidden", !isAdmin);
+      $("quick").classList.remove("hidden");
+      $("q-queue").classList.toggle("hidden", !isAdmin);
+      $("q-stats").classList.toggle("hidden", !isAdmin);
       $("tab-queue").style.display = isAdmin ? "" : "none";
       if (isAdmin) refreshQueueBadge();
       loadCrate(refreshCrateBadge);
@@ -580,7 +609,6 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     if (data && Array.isArray(data.items)) crateItems = data.items;
     crateCount = crateItems.length;
     const b=$("q-crate-n"); b.style.display=crateCount>0?"flex":"none"; b.textContent=crateCount;
-    if (!isAdmin) $("quick").classList.toggle("hidden", crateCount===0);
   }
 
   /* ── formatting screen ── */
@@ -918,7 +946,8 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   $("sheet-mask").addEventListener("click", closeSheet);
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
-      if ($("success-screen").classList.contains("open")) hideSuccess();
+      if ($("coach").classList.contains("open")) closeCoach();
+      else if ($("success-screen").classList.contains("open")) hideSuccess();
       else if ($("publish-sheet").classList.contains("open")) closePublish();
       else if ($("share-sheet").classList.contains("open")) closeShare();
       else if ($("sheet").classList.contains("open")) closeSheet();
@@ -1131,6 +1160,18 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   $("query").addEventListener("focus", () => $("searchbar").classList.add("focus"));
   $("query").addEventListener("blur", () => { $("searchbar").classList.remove("focus"); setTimeout(()=>$("typeahead").classList.remove("open"),180); });
   $("clear").addEventListener("click", () => { $("query").value=""; $("clear").style.display="none"; $("query").focus(); });
+  $("paste-btn").addEventListener("click", () => {
+    hap.tap();
+    tryClipboard((text) => {
+      const value = String(text || "").trim();
+      if (!value) { flash(EN?"Clipboard is empty":"В буфере ничего нет"); return; }
+      $("query").value = value;
+      $("clear").style.display = "block";
+      renderTypeahead();
+      $("query").focus();
+      hap.ok();
+    });
+  });
   $("nf-retry").addEventListener("click", () => { hap.tap(); if (lastQuery) { search(lastQuery); } else { $("query").value=""; loadHome(); show("home"); $("query").focus(); } });
   $("toast-cancel").addEventListener("click", () => setToastOpen(false));
 
@@ -1167,6 +1208,10 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
 
   /* ── coach ── */
   let coachShown = false;
+  function closeCoach() {
+    $("coach-mask").classList.remove("open"); $("coach-mask").setAttribute("aria-hidden", "true");
+    $("coach").classList.remove("open"); $("coach").setAttribute("aria-hidden", "true"); $("coach").inert = true;
+  }
   function maybeCoach() {
     if (coachShown) return; coachShown = true;
     const KEY = "coach4", start = () => setTimeout(startCoach, 800);
@@ -1176,12 +1221,18 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   function startCoach() {
     let step = 0; const steps = T.coach;
     const render = () => {
-      $("coach-emoji").textContent = steps[step][0]; $("coach-text").textContent = steps[step][1];
+      $("coach-step").textContent = T.step+" "+(step+1)+" / "+steps.length;
+      $("coach-emoji").textContent = steps[step][0]; $("coach-title").textContent = steps[step][1]; $("coach-text").textContent = steps[step][2];
       $("coach-dots").innerHTML = steps.map((_,i)=>"<i"+(i===step?' class="on"':"")+"></i>").join("");
       $("coach-next").textContent = step===steps.length-1?T.gotIt:T.next;
     };
-    $("coach-mask").classList.add("open"); $("coach").classList.add("open"); render();
-    $("coach-next").onclick = () => { hap.tap(); step++; if (step>=steps.length) { $("coach-mask").classList.remove("open"); $("coach").classList.remove("open"); return; } render(); };
+    $("coach-skip").textContent = T.skip;
+    $("coach-mask").classList.add("open"); $("coach-mask").setAttribute("aria-hidden", "false");
+    $("coach").classList.add("open"); $("coach").setAttribute("aria-hidden", "false"); $("coach").inert = false; render();
+    requestAnimationFrame(() => $("coach-next").focus());
+    $("coach-next").onclick = () => { hap.tap(); step++; if (step>=steps.length) { closeCoach(); return; } render(); };
+    $("coach-skip").onclick = closeCoach;
+    $("coach-mask").onclick = closeCoach;
   }
 
   /* ── native ── */

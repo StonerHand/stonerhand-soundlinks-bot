@@ -802,6 +802,7 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[0][0].api_kwargs, {"style": "success"})
         self.assertEqual(rows[1][0].text, "🔎 Найти релиз")
         self.assertEqual(rows[1][1].text, "🧺 Подборка · 3")
+        self.assertEqual(rows[1][1].api_kwargs, {"style": "success"})
         self.assertEqual(rows[2][0].text, "📊 Статистика канала")
         self.assertEqual(rows[3][0].text, "▶ Как всё работает")
         self.assertEqual(rows[-1][0].text, "↗ Поделиться ботом")

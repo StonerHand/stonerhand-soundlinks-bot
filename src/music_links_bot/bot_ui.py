@@ -11,6 +11,17 @@ from music_links_bot.keyboards import _channel_button
 from music_links_bot.publication_state import webapp_url
 
 
+def _crate_button(lang: str, crate_count: int) -> InlineKeyboardButton:
+    """Make a non-empty collection visible without adding another menu row."""
+    safe_count = max(0, min(10, crate_count))
+    kwargs = {"api_kwargs": {"style": "success"}} if safe_count else {}
+    return InlineKeyboardButton(
+        get_text(lang, "home_crate").format(count=safe_count),
+        callback_data=encode_callback("crate", "open"),
+        **kwargs,
+    )
+
+
 def build_home_text(
     *,
     lang: str,
@@ -62,10 +73,7 @@ def build_start_keyboard(
                 switch_inline_query_current_chat="",
                 api_kwargs={"style": "primary"},
             ),
-            InlineKeyboardButton(
-                get_text(lang, "home_crate").format(count=max(0, min(10, crate_count))),
-                callback_data=encode_callback("crate", "open"),
-            ),
+            _crate_button(lang, crate_count),
         ]
     )
     if is_admin:
@@ -150,12 +158,7 @@ def build_section_keyboard(
                 switch_inline_query_current_chat="",
                 api_kwargs={"style": "primary"},
             ),
-            InlineKeyboardButton(
-                get_text(lang, "home_crate").format(
-                    count=max(0, min(10, crate_count))
-                ),
-                callback_data=encode_callback("crate", "open"),
-            ),
+            _crate_button(lang, crate_count),
         ]
     )
 
