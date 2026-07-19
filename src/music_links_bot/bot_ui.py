@@ -77,14 +77,20 @@ def build_start_keyboard(
         ]
     )
     if is_admin:
-        rows.append(
-            [
+        admin_row = [
+            InlineKeyboardButton(
+                get_text(lang, "home_stats"),
+                callback_data=encode_callback("menu", "stats"),
+            )
+        ]
+        if studio_url:
+            admin_row.append(
                 InlineKeyboardButton(
-                    get_text(lang, "home_stats"),
-                    callback_data=encode_callback("menu", "stats"),
+                    get_text(lang, "home_queue"),
+                    web_app=WebAppInfo(url=f"{studio_url}?view=queue"),
                 )
-            ]
-        )
+            )
+        rows.append(admin_row)
     discovery_row = [
         InlineKeyboardButton(
             get_text(lang, "home_result"),

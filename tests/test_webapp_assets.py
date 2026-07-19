@@ -43,6 +43,7 @@ class WebAppAssetTests(unittest.TestCase):
             "home-title",
             "search-go",
             "paste-btn",
+            "home-alert",
             "q-inline",
             "result-readiness",
             "format-preview",
@@ -52,12 +53,17 @@ class WebAppAssetTests(unittest.TestCase):
             "success-screen",
             "cp-vinyl",
             "coach-skip",
+            "publish-close",
+            "fmt-sync",
         ):
             self.assertIn(f'id="{element_id}"', html)
         self.assertNotIn('data-tab="stats"', html)
         self.assertIn("@media (max-width:360px)", css)
         self.assertIn("bindSwipe", js)
         self.assertIn("showSuccess", js)
+        self.assertIn("contentSafeAreaInset", js)
+        self.assertIn("MainButton", js)
+        self.assertIn('["crate","queue","stats"].includes(viewParam)', js)
 
     def test_html_ids_are_unique(self) -> None:
         import re

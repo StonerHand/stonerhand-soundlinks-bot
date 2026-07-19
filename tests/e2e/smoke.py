@@ -54,11 +54,13 @@ RESPONSES = {
 }
 REQUEST_BODIES: list[dict] = []
 ACTION_ATTEMPTS: dict[str, int] = {}
+FAIL_ACTIONS: set[str] = set()
 
 INIT = """window.Telegram={WebApp:{initData:"x",initDataUnsafe:{user:{language_code:"ru"}},colorScheme:"dark",
-ready(){},expand(){},close(){},setHeaderColor(){},setBackgroundColor(){},BackButton:{show(){},hide(){},onClick(){}},
+ready(){},expand(){},close(){},setHeaderColor(){},setBackgroundColor(){},onEvent(){},contentSafeAreaInset:{top:7,right:0,bottom:11,left:0},BackButton:{show(){},hide(){},onClick(){}},
 HapticFeedback:{impactOccurred(){},selectionChanged(){},notificationOccurred(){}},
 CloudStorage:{getItem(k,cb){cb(null,null)},setItem(){}},isVersionAtLeast(){return false},
+MainButton:{text:"",visible:false,handler:null,setText(t){this.text=t},show(){this.visible=true},hide(){this.visible=false},enable(){},disable(){},showProgress(){},hideProgress(){},onClick(fn){this.handler=fn},offClick(fn){if(this.handler===fn)this.handler=null}},
 switchInlineQuery(q){window.__inlineQuery=q},readTextFromClipboard(cb){cb("https://open.spotify.com/track/pasted")}}};"""
 
 
@@ -77,6 +79,12 @@ def _route_api(route):
     REQUEST_BODIES.append(body)
     action = body.get("action")
     ACTION_ATTEMPTS[action] = ACTION_ATTEMPTS.get(action, 0) + 1
+    if action in FAIL_ACTIONS:
+        route.fulfill(status=503, json={"ok": False, "error": "network", "retryable": False}, content_type="application/json")
+        return
+    if action == "resolve" and (body.get("payload") or {}).get("query") == "missing":
+        route.fulfill(json={"ok": False, "error": "not_found"}, content_type="application/json")
+        return
     if action == "history" and ACTION_ATTEMPTS[action] == 1:
         route.fulfill(
             status=503,
@@ -85,6 +93,19 @@ def _route_api(route):
         )
         return
     route.fulfill(json=RESPONSES.get(action, {"ok": True}), content_type="application/json")
+
+
+def _theme_contrast(page) -> float:
+    return page.evaluate(
+        """() => {
+          const root=getComputedStyle(document.documentElement), probe=document.createElement('i');
+          document.body.appendChild(probe);
+          const rgb=(value)=>{probe.style.color=value;const m=getComputedStyle(probe).color.match(/\\d+(?:\\.\\d+)?/g);return m.slice(0,3).map(Number)};
+          const lum=(values)=>values.map(v=>v/255).map(v=>v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4)).reduce((s,v,i)=>s+v*[.2126,.7152,.0722][i],0);
+          const a=lum(rgb(root.getPropertyValue('--fg'))),b=lum(rgb(root.getPropertyValue('--bg')));probe.remove();
+          return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+        }"""
+    )
 
 
 def main() -> int:
@@ -96,7 +117,7 @@ def main() -> int:
         page.route("**/telegram.org/**", lambda r: r.abort())
         page.route("**/cover.local/**", lambda r: r.fulfill(status=404))
         page.route("**/api/webapp", _route_api)
-        page.route("https://studio.local/app", lambda r: r.fulfill(body=HTML, content_type="text/html"))
+        page.route("https://studio.local/app*", lambda r: r.fulfill(body=HTML, content_type="text/html"))
         page.route("https://studio.local/webapp/styles.css", lambda r: r.fulfill(body=CSS, content_type="text/css"))
         page.route("https://studio.local/webapp/app.js", lambda r: r.fulfill(body=JS, content_type="application/javascript"))
         page.route("https://studio.local/webapp/api-client.js", lambda r: r.fulfill(body=API_JS, content_type="application/javascript"))
@@ -113,6 +134,10 @@ def main() -> int:
             failures.append("home view not shown on boot")
         if page.evaluate("document.documentElement.scrollWidth > window.innerWidth"):
             failures.append("home view has horizontal overflow at 390px")
+        if _theme_contrast(page) < 4.5:
+            failures.append("dark theme foreground contrast is below WCAG AA")
+        if page.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--tg-safe-bottom').trim()") != "11px":
+            failures.append("Telegram content safe area was not applied")
         if page.eval_on_selector("#quick", "el => el.classList.contains('hidden')"):
             failures.append("quick actions are hidden for an ordinary user")
         if not page.eval_on_selector("#q-queue", "el => el.classList.contains('hidden')"):
@@ -156,11 +181,29 @@ def main() -> int:
             failures.append("result card missing track title")
         if page.locator("#result-readiness span").count() != 3:
             failures.append("result readiness summary is incomplete")
+        if not page.evaluate("Telegram.WebApp.MainButton.visible && Telegram.WebApp.MainButton.text.length > 0"):
+            failures.append("native Telegram MainButton is not active on the result")
+        if page.evaluate("document.documentElement.scrollWidth > window.innerWidth"):
+            failures.append("result view has horizontal overflow")
         if not page.eval_on_selector("#coach", "el => el.classList.contains('open')"):
             failures.append("first-run coach did not open")
         page.keyboard.press("Escape")
         if page.eval_on_selector("#coach", "el => el.classList.contains('open')"):
             failures.append("first-run coach cannot be dismissed with Escape")
+
+        # Formatting auto-saves and never allows a post without platforms.
+        page.eval_on_selector("#open-format", "el => el.click()")
+        page.eval_on_selector("#cta-input", "el => {el.value='новый текст';el.dispatchEvent(new Event('input'))}")
+        page.wait_for_timeout(650)
+        if page.eval_on_selector("#fmt-sync", "el => el.textContent") != "Сохранено":
+            failures.append("formatting changes do not reach the saved state")
+        checks = page.locator("#pm-list .pm-check")
+        checks.nth(0).click()
+        checks.nth(1).click()
+        if page.locator("#pm-list .pm-check.on").count() < 1:
+            failures.append("formatting allowed all platforms to be disabled")
+        page.eval_on_selector("#fmt-apply", "el => el.click()")
+        page.wait_for_timeout(250)
 
         # 3. publication uses a destination sheet and a success state
         page.eval_on_selector("#action-main", "el => el.click()")
@@ -178,15 +221,23 @@ def main() -> int:
         page.wait_for_timeout(500)
         if page.eval_on_selector("#v-crate", "el => el.classList.contains('hidden')"):
             failures.append("crate view not shown after tab click")
+        if page.evaluate("Telegram.WebApp.MainButton.visible"):
+            failures.append("native Telegram MainButton stayed visible outside the result")
 
         # 5. home shortcut cards are wired (they mirror the tab bar)
         page.eval_on_selector('#tabbar [data-tab="home"]', "el => el.click()")
         page.wait_for_timeout(300)
         page.eval_on_selector("#q-queue", "el => el.classList.remove('hidden')")
+        FAIL_ACTIONS.add("queue")
         page.eval_on_selector("#q-queue", "el => el.click()")
         page.wait_for_timeout(400)
         if page.eval_on_selector("#v-queue", "el => el.classList.contains('hidden')"):
             failures.append("home shortcut #q-queue did not open the queue")
+        if page.locator("#queue-list .state-action").count() != 1:
+            failures.append("queue network error has no visible retry state")
+        FAIL_ACTIONS.discard("queue")
+        page.eval_on_selector("#queue-list .state-action", "el => el.click()")
+        page.wait_for_timeout(300)
 
         # 6. pasting multiple links builds a crate automatically
         page.eval_on_selector('#tabbar [data-tab="home"]', "el => el.click()")
@@ -201,6 +252,32 @@ def main() -> int:
             failures.append("batch paste did not open the crate")
         elif "Dopesmoker" not in page.eval_on_selector("#v-crate", "el => el.innerText"):
             failures.append("batch paste crate is missing items")
+        if page.evaluate("document.documentElement.scrollWidth > window.innerWidth"):
+            failures.append("crate view has horizontal overflow")
+
+        # A failed search must lead back to an editable query, not repeat itself.
+        page.eval_on_selector('#tabbar [data-tab="home"]', "el => el.click()")
+        page.wait_for_timeout(200)
+        page.evaluate("document.getElementById('query').value = 'missing'")
+        page.eval_on_selector("#query", "el => el.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter'}))")
+        page.wait_for_timeout(350)
+        if page.eval_on_selector("#v-notfound", "el => el.classList.contains('hidden')"):
+            failures.append("not-found state did not render")
+        page.eval_on_selector("#nf-retry", "el => el.click()")
+        page.wait_for_timeout(150)
+        if page.eval_on_selector("#query", "el => el.value") != "missing":
+            failures.append("edit-query action did not preserve the failed query")
+
+        # Theme and cross-surface deep links keep native behavior intact.
+        page.eval_on_selector("#theme-btn", "el => el.click()")
+        if not page.eval_on_selector("body", "el => el.classList.contains('light')"):
+            failures.append("theme toggle did not switch to light mode")
+        if _theme_contrast(page) < 4.5:
+            failures.append("light theme foreground contrast is below WCAG AA")
+        page.goto("https://studio.local/app?view=crate", wait_until="load")
+        page.wait_for_timeout(600)
+        if page.eval_on_selector("#v-crate", "el => el.classList.contains('hidden')"):
+            failures.append("?view=crate deep link did not open the crate")
 
         if errors:
             failures.append("uncaught page errors: " + " | ".join(errors))

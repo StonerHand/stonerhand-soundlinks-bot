@@ -139,6 +139,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "open_studio": {RU: "🎛 Открыть Студию", EN: "🎛 Open Studio"},
     "home_crate": {RU: "🧺 Подборка · {count}", EN: "🧺 Crate · {count}"},
     "home_stats": {RU: "📊 Статистика канала", EN: "📊 Channel stats"},
+    "home_queue": {RU: "🗓 Очередь", EN: "🗓 Queue"},
     "home_result": {RU: "✨ Пример поста", EN: "✨ Example post"},
     "home_back": {RU: "← Главное меню", EN: "← Main menu"},
     "next": {RU: "Дальше →", EN: "Next →"},
