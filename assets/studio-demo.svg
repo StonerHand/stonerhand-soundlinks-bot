@@ -1,124 +1,225 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" font-family="'JetBrains Mono', ui-monospace, monospace">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 500" role="img" aria-labelledby="title desc">
+  <title id="title">StonerHand Studio — animated product demo</title>
+  <desc id="desc">A looping demonstration: search for a release, wait for lookup, edit the finished post and choose where to publish it.</desc>
   <defs>
-    <linearGradient id="amber" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#C97A1E"/><stop offset="1" stop-color="#8B4E10"/>
+    <linearGradient id="hero" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#C97A1E" stop-opacity=".24"/>
+      <stop offset=".55" stop-color="#492B12" stop-opacity=".08"/>
+      <stop offset="1" stop-color="#0D0D0E" stop-opacity="0"/>
     </linearGradient>
     <linearGradient id="cover" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#4a3a5a"/><stop offset=".5" stop-color="#2a1c2e"/><stop offset="1" stop-color="#120b16"/>
+      <stop offset="0" stop-color="#D3984C"/>
+      <stop offset=".36" stop-color="#59371E"/>
+      <stop offset=".7" stop-color="#201817"/>
+      <stop offset="1" stop-color="#09090A"/>
     </linearGradient>
-    <linearGradient id="covergrad" x1="0" y1="0" x2="0" y2="1">
-      <stop offset=".35" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".6"/>
-    </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0" stop-color="#C97A1E" stop-opacity=".35"/>
+      <stop offset="1" stop-color="#C97A1E" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="grain" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="3" seed="4"/>
+      <feColorMatrix values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 .055 0"/>
+    </filter>
+    <clipPath id="appClip"><rect x="18" y="18" width="844" height="464" rx="26"/></clipPath>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .display { font-family: "Arial Black", "Segoe UI", sans-serif; font-weight: 800; letter-spacing: -.03em; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; }
+      .home { animation: home 12s ease-in-out infinite; }
+      .loading { animation: loading 12s ease-in-out infinite; }
+      .result { animation: result 12s ease-in-out infinite; }
+      .publish { animation: publish 12s cubic-bezier(.22,1,.36,1) infinite; }
+      .cursor { animation: blink .7s steps(1) infinite; }
+      .spin { transform-origin: 440px 255px; animation: spin 1.5s linear infinite; }
+      .eq1 { animation: eq .52s ease-in-out infinite; transform-origin: center bottom; }
+      .eq2 { animation: eq .62s .1s ease-in-out infinite; transform-origin: center bottom; }
+      .eq3 { animation: eq .44s .2s ease-in-out infinite; transform-origin: center bottom; }
+      .pulse { animation: pulse 1.8s ease-in-out infinite; }
+      .p1 { animation: platform 12s ease-in-out infinite; }
+      .p2 { animation: platform 12s .18s ease-in-out infinite; }
+      .p3 { animation: platform 12s .36s ease-in-out infinite; }
+      @keyframes home { 0%,19%{opacity:1;transform:translateY(0)} 24%,100%{opacity:0;transform:translateY(-10px)} }
+      @keyframes loading { 0%,19%,42%,100%{opacity:0} 24%,37%{opacity:1} }
+      @keyframes result { 0%,36%,100%{opacity:0;transform:translateY(12px)} 43%,78%{opacity:1;transform:translateY(0)} 84%{opacity:1;transform:translateY(0)} 91%{opacity:0} }
+      @keyframes publish { 0%,73%,100%{opacity:0;transform:translateY(80px)} 81%,96%{opacity:1;transform:translateY(0)} }
+      @keyframes blink { 0%,48%{opacity:1} 49%,100%{opacity:0} }
+      @keyframes spin { to{transform:rotate(360deg)} }
+      @keyframes eq { 0%,100%{transform:scaleY(.3)} 50%{transform:scaleY(1)} }
+      @keyframes pulse { 0%,100%{opacity:.32} 50%{opacity:.8} }
+      @keyframes platform { 0%,45%{opacity:0;transform:translateY(7px)} 52%,100%{opacity:1;transform:translateY(0)} }
+      @media (prefers-reduced-motion: reduce) {
+        .home,.loading,.publish{display:none}.result{animation:none;opacity:1;transform:none}
+        .spin,.eq1,.eq2,.eq3,.pulse,.p1,.p2,.p3,.cursor{animation:none}
+      }
+    </style>
   </defs>
 
-  <!-- backdrop -->
-  <rect width="640" height="400" rx="18" fill="#0D0D0E"/>
-  <rect width="640" height="400" rx="18" fill="none" stroke="#2B2D31"/>
-  <ellipse cx="320" cy="-40" rx="280" ry="130" fill="#C97A1E" opacity=".06"/>
+  <rect width="880" height="500" rx="30" fill="#080809"/>
+  <rect x="18" y="18" width="844" height="464" rx="26" fill="#0D0D0E" stroke="#2B2D31" stroke-width="2"/>
+  <g clip-path="url(#appClip)">
+    <ellipse cx="165" cy="55" rx="260" ry="170" fill="url(#hero)"/>
+    <rect x="18" y="18" width="844" height="464" filter="url(#grain)" opacity=".5"/>
 
-  <!-- header -->
-  <rect x="24" y="24" width="40" height="40" rx="12" fill="url(#amber)"/>
-  <circle cx="44" cy="44" r="11" fill="none" stroke="#0D0D0E" stroke-width="2.4"/>
-  <circle cx="44" cy="44" r="3.4" fill="#0D0D0E"/>
-  <text x="76" y="43" fill="#F4F4F1" font-size="21" font-family="'Unbounded','Golos Text',sans-serif" font-weight="600">Студия</text>
-  <circle cx="80" cy="56" r="2.6" fill="#C97A1E">
-    <animate attributeName="opacity" values="1;.3;1" dur="1.6s" repeatCount="indefinite"/>
-  </circle>
-  <text x="89" y="59" fill="#8C8C88" font-size="9" letter-spacing="1.5">STONERHAND SOUNDLINKS</text>
-  <!-- admin pill -->
-  <rect x="556" y="30" width="60" height="26" rx="9" fill="#C97A1E" opacity=".12"/>
-  <rect x="556" y="30" width="60" height="26" rx="9" fill="none" stroke="#C97A1E" stroke-opacity=".33"/>
-  <text x="586" y="47" text-anchor="middle" fill="#C97A1E" font-size="10" letter-spacing="1">ADMIN</text>
-
-  <!-- search bar -->
-  <rect x="24" y="82" width="592" height="42" rx="14" fill="#17181A" stroke="#2B2D31"/>
-  <circle cx="46" cy="103" r="6" fill="none" stroke="#8C8C88" stroke-width="1.6"/>
-  <line x1="50.5" y1="107.5" x2="54" y2="111" stroke="#8C8C88" stroke-width="1.6" stroke-linecap="round"/>
-  <text x="66" y="108" fill="#F4F4F1" font-size="14" letter-spacing=".5">sleep dragonaut<tspan fill="#C97A1E">▍</tspan></text>
-  <rect x="66" y="88" width="150" height="30" fill="#17181A">
-    <animate attributeName="x" values="66;66;216;216;216;66" keyTimes="0;.04;.22;.9;.96;1" dur="9s" repeatCount="indefinite"/>
-    <animate attributeName="width" values="150;150;0;0;0;150" keyTimes="0;.04;.22;.9;.96;1" dur="9s" repeatCount="indefinite"/>
-  </rect>
-
-  <!-- vinyl loader -->
-  <g>
-    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;.24;.28;.42;.46;1" dur="9s" repeatCount="indefinite"/>
-    <g transform="translate(320,248)">
-      <g>
-        <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="1.8s" repeatCount="indefinite"/>
-        <circle r="46" fill="none" stroke="url(#amber)" stroke-width="5" stroke-dasharray="60 220" stroke-linecap="round"/>
-        <circle r="46" fill="#141416"/>
-        <circle r="16" fill="#0D0D0E"/>
-        <circle r="4" fill="#C97A1E"/>
-      </g>
-    </g>
-    <text x="320" y="332" text-anchor="middle" fill="#8C8C88" font-size="10" letter-spacing="2.5">ИЩЕМ РЕЛИЗ…</text>
-  </g>
-
-  <!-- result card (new design) -->
-  <g>
-    <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;.44;.5;.95;1" dur="9s" repeatCount="indefinite"/>
-    <animateTransform attributeName="transform" type="translate" values="0 16;0 16;0 0;0 0;0 16" keyTimes="0;.44;.52;.95;1" dur="9s" repeatCount="indefinite"/>
-
-    <rect x="24" y="142" width="592" height="234" rx="20" fill="#202226" stroke="#2B2D31"/>
-
-    <!-- cover with gradient + genre badge + play ring -->
-    <clipPath id="cc"><rect x="40" y="158" width="198" height="198" rx="14"/></clipPath>
-    <g clip-path="url(#cc)">
-      <rect x="40" y="158" width="198" height="198" fill="url(#cover)"/>
-      <circle cx="139" cy="250" r="42" fill="none" stroke="#fff" stroke-opacity=".08" stroke-width="8"/>
-      <rect x="40" y="158" width="198" height="198" fill="url(#covergrad)"/>
-    </g>
-    <!-- genre badge -->
-    <rect x="52" y="170" width="98" height="22" rx="8" fill="#000" opacity=".5"/>
-    <text x="62" y="185" fill="#E5C38A" font-size="10" letter-spacing="1">DOOM METAL</text>
-    <!-- 0:30 badge -->
-    <rect x="182" y="170" width="46" height="20" rx="7" fill="#000" opacity=".55"/>
-    <text x="205" y="184" text-anchor="middle" fill="#ffffff" opacity=".7" font-size="9">0:30</text>
-    <!-- play button + progress ring -->
-    <g transform="translate(212,330)">
-      <circle r="20" fill="#0D0D0E" opacity=".82"/>
-      <circle r="20" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="2.5"/>
-      <circle r="20" fill="none" stroke="#C97A1E" stroke-width="2.5" stroke-dasharray="125.6" stroke-linecap="round" transform="rotate(-90)">
-        <animate attributeName="stroke-dashoffset" values="125.6;125.6;125.6;0" keyTimes="0;.5;.52;1" dur="9s" repeatCount="indefinite"/>
-      </circle>
-      <polygon points="-5,-8 12,0 -5,8" fill="#fff"/>
-    </g>
-
-    <!-- post text -->
-    <text x="262" y="196" fill="#F4F4F1" font-size="21" font-family="'Unbounded','Golos Text',sans-serif" font-weight="600">Dragonaut</text>
-    <text x="262" y="220" fill="#8C8C88" font-size="13">📻 · Sleep · 1992</text>
-    <text x="262" y="246" fill="#E5C38A" font-size="12" font-style="italic">кнопки ниже, трек ждет</text>
-    <text x="262" y="270" fill="#8C8C88" font-size="11">#stonerhand  #doom  #metal  #1992</text>
-
-    <!-- platform pills -->
+    <!-- shared header -->
     <g>
-      <g>
-        <animate attributeName="opacity" values="0;0;1" keyTimes="0;.55;.6" dur="9s" repeatCount="indefinite"/>
-        <rect x="262" y="286" width="168" height="32" rx="10" fill="#1DB954" fill-opacity=".1" stroke="#1DB954" stroke-opacity=".4"/>
-        <rect x="272" y="294" width="16" height="16" rx="4" fill="#1DB954"/>
-        <text x="280" y="306" text-anchor="middle" fill="#fff" font-size="9" font-weight="700">S</text>
-        <text x="296" y="306" fill="#1DB954" font-size="11" font-weight="700">Spotify</text>
+      <rect x="48" y="44" width="38" height="38" rx="11" fill="#C97A1E" fill-opacity=".14" stroke="#C97A1E" stroke-opacity=".34"/>
+      <circle cx="67" cy="63" r="10" fill="none" stroke="#C97A1E" stroke-width="2"/>
+      <circle cx="67" cy="63" r="3" fill="#C97A1E"/>
+      <text x="100" y="58" fill="#F4F4F1" font-size="15" class="display" letter-spacing=".04em">STONERHAND</text>
+      <text x="100" y="75" fill="#8C8C88" font-size="10" class="mono">STUDIO / 04</text>
+      <rect x="733" y="49" width="67" height="27" rx="9" fill="#C97A1E" fill-opacity=".1" stroke="#C97A1E" stroke-opacity=".34"/>
+      <text x="766.5" y="67" text-anchor="middle" fill="#C97A1E" font-size="9" class="mono">ADMIN</text>
+      <circle cx="823" cy="62.5" r="14" fill="#17181A" stroke="#2B2D31"/>
+      <circle cx="823" cy="62.5" r="5" fill="none" stroke="#8C8C88" stroke-width="1.4"/>
+      <path d="M823 52v3m0 15v3m-10-10.5h3m14 0h3" stroke="#8C8C88" stroke-width="1.3" stroke-linecap="round"/>
+    </g>
+
+    <!-- 01 home / search -->
+    <g class="home">
+      <text x="48" y="127" fill="#C97A1E" font-size="10" class="mono">MUSIC POST WORKSHOP</text>
+      <text x="48" y="170" fill="#F4F4F1" font-size="39" class="display">Собери пост,</text>
+      <text x="48" y="209" fill="#E5C38A" font-size="39" class="display" font-style="italic">который звучит.</text>
+      <text x="48" y="238" fill="#8C8C88" font-size="14">Вставь ссылку или найди релиз — остальное Студия соберёт сама.</text>
+
+      <rect x="48" y="266" width="784" height="58" rx="18" fill="#17181A" stroke="#C97A1E" stroke-opacity=".65"/>
+      <circle cx="76" cy="294" r="8" fill="none" stroke="#8C8C88" stroke-width="1.8"/>
+      <line x1="82" y1="300" x2="88" y2="306" stroke="#8C8C88" stroke-width="1.8" stroke-linecap="round"/>
+      <text x="103" y="300" fill="#F4F4F1" font-size="16">sleep — dragonaut</text>
+      <rect x="241" y="283" width="2" height="22" rx="1" fill="#C97A1E" class="cursor"/>
+      <rect x="777" y="278" width="42" height="34" rx="12" fill="#C97A1E"/>
+      <path d="M792 286l9 9-9 9" fill="none" stroke="#0D0D0E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <g transform="translate(48 348)">
+        <rect width="248" height="72" rx="18" fill="#17181A" stroke="#2B2D31"/>
+        <circle cx="35" cy="36" r="16" fill="#C97A1E" fill-opacity=".14"/>
+        <path d="M29 36h12m-6-6v12" stroke="#C97A1E" stroke-width="1.8" stroke-linecap="round"/>
+        <text x="62" y="32" fill="#F4F4F1" font-size="14" font-weight="700">Создать</text>
+        <text x="62" y="50" fill="#8C8C88" font-size="11">ссылка или название</text>
       </g>
-      <g>
-        <animate attributeName="opacity" values="0;0;1" keyTimes="0;.59;.64" dur="9s" repeatCount="indefinite"/>
-        <rect x="438" y="286" width="168" height="32" rx="10" fill="#FA2D48" fill-opacity=".1" stroke="#FA2D48" stroke-opacity=".4"/>
-        <rect x="448" y="294" width="16" height="16" rx="4" fill="#FA2D48"/>
-        <text x="456" y="306" text-anchor="middle" fill="#fff" font-size="9" font-weight="700">A</text>
-        <text x="472" y="306" fill="#FA2D48" font-size="11" font-weight="700">Apple Music</text>
+      <g transform="translate(314 348)">
+        <rect width="248" height="72" rx="18" fill="#17181A" stroke="#2B2D31"/>
+        <circle cx="35" cy="36" r="16" fill="#C97A1E" fill-opacity=".14"/>
+        <path d="M28 31l7-4 7 4-7 4zm0 7l7 4 7-4" fill="none" stroke="#C97A1E" stroke-width="1.5"/>
+        <text x="62" y="32" fill="#F4F4F1" font-size="14" font-weight="700">Подборка</text>
+        <text x="62" y="50" fill="#8C8C88" font-size="11">собрать сет</text>
       </g>
-      <g>
-        <animate attributeName="opacity" values="0;0;1" keyTimes="0;.63;.68" dur="9s" repeatCount="indefinite"/>
-        <rect x="262" y="326" width="168" height="32" rx="10" fill="#A238FF" fill-opacity=".1" stroke="#A238FF" stroke-opacity=".4"/>
-        <rect x="272" y="334" width="16" height="16" rx="4" fill="#A238FF"/>
-        <text x="280" y="346" text-anchor="middle" fill="#fff" font-size="9" font-weight="700">D</text>
-        <text x="296" y="346" fill="#A238FF" font-size="11" font-weight="700">Deezer</text>
+      <g transform="translate(580 348)">
+        <rect width="252" height="72" rx="18" fill="#17181A" stroke="#2B2D31"/>
+        <circle cx="35" cy="36" r="16" fill="#C97A1E" fill-opacity=".14"/>
+        <path d="M28 40v-7m7 7V28m7 12v-10" stroke="#C97A1E" stroke-width="1.6" stroke-linecap="round"/>
+        <text x="62" y="32" fill="#F4F4F1" font-size="14" font-weight="700">Статистика</text>
+        <text x="62" y="50" fill="#8C8C88" font-size="11">ритм канала</text>
       </g>
-      <g>
-        <animate attributeName="opacity" values="0;0;1" keyTimes="0;.67;.72" dur="9s" repeatCount="indefinite"/>
-        <rect x="438" y="326" width="168" height="32" rx="10" fill="#17181A" stroke="#2B2D31"/>
-        <text x="522" y="346" text-anchor="middle" fill="#8C8C88" font-size="11">+ Все</text>
+      <text x="48" y="455" fill="#8C8C88" font-size="9" class="mono">01 / SEARCH</text>
+    </g>
+
+    <!-- 02 loading -->
+    <g class="loading" opacity="0">
+      <circle cx="440" cy="255" r="102" fill="url(#glow)" class="pulse"/>
+      <g class="spin">
+        <circle cx="440" cy="255" r="66" fill="#17181A" stroke="#2B2D31" stroke-width="2"/>
+        <circle cx="440" cy="255" r="55" fill="none" stroke="#313236" stroke-width="1" stroke-dasharray="2 5"/>
+        <circle cx="440" cy="255" r="29" fill="#0D0D0E"/>
+        <circle cx="440" cy="255" r="15" fill="#C97A1E"/>
+        <circle cx="440" cy="255" r="4" fill="#0D0D0E"/>
+        <path d="M440 189a66 66 0 0 1 57 33" fill="none" stroke="#C97A1E" stroke-width="5" stroke-linecap="round"/>
       </g>
+      <text x="440" y="358" text-anchor="middle" fill="#C97A1E" font-size="10" class="mono">DIGGING THE CRATES</text>
+      <text x="440" y="383" text-anchor="middle" fill="#F4F4F1" font-size="17" font-weight="700">Собираем площадки…</text>
+      <text x="440" y="408" text-anchor="middle" fill="#8C8C88" font-size="12">Song.link · обложка · жанр · preview</text>
+      <text x="48" y="455" fill="#8C8C88" font-size="9" class="mono">02 / LOOKUP</text>
+    </g>
+
+    <!-- 03 result -->
+    <g class="result" opacity="0">
+      <text x="48" y="116" fill="#C97A1E" font-size="9" class="mono">READY TO AIR</text>
+      <text x="48" y="138" fill="#F4F4F1" font-size="16" font-weight="700">Так пост увидит аудитория</text>
+      <rect x="624" y="105" width="208" height="39" rx="13" fill="#17181A" stroke="#2B2D31"/>
+      <path d="M644 120h15m-12-5v10m9-13v16" stroke="#C97A1E" stroke-width="1.6" stroke-linecap="round"/>
+      <text x="671" y="130" fill="#C97A1E" font-size="12" class="mono">ОФОРМЛЕНИЕ</text>
+
+      <rect x="48" y="158" width="784" height="244" rx="24" fill="#202226" stroke="#2B2D31"/>
+      <g>
+        <rect x="64" y="174" width="212" height="212" rx="18" fill="url(#cover)"/>
+        <circle cx="170" cy="280" r="69" fill="#111" fill-opacity=".25" stroke="#F4F4F1" stroke-opacity=".08" stroke-width="12"/>
+        <circle cx="170" cy="280" r="21" fill="#C97A1E" fill-opacity=".8"/>
+        <path d="M143 224c28 5 54 20 74 49M120 259c40 0 72 17 96 47" fill="none" stroke="#E5C38A" stroke-opacity=".24" stroke-width="2"/>
+        <rect x="76" y="186" width="92" height="23" rx="8" fill="#09090A" fill-opacity=".68"/>
+        <text x="122" y="202" text-anchor="middle" fill="#E5C38A" font-size="9" class="mono">DOOM METAL</text>
+        <circle cx="244" cy="354" r="23" fill="#0D0D0E" stroke="#C97A1E" stroke-width="2.5"/>
+        <path d="M238 345l15 9-15 9z" fill="#F4F4F1"/>
+        <g fill="#C97A1E">
+          <rect x="80" y="356" width="3" height="13" rx="1.5" class="eq1"/>
+          <rect x="86" y="350" width="3" height="19" rx="1.5" class="eq2"/>
+          <rect x="92" y="354" width="3" height="15" rx="1.5" class="eq3"/>
+        </g>
+      </g>
+
+      <text x="302" y="201" fill="#F4F4F1" font-size="26" class="display">Dragonaut</text>
+      <text x="302" y="225" fill="#8C8C88" font-size="13">Sleep · 1992 · Single</text>
+      <text x="302" y="258" fill="#E5C38A" font-size="13" font-style="italic">кнопки ниже, трек ждёт ✎</text>
+      <text x="302" y="285" fill="#8C8C88" font-size="11" class="mono">#stonerhand  #doom  #metal  #1992</text>
+
+      <g class="p1">
+        <rect x="302" y="310" width="157" height="35" rx="12" fill="#1DB954" fill-opacity=".11" stroke="#1DB954" stroke-opacity=".4"/>
+        <circle cx="321" cy="327.5" r="8" fill="#1DB954"/>
+        <text x="337" y="332" fill="#1DB954" font-size="11" font-weight="700">Spotify</text>
+      </g>
+      <g class="p2">
+        <rect x="468" y="310" width="157" height="35" rx="12" fill="#FA2D48" fill-opacity=".1" stroke="#FA2D48" stroke-opacity=".4"/>
+        <circle cx="487" cy="327.5" r="8" fill="#FA2D48"/>
+        <text x="503" y="332" fill="#FA2D48" font-size="11" font-weight="700">Apple Music</text>
+      </g>
+      <g class="p3">
+        <rect x="634" y="310" width="178" height="35" rx="12" fill="#17181A" stroke="#2B2D31"/>
+        <text x="723" y="332" text-anchor="middle" fill="#8C8C88" font-size="11" class="mono">+ ВСЕ ПЛОЩАДКИ</text>
+      </g>
+
+      <rect x="302" y="357" width="350" height="45" rx="15" fill="#C97A1E"/>
+      <text x="477" y="385" text-anchor="middle" fill="#0D0D0E" font-size="13" class="mono" font-weight="700">ОПУБЛИКОВАТЬ</text>
+      <rect x="662" y="357" width="48" height="45" rx="15" fill="#17181A" stroke="#2B2D31"/>
+      <path d="M679 379h14m-7-7v14" stroke="#8C8C88" stroke-width="1.8" stroke-linecap="round"/>
+      <rect x="720" y="357" width="48" height="45" rx="15" fill="#17181A" stroke="#2B2D31"/>
+      <circle cx="744" cy="379.5" r="7" fill="none" stroke="#8C8C88" stroke-width="1.5"/>
+      <path d="M744 376v4l3 2" fill="none" stroke="#8C8C88" stroke-width="1.5" stroke-linecap="round"/>
+      <rect x="778" y="357" width="34" height="45" rx="15" fill="#17181A" stroke="#2B2D31"/>
+      <path d="M789 379l10-7v14z" fill="none" stroke="#8C8C88" stroke-width="1.4"/>
+      <text x="48" y="455" fill="#8C8C88" font-size="9" class="mono">03 / EDIT</text>
+    </g>
+
+    <!-- 04 publish sheet -->
+    <g class="publish" opacity="0">
+      <rect x="18" y="18" width="844" height="464" fill="#000" fill-opacity=".66"/>
+      <rect x="205" y="174" width="470" height="308" rx="28" fill="#202226" stroke="#3A3C41"/>
+      <rect x="410" y="188" width="60" height="4" rx="2" fill="#55575B"/>
+      <text x="235" y="228" fill="#C97A1E" font-size="9" class="mono">FINAL STEP</text>
+      <text x="235" y="258" fill="#F4F4F1" font-size="22" class="display">Куда отправить пост?</text>
+
+      <g transform="translate(235 278)">
+        <rect width="410" height="50" rx="15" fill="#C97A1E"/>
+        <circle cx="26" cy="25" r="13" fill="#0D0D0E" fill-opacity=".16"/>
+        <path d="M20 25l13-7-4 14-3-5z" fill="none" stroke="#0D0D0E" stroke-width="1.5" stroke-linejoin="round"/>
+        <text x="51" y="22" fill="#0D0D0E" font-size="13" font-weight="800">В канал</text>
+        <text x="51" y="38" fill="#0D0D0E" fill-opacity=".68" font-size="10">опубликовать для всех</text>
+        <text x="386" y="31" text-anchor="middle" fill="#0D0D0E" font-size="19">›</text>
+      </g>
+      <g transform="translate(235 338)">
+        <rect width="198" height="58" rx="15" fill="#17181A" stroke="#2B2D31"/>
+        <text x="18" y="25" fill="#F4F4F1" font-size="12" font-weight="700">Отправить себе</text>
+        <text x="18" y="42" fill="#8C8C88" font-size="9">проверить в личке</text>
+      </g>
+      <g transform="translate(447 338)">
+        <rect width="198" height="58" rx="15" fill="#17181A" stroke="#2B2D31"/>
+        <text x="18" y="25" fill="#F4F4F1" font-size="12" font-weight="700">В очередь</text>
+        <text x="18" y="42" fill="#8C8C88" font-size="9">выбрать время</text>
+      </g>
+      <g transform="translate(235 406)">
+        <rect width="410" height="48" rx="15" fill="#17181A" stroke="#2B2D31"/>
+        <text x="205" y="30" text-anchor="middle" fill="#8C8C88" font-size="11" class="mono">ПОДЕЛИТЬСЯ ССЫЛКОЙ</text>
+      </g>
+      <text x="48" y="455" fill="#8C8C88" font-size="9" class="mono">04 / PUBLISH</text>
     </g>
   </g>
+  <rect x="18" y="18" width="844" height="464" rx="26" fill="none" stroke="#2B2D31" stroke-width="2"/>
 </svg>
