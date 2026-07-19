@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from html import escape
+from urllib.parse import quote
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
 from music_links_bot.bot_runtime import encode_callback
@@ -8,9 +11,51 @@ from music_links_bot.keyboards import _channel_button
 from music_links_bot.publication_state import webapp_url
 
 
-def build_start_keyboard(bot_username: str | None, *, lang: str) -> InlineKeyboardMarkup:
-    del bot_username
-    rows = [
+def build_home_text(
+    *,
+    lang: str,
+    first_name: str = "",
+    crate_count: int = 0,
+    is_admin: bool = False,
+    first_visit: bool = False,
+) -> str:
+    safe_name = escape(first_name.strip()[:40])
+    greeting = get_text(lang, "home_title_new" if first_visit else "home_title")
+    if safe_name and not first_visit:
+        greeting = greeting.replace("{name}", f", {safe_name}")
+    else:
+        greeting = greeting.replace("{name}", "")
+    mode = get_text(lang, "home_mode_admin" if is_admin else "home_mode_user")
+    return get_text(lang, "home_body").format(
+        greeting=greeting,
+        crate_count=max(0, min(10, crate_count)),
+        mode=mode,
+    )
+
+
+def build_start_keyboard(
+    bot_username: str | None,
+    *,
+    lang: str,
+    crate_count: int = 0,
+    is_admin: bool = False,
+    show_tour: bool = False,
+    include_studio: bool = True,
+) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    studio_url = webapp_url()
+    if studio_url and include_studio:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "open_studio"),
+                    web_app=WebAppInfo(url=studio_url),
+                    api_kwargs={"style": "success"},
+                )
+            ]
+        )
+
+    rows.append(
         [
             InlineKeyboardButton(
                 get_text(lang, "quick_search"),
@@ -18,27 +63,106 @@ def build_start_keyboard(bot_username: str | None, *, lang: str) -> InlineKeyboa
                 api_kwargs={"style": "primary"},
             ),
             InlineKeyboardButton(
-                get_text(lang, "quick_tour"),
-                callback_data=encode_callback("menu", "onboard1"),
+                get_text(lang, "home_crate").format(count=max(0, min(10, crate_count))),
+                callback_data=encode_callback("crate", "open"),
             ),
         ]
-    ]
-    studio_url = webapp_url()
-    if studio_url:
+    )
+    if is_admin:
         rows.append(
             [
                 InlineKeyboardButton(
-                    get_text(lang, "open_studio"), web_app=WebAppInfo(url=studio_url)
+                    get_text(lang, "home_stats"),
+                    callback_data=encode_callback("menu", "stats"),
                 )
             ]
         )
-    rows.append(
-        [
+    discovery_row = [
+        InlineKeyboardButton(
+            get_text(lang, "home_result"),
+            callback_data=encode_callback("menu", "demo"),
+        )
+    ]
+    if show_tour:
+        discovery_row.insert(
+            0,
+            InlineKeyboardButton(
+                get_text(lang, "quick_tour"),
+                callback_data=encode_callback("menu", "onboard1"),
+            ),
+        )
+    else:
+        discovery_row.append(
             InlineKeyboardButton(
                 get_text(lang, "tab_help"),
                 callback_data=encode_callback("menu", "help"),
+            )
+        )
+    rows.append(discovery_row)
+    rows.append(
+        [
+            InlineKeyboardButton(
+                get_text(lang, "tab_guide"),
+                callback_data=encode_callback("menu", "guide"),
             ),
             _channel_button(),
+        ]
+    )
+    if bot_username:
+        bot_url = f"https://t.me/{bot_username}"
+        share_url = "https://t.me/share/url?url=" + quote(bot_url, safe="")
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "share_button"),
+                    url=share_url,
+                )
+            ]
+        )
+    return InlineKeyboardMarkup(rows)
+
+
+def build_section_keyboard(
+    bot_username: str | None,
+    *,
+    lang: str,
+    crate_count: int = 0,
+    include_studio: bool = True,
+) -> InlineKeyboardMarkup:
+    del bot_username
+    rows: list[list[InlineKeyboardButton]] = []
+    studio_url = webapp_url()
+    if studio_url and include_studio:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "open_studio"),
+                    web_app=WebAppInfo(url=studio_url),
+                    api_kwargs={"style": "success"},
+                )
+            ]
+        )
+    rows.extend(
+        [
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "quick_search"),
+                    switch_inline_query_current_chat="",
+                    api_kwargs={"style": "primary"},
+                ),
+                InlineKeyboardButton(
+                    get_text(lang, "home_crate").format(
+                        count=max(0, min(10, crate_count))
+                    ),
+                    callback_data=encode_callback("crate", "open"),
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "home_back"),
+                    callback_data=encode_callback("menu", "start"),
+                )
+            ],
         ]
     )
     return InlineKeyboardMarkup(rows)

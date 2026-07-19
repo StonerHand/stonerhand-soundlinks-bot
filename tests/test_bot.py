@@ -1,4 +1,5 @@
 import unittest
+import os
 from pathlib import Path
 import sys
 from unittest.mock import patch
@@ -15,6 +16,8 @@ from music_links_bot.bot import (
     _build_artist_keyboard,
     _build_error_keyboard,
     _build_intro_keyboard,
+    _build_home_text,
+    _build_start_keyboard,
     _build_link_keyboard,
     _build_mixed_collection_keyboard,
     _build_nts_keyboard,
@@ -543,7 +546,7 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(keyboard.inline_keyboard[0][0].text, "Что поддерживается")
         self.assertEqual(keyboard.inline_keyboard[0][0].callback_data, "menu:platforms")
         self.assertEqual(keyboard.inline_keyboard[1][0].text, "🪨 Открыть канал")
-        self.assertEqual(keyboard.inline_keyboard[1][1].text, "Поделиться ботом")
+        self.assertEqual(keyboard.inline_keyboard[1][1].text, "↗ Поделиться ботом")
 
     def test_collection_keyboard_can_hide_channel_button(self) -> None:
         keyboard = _build_collection_keyboard(
@@ -652,32 +655,58 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertFalse(_should_include_hashtags(PrivateMessageStub()))
         self.assertTrue(_should_include_hashtags(GroupMessageStub()))
 
-    def test_intro_keyboard_uses_menu_rows_and_action_row(self) -> None:
+    def test_section_keyboard_keeps_creation_actions_close(self) -> None:
         keyboard = _build_intro_keyboard("StonerHandBot")
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(len(rows), 4)
-        self.assertEqual(rows[0][0].text, "🚀 Быстрый старт")
-        self.assertEqual(rows[0][1].text, "📖 Как пользоваться")
-        self.assertEqual(rows[1][0].text, "🎛 Сервисы")
-        self.assertEqual(rows[1][1].text, "📣 Для каналов")
-        self.assertEqual(rows[2][0].text, "🧪 Пример поста")
-        self.assertEqual(rows[3][0].text, "🪨 Открыть канал")
-        self.assertEqual(rows[3][1].text, "Поделиться ботом")
-        self.assertEqual(rows[3][0].api_kwargs, {"style": "primary"})
-        self.assertEqual(rows[3][1].api_kwargs, {"style": "primary"})
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0][0].text, "🔎 Новый пост")
+        self.assertEqual(rows[0][1].text, "🧺 Подборка · 0")
+        self.assertEqual(rows[1][0].text, "← Главное меню")
+        self.assertEqual(rows[0][0].api_kwargs, {"style": "primary"})
 
-    def test_intro_keyboard_marks_active_menu_item(self) -> None:
-        keyboard = _build_intro_keyboard("StonerHandBot", active="menu:platforms")
+    def test_home_keyboard_prioritizes_studio_and_reflects_state(self) -> None:
+        with patch.dict(os.environ, {"WEBAPP_URL": "https://studio.example/app"}):
+            keyboard = _build_start_keyboard(
+                "StonerHandBot",
+                lang="ru",
+                crate_count=3,
+                is_admin=True,
+                show_tour=True,
+            )
 
-        self.assertEqual(keyboard.inline_keyboard[1][0].text, "• 🎛 Сервисы")
-        self.assertEqual(
-            keyboard.inline_keyboard[1][0].api_kwargs,
-            {"style": "success"},
+        rows = keyboard.inline_keyboard
+        self.assertEqual(rows[0][0].text, "🎛 Открыть Студию")
+        self.assertEqual(rows[0][0].api_kwargs, {"style": "success"})
+        self.assertEqual(rows[1][0].text, "🔎 Новый пост")
+        self.assertEqual(rows[1][1].text, "🧺 Подборка · 3")
+        self.assertEqual(rows[2][0].text, "📊 Статистика канала")
+        self.assertEqual(rows[3][0].text, "▶ Быстрый тур")
+        self.assertEqual(rows[-1][0].text, "↗ Поделиться ботом")
+
+    def test_home_text_is_personal_and_escapes_telegram_html(self) -> None:
+        text = _build_home_text(
+            lang="ru",
+            first_name="<Артём>",
+            crate_count=4,
+            is_admin=True,
         )
-        self.assertEqual(
-            keyboard.inline_keyboard[0][0].api_kwargs,
-            {"style": "primary"},
+
+        self.assertIn("Студия готова, &lt;Артём&gt;", text)
+        self.assertIn("Подборка: 4/10", text)
+        self.assertIn("Канал, очередь и статистика доступны", text)
+
+    def test_home_keyboard_omits_webapp_button_outside_private_chat(self) -> None:
+        with patch.dict(os.environ, {"WEBAPP_URL": "https://studio.example/app"}):
+            keyboard = _build_start_keyboard(
+                "StonerHandBot",
+                lang="ru",
+                include_studio=False,
+            )
+
+        self.assertNotIn(
+            "🎛 Открыть Студию",
+            [button.text for row in keyboard.inline_keyboard for button in row],
         )
 
     def test_menu_text_uses_compact_html_headings(self) -> None:
