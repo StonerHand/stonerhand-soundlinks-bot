@@ -312,34 +312,36 @@ def build_application(settings: Settings) -> Application:
 
 BOT_DESCRIPTIONS = {
     "": (
-        "Превращаю музыкальные ссылки в аккуратные посты: обложка, "
-        "автохэштеги и кнопки всех площадок.\n\n"
-        "• Ссылка, название трека или прослушка прямо в 🎛 Студии\n"
-        "• Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
-        "Yandex Music, NTS Radio\n"
+        "Музыкальный редактор для Telegram.\n\n"
+        "• Ссылка или название → выбор точного релиза\n"
+        "• Карточка с обложкой и кнопками площадок\n"
+        "• Хэштеги, цитата, размер превью и отправка себе\n"
+        "• Подборки /crate и перестановка треков\n"
         "• Inline: @StonerHandBot + запрос в любом чате\n"
-        "• Студия: живой предпросмотр, подборки, отложенный постинг, "
-        "фото-режим и публикация в канал"
+        "• Studio: live-preview, очередь и публикация в канал\n\n"
+        "Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
+        "Yandex Music, NTS Radio."
     ),
     "en": (
-        "I turn music links into clean posts: cover art, smart hashtags "
-        "and buttons for every platform.\n\n"
-        "• A link, a track name or a preview right in the 🎛 Studio\n"
-        "• Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
-        "Yandex Music, NTS Radio\n"
+        "A music post editor for Telegram.\n\n"
+        "• Paste a link or title and choose the exact release\n"
+        "• Get a card with cover art and platform buttons\n"
+        "• Tune hashtags, quote, preview size and send to yourself\n"
+        "• Build and reorder crates with /crate\n"
         "• Inline: @StonerHandBot + a query in any chat\n"
-        "• Studio: live preview, crates, scheduled posting, photo mode "
-        "and publish-to-channel"
+        "• Studio: live preview, queue and channel publishing\n\n"
+        "Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
+        "Yandex Music and NTS Radio."
     ),
 }
 BOT_SHORT_DESCRIPTIONS = {
     "": (
-        "Кидай ссылку или название трека → пост с обложкой, хэштегами "
-        "и кнопками всех площадок. Всё в 🎛 Студии"
+        "Ссылка или название → готовый музыкальный пост. "
+        "Поиск, редактор, подборки и публикация в Studio."
     ),
     "en": (
-        "Drop a link or a track name → a post with cover art, hashtags "
-        "and buttons for every platform. All in the 🎛 Studio"
+        "A link or title → a finished music post. "
+        "Search, editing, crates and publishing in Studio."
     ),
 }
 

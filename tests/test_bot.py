@@ -6,6 +6,8 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from music_links_bot.bot import (
+    BOT_DESCRIPTIONS,
+    BOT_SHORT_DESCRIPTIONS,
     MAX_BUTTON_TEXT_LENGTH,
     PUBLIC_BOT_COMMANDS,
     _build_collection_keyboard,
@@ -369,6 +371,15 @@ class UpdateStub:
 
 
 class BotKeyboardTests(unittest.TestCase):
+    def test_profile_descriptions_are_current_and_fit_telegram_limits(self) -> None:
+        self.assertIn("Подборки /crate", BOT_DESCRIPTIONS[""])
+        self.assertIn("выбор точного релиза", BOT_DESCRIPTIONS[""])
+        self.assertIn("редактор, подборки", BOT_SHORT_DESCRIPTIONS[""])
+        self.assertTrue(all(len(value) <= 512 for value in BOT_DESCRIPTIONS.values()))
+        self.assertTrue(
+            all(len(value) <= 120 for value in BOT_SHORT_DESCRIPTIONS.values())
+        )
+
     def test_release_fingerprint_is_stable_and_case_insensitive(self) -> None:
         first = _release_fingerprint("Black Sabbath", "Paranoid")
         second = _release_fingerprint("black sabbath", "PARANOID")

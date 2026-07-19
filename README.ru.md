@@ -2,6 +2,8 @@
 
 # 🎧 StonerHand Soundlinks Bot
 
+![Актуальное превью StonerHand Studio](assets/telegram-preview-v2.png)
+
 ### Кидаешь ссылку — получаешь идеальный пост
 
 **Трек, альбом, плейлист, подкаст, YouTube или NTS Radio → карточка с обложкой,
