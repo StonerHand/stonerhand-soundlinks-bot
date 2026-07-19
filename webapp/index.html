@@ -46,16 +46,24 @@
     <div class="view" id="v-home">
       <div class="head">
         <div class="logo"><svg class="icon s16"><use href="#i-disc"/></svg></div>
-        <span class="wordmark">Студия</span>
+        <div class="brand-lockup"><span class="brand-name">STONERHAND</span><span class="wordmark">Studio / 04</span></div>
         <span class="badge-admin hidden" id="admin-badge">ADMIN</span>
+        <button class="theme-btn hidden" id="admin-tools" type="button" aria-label="Открыть статистику"><svg class="icon s16"><use href="#i-bar"/></svg></button>
         <button class="theme-btn" id="theme-btn" type="button" aria-label="Включить светлую тему"><svg class="icon s16"><use href="#i-sun"/></svg></button>
         <button class="theme-btn hidden" id="fs-btn" type="button" title="На весь экран" aria-label="Открыть на весь экран"><svg class="icon s16"><use href="#i-expand"/></svg></button>
       </div>
-      <div class="searchbox">
+      <section class="home-hero" aria-labelledby="home-title">
+        <div class="hero-noise"></div>
+        <span class="hero-kicker">MUSIC POST WORKSHOP</span>
+        <h1 id="home-title">Собери пост,<br><em>который звучит.</em></h1>
+        <p id="home-hint">Вставь ссылку или найди релиз — остальное Студия соберёт сама.</p>
+      </section>
+      <div class="searchbox home-search">
         <div class="searchbar" id="searchbar">
           <svg class="icon s18" style="color:var(--muted)"><use href="#i-search"/></svg>
           <input id="query" aria-label="Ссылка или название релиза" placeholder="Ссылка или название…" autocomplete="off" enterkeyhint="search">
           <button class="clear" id="clear" type="button" aria-label="Очистить поиск"><svg class="icon s16"><use href="#i-x"/></svg></button>
+          <button class="search-go" id="search-go" type="button" aria-label="Найти релиз"><svg class="icon s18"><use href="#i-cr"/></svg></button>
         </div>
         <button class="clip-banner" id="clip-banner">
           <svg class="icon s16 cb-ico"><use href="#i-clipboard"/></svg>
@@ -65,9 +73,9 @@
         <div class="typeahead" id="typeahead"></div>
       </div>
       <div class="quick hidden" id="quick">
-        <button id="q-crate"><svg class="icon s18"><use href="#i-layers"/></svg><span>Подборка</span><span class="qn" id="q-crate-n"></span></button>
-        <button id="q-queue"><svg class="icon s18"><use href="#i-clock"/></svg><span>Очередь</span><span class="qn" id="q-queue-n"></span></button>
-        <button id="q-stats"><svg class="icon s18"><use href="#i-bar"/></svg><span>Статистика</span></button>
+        <button id="q-crate"><span class="quick-icon"><svg class="icon s18"><use href="#i-layers"/></svg></span><span><b>Подборка</b><small>Собрать сет</small></span><span class="qn" id="q-crate-n"></span></button>
+        <button id="q-queue"><span class="quick-icon"><svg class="icon s18"><use href="#i-clock"/></svg></span><span><b>Очередь</b><small>Планы на эфир</small></span><span class="qn" id="q-queue-n"></span></button>
+        <button id="q-stats"><span class="quick-icon"><svg class="icon s18"><use href="#i-bar"/></svg></span><span><b>Статистика</b><small>Ритм канала</small></span></button>
       </div>
       <div class="scroll">
         <div id="home-skel">
@@ -81,13 +89,6 @@
           <div class="list" id="hist-list"></div>
         </div>
         <div id="home-empty" class="hidden">
-          <div class="center" style="padding-top:32px">
-            <div class="blob"><svg class="icon" style="width:32px;height:32px"><use href="#i-music"/></svg></div>
-            <div>
-              <div class="t1">Создавай посты за пару секунд</div>
-              <div class="t2" id="home-hint">Введи исполнителя и трек<br>или вставь ссылку на любую платформу</div>
-            </div>
-          </div>
           <div class="list-head"><span class="seclabel" id="popular-lbl">Популярные запросы</span></div>
           <div class="list" id="suggestions"></div>
         </div>
@@ -103,11 +104,11 @@
 
     <!-- LOADING -->
     <div class="view hidden" id="v-loading">
-      <div style="padding:48px 16px 24px"><div class="vinyl"><div class="hole"><div class="dot"></div></div></div>
-        <div class="status-note" style="margin-top:20px" id="loading-lbl">ИЩЕМ РЕЛИЗ…</div></div>
-      <div class="list">
-        <div class="row" style="opacity:1"><div class="skel" style="width:56px;height:56px"></div><div style="flex:1"><div class="skel" style="width:70%;height:14px;margin-bottom:8px"></div><div class="skel" style="width:45%;height:10px;margin-bottom:8px"></div><div class="skel" style="width:25%;height:10px"></div></div></div>
-        <div class="row" style="opacity:1"><div class="skel" style="width:56px;height:56px"></div><div style="flex:1"><div class="skel" style="width:60%;height:14px;margin-bottom:8px"></div><div class="skel" style="width:40%;height:10px"></div></div></div>
+      <div class="loading-head"><div class="vinyl"><div class="hole"><div class="dot"></div></div></div>
+        <div><span class="hero-kicker">DIGGING THE CRATES</span><div class="status-note" id="loading-lbl">ИЩЕМ РЕЛИЗ…</div></div></div>
+      <div class="loading-card">
+        <div class="skel loading-cover"></div>
+        <div class="loading-lines"><div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="loading-pills"><i></i><i></i><i></i></div></div>
       </div>
     </div>
 
@@ -128,6 +129,7 @@
         <div class="sub"><span class="seclabel">Превью поста</span></div>
         <button style="display:flex;align-items:center;gap:6px;padding:9px 12px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--primary);font-family:'JetBrains Mono';font-size:12px" id="open-format"><svg class="icon s14"><use href="#i-sliders"/></svg>Оформление</button></div>
       <div class="result-scroll">
+        <div class="result-intro"><span>READY TO AIR</span><strong>Так пост увидит аудитория</strong></div>
         <div class="post-card" id="post-card"></div>
         <div class="status-note" id="status"></div>
       </div>
@@ -138,6 +140,10 @@
       <div class="head"><button class="back" id="fmt-back" aria-label="Назад"><svg class="icon s18"><use href="#i-cl"/></svg></button>
         <div class="sub"><div class="lbl">Оформление</div></div></div>
       <div class="scroll" style="padding:0 16px 120px">
+        <div class="format-preview" id="format-preview">
+          <div class="format-preview-art" id="fmt-preview-art">♪</div>
+          <div><span>LIVE PREVIEW</span><strong id="fmt-preview-title">Релиз</strong><small id="fmt-preview-sub">Исполнитель</small></div>
+        </div>
         <div class="fsec">
           <div class="fsec-head" style="display:flex;align-items:center;justify-content:space-between">
             <span class="seclabel" id="t-presets">Пресеты</span>
@@ -172,7 +178,7 @@
     <div class="view hidden" id="v-crate">
       <div class="head"><button class="back" id="crate-back" aria-label="Назад"><svg class="icon s18"><use href="#i-cl"/></svg></button>
         <div class="sub"><span class="seclabel">Подборка</span><div class="lbl" id="crate-count">0 треков</div></div></div>
-      <div class="scroll"><div class="list" id="crate-list"></div><div class="status-note" id="crate-empty"></div></div>
+      <div class="scroll"><div class="crate-cover" id="crate-cover"><div class="crate-stack" id="crate-stack"><i></i><i></i><i></i></div><div><span>CURATED BY STONERHAND</span><strong>Следующий сет</strong><small id="crate-cover-count">0 треков</small></div></div><div class="list" id="crate-list"></div><div class="status-note" id="crate-empty"></div></div>
       <div class="dock" id="crate-dock"><div class="dock-row"><button class="dock-primary hidden" id="crate-main"></button></div>
         <button class="crate-clear hidden" id="crate-clear" style="width:100%;margin-top:10px;background:none;border:none;color:var(--muted);font-size:12px;font-family:inherit;padding:8px"></button></div>
     </div>
@@ -215,9 +221,9 @@
   <!-- TAB BAR -->
   <nav class="tabbar" id="tabbar" aria-label="Основная навигация">
     <button data-tab="home"><svg class="icon s18"><use href="#i-home"/></svg><span>Главная</span></button>
+    <button class="create-tab" id="create-tab" aria-label="Создать пост"><span><svg class="icon s18"><use href="#i-plus"/></svg></span><small>Создать</small></button>
     <button data-tab="crate"><svg class="icon s18"><use href="#i-layers"/></svg><span>Подборка</span></button>
     <button data-tab="queue" id="tab-queue"><svg class="icon s18"><use href="#i-clock"/></svg><span>Очередь</span></button>
-    <button data-tab="stats" id="tab-stats"><svg class="icon s18"><use href="#i-bar"/></svg><span>Статистика</span></button>
   </nav>
 </div>
 
@@ -236,15 +242,37 @@
   <div id="share-list"></div>
 </div>
 
+<!-- Publish destination sheet -->
+<div class="mask" id="publish-mask" aria-hidden="true"></div>
+<div class="sheet publish-sheet" id="publish-sheet" role="dialog" aria-modal="true" aria-labelledby="publish-title" aria-hidden="true" inert>
+  <div class="grab"></div><span class="sheet-kicker">FINAL STEP</span><h3 id="publish-title">Куда отправить пост?</h3>
+  <div class="publish-options">
+    <button id="publish-channel"><span class="po-icon accent"><svg class="icon s18"><use href="#i-send"/></svg></span><span><b>В канал</b><small>Опубликовать для всех</small></span><svg class="icon s16"><use href="#i-cr"/></svg></button>
+    <button id="publish-self"><span class="po-icon"><svg class="icon s18"><use href="#i-disc"/></svg></span><span><b>Отправить себе</b><small>Проверить в личном чате</small></span><svg class="icon s16"><use href="#i-cr"/></svg></button>
+    <button id="publish-later"><span class="po-icon"><svg class="icon s18"><use href="#i-clock"/></svg></span><span><b>Добавить в очередь</b><small>Выбрать дату и время</small></span><svg class="icon s16"><use href="#i-cr"/></svg></button>
+    <button id="publish-copy"><span class="po-icon"><svg class="icon s18"><use href="#i-share"/></svg></span><span><b>Поделиться ссылкой</b><small>Открыть список площадок</small></span><svg class="icon s16"><use href="#i-cr"/></svg></button>
+  </div>
+</div>
+
 <!-- Candidate mini-player -->
 <div class="cand-player" id="cand-player">
   <div class="cand-player-inner">
+    <div class="cp-vinyl" id="cp-vinyl"><span></span></div>
     <button class="cp-btn" id="cp-prev" aria-label="Предыдущий трек"><svg class="icon s16"><use href="#i-cl"/></svg></button>
     <button class="cp-btn play" id="cp-play" aria-label="Воспроизвести"><svg class="icon s16"><use href="#i-music"/></svg></button>
     <button class="cp-btn" id="cp-next" aria-label="Следующий трек"><svg class="icon s16"><use href="#i-cr"/></svg></button>
     <div class="cp-meta"><div class="cp-title" id="cp-title"></div><div class="cp-sub" id="cp-sub"></div></div>
     <button class="cp-btn" id="cp-close" aria-label="Закрыть плеер"><svg class="icon s16"><use href="#i-x"/></svg></button>
   </div>
+</div>
+
+<!-- Publication success -->
+<div class="success-screen" id="success-screen" role="dialog" aria-modal="true" aria-labelledby="success-title" aria-hidden="true">
+  <div class="success-orbit"><div class="success-disc"><svg class="icon"><use href="#i-check"/></svg></div></div>
+  <span class="success-stamp">PUBLISHED</span>
+  <h2 id="success-title">Пост вышел в эфир</h2>
+  <p id="success-copy">Готово. Можно собирать следующий релиз.</p>
+  <div class="success-actions"><button id="success-next">Создать следующий</button><button id="success-close">Вернуться к посту</button></div>
 </div>
 
 <!-- Coach -->
