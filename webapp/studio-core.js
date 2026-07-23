@@ -1,4 +1,5 @@
 const HTTP_URL = /^https?:\/\//i;
+const QUERY_URL = /https?:\/\/[^\s<>"']+/gi;
 
 export function escapeHtml(value) {
   const node = document.createElement("div");
@@ -9,6 +10,19 @@ export function escapeHtml(value) {
 export function safeHttpUrl(value) {
   const url = String(value == null ? "" : value);
   return HTTP_URL.test(url) ? escapeHtml(url) : "";
+}
+
+export function analyzeQuery(value, maxLinks = 10) {
+  const text = String(value == null ? "" : value).trim();
+  const urls = text.match(QUERY_URL) || [];
+  const uniqueUrls = [...new Set(urls)];
+  const limit = Math.max(2, Number(maxLinks) || 10);
+  return {
+    empty: text.length === 0,
+    mode: uniqueUrls.length >= 2 ? "batch" : "single",
+    linkCount: Math.min(uniqueUrls.length, limit),
+    overflow: Math.max(0, uniqueUrls.length - limit),
+  };
 }
 
 export function pluralize(
@@ -53,9 +67,14 @@ export function assessDraft(state, copy) {
     },
     {
       key: "artwork",
-      ok: HTTP_URL.test(String(release.artwork || "")),
+      ok: (
+        release.artwork_failed !== true
+        && HTTP_URL.test(String(release.artwork || ""))
+      ),
       blocking: false,
-      label: release.artwork ? copy.artworkReady : copy.noArtwork,
+      label: release.artwork && release.artwork_failed !== true
+        ? copy.artworkReady
+        : copy.noArtwork,
     },
     {
       key: "hashtags",
@@ -118,7 +137,10 @@ export function createDraftSnapshot(state) {
     draftId: String(state.draft_id),
     artist: String(state.release.artist || ""),
     title: String(state.release.title || ""),
-    artwork: HTTP_URL.test(String(state.release.artwork || ""))
+    artwork: (
+      state.release.artwork_failed !== true
+      && HTTP_URL.test(String(state.release.artwork || ""))
+    )
       ? String(state.release.artwork)
       : "",
     emoji: String(state.release.emoji || "🎵"),

@@ -412,7 +412,15 @@ async def _action_resolve_batch(context, body: dict, user_id: int) -> dict:
         seen.add(fingerprint)
         items.append(compact)
 
-    return _crate_view(items)
+    result = _crate_view(items)
+    result.update(
+        {
+            "requested_count": len(source_urls),
+            "resolved_count": len(items),
+            "failed_count": max(0, len(source_urls) - len(items)),
+        }
+    )
+    return result
 
 
 async def _action_draft(context, body: dict, user_id: int, is_admin: bool) -> dict:

@@ -1,4 +1,4 @@
-/* Studio 8 — adaptive workspace shell.
+/* Adaptive Studio workspace shell.
    Kept separate from component CSS so the visual system can evolve without
    mixing product layout with legacy component behavior. */
 
@@ -71,7 +71,7 @@ body::before { opacity: .014; }
 .home-hero {
   min-height: auto;
   margin: 12px 14px 0;
-  padding: 22px 20px 19px;
+  padding: 19px 20px 16px;
   border-radius: 28px;
   overflow: hidden;
   background:
@@ -98,8 +98,8 @@ body::before { opacity: .014; }
 
 .home-hero h1 {
   max-width: 500px;
-  margin: 10px 0 9px;
-  font-size: clamp(26px, 7.4vw, 38px);
+  margin: 8px 0 7px;
+  font-size: clamp(25px, 7vw, 36px);
   line-height: 1.04;
   letter-spacing: -.055em;
 }
@@ -120,7 +120,7 @@ body::before { opacity: .014; }
   text-transform: uppercase;
 }
 .hero-status i { width: 6px; height: 6px; border-radius: 50%; background: var(--acid); box-shadow: 0 0 12px var(--acid); }
-.hero-flow { margin-top: 17px; padding-top: 14px; }
+.hero-flow { margin-top: 13px; padding-top: 11px; padding-right: 66px; }
 
 .home-search { position: relative; z-index: 3; margin-top: -1px; padding: 10px 14px 0; }
 .searchbar {
@@ -131,10 +131,14 @@ body::before { opacity: .014; }
   box-shadow: 0 14px 36px rgba(0,0,0,.18);
 }
 .searchbar.focus { box-shadow: 0 0 0 3px color-mix(in srgb,var(--primary) 15%,transparent), 0 16px 38px rgba(0,0,0,.2); }
+.searchbar.batch { border-color:color-mix(in srgb,var(--acid) 60%,var(--border));box-shadow:0 0 0 3px color-mix(in srgb,var(--acid) 10%,transparent),0 16px 38px rgba(0,0,0,.2); }
 .searchbar input { font-size: 15px; }
 .search-go { width: 44px; height: 44px; border-radius: 14px; background: linear-gradient(145deg, #b8c0ff, var(--primary)); box-shadow: 0 7px 18px rgba(97,113,220,.28); }
+.searchbar.batch .search-go { background:linear-gradient(145deg,color-mix(in srgb,var(--acid) 80%,white),var(--acid));box-shadow:0 7px 18px color-mix(in srgb,var(--acid) 24%,transparent); }
+.search-go:disabled { opacity:.42;box-shadow:none; }
 .paste-btn { width: 38px; height: 38px; border-radius: 12px; }
 .search-support { padding-inline: 4px; }
+.search-support .batch-ready { color:var(--acid);font-weight:700; }
 
 .resume-card {
   margin: 11px 14px 0;
@@ -323,7 +327,7 @@ body::before { opacity: .014; }
 .sheet { max-width: 640px; }
 
 @media (min-width: 560px) {
-  .home-hero { padding: 28px; }
+  .home-hero { padding: 24px 28px 20px; }
   .hero-flow { max-width: 430px; }
   .quick { grid-template-columns: repeat(4, minmax(0,1fr)); }
   .quick button { min-height: 96px; flex-direction: column; align-items: flex-start; }
@@ -351,7 +355,16 @@ body::before { opacity: .014; }
   .crate-health { display: none; }
 }
 
+@media (max-height: 720px) {
+  .home-hero { padding-block:15px 13px; }
+  .home-hero h1 { font-size:clamp(23px,6.5vw,30px); }
+  .home-hero p { display:none; }
+  .hero-flow { margin-top:10px;padding-top:9px; }
+  .quick button { min-height:68px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .hero-signal i { animation:none; }
   .health-score,
   .crate-health { transition: none; }
 }

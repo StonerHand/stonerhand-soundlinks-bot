@@ -32,6 +32,7 @@ jobs:
           node --check webapp/app.js
           node --check webapp/api-client.js
           node --check webapp/cloud-storage.js
+          node --check webapp/studio-core.js
 
   e2e:
     runs-on: ubuntu-latest

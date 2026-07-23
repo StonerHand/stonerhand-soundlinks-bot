@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 500" role="img" aria-labelledby="title desc">
   <title id="title">StonerHand Studio — animated product demo</title>
-  <desc id="desc">A looping demonstration: search for a release, wait for lookup, edit the finished post and choose where to publish it.</desc>
+  <desc id="desc">A looping demonstration of the current Studio: smart single or multi-link search, lookup, live post editing and native sharing or publishing.</desc>
   <defs>
     <linearGradient id="hero" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#C97A1E" stop-opacity=".24"/>
@@ -26,6 +26,24 @@
       text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       .display { font-family: "Arial Black", "Segoe UI", sans-serif; font-weight: 800; letter-spacing: -.03em; }
       .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; }
+      /* Current product palette: periwinkle primary, mint signal and deep
+         graphite surfaces. Attribute selectors also recolor the older
+         illustration primitives, keeping this demo small and build-free. */
+      [fill="#C97A1E"] { fill: #93A0FF; }
+      [stroke="#C97A1E"] { stroke: #93A0FF; }
+      [stop-color="#C97A1E"] { stop-color: #93A0FF; }
+      [fill="#E5C38A"] { fill: #7EE0B8; }
+      [stroke="#E5C38A"] { stroke: #7EE0B8; }
+      [fill="#0D0D0E"] { fill: #0B0E15; }
+      [stroke="#0D0D0E"] { stroke: #0B0E15; }
+      [fill="#17181A"] { fill: #131824; }
+      [stroke="#17181A"] { stroke: #131824; }
+      [fill="#202226"] { fill: #181E2B; }
+      [fill="#2B2D31"] { fill: #30384A; }
+      [stroke="#2B2D31"] { stroke: #30384A; }
+      [fill="#8C8C88"] { fill: #98A0B3; }
+      [stroke="#8C8C88"] { stroke: #98A0B3; }
+      [fill="#F4F4F1"] { fill: #F4F6FC; }
       .home { animation: home 12s ease-in-out infinite; }
       .loading { animation: loading 12s ease-in-out infinite; }
       .result { animation: result 12s ease-in-out infinite; }
@@ -67,7 +85,7 @@
       <circle cx="67" cy="63" r="10" fill="none" stroke="#C97A1E" stroke-width="2"/>
       <circle cx="67" cy="63" r="3" fill="#C97A1E"/>
       <text x="100" y="58" fill="#F4F4F1" font-size="15" class="display" letter-spacing=".04em">STONERHAND</text>
-      <text x="100" y="75" fill="#8C8C88" font-size="10" class="mono">STUDIO / 04</text>
+      <text x="100" y="75" fill="#8C8C88" font-size="10" class="mono">TELEGRAM MINI APP</text>
       <rect x="733" y="49" width="67" height="27" rx="9" fill="#C97A1E" fill-opacity=".1" stroke="#C97A1E" stroke-opacity=".34"/>
       <text x="766.5" y="67" text-anchor="middle" fill="#C97A1E" font-size="9" class="mono">ADMIN</text>
       <circle cx="823" cy="62.5" r="14" fill="#17181A" stroke="#2B2D31"/>
@@ -80,13 +98,13 @@
       <text x="48" y="127" fill="#C97A1E" font-size="10" class="mono">MUSIC POST WORKSHOP</text>
       <text x="48" y="170" fill="#F4F4F1" font-size="39" class="display">Собери пост,</text>
       <text x="48" y="209" fill="#E5C38A" font-size="39" class="display" font-style="italic">который звучит.</text>
-      <text x="48" y="238" fill="#8C8C88" font-size="14">Вставь ссылку или найди релиз — остальное Студия соберёт сама.</text>
+      <text x="48" y="238" fill="#8C8C88" font-size="14">Ссылка, название или несколько треков — Студия распознает сценарий сама.</text>
 
       <rect x="48" y="266" width="784" height="58" rx="18" fill="#17181A" stroke="#C97A1E" stroke-opacity=".65"/>
       <circle cx="76" cy="294" r="8" fill="none" stroke="#8C8C88" stroke-width="1.8"/>
       <line x1="82" y1="300" x2="88" y2="306" stroke="#8C8C88" stroke-width="1.8" stroke-linecap="round"/>
-      <text x="103" y="300" fill="#F4F4F1" font-size="16">sleep — dragonaut</text>
-      <rect x="241" y="283" width="2" height="22" rx="1" fill="#C97A1E" class="cursor"/>
+      <text x="103" y="300" fill="#F4F4F1" font-size="16">2 ссылки → собрать подборку</text>
+      <rect x="318" y="283" width="2" height="22" rx="1" fill="#C97A1E" class="cursor"/>
       <rect x="777" y="278" width="42" height="34" rx="12" fill="#C97A1E"/>
       <path d="M792 286l9 9-9 9" fill="none" stroke="#0D0D0E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 
@@ -95,21 +113,21 @@
         <circle cx="35" cy="36" r="16" fill="#C97A1E" fill-opacity=".14"/>
         <path d="M29 36h12m-6-6v12" stroke="#C97A1E" stroke-width="1.8" stroke-linecap="round"/>
         <text x="62" y="32" fill="#F4F4F1" font-size="14" font-weight="700">Создать</text>
-        <text x="62" y="50" fill="#8C8C88" font-size="11">ссылка или название</text>
+        <text x="62" y="50" fill="#8C8C88" font-size="11">умный поиск релиза</text>
       </g>
       <g transform="translate(314 348)">
         <rect width="248" height="72" rx="18" fill="#17181A" stroke="#2B2D31"/>
         <circle cx="35" cy="36" r="16" fill="#C97A1E" fill-opacity=".14"/>
         <path d="M28 31l7-4 7 4-7 4zm0 7l7 4 7-4" fill="none" stroke="#C97A1E" stroke-width="1.5"/>
         <text x="62" y="32" fill="#F4F4F1" font-size="14" font-weight="700">Подборка</text>
-        <text x="62" y="50" fill="#8C8C88" font-size="11">собрать сет</text>
+        <text x="62" y="50" fill="#8C8C88" font-size="11">до 10 треков</text>
       </g>
       <g transform="translate(580 348)">
         <rect width="252" height="72" rx="18" fill="#17181A" stroke="#2B2D31"/>
         <circle cx="35" cy="36" r="16" fill="#C97A1E" fill-opacity=".14"/>
         <path d="M28 40v-7m7 7V28m7 12v-10" stroke="#C97A1E" stroke-width="1.6" stroke-linecap="round"/>
-        <text x="62" y="32" fill="#F4F4F1" font-size="14" font-weight="700">Статистика</text>
-        <text x="62" y="50" fill="#8C8C88" font-size="11">ритм канала</text>
+        <text x="62" y="32" fill="#F4F4F1" font-size="14" font-weight="700">Очередь</text>
+        <text x="62" y="50" fill="#8C8C88" font-size="11">публикации по времени</text>
       </g>
       <text x="48" y="455" fill="#8C8C88" font-size="9" class="mono">01 / SEARCH</text>
     </g>
@@ -156,10 +174,10 @@
         </g>
       </g>
 
-      <text x="302" y="201" fill="#F4F4F1" font-size="26" class="display">Dragonaut</text>
-      <text x="302" y="225" fill="#8C8C88" font-size="13">Sleep · 1992 · Single</text>
-      <text x="302" y="258" fill="#E5C38A" font-size="13" font-style="italic">кнопки ниже, трек ждёт ✎</text>
-      <text x="302" y="285" fill="#8C8C88" font-size="11" class="mono">#stonerhand  #doom  #metal  #1992</text>
+      <text x="302" y="201" fill="#F4F4F1" font-size="26" class="display">Dopesmoker</text>
+      <text x="302" y="225" fill="#8C8C88" font-size="13">Sleep · 1999 · Album</text>
+      <text x="302" y="258" fill="#E5C38A" font-size="13" font-style="italic">слушать обязательно ✎</text>
+      <text x="302" y="285" fill="#8C8C88" font-size="11" class="mono">#stonerhand  #doom  #metal  #1999</text>
 
       <g class="p1">
         <rect x="302" y="310" width="157" height="35" rx="12" fill="#1DB954" fill-opacity=".11" stroke="#1DB954" stroke-opacity=".4"/>
@@ -216,7 +234,7 @@
       </g>
       <g transform="translate(235 406)">
         <rect width="410" height="48" rx="15" fill="#17181A" stroke="#2B2D31"/>
-        <text x="205" y="30" text-anchor="middle" fill="#8C8C88" font-size="11" class="mono">ПОДЕЛИТЬСЯ ССЫЛКОЙ</text>
+        <text x="205" y="30" text-anchor="middle" fill="#8C8C88" font-size="11" class="mono">ПОДЕЛИТЬСЯ С КНОПКАМИ</text>
       </g>
       <text x="48" y="455" fill="#8C8C88" font-size="9" class="mono">04 / PUBLISH</text>
     </g>

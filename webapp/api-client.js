@@ -12,6 +12,11 @@ export function createApiClient({ getInitData, onUnauthorized, defaultTimeout = 
     const id = opts.requestId || retryIds.get(signature) || requestId();
     retryIds.set(signature, id);
     if (retryIds.size > 50) retryIds.delete(retryIds.keys().next().value);
+    if (opts.abortable && pendingAbort) {
+      pendingAbort.cancelled = true;
+      pendingAbort.ctrl.abort();
+      pendingAbort = null;
+    }
     const attempts = Math.max(1, Number(opts.attempts) || 2);
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       const ctrl = new AbortController();

@@ -71,7 +71,8 @@ STRINGS: dict[str, dict[str, str]] = {
             "<blockquote>◉ <b>Рабочее состояние</b>\n"
             "Подборка · {crate_count}/10\n{mode}</blockquote>\n"
             "<b>Быстрый старт</b>\n"
-            "Пришли ссылку или напиши <code>артист — трек</code>"
+            "Пришли ссылку, напиши <code>артист — трек</code> или вставь "
+            "несколько ссылок — получится подборка."
         ),
         EN: (
             "{greeting}\n\n"
@@ -79,7 +80,8 @@ STRINGS: dict[str, dict[str, str]] = {
             "<blockquote>◉ <b>Workspace status</b>\n"
             "Crate · {crate_count}/10\n{mode}</blockquote>\n"
             "<b>Quick start</b>\n"
-            "Send a link or type <code>artist — track</code>"
+            "Send a link, type <code>artist — track</code>, or paste several "
+            "links to build a crate."
         ),
     },
     "home_mode_admin": {
@@ -344,10 +346,10 @@ STRINGS: dict[str, dict[str, str]] = {
     "ed_preview_small": {RU: "малая", EN: "small"},
     "ed_preview_large": {RU: "большая", EN: "large"},
     "ed_done": {RU: "✅ Готово", EN: "✅ Done"},
-    "ed_delete": {RU: "Удалить", EN: "Delete"},
-    "ed_more": {RU: "••• Ещё", EN: "••• More"},
-    "ed_send_self": {RU: "Отправить себе", EN: "Send to me"},
-    "ed_add_crate": {RU: "+ В подборку", EN: "+ Add to crate"},
+    "ed_delete": {RU: "🗑 Удалить", EN: "🗑 Delete"},
+    "ed_more": {RU: "⚙️ Настроить", EN: "⚙️ Customize"},
+    "ed_send_self": {RU: "✉️ Отправить себе", EN: "✉️ Send to me"},
+    "ed_add_crate": {RU: "🧺 В подборку", EN: "🧺 Add to crate"},
     "ed_crate_added": {RU: "Добавлено в подборку", EN: "Added to crate"},
     "ed_sent": {RU: "Готово — пост отправлен ниже", EN: "Done — the post is below"},
     "ed_publish": {RU: "📤 В канал", EN: "📤 To channel"},

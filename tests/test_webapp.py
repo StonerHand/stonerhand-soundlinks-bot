@@ -542,9 +542,43 @@ class PreviewAndRateLimitTests(unittest.TestCase):
         res = asyncio.run(_action_resolve_batch(context, body, 7))
         self.assertTrue(res["ok"])
         self.assertEqual(res["count"], 2)
+        self.assertEqual(res["requested_count"], 2)
+        self.assertEqual(res["resolved_count"], 2)
+        self.assertEqual(res["failed_count"], 0)
         self.assertEqual(sorted(item["title"] for item in res["items"]), ["aaa", "bbb"])
         # each item carries a resendable payload for the crate
         self.assertTrue(all(item.get("data") for item in res["items"]))
+
+    def test_resolve_batch_reports_partial_results(self) -> None:
+        import asyncio
+        from api.webapp import _action_resolve_batch
+        from music_links_bot.models import TrackMatch
+
+        context = _crate_context()
+        context.application.bot_data["songlink_client"] = object()
+        context.application.bot_data["soundcloud_client"] = None
+        body = {
+            "query": " ".join(
+                f"https://open.spotify.com/track/{item}"
+                for item in ("aaa", "bbb", "ccc")
+            )
+        }
+        match = TrackMatch(
+            title="aaa",
+            artist="Sleep",
+            links={"spotify": "https://open.spotify.com/track/aaa"},
+        )
+
+        with patch(
+            "api.webapp._lookup_tracks",
+            new=AsyncMock(return_value=([match], body["query"].split()[1:])),
+        ):
+            res = asyncio.run(_action_resolve_batch(context, body, 7))
+
+        self.assertTrue(res["ok"])
+        self.assertEqual(res["requested_count"], 3)
+        self.assertEqual(res["resolved_count"], 1)
+        self.assertEqual(res["failed_count"], 2)
 
     def test_resolve_batch_needs_two_urls(self) -> None:
         import asyncio

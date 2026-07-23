@@ -9,7 +9,7 @@ class WebAppAssetTests(unittest.TestCase):
     def test_page_loads_split_assets(self) -> None:
         html = (ROOT / "webapp" / "index.html").read_text()
         self.assertIn('href="/webapp/styles.css"', html)
-        self.assertIn('href="/webapp/studio-8.css"', html)
+        self.assertIn('href="/webapp/studio-shell.css"', html)
         self.assertIn('type="module" src="/webapp/app.js"', html)
         self.assertIn('<span class="wordmark">Studio</span>', html)
         self.assertNotIn("Studio / 08", html)
@@ -24,10 +24,10 @@ class WebAppAssetTests(unittest.TestCase):
         self.assertIn("webapp/api-client.js", build_sources)
         self.assertIn("webapp/cloud-storage.js", build_sources)
         self.assertIn("webapp/studio-core.js", build_sources)
-        self.assertIn("webapp/studio-8.css", build_sources)
+        self.assertIn("webapp/studio-shell.css", build_sources)
         self.assertIn("/webapp/api-client.js", route_sources)
         self.assertIn("/webapp/studio-core.js", route_sources)
-        self.assertIn("/webapp/studio-8.css", route_sources)
+        self.assertIn("/webapp/studio-shell.css", route_sources)
         app_route = next(item for item in config["routes"] if item["src"] == "/app")
         self.assertIn("Content-Security-Policy", app_route["headers"])
         self.assertIn("frame-ancestors", app_route["headers"]["Content-Security-Policy"])
@@ -94,6 +94,10 @@ class WebAppAssetTests(unittest.TestCase):
         self.assertIn("assessCollection", js)
         self.assertIn("button.dataset.target", js)
         self.assertIn("createDraftSnapshot", js)
+        self.assertIn("analyzeQuery", js)
+        self.assertIn("cover-fallback", css)
+        self.assertIn("hero-signal", html)
+        self.assertNotIn('content:"04"', css)
         self.assertIn('["crate","queue","stats"].includes(viewParam)', js)
 
     def test_html_ids_are_unique(self) -> None:

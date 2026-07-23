@@ -2,9 +2,9 @@
 
 # 🎧 StonerHand Soundlinks Bot
 
-### A link or title → the exact release and a finished Telegram post
+### A link, title or a handful of tracks → a finished Telegram post
 
-Artwork, automatic hashtags, platform buttons, editing, crates and queue — in 🎛 Studio.
+Artwork, smart tags, every platform, native sharing and publishing — in 🎛 Studio.
 
 [Open the bot](https://t.me/StonerHandBot) · [Channel](https://t.me/stonerhand) · [Русская версия](README.ru.md) · [Architecture (RU)](ARCHITECTURE.ru.md)
 
@@ -21,12 +21,12 @@ Artwork, automatic hashtags, platform buttons, editing, crates and queue — in 
 
 | Telegram bot | Studio Mini App |
 | --- | --- |
-| Link or title search with an exact-release picker | Live post preview and a 30-second audio preview |
-| Finished card with artwork, CTA, tags and platforms | CTA, tags, quote, artwork and platform ordering |
-| Personal `/start` workspace, inline mode and quick editor | Adaptive 320–620 px workspace, active draft, presets and both themes |
-| Several links → one collection post | A 10-track crate with drag-and-drop |
-| Errors recover directly into search or Studio | Live readiness score, publish preflight, undo and a 50-job queue |
-| DMs, groups and channels with RU/EN UI | History and admin statistics |
+| Link or title → exact-release picker → editable card | Live card and optional 30-second audio preview |
+| 2–12 links → one numbered collection | Smart multi-link import into a 10-track crate |
+| Artwork, CTA, tags and compact platform buttons | CTA, quote, tags, cover mode and platform ordering |
+| Native share keeps the post and its buttons together | Presets, active-draft recovery and publish preflight |
+| Inline search inside any chat; automatic replacement in groups/channels | Drag/reorder, sections, notes and collection styling |
+| One `/start` workspace, RU/EN and recoverable errors | Queue, reschedule/undo, history and admin analytics |
 
 ```text
 Spotify / Apple Music / YouTube / SoundCloud / Bandcamp / Deezer / Tidal
@@ -39,10 +39,11 @@ Metadata and universal links come from Song.link/Odesli, iTunes Search and oEmbe
 
 ```mermaid
 flowchart LR
-    A["Link or title"] --> B["Choose release"]
-    B --> C["Artwork + platforms"]
-    C --> D["Edit / build crate"]
-    D --> E["Self · channel · queue"]
+    A["Link / title"] --> B["Choose release"]
+    A2["2–12 links"] --> C["Build crate"]
+    B --> D["Preview + edit"]
+    C --> D
+    D --> E["Share · self · channel · queue"]
 ```
 
 Every user can search, edit, build crates and send finished posts to themselves. Channel publishing, scheduling, undo and stats are restricted to `ADMIN_CHAT_ID`.
@@ -108,9 +109,9 @@ Ping `/api/health` every five minutes for timely scheduled posts.
 
 ```text
 api/                    Vercel webhook, Studio API, health and setup
-src/music_links_bot/    handlers, lookup, formatter, runtime, queue and storage
-webapp/                 build-free Mini App: HTML, CSS and ES modules
-tests/                  322 offline tests + Playwright smoke
+src/music_links_bot/    bot UI, inline mode, lookup, delivery, queue and storage
+webapp/                 build-free Mini App: semantic HTML, design system, ES modules
+tests/                  offline unit/integration suite + adaptive Playwright smoke
 ```
 
 For request flows, API actions, Redis keys, security and extension rules, see [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
