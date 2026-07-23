@@ -122,6 +122,24 @@ def _theme_contrast(page) -> float:
     )
 
 
+def _small_touch_targets(page) -> list[str]:
+    return page.evaluate(
+        """() => [...document.querySelectorAll(
+          'button,a[href],input:not([type="checkbox"]):not([type="radio"]),select,textarea,[role="button"]'
+        )].filter((el) => {
+          const box = el.getBoundingClientRect(), style = getComputedStyle(el);
+          return box.width > 0 && box.height > 0 &&
+                 style.display !== 'none' && style.visibility !== 'hidden' &&
+                 (box.width < 44 || box.height < 44);
+        }).slice(0, 20).map((el) => {
+          const box = el.getBoundingClientRect();
+          const name = el.id || el.getAttribute('aria-label') ||
+                       (el.textContent || el.tagName).trim().replace(/\\s+/g, ' ').slice(0, 24);
+          return `${name}:${Math.round(box.width)}x${Math.round(box.height)}`;
+        })"""
+    )
+
+
 def _capture(page, name: str) -> None:
     if not CAPTURE_DIR:
         return
@@ -168,6 +186,24 @@ def main() -> int:
             failures.append("empty search can be submitted")
         if not page.eval_on_selector("#q-queue", "el => el.classList.contains('hidden')"):
             failures.append("admin queue shortcut is visible to an ordinary user")
+        small_targets = _small_touch_targets(page)
+        if small_targets:
+            failures.append("home has undersized touch targets: " + ", ".join(small_targets))
+        mobile_type = page.evaluate(
+            """() => ({
+              body: parseFloat(getComputedStyle(document.body).fontSize),
+              search: parseFloat(getComputedStyle(document.getElementById('query')).fontSize),
+              quick: parseFloat(getComputedStyle(document.querySelector('#q-create b')).fontSize),
+              nav: parseFloat(getComputedStyle(document.querySelector('#tabbar [data-tab] span')).fontSize),
+            })"""
+        )
+        if (
+            mobile_type["body"] < 16
+            or mobile_type["search"] < 16
+            or mobile_type["quick"] < 14
+            or mobile_type["nav"] < 11
+        ):
+            failures.append("mobile typography regressed below the thumb-first scale: " + str(mobile_type))
         _capture(page, "01-home-dark")
 
         # Clipboard paste and inline mode are first-class shortcuts on home.
@@ -199,6 +235,14 @@ def main() -> int:
                 failures.append(f"popular card title overlaps its icon at {width}px")
             if page.evaluate("document.documentElement.scrollWidth > window.innerWidth"):
                 failures.append(f"home view has horizontal overflow at {width}px")
+            small_targets = _small_touch_targets(page)
+            if small_targets:
+                failures.append(
+                    f"home has undersized touch targets at {width}px: "
+                    + ", ".join(small_targets)
+                )
+            if width == 320:
+                _capture(page, "01b-home-320")
         page.set_viewport_size({"width": 390, "height": 800})
 
         # 2. a search renders the result card with the track title
@@ -230,6 +274,9 @@ def main() -> int:
         page.keyboard.press("Escape")
         if page.eval_on_selector("#coach", "el => el.classList.contains('open')"):
             failures.append("first-run coach cannot be dismissed with Escape")
+        small_targets = _small_touch_targets(page)
+        if small_targets:
+            failures.append("result has undersized touch targets: " + ", ".join(small_targets))
         _capture(page, "02-result-dark")
         page.set_viewport_size({"width": 880, "height": 900})
         page.wait_for_timeout(150)
@@ -260,6 +307,9 @@ def main() -> int:
         )
         if input_top < nav_bottom - 2:
             failures.append("format navigation scrolls the field under its sticky header")
+        small_targets = _small_touch_targets(page)
+        if small_targets:
+            failures.append("format editor has undersized touch targets: " + ", ".join(small_targets))
         _capture(page, "03-format-dark")
         page.eval_on_selector("#cta-input", "el => {el.value='новый текст';el.dispatchEvent(new Event('input'))}")
         page.wait_for_timeout(650)
@@ -280,17 +330,23 @@ def main() -> int:
             failures.append("publish destination sheet did not open")
         if page.locator("#publish-preflight .preflight-item").count() != 4:
             failures.append("publication preflight is incomplete")
+        small_targets = _small_touch_targets(page)
+        if small_targets:
+            failures.append("publish sheet has undersized touch targets: " + ", ".join(small_targets))
+        _capture(page, "03b-publish-sheet")
         page.eval_on_selector("#publish-self", "el => el.click()")
         page.wait_for_timeout(300)
         if not page.eval_on_selector("#success-screen", "el => el.classList.contains('open')"):
             failures.append("publication success state did not open")
         page.eval_on_selector("#success-close", "el => el.click()")
+        page.wait_for_timeout(350)
 
         # Native sharing sends the exact prepared post, including its keyboard.
         page.eval_on_selector("#action-share", "el => el.click()")
         page.wait_for_timeout(100)
         if not page.eval_on_selector("#share-sheet", "el => el.classList.contains('open')"):
             failures.append("share sheet did not open")
+        _capture(page, "03c-share-sheet")
         page.eval_on_selector("#share-post", "el => el.click()")
         page.wait_for_timeout(250)
         if page.evaluate("window.__preparedMessage") != "prepared-1":
@@ -348,6 +404,22 @@ def main() -> int:
             failures.append("batch paste crate is missing items")
         if page.evaluate("document.documentElement.scrollWidth > window.innerWidth"):
             failures.append("crate view has horizontal overflow")
+        crate_health_state = page.evaluate(
+            """() => ({
+              display: getComputedStyle(document.getElementById('crate-health')).display,
+              width: innerWidth,
+              mobile: matchMedia('(max-width: 719px)').matches,
+            })"""
+        )
+        if crate_health_state["display"] != "none":
+            failures.append(
+                "mobile crate cover still shows the cramped desktop health gauge: "
+                + str(crate_health_state)
+            )
+        small_targets = _small_touch_targets(page)
+        if small_targets:
+            failures.append("crate has undersized touch targets: " + ", ".join(small_targets))
+        _capture(page, "03d-crate-mobile")
         page.eval_on_selector("#crate-edit", "el => el.click()")
         page.eval_on_selector("#crate-title-input", "el => el.value='Тяжёлый вечер'")
         page.eval_on_selector("#crate-intro-input", "el => el.value='Два релиза рядом'")
