@@ -86,6 +86,7 @@ _crate_response = _studio_storage._crate_response
 
 from music_links_bot.url_utils import extract_supported_urls
 from music_links_bot.webapp_auth import validate_init_data
+from music_links_bot.text_utils import normalize_hashtag
 from telegram import InlineQueryResultArticle, InputTextMessageContent
 from telegram.constants import ParseMode
 from telegram.error import TelegramError
@@ -514,7 +515,9 @@ async def _action_prepare_crate_share(context, body: dict, user_id: int) -> dict
         return {"ok": False, "error": "need more tracks"}
 
     tracks = [_track_from_item(item) for item in items]
-    text = format_collection_message(tracks, include_hashtags=True)
+    text = format_collection_message(
+        tracks, include_hashtags=True, **_collection_format_options(body, len(tracks))
+    )
     keyboard = _build_collection_keyboard(tracks, include_channel_button=True)
     result = InlineQueryResultArticle(
         id=hashlib.sha256(f"{user_id}:{text}".encode("utf-8")).hexdigest()[:32],
@@ -867,7 +870,11 @@ async def _action_crate_deliver(
         return {"ok": False, "error": "need more tracks"}
 
     tracks = [_track_from_item(item) for item in items]
-    text = format_collection_message(tracks, include_hashtags=True)
+    text = format_collection_message(
+        tracks,
+        include_hashtags=True,
+        **_collection_format_options(body or {}, len(tracks)),
+    )
 
     if action == "crate_publish":
         target = context.application.bot_data.get("publish_chat_id") or f"@{CHANNEL_USERNAME}"
@@ -903,6 +910,50 @@ async def _action_crate_deliver(
         await _save_crate(context, user_id, items)
 
     return {"ok": True}
+
+
+def _collection_format_options(body: dict, item_count: int) -> dict:
+    """Validate the client-side collection editor without trusting raw HTML."""
+    raw = body.get("collection") if isinstance(body.get("collection"), dict) else {}
+
+    def text(key: str, limit: int) -> str | None:
+        value = raw.get(key)
+        if not isinstance(value, str):
+            return None
+        value = " ".join(value.split()).strip()
+        return value[:limit] or None
+
+    raw_tags = raw.get("tags")
+    tags = [
+        tag
+        for tag in (
+            normalize_hashtag(value)
+            for value in (raw_tags[:8] if isinstance(raw_tags, list) else [])
+        )
+        if tag
+    ]
+    raw_items = body.get("item_meta")
+    item_meta = raw_items if isinstance(raw_items, list) else []
+    notes: list[str] = []
+    sections: list[str] = []
+    for index in range(item_count):
+        entry = item_meta[index] if index < len(item_meta) else {}
+        entry = entry if isinstance(entry, dict) else {}
+        note = entry.get("note")
+        section = entry.get("section")
+        notes.append(" ".join(note.split())[:120] if isinstance(note, str) else "")
+        sections.append(
+            " ".join(section.split())[:40] if isinstance(section, str) else ""
+        )
+
+    return {
+        "title": text("title", 80),
+        "intro": text("intro", 280),
+        "outro": text("outro", 160),
+        "hashtags": " ".join(tags) if tags else None,
+        "item_notes": notes,
+        "item_sections": sections,
+    }
 
 
 async def _lookup_track_preview(context, track: TrackMatch) -> str | None:

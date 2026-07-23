@@ -401,28 +401,56 @@ def format_collection_message(
     tracks: list[TrackMatch],
     *,
     include_hashtags: bool = True,
+    title: str | None = None,
+    intro: str | None = None,
+    outro: str | None = None,
+    hashtags: str | None = None,
+    item_notes: list[str] | None = None,
+    item_sections: list[str] | None = None,
 ) -> str:
     seed = "|".join(f"{track.artist}:{track.title}:{track.kind}" for track in tracks)
-    lines = [
-        pick_phrase("collection_intro", seed),
-        "",
-    ]
+    lines: list[str] = []
+    if title:
+        lines.extend([f"<b>{escape(title)}</b>", ""])
+    lines.extend([escape(intro) if intro else pick_phrase("collection_intro", seed), ""])
 
+    active_section = ""
     for index, track in enumerate(tracks, start=1):
+        section = (
+            item_sections[index - 1].strip()
+            if item_sections and index <= len(item_sections)
+            else ""
+        )
+        if section and section != active_section:
+            if lines and lines[-1]:
+                lines.append("")
+            lines.append(f"<b>{escape(section)}</b>")
+            active_section = section
         emoji = pick_track_emoji(track)
         lines.append(
             f"{index}. {emoji} · "
             f"{_linked_heading(track.page_url, format_track_heading(track))}"
         )
+        note = (
+            item_notes[index - 1].strip()
+            if item_notes and index <= len(item_notes)
+            else ""
+        )
+        if note:
+            lines.append(f"   <i>↳ {escape(note)}</i>")
 
     lines.extend(
         [
             "",
-            f"<i>{escape(pick_phrase('collection_cta', seed))}</i>",
+            f"<i>{escape(outro) if outro else escape(pick_phrase('collection_cta', seed))}</i>",
         ]
     )
 
-    return _with_hashtags(lines, build_collection_hashtags(tracks), include_hashtags=include_hashtags)
+    return _with_hashtags(
+        lines,
+        hashtags if hashtags is not None else build_collection_hashtags(tracks),
+        include_hashtags=include_hashtags,
+    )
 
 
 def prepend_user_text(message_text: str, *, author_label: str | None = None) -> str:

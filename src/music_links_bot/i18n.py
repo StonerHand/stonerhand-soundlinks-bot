@@ -375,14 +375,30 @@ STRINGS: dict[str, dict[str, str]] = {
         EN: "Already done — nothing was sent twice.",
     },
     "retry": {RU: "Повторить", EN: "Retry"},
-    "error_title": {RU: "Не получилось собрать пост", EN: "Could not build the post"},
+    "error_title": {RU: "Пост пока не собран", EN: "The post is not ready yet"},
     "error_search": {
-        RU: "Не нашёл точного совпадения. Добавь имя артиста или уточни название релиза.",
-        EN: "No exact match. Add the artist name or refine the release title.",
+        RU: (
+            "Не нашёл точного релиза по этому запросу.\n\n"
+            "<blockquote>Попробуй формат <code>артист — название</code> "
+            "или пришли прямую ссылку Spotify, Apple Music, YouTube либо SoundCloud.</blockquote>"
+        ),
+        EN: (
+            "I could not find an exact release for that query.\n\n"
+            "<blockquote>Try <code>artist — title</code> or send a direct Spotify, "
+            "Apple Music, YouTube, or SoundCloud link.</blockquote>"
+        ),
     },
     "error_provider": {
-        RU: "Музыкальный сервис временно не отвечает. Ссылка сохранена — попробуй ещё раз.",
-        EN: "A music provider is temporarily unavailable. The link is saved — try again.",
+        RU: (
+            "Музыкальный сервис временно не отвечает, но ссылка не потеряна.\n\n"
+            "<blockquote>Нажми «Повторить». Если ошибка останется — открой ссылку "
+            "и пришли её ещё раз через несколько минут.</blockquote>"
+        ),
+        EN: (
+            "The music provider is temporarily unavailable, but your link is safe.\n\n"
+            "<blockquote>Tap Retry. If it still fails, open the link and send it "
+            "again in a few minutes.</blockquote>"
+        ),
     },
     "search_choose": {
         RU: "<b>Выбери релиз</b>\n\nНашёл несколько вариантов по запросу «{query}»:",

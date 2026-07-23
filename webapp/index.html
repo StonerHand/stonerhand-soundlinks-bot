@@ -178,7 +178,7 @@
         </div>
         <div class="fsec" id="tags-sec">
           <div class="fsec-head"><span class="seclabel" id="format-tags">Хэштеги</span></div>
-          <div class="fsec-body pad"><div class="chips" id="tag-cloud"></div></div>
+          <div class="fsec-body pad"><div class="chips" id="tag-cloud"></div><div class="tag-suggestions" id="tag-suggestions"></div><div class="field-health" id="tag-health" role="status"></div></div>
         </div>
         <div class="fsec">
           <div class="fsec-head"><span class="seclabel" id="format-platforms">Платформы и порядок</span></div>
@@ -191,7 +191,7 @@
     <!-- CRATE -->
     <div class="view hidden" id="v-crate">
       <div class="head"><button class="back" id="crate-back" aria-label="Назад"><svg class="icon s18"><use href="#i-cl"/></svg></button>
-        <div class="sub"><span class="seclabel" id="crate-label">Подборка</span><div class="lbl" id="crate-count">0 треков</div></div></div>
+        <div class="sub"><span class="seclabel" id="crate-label">Подборка</span><div class="lbl" id="crate-count">0 треков</div></div><button class="format-pill" id="crate-edit" type="button"><svg class="icon s14"><use href="#i-sliders"/></svg><span id="crate-edit-label">Оформить</span></button></div>
       <div class="scroll"><div class="crate-cover" id="crate-cover"><div class="crate-stack" id="crate-stack"><i></i><i></i><i></i></div><div><span id="crate-kicker">CURATED BY STONERHAND</span><strong id="crate-hero-title">Следующий сет</strong><small id="crate-cover-count">0 треков</small></div></div><div class="list" id="crate-list"></div><div class="status-note" id="crate-empty"></div></div>
       <div class="dock" id="crate-dock"><div class="dock-row"><button class="dock-primary hidden" id="crate-main"></button><button class="dock-ico hidden" id="crate-share" type="button" title="Поделиться подборкой" aria-label="Поделиться подборкой"><svg class="icon"><use href="#i-share"/></svg></button></div>
         <button class="crate-clear hidden" id="crate-clear" style="width:100%;margin-top:10px;background:none;border:none;color:var(--muted);font-size:12px;font-family:inherit;padding:8px"></button></div>
@@ -266,12 +266,37 @@
 <div class="mask" id="publish-mask" aria-hidden="true"></div>
 <div class="sheet publish-sheet" id="publish-sheet" role="dialog" aria-modal="true" aria-labelledby="publish-title" aria-hidden="true" inert>
   <div class="grab"></div><div class="sheet-head"><div><span class="sheet-kicker" id="publish-kicker">FINAL STEP</span><h3 id="publish-title">Куда отправить пост?</h3></div><button class="sheet-close" id="publish-close" type="button" aria-label="Закрыть"><svg class="icon s16"><use href="#i-x"/></svg></button></div>
+  <div class="publish-summary" id="publish-summary" aria-live="polite"></div>
   <div class="publish-options">
     <button id="publish-channel"><span class="po-icon accent"><svg class="icon s18"><use href="#i-send"/></svg></span><span><b id="publish-channel-title">В канал</b><small id="publish-channel-copy">Опубликовать для всех</small></span><svg class="icon s16"><use href="#i-cr"/></svg></button>
     <button id="publish-self"><span class="po-icon"><svg class="icon s18"><use href="#i-disc"/></svg></span><span><b id="publish-self-title">Отправить себе</b><small id="publish-self-copy">Проверить в личном чате</small></span><svg class="icon s16"><use href="#i-cr"/></svg></button>
     <button id="publish-later"><span class="po-icon"><svg class="icon s18"><use href="#i-clock"/></svg></span><span><b id="publish-later-title">Добавить в очередь</b><small id="publish-later-copy">Выбрать дату и время</small></span><svg class="icon s16"><use href="#i-cr"/></svg></button>
-    <button id="publish-copy"><span class="po-icon"><svg class="icon s18"><use href="#i-share"/></svg></span><span><b id="publish-copy-title">Поделиться ссылкой</b><small id="publish-copy-copy">Открыть список площадок</small></span><svg class="icon s16"><use href="#i-cr"/></svg></button>
+    <button id="publish-copy"><span class="po-icon"><svg class="icon s18"><use href="#i-share"/></svg></span><span><b id="publish-copy-title">Отправить в другой чат</b><small id="publish-copy-copy">Готовый пост со всеми кнопками</small></span><svg class="icon s16"><use href="#i-cr"/></svg></button>
   </div>
+</div>
+
+<!-- Collection editor -->
+<div class="mask" id="crate-editor-mask" aria-hidden="true"></div>
+<div class="sheet editor-sheet" id="crate-editor-sheet" role="dialog" aria-modal="true" aria-labelledby="crate-editor-title" aria-hidden="true" inert>
+  <div class="grab"></div><div class="sheet-head"><div><span class="sheet-kicker" id="crate-editor-kicker">РЕДАКТОР ПОДБОРКИ</span><h3 id="crate-editor-title">Оформление</h3></div><button class="sheet-close" id="crate-editor-close" type="button" aria-label="Закрыть"><svg class="icon s16"><use href="#i-x"/></svg></button></div>
+  <div class="editor-fields">
+    <label><span id="crate-title-label">Название</span><input id="crate-title-input" maxlength="80" placeholder="Например, тяжёлый вечер"></label>
+    <label><span id="crate-intro-label">Вступление</span><textarea id="crate-intro-input" maxlength="280" rows="3" placeholder="Коротко представь подборку"></textarea></label>
+    <label><span id="crate-outro-label">Финальная фраза</span><textarea id="crate-outro-input" maxlength="160" rows="2" placeholder="Что сделать после прослушивания"></textarea></label>
+    <label><span id="crate-tags-label">Хэштеги</span><input id="crate-tags-input" maxlength="160" placeholder="#stonerhand #collection"></label>
+  </div>
+  <button class="sheet-primary" id="crate-editor-save" type="button">Сохранить оформление</button>
+</div>
+
+<!-- Collection item editor -->
+<div class="mask" id="crate-item-mask" aria-hidden="true"></div>
+<div class="sheet editor-sheet" id="crate-item-sheet" role="dialog" aria-modal="true" aria-labelledby="crate-item-title" aria-hidden="true" inert>
+  <div class="grab"></div><div class="sheet-head"><div><span class="sheet-kicker" id="crate-item-kicker">ТРЕК В ПОДБОРКЕ</span><h3 id="crate-item-title">Комментарий и группа</h3></div><button class="sheet-close" id="crate-item-close" type="button" aria-label="Закрыть"><svg class="icon s16"><use href="#i-x"/></svg></button></div>
+  <div class="editor-fields">
+    <label><span id="crate-section-label">Группа</span><input id="crate-section-input" maxlength="40" list="crate-section-options" placeholder="Например, Новинки"><datalist id="crate-section-options"><option value="Новинки"><option value="Тяжёлое"><option value="Классика"><option value="Финал"></datalist></label>
+    <label><span id="crate-note-label">Комментарий</span><textarea id="crate-note-input" maxlength="120" rows="3" placeholder="Почему этот трек здесь"></textarea></label>
+  </div>
+  <button class="sheet-primary" id="crate-item-save" type="button">Сохранить трек</button>
 </div>
 
 <!-- Candidate mini-player -->

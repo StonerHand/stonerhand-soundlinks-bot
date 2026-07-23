@@ -330,7 +330,19 @@ class CrateApiTests(unittest.TestCase):
         bot = _PreparedShareBotStub()
         application = SimpleNamespace(bot_data={"drafts": {}}, bot=bot)
         context = SimpleNamespace(application=application, bot=bot)
-        body = {"items": [_crate_track("One"), _crate_track("Two")]}
+        body = {
+            "items": [_crate_track("One"), _crate_track("Two")],
+            "collection": {
+                "title": "Тяжёлый вечер",
+                "intro": "Два релиза рядом",
+                "outro": "Слушать по порядку",
+                "tags": ["stonerhand", "#doom"],
+            },
+            "item_meta": [
+                {"section": "Новинки", "note": "Начинаем здесь"},
+                {"section": "Финал", "note": "Закрывает сет"},
+            ],
+        }
 
         result = asyncio.run(_action_prepare_crate_share(context, body, 7))
 
@@ -338,6 +350,10 @@ class CrateApiTests(unittest.TestCase):
         prepared = bot.prepared[0]["result"]
         self.assertIn("One", prepared.input_message_content.message_text)
         self.assertIn("Two", prepared.input_message_content.message_text)
+        self.assertIn("<b>Тяжёлый вечер</b>", prepared.input_message_content.message_text)
+        self.assertIn("<b>Новинки</b>", prepared.input_message_content.message_text)
+        self.assertIn("↳ Начинаем здесь", prepared.input_message_content.message_text)
+        self.assertIn("#stonerhand #doom", prepared.input_message_content.message_text)
         buttons = [
             button
             for row in prepared.reply_markup.inline_keyboard
