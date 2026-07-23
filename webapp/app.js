@@ -420,6 +420,7 @@ import {
       el.style.cssText = "position:fixed;left:50%;bottom:88px;transform:translateX(-50%);z-index:9998;max-width:82%;padding:10px 18px;border-radius:12px;background:var(--card);border:1px solid var(--border);color:var(--fg);font-size:13px;line-height:1.4;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.3);opacity:0;transition:opacity .2s";
       document.body.appendChild(el);
     }
+    el.hidden = false;
     el.textContent = msg; el.style.opacity = "1";
     clearTimeout(el._t); el._t = setTimeout(() => { el.style.opacity = "0"; }, 2400);
   }
@@ -1211,7 +1212,15 @@ import {
   let lastSheetTrigger = null;
   function setSheetOpen(sheetId, maskId, open, trigger) {
     const sheet = $(sheetId), mask = $(maskId);
-    if (open) hideNativeMain();
+    if (open) {
+      hideNativeMain();
+      setToastOpen(false);
+      const flashNotice = document.getElementById("flash");
+      if (flashNotice) {
+        clearTimeout(flashNotice._t);
+        flashNotice.hidden = true;
+      }
+    }
     sheet.classList.toggle("open", open); mask.classList.toggle("open", open);
     sheet.setAttribute("aria-hidden", String(!open)); mask.setAttribute("aria-hidden", String(!open));
     sheet.inert = !open;
