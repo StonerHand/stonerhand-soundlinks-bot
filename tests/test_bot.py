@@ -1098,10 +1098,11 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
 
             def __init__(self) -> None:
                 self.answers: list[list] = []
+                self.answer_kwargs: list[dict] = []
 
             async def answer(self, results, **kwargs) -> None:
-                del kwargs
                 self.answers.append(list(results))
+                self.answer_kwargs.append(dict(kwargs))
 
         inline_query = InlineQueryStub()
         update = type("InlineUpdateStub", (), {"inline_query": inline_query})()
@@ -1114,6 +1115,8 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
             inline_query.answers[0][0].title,
             "Подборка · 2 релиза",
         )
+        self.assertEqual(inline_query.answer_kwargs[0]["cache_time"], 1800)
+        self.assertFalse(inline_query.answer_kwargs[0]["is_personal"])
 
     async def test_inline_direct_urls_return_one_collection_card(self) -> None:
         from music_links_bot.bot import inline_query_handler
@@ -1128,10 +1131,11 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
 
             def __init__(self) -> None:
                 self.answers: list[list] = []
+                self.answer_kwargs: list[dict] = []
 
             async def answer(self, results, **kwargs) -> None:
-                del kwargs
                 self.answers.append(list(results))
+                self.answer_kwargs.append(dict(kwargs))
 
         inline_query = InlineQueryStub()
         update = type("InlineUpdateStub", (), {"inline_query": inline_query})()
@@ -1141,6 +1145,8 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(inline_query.answers), 1)
         self.assertEqual(len(inline_query.answers[0]), 1)
         self.assertEqual(inline_query.answers[0][0].title, "Подборка · 3 релиза")
+        self.assertEqual(inline_query.answer_kwargs[0]["cache_time"], 0)
+        self.assertTrue(inline_query.answer_kwargs[0]["is_personal"])
 
     async def test_inline_youtube_result_uses_video_card(self) -> None:
         result = await _build_inline_result(

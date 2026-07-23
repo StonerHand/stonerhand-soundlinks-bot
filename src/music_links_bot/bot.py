@@ -778,10 +778,11 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     query_text = inline_query.query or ""
     shared_urls = parse_share_query(query_text)
     source_urls = extract_supported_urls(query_text)[:MAX_LINKS_PER_MESSAGE]
+    is_direct_collection = shared_urls is None and len(source_urls) > 1
     collection_urls = (
         shared_urls
         if shared_urls is not None
-        else source_urls if len(source_urls) > 1 else None
+        else source_urls if is_direct_collection else None
     )
     if collection_urls is not None:
         if not collection_urls:
@@ -810,8 +811,8 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         try:
             await inline_query.answer(
                 [shared_result],
-                cache_time=INLINE_CACHE_SECONDS,
-                is_personal=False,
+                cache_time=0 if is_direct_collection else INLINE_CACHE_SECONDS,
+                is_personal=is_direct_collection,
                 button=InlineQueryResultsButton(
                     text=get_text(lang, "open_studio"), start_parameter="studio"
                 ),
