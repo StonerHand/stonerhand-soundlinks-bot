@@ -20,7 +20,9 @@ class WebAppAssetTests(unittest.TestCase):
         route_sources = {item["src"] for item in config["routes"]}
         self.assertIn("webapp/api-client.js", build_sources)
         self.assertIn("webapp/cloud-storage.js", build_sources)
+        self.assertIn("webapp/studio-core.js", build_sources)
         self.assertIn("/webapp/api-client.js", route_sources)
+        self.assertIn("/webapp/studio-core.js", route_sources)
         app_route = next(item for item in config["routes"] if item["src"] == "/app")
         self.assertIn("Content-Security-Policy", app_route["headers"])
         self.assertIn("frame-ancestors", app_route["headers"]["Content-Security-Policy"])
@@ -62,7 +64,10 @@ class WebAppAssetTests(unittest.TestCase):
             "crate-editor-sheet",
             "crate-item-sheet",
             "publish-summary",
+            "publish-preflight",
             "tag-suggestions",
+            "resume-card",
+            "resume-open",
         ):
             self.assertIn(f'id="{element_id}"', html)
         self.assertNotIn('data-tab="stats"', html)
@@ -74,6 +79,9 @@ class WebAppAssetTests(unittest.TestCase):
         self.assertIn("shareMessage", js)
         self.assertIn('"prepare_share"', js)
         self.assertIn('"prepare_crate_share"', js)
+        self.assertIn('"dashboard"', js)
+        self.assertIn("assessDraft", js)
+        self.assertIn("createDraftSnapshot", js)
         self.assertIn('["crate","queue","stats"].includes(viewParam)', js)
 
     def test_html_ids_are_unique(self) -> None:

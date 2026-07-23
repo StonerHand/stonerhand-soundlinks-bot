@@ -83,6 +83,16 @@
   .quick button:active { transform: scale(.95); }
   .quick .qn { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: var(--primary); color: var(--primary-fg); font-size: 9px; font-weight: 700; display: none; align-items: center; justify-content: center; }
 
+  /* ── active workspace ── */
+  .resume-card { position: relative; display: grid; grid-template-columns: 52px minmax(0,1fr) auto; align-items: center; gap: 12px; margin: 12px 16px 0; padding: 12px; border-radius: 20px; color: var(--fg); background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 14%, var(--surface)), var(--surface)); border: 1px solid color-mix(in srgb, var(--primary) 38%, var(--border)); box-shadow: 0 10px 30px color-mix(in srgb, var(--primary) 10%, transparent); }
+  .resume-art { width: 52px; height: 52px; border-radius: 15px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: var(--card); font-size: 22px; background-position: center; background-size: cover; }
+  .resume-copy { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .resume-copy strong, .resume-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .resume-copy strong { font-size: 14px; }
+  .resume-copy small { color: var(--muted); font-size: 12px; }
+  #resume-open { min-height: 44px; display: inline-flex; align-items: center; gap: 4px; padding: 0 12px; border: 0; border-radius: 13px; background: var(--primary); color: var(--primary-fg); font: 700 11px "JetBrains Mono", monospace; }
+  .resume-dismiss { position: absolute; top: -7px; right: -7px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid var(--border); background: var(--card); color: var(--muted); }
+
   /* ── lists ── */
   .list { padding: 4px 16px 16px; display: flex; flex-direction: column; gap: 8px; }
   .list-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px 8px; }
@@ -167,6 +177,14 @@
   .dock-ico:active { transform: scale(.95); background: var(--card); }
   .dock-undo { display: flex; align-items: center; gap: 6px; padding: 0 16px; height: 54px; border-radius: 18px; background: var(--surface); border: 1px solid var(--border); color: var(--primary); font-family: "JetBrains Mono"; font-size: 12px; }
   .dock-status { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; height: 54px; border-radius: 18px; background: var(--surface); border: 1px solid var(--border); color: var(--success); font-family: "JetBrains Mono"; font-size: 13px; }
+
+  .publish-preflight { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin: 0 0 14px; }
+  .preflight-item { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 9px 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); font-size: 11px; line-height: 1.25; }
+  .preflight-item.ok { color: var(--fg); border-color: color-mix(in srgb, var(--success) 30%, var(--border)); }
+  .preflight-item.warn { border-color: color-mix(in srgb, var(--primary) 30%, var(--border)); }
+  .preflight-item.block { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
+  .preflight-dot { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: currentColor; }
+  .publish-options button:disabled { opacity: .42; pointer-events: none; filter: grayscale(.35); }
 
   /* ── formatting sections ── */
   .fsec { border-radius: 16px; background: var(--surface); border: 1px solid var(--border); overflow: hidden; margin-bottom: 16px; }

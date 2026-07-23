@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from html import escape
+from urllib.parse import quote
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
 from music_links_bot.bot_runtime import encode_callback
 from music_links_bot.i18n import get_text
-from music_links_bot.keyboards import _channel_button
+from music_links_bot.keyboards import _channel_button, _url_button
 from music_links_bot.publication_state import webapp_url
 
 
@@ -173,6 +174,59 @@ def build_section_keyboard(
             )
         ]
     )
+    return InlineKeyboardMarkup(rows)
+
+
+def build_error_keyboard(
+    bot_username: str | None,
+    *,
+    lang: str = "ru",
+    include_studio: bool = True,
+) -> InlineKeyboardMarkup:
+    """Give every failure an immediate recovery path, not a dead-end menu."""
+    rows: list[list[InlineKeyboardButton]] = [
+        [
+            InlineKeyboardButton(
+                get_text(lang, "quick_search"),
+                switch_inline_query_current_chat="",
+                api_kwargs={"style": "primary"},
+            )
+        ]
+    ]
+    studio_url = webapp_url()
+    if include_studio and studio_url:
+        rows[0].append(
+            InlineKeyboardButton(
+                get_text(lang, "open_studio"),
+                web_app=WebAppInfo(url=studio_url),
+                api_kwargs={"style": "success"},
+            )
+        )
+    rows.append(
+        [
+            InlineKeyboardButton(
+                get_text(lang, "error_platforms_button"),
+                callback_data="menu:platforms",
+            ),
+            InlineKeyboardButton(
+                get_text(lang, "home_back"),
+                callback_data="menu:start",
+            ),
+        ]
+    )
+    if bot_username:
+        bot_url = f"https://t.me/{bot_username}"
+        share_url = "https://t.me/share/url?url=" + quote(bot_url, safe="")
+        rows.append(
+            [
+                _channel_button(),
+                _url_button(
+                    get_text(lang, "share_button"),
+                    url=share_url,
+                    style="primary",
+                ),
+            ]
+        )
     return InlineKeyboardMarkup(rows)
 
 

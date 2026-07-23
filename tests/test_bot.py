@@ -629,10 +629,16 @@ class BotKeyboardTests(unittest.TestCase):
     def test_error_keyboard_points_to_supported_services(self) -> None:
         keyboard = _build_error_keyboard("StonerHandBot")
 
-        self.assertEqual(keyboard.inline_keyboard[0][0].text, "Что поддерживается")
-        self.assertEqual(keyboard.inline_keyboard[0][0].callback_data, "menu:platforms")
-        self.assertEqual(keyboard.inline_keyboard[1][0].text, "🪨 Открыть канал")
-        self.assertEqual(keyboard.inline_keyboard[1][1].text, "↗ Поделиться ботом")
+        self.assertEqual(keyboard.inline_keyboard[0][0].text, "🔎 Найти релиз")
+        self.assertEqual(
+            keyboard.inline_keyboard[0][0].switch_inline_query_current_chat,
+            "",
+        )
+        self.assertEqual(keyboard.inline_keyboard[1][0].text, "Что поддерживается")
+        self.assertEqual(keyboard.inline_keyboard[1][0].callback_data, "menu:platforms")
+        self.assertEqual(keyboard.inline_keyboard[1][1].callback_data, "menu:start")
+        self.assertEqual(keyboard.inline_keyboard[2][0].text, "🪨 Открыть канал")
+        self.assertEqual(keyboard.inline_keyboard[2][1].text, "↗ Поделиться ботом")
 
     def test_collection_keyboard_can_hide_channel_button(self) -> None:
         keyboard = _build_collection_keyboard(
@@ -1351,7 +1357,8 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("<code>артист — название</code>", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "Повторить")
-        self.assertEqual(keyboard[1][0].text, "Что поддерживается")
+        self.assertEqual(keyboard[1][0].text, "🔎 Найти релиз")
+        self.assertEqual(keyboard[2][0].text, "Что поддерживается")
         self.assertEqual(context.bot.sent_messages, [])
         self.assertEqual(context.bot.chat_actions, [])
 

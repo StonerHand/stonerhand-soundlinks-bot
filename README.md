@@ -23,9 +23,9 @@ Artwork, automatic hashtags, platform buttons, editing, crates and queue — in 
 | --- | --- |
 | Link or title search with an exact-release picker | Live post preview and a 30-second audio preview |
 | Finished card with artwork, CTA, tags and platforms | CTA, tags, quote, artwork and platform ordering |
-| Personal `/start` workspace, inline mode and quick editor | Style presets plus light and dark themes |
+| Personal `/start` workspace, inline mode and quick editor | Active draft, style presets plus light and dark themes |
 | Several links → one collection post | A 10-track crate with drag-and-drop |
-| Duplicate guard, retries and double-tap protection | Publish, undo and a 50-job queue |
+| Errors recover directly into search or Studio | Publish preflight, undo and a 50-job queue |
 | DMs, groups and channels with RU/EN UI | History and admin statistics |
 
 ```text
@@ -110,7 +110,7 @@ Ping `/api/health` every five minutes for timely scheduled posts.
 api/                    Vercel webhook, Studio API, health and setup
 src/music_links_bot/    handlers, lookup, formatter, runtime, queue and storage
 webapp/                 build-free Mini App: HTML, CSS and ES modules
-tests/                  299 offline tests + Playwright smoke
+tests/                  322 offline tests + Playwright smoke
 ```
 
 For request flows, API actions, Redis keys, security and extension rules, see [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
