@@ -204,6 +204,63 @@ def main() -> int:
             or mobile_type["nav"] < 11
         ):
             failures.append("mobile typography regressed below the thumb-first scale: " + str(mobile_type))
+        hero_layout = page.evaluate(
+            """() => {
+              const hero = document.querySelector('.home-hero').getBoundingClientRect();
+              const title = document.getElementById('home-title').getBoundingClientRect();
+              const hint = document.getElementById('home-hint').getBoundingClientRect();
+              const flow = document.querySelector('.hero-flow').getBoundingClientRect();
+              return {
+                height: hero.height,
+                titleHeight: title.height,
+                hintHeight: hint.height,
+                clipped: Math.max(title.bottom, hint.bottom, flow.bottom) > hero.bottom + 0.5,
+              };
+            }"""
+        )
+        if (
+            hero_layout["height"] < 190
+            or hero_layout["titleHeight"] < 50
+            or hero_layout["hintHeight"] < 20
+            or hero_layout["clipped"]
+        ):
+            failures.append("mobile hero typography is clipped or collapsed: " + str(hero_layout))
+        home_scroll = page.evaluate(
+            """() => {
+              const el = document.getElementById('v-home');
+              const before = el.scrollTop;
+              el.scrollTop = 180;
+              return {
+                before,
+                after: el.scrollTop,
+                clientHeight: el.clientHeight,
+                scrollHeight: el.scrollHeight,
+                overflowY: getComputedStyle(el).overflowY,
+                touchAction: getComputedStyle(el).touchAction,
+              };
+            }"""
+        )
+        if (
+            home_scroll["scrollHeight"] <= home_scroll["clientHeight"]
+            or home_scroll["after"] <= home_scroll["before"]
+            or home_scroll["overflowY"] not in ("auto", "scroll")
+            or home_scroll["touchAction"] != "pan-y"
+        ):
+            failures.append("home is not vertically scrollable on mobile: " + str(home_scroll))
+        _capture(page, "01a-home-scrolled")
+        page.eval_on_selector("#v-home", "el => { el.scrollTop = 0; }")
+        active_home_style = page.eval_on_selector(
+            '#tabbar [data-tab="home"]',
+            """el => ({
+              backgroundColor: getComputedStyle(el).backgroundColor,
+              backgroundImage: getComputedStyle(el).backgroundImage,
+            })""",
+        )
+        if (
+            active_home_style["backgroundColor"] not in ("rgba(0, 0, 0, 0)", "transparent")
+            or active_home_style["backgroundImage"] != "none"
+        ):
+            failures.append("active mobile tab still renders as a heavy outlined tile: " + str(active_home_style))
         _capture(page, "01-home-dark")
 
         # Clipboard paste and inline mode are first-class shortcuts on home.
@@ -416,6 +473,25 @@ def main() -> int:
                 "mobile crate cover still shows the cramped desktop health gauge: "
                 + str(crate_health_state)
             )
+        crate_cover_type = page.evaluate(
+            """() => {
+              const ids = ['crate-kicker', 'crate-hero-title', 'crate-cover-count'];
+              const rects = ids.map(id => {
+                const rect = document.getElementById(id).getBoundingClientRect();
+                return {id, top: rect.top, bottom: rect.bottom, height: rect.height};
+              });
+              return {
+                rects,
+                overlaps: rects.some((rect, index) =>
+                  index > 0 && rect.top < rects[index - 1].bottom - 0.5
+                ),
+              };
+            }"""
+        )
+        if crate_cover_type["overlaps"] or any(
+            rect["height"] <= 0 for rect in crate_cover_type["rects"]
+        ):
+            failures.append("crate cover typography overlaps: " + str(crate_cover_type))
         small_targets = _small_touch_targets(page)
         if small_targets:
             failures.append("crate has undersized touch targets: " + ", ".join(small_targets))
@@ -488,6 +564,18 @@ def main() -> int:
             or quick_theme["backgroundImage"] == "none"
         ):
             failures.append("light theme quick actions did not adopt the light product surface")
+        light_hero = page.eval_on_selector(
+            ".home-hero",
+            """el => ({
+              color:getComputedStyle(el).color,
+              backgroundImage:getComputedStyle(el).backgroundImage,
+            })""",
+        )
+        if (
+            light_hero["color"] != "rgb(23, 25, 34)"
+            or "rgb(255, 255, 255)" not in light_hero["backgroundImage"]
+        ):
+            failures.append("light theme hero still renders as a dark panel: " + str(light_hero))
         _capture(page, "04-home-light")
         page.set_viewport_size({"width": 620, "height": 900})
         page.goto("https://studio.local/app", wait_until="load")
