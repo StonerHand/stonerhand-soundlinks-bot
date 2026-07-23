@@ -27,7 +27,7 @@ import {
   const EN = !((tg.initDataUnsafe?.user?.language_code || "ru").match(/^(ru|uk|be|kk)/));
   const T = EN ? {
     ph: "A link or a name…", recent: "RECENT", popular: "POPULAR QUERIES",
-    hint: "Paste a link or find a release — Studio will build the rest.",
+    hint: "A link, title or several tracks — Studio recognizes the flow automatically.",
     loading: "SEARCHING…", found: "found", release1: "release", release2: "releases",
     nf: "Release not found", nfSub: "Try another name", retry: "Try again",
     previewTitle: "Post preview", format: "Style", apply: "Apply",
@@ -48,7 +48,7 @@ import {
     coach: [["🔎","Find the release","Paste a link or search by artist and title."],["🎧","Check the sound","Preview the track before you build the post."],["🎛","Shape the card","Tune the text, cover and platforms in Style."],["📡","Choose a destination","Send to yourself, a channel or the publishing queue."]],
     gotIt: "Start creating", next: "Next", skip: "Skip", step: "STEP",
     flow: ["Find","Style","Send"], support: "All music platforms", batch: "Several links → crate",
-    quick: { crate:["Crate","Build a set"], inline:["Inline search","In any chat"], queue:["Queue","Publishing plan"], stats:["Analytics","Channel pulse"] },
+    quick: { create:["Create","Smart release search"], crate:["Crate","Build a set"], inline:["Inline search","In any chat"], queue:["Queue","Publishing plan"], stats:["Analytics","Channel pulse"] },
     readyCover: "Artwork", readyNoCover: "No artwork", readyHashtags: "Hashtags", readyClean: "Clean text", readyPlatforms: "platforms",
     ui: {
       heroKicker:"MUSIC POST WORKSHOP", heroTitle:"Build a post,<br><em>that sounds.</em>",
@@ -78,7 +78,7 @@ import {
     tagRecommended: "RECOMMENDED", tagHealthy: "Good set: clear and relevant", tagTooMany: "Keep up to 6–8 focused tags",
   } : {
     ph: "Ссылка или название…", recent: "НЕДАВНИЕ", popular: "ПОПУЛЯРНЫЕ ЗАПРОСЫ",
-    hint: "Вставь ссылку или найди релиз — остальное Студия соберёт сама.",
+    hint: "Ссылка, название или несколько треков — Студия распознает сценарий сама.",
     loading: "ИЩЕМ РЕЛИЗ…", found: "Найдено", release1: "релиз", release2: "релиза",
     nf: "Релиз не найден", nfSub: "Попробуй другое название", retry: "Попробовать снова",
     previewTitle: "Превью поста", format: "Оформление", apply: "Применить",
@@ -99,7 +99,7 @@ import {
     coach: [["🔎","Найди точный релиз","Вставь ссылку или найди музыку по артисту и названию."],["🎧","Проверь звучание","Прослушай отрывок до того, как собирать пост."],["🎛","Настрой карточку","Измени текст, обложку и площадки в «Оформлении»."],["📡","Выбери назначение","Отправь себе, опубликуй в канал или поставь в очередь."]],
     gotIt: "Начать", next: "Дальше", skip: "Пропустить", step: "ШАГ",
     flow: ["Найти","Оформить","Отправить"], support: "Все музыкальные сервисы", batch: "Несколько ссылок → подборка",
-    quick: { crate:["Подборка","Собрать сет"], inline:["Inline-поиск","В любом чате"], queue:["Очередь","Планы на эфир"], stats:["Статистика","Ритм канала"] },
+    quick: { create:["Создать","Умный поиск релиза"], crate:["Подборка","Собрать сет"], inline:["Inline-поиск","В любом чате"], queue:["Очередь","Планы на эфир"], stats:["Статистика","Ритм канала"] },
     readyCover: "Обложка", readyNoCover: "Без обложки", readyHashtags: "Хэштеги", readyClean: "Чистый текст", readyPlatforms: "площадок",
     ui: {
       heroKicker:"МУЗЫКАЛЬНАЯ МАСТЕРСКАЯ", heroTitle:"Собери пост,<br><em>который звучит.</em>",
@@ -210,7 +210,7 @@ import {
     document.body.classList.toggle("light", !dark);
     $("theme-btn").innerHTML = ico(dark ? "sun" : "moon", "s16");
     $("theme-btn").setAttribute("aria-label", dark ? (EN?"Use light theme":"Включить светлую тему") : (EN?"Use dark theme":"Включить тёмную тему"));
-    const bg = dark ? "#0A0908" : "#EEE4D4";
+    const bg = dark ? "#090B11" : "#F3F5FA";
     try { tg.setHeaderColor(bg); tg.setBackgroundColor(bg); } catch (e) {}
     $("dt-input").style.colorScheme = dark ? "dark" : "light";
   }
@@ -279,6 +279,7 @@ import {
   $("flow-send").textContent = T.flow[2];
   $("support-label").textContent = T.support;
   $("batch-label").textContent = T.batch;
+  $("q-create-title").textContent = T.quick.create[0]; $("q-create-sub").textContent = T.quick.create[1];
   $("q-crate-title").textContent = T.quick.crate[0]; $("q-crate-sub").textContent = T.quick.crate[1];
   $("q-inline-title").textContent = T.quick.inline[0]; $("q-inline-sub").textContent = T.quick.inline[1];
   $("q-queue-title").textContent = T.quick.queue[0]; $("q-queue-sub").textContent = T.quick.queue[1];
@@ -388,6 +389,12 @@ import {
     else if (t === "stats") openStats();
   }));
   // Home shortcut cards (mirror the tab bar).
+  $("q-create").addEventListener("click", () => {
+    hap.tap();
+    cancelPending();
+    show("home");
+    requestAnimationFrame(() => $("query").focus());
+  });
   $("q-crate").addEventListener("click", () => { hap.tap(); cancelPending(); openCrate(); });
   $("q-inline").addEventListener("click", () => {
     hap.tap();
@@ -517,6 +524,8 @@ import {
     const r = state.release, f = state.flags;
     const photo = Boolean(f.as_photo), mode = photo || f.large_preview ? "large" : "compact";
     const card = $("post-card");
+    card.classList.toggle("large", mode === "large");
+    card.classList.toggle("compact", mode === "compact");
     const artSrc = r.artwork_failed ? "" : safeUrl(r.artwork);
     const acc = r.accentColor || "var(--primary)";
     dyn = null;
