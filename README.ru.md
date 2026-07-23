@@ -23,9 +23,9 @@
 | --- | --- |
 | Поиск по ссылке или названию с выбором точного релиза | Live-preview поста и 30-секундная прослушка |
 | Готовая карточка с обложкой, CTA, тегами и площадками | CTA, теги, цитата, обложка и порядок кнопок |
-| Персональное `/start`-меню, inline и быстрый редактор | Пресеты оформления, светлая и тёмная темы |
+| Персональное `/start`-меню, inline и быстрый редактор | Активный черновик, пресеты, светлая и тёмная темы |
 | Несколько ссылок → один пост-подборка | Crate до 10 треков с drag-and-drop |
-| Антидубль, retry и защита от двойных нажатий | Публикация, undo и очередь до 50 постов |
+| Ошибки с прямым возвратом в поиск или Студию | Preflight публикации, undo и очередь до 50 постов |
 | Работа в личке, группах и каналах, RU/EN | История и admin-статистика |
 
 ```text
@@ -110,7 +110,7 @@ python tests/e2e/smoke.py
 api/                    Vercel webhook, Studio API, health, setup
 src/music_links_bot/    handlers, lookup, formatter, runtime, queue, storage
 webapp/                 Mini App без build-step: HTML, CSS, ES modules
-tests/                  299 offline tests + Playwright smoke
+tests/                  322 offline tests + Playwright smoke
 ```
 
 Подробные потоки, API actions, Redis keyspace, безопасность и правила расширения: [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).

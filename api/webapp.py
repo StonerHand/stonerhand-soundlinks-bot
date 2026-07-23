@@ -37,9 +37,7 @@ from music_links_bot.publication_state import (
     release_fingerprint as _release_fingerprint,
 )
 from music_links_bot.config import Settings
-from music_links_bot.constants import PLATFORM_BUTTON_STYLES, PLATFORM_LABELS
 from music_links_bot.formatter import (
-    build_auto_hashtags,
     format_collection_message,
     pick_track_emoji,
 )
@@ -51,7 +49,6 @@ from music_links_bot.loop_runner import (
     stop_background_loop,
 )
 from music_links_bot.models import TrackMatch
-from music_links_bot.phrases import pick_phrase
 from music_links_bot.publish_queue import (
     MAX_DELAY_SECONDS,
     QueueBusyError,
@@ -67,12 +64,14 @@ from music_links_bot.stats import load_stats, merge_stats
 from music_links_bot.studio_models import (
     MAX_CRATE_ITEMS,
     apply_draft_patch as _apply_draft_patch,
+    collection_format_options as _collection_format_options_impl,
     compact_track_data as _compact_track_data,
     crate_view as _crate_view,
     top_entries as _top_entries,
     track_from_item as _track_from_item,
     upscale_artwork as _upscale_artwork,
 )
+from music_links_bot.studio_presenters import build_draft_response
 
 from music_links_bot import studio_storage as _studio_storage
 
@@ -86,7 +85,6 @@ _crate_response = _studio_storage._crate_response
 
 from music_links_bot.url_utils import extract_supported_urls
 from music_links_bot.webapp_auth import validate_init_data
-from music_links_bot.text_utils import normalize_hashtag
 from telegram import InlineQueryResultArticle, InputTextMessageContent
 from telegram.constants import ParseMode
 from telegram.error import TelegramError
@@ -279,6 +277,7 @@ async def _handle_action(application, settings: Settings, user: dict, payload: d
             context, body, user_id
         ),
         "preview": lambda: _action_preview(context, body, user_id),
+        "dashboard": lambda: _action_dashboard(context, user_id, is_admin),
         "history": lambda: _action_history(context, user_id, is_admin),
         "send": lambda: _action_deliver(context, action, body, user_id, is_admin),
         "publish": lambda: _action_deliver(context, action, body, user_id, is_admin),
@@ -796,6 +795,44 @@ async def _action_history(context, user_id: int, is_admin: bool) -> dict:
     }
 
 
+async def _action_dashboard(context, user_id: int, is_admin: bool) -> dict:
+    """Load the complete Studio home in one round trip.
+
+    History, the server-side crate mirror and the publishing queue are
+    independent, so they can be fetched concurrently. This replaces the
+    previous three-request waterfall on every Mini App launch.
+    """
+    history_task = _action_history(context, user_id, is_admin)
+    crate_task = _crate_response(context, user_id)
+    if is_admin:
+        history, crate, queue = await asyncio.gather(
+            history_task,
+            crate_task,
+            _action_queue(context, True),
+        )
+    else:
+        history, crate = await asyncio.gather(history_task, crate_task)
+        queue = {"ok": True, "items": []}
+
+    queue_items = queue.get("items") if isinstance(queue, dict) else []
+    queue_items = queue_items if isinstance(queue_items, list) else []
+    next_at = min(
+        (
+            int(item.get("publish_at") or 0)
+            for item in queue_items
+            if isinstance(item, dict) and int(item.get("publish_at") or 0) > 0
+        ),
+        default=None,
+    )
+    return {
+        "ok": True,
+        "is_admin": is_admin,
+        "history": history.get("items") or [],
+        "crate": crate,
+        "queue": {"count": len(queue_items), "next_at": next_at},
+    }
+
+
 async def _action_crate_add(context, body: dict, user_id: int) -> dict:
     raw_item = body.get("item")
     if isinstance(raw_item, dict):
@@ -913,47 +950,7 @@ async def _action_crate_deliver(
 
 
 def _collection_format_options(body: dict, item_count: int) -> dict:
-    """Validate the client-side collection editor without trusting raw HTML."""
-    raw = body.get("collection") if isinstance(body.get("collection"), dict) else {}
-
-    def text(key: str, limit: int) -> str | None:
-        value = raw.get(key)
-        if not isinstance(value, str):
-            return None
-        value = " ".join(value.split()).strip()
-        return value[:limit] or None
-
-    raw_tags = raw.get("tags")
-    tags = [
-        tag
-        for tag in (
-            normalize_hashtag(value)
-            for value in (raw_tags[:8] if isinstance(raw_tags, list) else [])
-        )
-        if tag
-    ]
-    raw_items = body.get("item_meta")
-    item_meta = raw_items if isinstance(raw_items, list) else []
-    notes: list[str] = []
-    sections: list[str] = []
-    for index in range(item_count):
-        entry = item_meta[index] if index < len(item_meta) else {}
-        entry = entry if isinstance(entry, dict) else {}
-        note = entry.get("note")
-        section = entry.get("section")
-        notes.append(" ".join(note.split())[:120] if isinstance(note, str) else "")
-        sections.append(
-            " ".join(section.split())[:40] if isinstance(section, str) else ""
-        )
-
-    return {
-        "title": text("title", 80),
-        "intro": text("intro", 280),
-        "outro": text("outro", 160),
-        "hashtags": " ".join(tags) if tags else None,
-        "item_notes": notes,
-        "item_sections": sections,
-    }
+    return _collection_format_options_impl(body, item_count)
 
 
 async def _lookup_track_preview(context, track: TrackMatch) -> str | None:
@@ -972,70 +969,10 @@ async def _lookup_track_preview(context, track: TrackMatch) -> str | None:
 
 
 async def _draft_response(context, draft_id: str, draft: dict, is_admin: bool) -> dict:
-    track = TrackMatch(**draft["item"])
-    cta_key = {"album": "album_cta", "podcast": "podcast_cta"}.get(track.kind, "track_cta")
-    custom_cta = draft.get("custom_cta")
-    custom_tags = draft.get("custom_tags")
-
-    available = [key for key in PLATFORM_LABELS if track.links.get(key)]
-    selection = [
-        key
-        for key in (draft.get("platforms") or [])
-        if isinstance(key, str) and key in available
-    ]
-    if selection:
-        ordered = [*selection, *(key for key in available if key not in selection)]
-        enabled = set(selection)
-    else:
-        ordered = available
-        enabled = set(available)
-
-    platforms = [
-        {
-            "key": platform_key,
-            "label": PLATFORM_LABELS[platform_key],
-            "url": track.links[platform_key],
-            "style": PLATFORM_BUTTON_STYLES.get(platform_key, "primary"),
-            "enabled": platform_key in enabled,
-        }
-        for platform_key in ordered
-    ]
-
-    auto_hashtags = build_auto_hashtags(track)
-    if isinstance(custom_tags, list):
-        hashtags = " ".join(custom_tags)
-    else:
-        hashtags = auto_hashtags
-
-    return {
-        "ok": True,
-        "draft_id": draft_id,
-        "ttl": DRAFT_TTL_SECONDS,
-        "flags": {
-            "hashtags": bool(draft.get("hashtags")),
-            "quote": bool(draft.get("quote")),
-            "large_preview": bool(draft.get("large_preview")),
-            "as_photo": bool(draft.get("as_photo")),
-            "has_prefix": bool(draft.get("prefix")),
-        },
-        "can_publish": bool(is_admin and draft.get("can_publish", True)),
-        "release": {
-            "artist": track.artist,
-            "title": track.title,
-            "kind": track.kind,
-            "emoji": pick_track_emoji(track),
-            "year": track.release_year,
-            "genre": track.genre,
-            "artwork": track.thumbnail_url,
-            "page_url": track.page_url,
-            "preview": draft.get("preview"),
-            "preview_pending": bool(draft.get("preview_pending")),
-            "cta": custom_cta
-            or pick_phrase(cta_key, f"{track.artist}:{track.title}:{track.kind}"),
-            "cta_custom": bool(custom_cta),
-            "hashtags": hashtags,
-            "auto_hashtags": auto_hashtags,
-            "tags_custom": isinstance(custom_tags, list),
-            "platforms": platforms,
-        },
-    }
+    del context
+    return build_draft_response(
+        draft_id,
+        draft,
+        is_admin=is_admin,
+        ttl_seconds=DRAFT_TTL_SECONDS,
+    )

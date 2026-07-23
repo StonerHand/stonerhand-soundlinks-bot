@@ -19,6 +19,7 @@ CSS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "styles.css").re
 JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "app.js").read_text()
 API_JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "api-client.js").read_text()
 CLOUD_JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "cloud-storage.js").read_text()
+CORE_JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "studio-core.js").read_text()
 COVER = "https://cover.local/a.jpg"
 
 RELEASE = {
@@ -36,6 +37,11 @@ DRAFT = {"ok": True, "draft_id": "d1", "ttl": 3600,
          "flags": {"hashtags": True, "quote": False, "large_preview": True, "as_photo": False, "has_prefix": False},
          "can_publish": False, "release": RELEASE}
 RESPONSES = {
+    "dashboard": {
+        "ok": True, "is_admin": False, "history": [],
+        "crate": {"ok": True, "count": 0, "max": 10, "items": []},
+        "queue": {"count": 0, "next_at": None},
+    },
     "history": {"ok": True, "is_admin": False, "items": []},
     "resolve": DRAFT,
     "draft": DRAFT,
@@ -61,7 +67,7 @@ FAIL_ACTIONS: set[str] = set()
 INIT = """window.Telegram={WebApp:{initData:"x",initDataUnsafe:{user:{language_code:"ru"}},colorScheme:"dark",
 ready(){},expand(){},close(){},setHeaderColor(){},setBackgroundColor(){},onEvent(){},contentSafeAreaInset:{top:7,right:0,bottom:11,left:0},BackButton:{show(){},hide(){},onClick(){}},
 HapticFeedback:{impactOccurred(){},selectionChanged(){},notificationOccurred(){}},
-CloudStorage:{getItem(k,cb){cb(null,null)},setItem(){}},isVersionAtLeast(){return false},
+CloudStorage:{store:{},getItem(k,cb){cb(null,this.store[k]??null)},setItem(k,v,cb){this.store[k]=v;if(cb)cb(null,true)},removeItem(k,cb){delete this.store[k];if(cb)cb(null,true)}},isVersionAtLeast(){return false},
 MainButton:{text:"",visible:false,handler:null,setText(t){this.text=t},show(){this.visible=true},hide(){this.visible=false},enable(){},disable(){},showProgress(){},hideProgress(){},onClick(fn){this.handler=fn},offClick(fn){if(this.handler===fn)this.handler=null}},
 shareMessage(id,cb){window.__preparedMessage=id;if(cb)cb(true)},switchInlineQuery(q){window.__inlineQuery=q},readTextFromClipboard(cb){cb("https://open.spotify.com/track/pasted")}}};"""
 
@@ -87,7 +93,7 @@ def _route_api(route):
     if action == "resolve" and (body.get("payload") or {}).get("query") == "missing":
         route.fulfill(json={"ok": False, "error": "not_found"}, content_type="application/json")
         return
-    if action == "history" and ACTION_ATTEMPTS[action] == 1:
+    if action == "dashboard" and ACTION_ATTEMPTS[action] == 1:
         route.fulfill(
             status=503,
             json={"ok": False, "error": "internal", "retryable": True},
@@ -124,6 +130,7 @@ def main() -> int:
         page.route("https://studio.local/webapp/app.js", lambda r: r.fulfill(body=JS, content_type="application/javascript"))
         page.route("https://studio.local/webapp/api-client.js", lambda r: r.fulfill(body=API_JS, content_type="application/javascript"))
         page.route("https://studio.local/webapp/cloud-storage.js", lambda r: r.fulfill(body=CLOUD_JS, content_type="application/javascript"))
+        page.route("https://studio.local/webapp/studio-core.js", lambda r: r.fulfill(body=CORE_JS, content_type="application/javascript"))
 
         errors: list[str] = []
         page.on("pageerror", lambda e: errors.append(str(e)))
@@ -212,6 +219,8 @@ def main() -> int:
         page.wait_for_timeout(150)
         if not page.eval_on_selector("#publish-sheet", "el => el.classList.contains('open')"):
             failures.append("publish destination sheet did not open")
+        if page.locator("#publish-preflight .preflight-item").count() != 4:
+            failures.append("publication preflight is incomplete")
         page.eval_on_selector("#publish-self", "el => el.click()")
         page.wait_for_timeout(300)
         if not page.eval_on_selector("#success-screen", "el => el.classList.contains('open')"):
@@ -242,6 +251,10 @@ def main() -> int:
         # 5. home shortcut cards are wired (they mirror the tab bar)
         page.eval_on_selector('#tabbar [data-tab="home"]', "el => el.click()")
         page.wait_for_timeout(300)
+        if page.eval_on_selector("#resume-card", "el => el.classList.contains('hidden')"):
+            failures.append("active draft is not offered on the home dashboard")
+        elif "Dopesmoker" not in page.eval_on_selector("#resume-card", "el => el.innerText"):
+            failures.append("active draft card lost release context")
         page.eval_on_selector("#q-queue", "el => el.classList.remove('hidden')")
         FAIL_ACTIONS.add("queue")
         page.eval_on_selector("#q-queue", "el => el.click()")
@@ -331,8 +344,8 @@ def main() -> int:
             failures.append("uncaught page errors: " + " | ".join(errors))
         if not REQUEST_BODIES or any(not body.get("request_id") for body in REQUEST_BODIES):
             failures.append("API requests are missing request_id")
-        history_requests = [body for body in REQUEST_BODIES if body.get("action") == "history"]
-        if len(history_requests) < 2 or history_requests[0]["request_id"] != history_requests[1]["request_id"]:
+        dashboard_requests = [body for body in REQUEST_BODIES if body.get("action") == "dashboard"]
+        if len(dashboard_requests) < 2 or dashboard_requests[0]["request_id"] != dashboard_requests[1]["request_id"]:
             failures.append("retry did not reuse the original request_id")
 
         browser.close()

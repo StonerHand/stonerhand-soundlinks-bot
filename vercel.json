@@ -36,6 +36,10 @@
     {
       "src": "webapp/cloud-storage.js",
       "use": "@vercel/static"
+    },
+    {
+      "src": "webapp/studio-core.js",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
@@ -88,6 +92,10 @@
     {
       "src": "/webapp/cloud-storage.js",
       "dest": "webapp/cloud-storage.js"
+    },
+    {
+      "src": "/webapp/studio-core.js",
+      "dest": "webapp/studio-core.js"
     }
   ],
   "crons": [

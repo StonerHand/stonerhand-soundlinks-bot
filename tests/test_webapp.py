@@ -237,6 +237,28 @@ def _crate_track(title: str) -> dict:
     }
 
 
+class DashboardApiTests(unittest.TestCase):
+    def test_dashboard_combines_home_data_in_one_response(self) -> None:
+        import asyncio
+        from api.webapp import _action_dashboard, _record_history, _save_crate
+        from music_links_bot.models import TrackMatch
+
+        context = _crate_context()
+        track = TrackMatch(**_crate_track("Dopesmoker"))
+
+        async def scenario():
+            await _record_history(context, 7, track, track.page_url or "")
+            await _save_crate(context, 7, [_crate_track("Dopesmoker")])
+            return await _action_dashboard(context, 7, False)
+
+        result = asyncio.run(scenario())
+        self.assertTrue(result["ok"])
+        self.assertFalse(result["is_admin"])
+        self.assertEqual(result["history"][0]["title"], "Dopesmoker")
+        self.assertEqual(result["crate"]["count"], 1)
+        self.assertEqual(result["queue"], {"count": 0, "next_at": None})
+
+
 class CrateApiTests(unittest.TestCase):
     def _add(self, context, title: str) -> dict:
         import asyncio

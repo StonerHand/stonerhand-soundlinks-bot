@@ -133,3 +133,47 @@ def upscale_artwork(url: str | None) -> str | None:
     if not url:
         return None
     return url.replace("100x100", "300x300").replace("60x60", "300x300")
+
+
+def collection_format_options(body: dict, item_count: int) -> dict:
+    """Validate collection editor fields without trusting client-side HTML."""
+    raw = body.get("collection") if isinstance(body.get("collection"), dict) else {}
+
+    def text(key: str, limit: int) -> str | None:
+        value = raw.get(key)
+        if not isinstance(value, str):
+            return None
+        normalized = " ".join(value.split()).strip()
+        return normalized[:limit] or None
+
+    raw_tags = raw.get("tags")
+    tags = [
+        tag
+        for tag in (
+            normalize_hashtag(value)
+            for value in (raw_tags[:8] if isinstance(raw_tags, list) else [])
+        )
+        if tag
+    ]
+    raw_items = body.get("item_meta")
+    item_meta = raw_items if isinstance(raw_items, list) else []
+    notes: list[str] = []
+    sections: list[str] = []
+    for index in range(item_count):
+        entry = item_meta[index] if index < len(item_meta) else {}
+        entry = entry if isinstance(entry, dict) else {}
+        note = entry.get("note")
+        section = entry.get("section")
+        notes.append(" ".join(note.split())[:120] if isinstance(note, str) else "")
+        sections.append(
+            " ".join(section.split())[:40] if isinstance(section, str) else ""
+        )
+
+    return {
+        "title": text("title", 80),
+        "intro": text("intro", 280),
+        "outro": text("outro", 160),
+        "hashtags": " ".join(tags) if tags else None,
+        "item_notes": notes,
+        "item_sections": sections,
+    }

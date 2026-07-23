@@ -84,6 +84,16 @@
         </button>
         <div class="typeahead" id="typeahead"></div>
       </div>
+      <section class="resume-card hidden" id="resume-card" aria-labelledby="resume-title">
+        <div class="resume-art" id="resume-art">🎵</div>
+        <div class="resume-copy">
+          <span class="seclabel" id="resume-kicker">В РАБОТЕ</span>
+          <strong id="resume-title">Продолжить пост</strong>
+          <small id="resume-sub"></small>
+        </div>
+        <button id="resume-open" type="button"><span id="resume-action">Продолжить</span><svg class="icon s16"><use href="#i-cr"/></svg></button>
+        <button class="resume-dismiss" id="resume-dismiss" type="button" aria-label="Скрыть черновик"><svg class="icon s14"><use href="#i-x"/></svg></button>
+      </section>
       <div class="quick hidden" id="quick">
         <button id="q-crate"><span class="quick-icon"><svg class="icon s18"><use href="#i-layers"/></svg></span><span><b id="q-crate-title">Подборка</b><small id="q-crate-sub">Собрать сет</small></span><span class="qn" id="q-crate-n"></span></button>
         <button id="q-inline"><span class="quick-icon"><svg class="icon s18"><use href="#i-send"/></svg></span><span><b id="q-inline-title">Inline-поиск</b><small id="q-inline-sub">В любом чате</small></span></button>
@@ -267,6 +277,7 @@
 <div class="sheet publish-sheet" id="publish-sheet" role="dialog" aria-modal="true" aria-labelledby="publish-title" aria-hidden="true" inert>
   <div class="grab"></div><div class="sheet-head"><div><span class="sheet-kicker" id="publish-kicker">FINAL STEP</span><h3 id="publish-title">Куда отправить пост?</h3></div><button class="sheet-close" id="publish-close" type="button" aria-label="Закрыть"><svg class="icon s16"><use href="#i-x"/></svg></button></div>
   <div class="publish-summary" id="publish-summary" aria-live="polite"></div>
+  <div class="publish-preflight" id="publish-preflight" aria-live="polite"></div>
   <div class="publish-options">
     <button id="publish-channel"><span class="po-icon accent"><svg class="icon s18"><use href="#i-send"/></svg></span><span><b id="publish-channel-title">В канал</b><small id="publish-channel-copy">Опубликовать для всех</small></span><svg class="icon s16"><use href="#i-cr"/></svg></button>
     <button id="publish-self"><span class="po-icon"><svg class="icon s18"><use href="#i-disc"/></svg></span><span><b id="publish-self-title">Отправить себе</b><small id="publish-self-copy">Проверить в личном чате</small></span><svg class="icon s16"><use href="#i-cr"/></svg></button>

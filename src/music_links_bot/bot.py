@@ -8,7 +8,6 @@ import hashlib
 from html import escape
 import logging
 import secrets
-from urllib.parse import quote
 
 from telegram import (
     Bot,
@@ -111,7 +110,6 @@ _button_rows = _keyboards._button_rows
 _keyboard_with_optional_channel = _keyboards._keyboard_with_optional_channel
 _single_url_keyboard = _keyboards._single_url_keyboard
 _channel_button = _keyboards._channel_button
-_url_button = _keyboards._url_button
 _get_platform_order = _keyboards._get_platform_order
 
 from music_links_bot.kvstore import KVStore
@@ -132,6 +130,7 @@ from music_links_bot.bot_runtime import (
     encode_callback,
 )
 from music_links_bot.bot_ui import (
+    build_error_keyboard as _build_error_keyboard_view,
     build_home_text as _build_home_text,
     build_onboarding_keyboard as _build_onboarding_keyboard,
     build_section_keyboard as _build_section_keyboard,
@@ -2257,18 +2256,7 @@ def _build_error_keyboard(
     *,
     lang: str = "ru",
 ) -> InlineKeyboardMarkup:
-    rows = [[_menu_button(get_text(lang, "error_platforms_button"), MENU_PLATFORMS, None)]]
-    if bot_username:
-        bot_url = f"https://t.me/{bot_username}"
-        share_url = "https://t.me/share/url?url=" + quote(bot_url, safe="")
-        rows.append(
-            [
-                _channel_button(),
-                _url_button(get_text(lang, "share_button"), url=share_url, style="primary"),
-            ]
-        )
-
-    return InlineKeyboardMarkup(rows)
+    return _build_error_keyboard_view(bot_username, lang=lang)
 
 
 def _menu_button(label: str, callback_data: str, active: str | None) -> InlineKeyboardButton:

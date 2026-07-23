@@ -1,5 +1,14 @@
 import { createApiClient } from "/webapp/api-client.js";
 import { createCloudStorage } from "/webapp/cloud-storage.js";
+import {
+  assessCollection,
+  assessDraft,
+  createDraftSnapshot,
+  escapeHtml,
+  parseDraftSnapshot,
+  pluralize,
+  safeHttpUrl,
+} from "/webapp/studio-core.js";
 
 (function () {
   const tg = window.Telegram?.WebApp || {
@@ -126,6 +135,31 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     soundcloud:{color:"#FF5500",letter:"☁",name:"SoundCloud"}, deezer:{color:"#A238FF",letter:"≋",name:"Deezer"},
     tidal:{color:"#3EB3E7",letter:"◆",name:"Tidal"}, yandexMusic:{color:"#FC3F1D",letter:"Я",name:EN?"Yandex":"Яндекс"},
   };
+  const PREFLIGHT = EN ? {
+    draft: {
+      platforms:(n)=>n+" platforms connected", noPlatforms:"Choose at least one platform",
+      textReady:"Caption is ready", noText:"Add a short caption",
+      artworkReady:"Artwork is ready", noArtwork:"No artwork — text mode will be used",
+      cleanText:"Clean text without tags", tagsReady:(n)=>n+" focused hashtags", tooManyTags:"Too many hashtags",
+    },
+    collection: {
+      tracks:(n)=>n+" tracks in the set", needTracks:"Add at least two tracks",
+      titleReady:"Collection has a title", noTitle:"Add a memorable title",
+      notesReady:"Track notes added", noNotes:"Add context to at least one track",
+    },
+  } : {
+    draft: {
+      platforms:(n)=>"Подключено площадок: "+n, noPlatforms:"Выбери хотя бы одну площадку",
+      textReady:"Подводка готова", noText:"Добавь короткую подводку",
+      artworkReady:"Обложка готова", noArtwork:"Без обложки — будет текстовый режим",
+      cleanText:"Чистый текст без тегов", tagsReady:(n)=>"Точных хэштегов: "+n, tooManyTags:"Слишком много хэштегов",
+    },
+    collection: {
+      tracks:(n)=>"Треков в сете: "+n, needTracks:"Добавь минимум два трека",
+      titleReady:"У подборки есть название", noTitle:"Добавь запоминающееся название",
+      notesReady:"Есть комментарии к трекам", noNotes:"Добавь контекст хотя бы к одному треку",
+    },
+  };
 
   const $ = (id) => document.getElementById(id);
   const VIEWS = ["home","candidates","loading","notfound","result","format","crate","queue","stats"];
@@ -148,16 +182,11 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     warn(){try{tg.HapticFeedback.notificationOccurred("warning")}catch(e){}},
     err(){try{tg.HapticFeedback.notificationOccurred("error")}catch(e){}},
   };
-  function esc(v){const d=document.createElement("div");d.textContent=v==null?"":String(v);return d.innerHTML;}
+  const esc = escapeHtml;
   function plural(n, enOne, enMany, ruOne, ruFew, ruMany) {
-    if (EN) return Number(n) === 1 ? enOne : enMany;
-    const v=Math.abs(Number(n))%100, d=v%10;
-    if (v>10 && v<20) return ruMany;
-    if (d===1) return ruOne;
-    if (d>=2 && d<=4) return ruFew;
-    return ruMany;
+    return pluralize(n, [enOne, enMany], [ruOne, ruFew, ruMany], EN);
   }
-  function safeUrl(v){const u=String(v==null?"":v);return /^https?:\/\//i.test(u)?esc(u):"";}
+  const safeUrl = safeHttpUrl;
   function artHtml(url,emoji,cls){const s=safeUrl(url);return s?'<img class="'+cls+'" alt="" loading="lazy" data-emoji="'+esc(emoji||"🎵")+'" src="'+s+'">':'<div class="'+cls+'">'+esc(emoji||"🎵")+"</div>";}
   // A broken cover must never leave an empty hole: swap it for the emoji tile.
   window.addEventListener("error", (e) => {
@@ -631,7 +660,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     } catch(e) { if (seq !== loadSeq) return; $("nf-query").textContent = q; show("notfound"); hap.err(); }
   }
   function openDraftResult(res, applyDefaults) {
-    state = res; show("result"); renderCard(); hap.ok(); maybeCoach();
+    state = res; saveActiveDraft(); show("result"); renderCard(); hap.ok(); maybeCoach();
     if (applyDefaults) loadPrefs((prefs) => {
       if (!prefs) return; const patch = {};
       if (typeof prefs.hashtags==="boolean" && prefs.hashtags!==state.flags.hashtags) patch.hashtags=prefs.hashtags;
@@ -695,11 +724,42 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   async function loadDraft(id) {
     cancelPending(); const seq = loadSeq;
     show("loading");
-    try { const res = await api("draft", { draft_id: id }, { abortable: true }); if (seq !== loadSeq) return; if (res && res.ok) { openDraftResult(res, false); return; } } catch(e) { if (seq !== loadSeq) return; }
+    try {
+      const res = await api("draft", { draft_id: id }, { abortable: true });
+      if (seq !== loadSeq) return;
+      if (res && res.ok) { openDraftResult(res, false); return; }
+      if (res?.error === "draft not found") clearActiveDraft();
+    } catch(e) { if (seq !== loadSeq) return; }
     loadHome(); show("home");
   }
 
   /* ── home ── */
+  function clearActiveDraft() {
+    cloud.remove("activeDraft");
+    $("resume-card").classList.add("hidden");
+  }
+  function saveActiveDraft() {
+    const snapshot = createDraftSnapshot(state);
+    if (snapshot) cloud.set("activeDraft", JSON.stringify(snapshot));
+  }
+  function renderActiveDraft(snapshot) {
+    const card = $("resume-card");
+    if (!snapshot) { card.classList.add("hidden"); return; }
+    $("resume-kicker").textContent = EN ? "IN PROGRESS" : "В РАБОТЕ";
+    $("resume-title").textContent = snapshot.title || (EN ? "Untitled release" : "Релиз без названия");
+    $("resume-sub").textContent = snapshot.artist || (EN ? "Continue editing" : "Продолжить оформление");
+    $("resume-action").textContent = T.continueAction;
+    const art = $("resume-art");
+    art.textContent = snapshot.emoji || "🎵";
+    art.style.backgroundImage = safeUrl(snapshot.artwork)
+      ? 'url("'+String(snapshot.artwork).replace(/"/g,"%22")+'")'
+      : "";
+    $("resume-open").onclick = () => { hap.tap(); loadDraft(snapshot.draftId); };
+    card.classList.remove("hidden");
+  }
+  $("resume-dismiss").addEventListener("click", (event) => {
+    event.stopPropagation(); hap.tap(); clearActiveDraft();
+  });
   function setHomeError(open) {
     $("home-alert").classList.toggle("hidden", !open);
     $("home-alert").setAttribute("aria-hidden", String(!open));
@@ -707,8 +767,14 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   async function loadHome() {
     $("quick").classList.remove("hidden");
     if (!isAdmin) { $("q-queue").classList.add("hidden"); $("q-stats").classList.add("hidden"); }
+    const localCrate = new Promise((resolve) => loadCrate(resolve));
+    cloud.get("activeDraft", (_error, raw) => {
+      const snapshot = parseDraftSnapshot(raw);
+      if (!snapshot && raw) cloud.remove("activeDraft");
+      renderActiveDraft(snapshot);
+    });
     try {
-      const res = await api("history", {});
+      const [res] = await Promise.all([api("dashboard", {}), localCrate]);
       $("home-skel").classList.add("hidden");
       if (!res.ok) { setHomeError(true); $("home-empty").classList.remove("hidden"); return; }
       setHomeError(false);
@@ -719,9 +785,17 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
       $("q-queue").classList.toggle("hidden", !isAdmin);
       $("q-stats").classList.toggle("hidden", !isAdmin);
       $("tab-queue").style.display = isAdmin ? "" : "none";
-      if (isAdmin) refreshQueueBadge();
-      loadCrate(refreshCrateBadge);
-      historyItems = res.items || [];
+      const serverCrate = res.crate || {};
+      if (!crateItems.length && Array.isArray(serverCrate.items) && serverCrate.items.length) {
+        crateItems = adoptCrateItems(serverCrate.items); persistCrate();
+      }
+      refreshCrateBadge();
+      const queue = res.queue || {};
+      const queueBadge = $("q-queue-n");
+      queueBadge.style.display = queue.count > 0 ? "flex" : "none";
+      queueBadge.textContent = queue.count || "";
+      $("q-queue-sub").textContent = queue.next_at ? fmtWhen(queue.next_at) : T.quick.queue[1];
+      historyItems = res.history || [];
       $("home-history").classList.toggle("hidden", historyItems.length===0);
       $("home-empty").classList.toggle("hidden", historyItems.length>0);
       const list = $("hist-list"); list.innerHTML = "";
@@ -918,7 +992,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
         // a newer edit already fired — don't let this stale response revert it
         if (seq !== syncSeq) return;
         if (!res || !res.ok) { setFormatSync("error"); return; }
-        state = res;
+        state = res; saveActiveDraft();
         setFormatSync("saved");
         if (!$("v-result").classList.contains("hidden")) renderCard();
       } catch(e) { if (seq === syncSeq) { setFormatSync("error"); flash(errorText(e.message)); } }
@@ -968,6 +1042,17 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     const canPublish=publishMode==="crate"?isAdmin:Boolean(state?.can_publish);
     $("publish-channel").classList.toggle("hidden", !canPublish);
     $("publish-later").classList.toggle("hidden", !canPublish || publishMode==="crate");
+    const readiness = publishMode === "crate"
+      ? assessCollection(crateItems, collectionMeta, PREFLIGHT.collection)
+      : assessDraft(state, PREFLIGHT.draft);
+    $("publish-preflight").innerHTML = readiness.checks.map((check) =>
+      '<div class="preflight-item '+(check.blocking?"block":check.ok?"ok":"warn")+'">'+
+      '<i class="preflight-dot"></i><span>'+esc(check.label)+"</span></div>"
+    ).join("");
+    $("publish-channel").disabled = !readiness.ready;
+    $("publish-self").disabled = !readiness.ready;
+    $("publish-later").disabled = !readiness.ready;
+    $("publish-copy").disabled = !readiness.ready;
     if(publishMode==="crate"){
       const first=crateItems[0]||{}, title=collectionMeta.title||(EN?"Collection":"Подборка");
       $("publish-summary").innerHTML=artHtml(first.artwork,first.emoji,"publish-art")+

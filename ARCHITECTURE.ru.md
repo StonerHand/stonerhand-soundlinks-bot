@@ -64,6 +64,7 @@ src/music_links_bot/
   i18n.py              RU/EN интерфейсные строки
   telegram_text.py     безопасное сохранение rich-text подводок
   studio_models.py     валидация draft patch и crate payload
+  studio_presenters.py стабильный публичный Studio response для draft
   studio_storage.py    история и серверное зеркало crate
   publish_queue.py     durable-очередь отложенных публикаций
   publication_state.py антидубль опубликованных релизов
@@ -85,6 +86,7 @@ webapp/
   app.js               state machine, UI, Telegram WebApp integration
   api-client.js        JSON transport, timeout/cancel, request_id
   cloud-storage.js     Promise/callback adapter Telegram CloudStorage
+  studio-core.js       UX-правила, preflight и snapshot черновика
 
 tests/
   test_*.py            unit и integration tests без внешней сети
@@ -249,7 +251,15 @@ Studio не требует Node build:
 - `styles.css` задаёт editorial design system, CSS variables, light/dark theme, safe areas, touch targets и reduced motion;
 - `app.js` управляет state/view transitions, Telegram WebApp API, player, formatting, presets, crate, queue и stats;
 - `api-client.js` создаёт `request_id`, ставит timeout, поддерживает abort и нормализует ошибки;
-- `cloud-storage.js` хранит тему, onboarding, presets и client-authoritative crate.
+- `cloud-storage.js` хранит тему, onboarding, presets, active draft и client-authoritative crate;
+- `studio-core.js` независимо от транспорта оценивает готовность поста/подборки и сериализует active draft snapshot.
+
+Home загружается одним action `dashboard`: history, зеркало crate и очередь читаются
+параллельно на сервере. Это убирает прежний waterfall из трёх запросов. Последний
+открытый draft сохраняется в CloudStorage и показывается отдельной карточкой
+«Продолжить». Перед отправкой единый preflight показывает состояние площадок,
+подводки, обложки и хэштегов; блокирующим условием остаётся только отсутствие
+доступной площадки.
 
 Сервер не доверяет отображаемому клиентом admin-state. Каждое privileged действие снова проверяет `user.id == ADMIN_CHAT_ID`.
 
@@ -275,6 +285,7 @@ Studio не требует Node build:
 | `draft` | владелец draft | открыть draft из Telegram |
 | `preview` | владелец draft | лениво получить audio preview |
 | `update` | владелец draft | применить flags, CTA, tags и platform order |
+| `dashboard` | пользователь | history + crate + краткое состояние очереди одним запросом |
 | `history` | пользователь | последние 10 релизов и published state |
 | `send` | пользователь | отправить пост себе |
 | `publish` / `unpublish` | админ | публикация в канал / undo |
@@ -290,7 +301,7 @@ Studio не требует Node build:
 | Состояние | Авторитетный источник | Fallback / зеркало |
 | --- | --- | --- |
 | текущий экран и release editor | память страницы | нет |
-| тема, onboarding, presets | Telegram CloudStorage | localStorage вне Telegram |
+| тема, onboarding, presets, active draft | Telegram CloudStorage | localStorage вне Telegram |
 | crate | CloudStorage клиента | `crate:<user>` в Redis на 14 дней |
 | draft | Redis на 48 часов | bounded memory текущего инстанса |
 | history | Redis на 90 дней | memory текущего инстанса |
