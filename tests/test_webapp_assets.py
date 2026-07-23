@@ -11,7 +11,7 @@ class WebAppAssetTests(unittest.TestCase):
         self.assertIn('href="/webapp/styles.css"', html)
         self.assertIn('href="/webapp/studio-shell.css"', html)
         self.assertIn('type="module" src="/webapp/app.js"', html)
-        self.assertIn('<span class="wordmark">Studio</span>', html)
+        self.assertIn('<span class="wordmark">Telegram Mini App</span>', html)
         self.assertNotIn("Studio / 08", html)
         self.assertNotIn("<style>", html)
 
@@ -52,6 +52,7 @@ class WebAppAssetTests(unittest.TestCase):
             "paste-btn",
             "home-alert",
             "q-inline",
+            "q-create",
             "result-readiness",
             "format-preview",
             "crate-cover",

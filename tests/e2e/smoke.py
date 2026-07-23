@@ -178,6 +178,9 @@ def main() -> int:
         page.eval_on_selector("#q-inline", "el => el.click()")
         if page.evaluate("window.__inlineQuery") != "":
             failures.append("inline shortcut did not open Telegram inline mode")
+        page.eval_on_selector("#q-create", "el => el.click()")
+        if not page.eval_on_selector("#query", "el => document.activeElement === el"):
+            failures.append("create shortcut did not focus the primary search")
 
         # Popular cards must keep their title clear of the decorative music
         # icon, including the narrowest Telegram viewport we support.
@@ -228,6 +231,18 @@ def main() -> int:
         if page.eval_on_selector("#coach", "el => el.classList.contains('open')"):
             failures.append("first-run coach cannot be dismissed with Escape")
         _capture(page, "02-result-dark")
+        page.set_viewport_size({"width": 880, "height": 900})
+        page.wait_for_timeout(150)
+        if page.evaluate("document.documentElement.scrollWidth > window.innerWidth"):
+            failures.append("desktop result view has horizontal overflow")
+        result_columns = page.eval_on_selector(
+            "#post-card",
+            "el => getComputedStyle(el).gridTemplateColumns",
+        )
+        if result_columns == "none" or len(result_columns.split()) < 2:
+            failures.append("desktop result did not adopt the product-preview split card")
+        _capture(page, "02b-result-desktop")
+        page.set_viewport_size({"width": 390, "height": 800})
 
         # Formatting auto-saves and never allows a post without platforms.
         page.eval_on_selector("#open-format", "el => el.click()")
@@ -389,6 +404,18 @@ def main() -> int:
             failures.append("theme toggle did not switch to light mode")
         if _theme_contrast(page) < 4.5:
             failures.append("light theme foreground contrast is below WCAG AA")
+        quick_theme = page.eval_on_selector(
+            "#q-create",
+            """el => ({
+              color:getComputedStyle(el).color,
+              backgroundImage:getComputedStyle(el).backgroundImage,
+            })""",
+        )
+        if (
+            quick_theme["color"] != "rgb(23, 26, 36)"
+            or quick_theme["backgroundImage"] == "none"
+        ):
+            failures.append("light theme quick actions did not adopt the light product surface")
         _capture(page, "04-home-light")
         page.set_viewport_size({"width": 620, "height": 900})
         page.goto("https://studio.local/app", wait_until="load")
@@ -398,6 +425,16 @@ def main() -> int:
         if page.eval_on_selector(".wrap", "el => el.getBoundingClientRect().width") < 580:
             failures.append("workspace does not adapt to a wide Telegram viewport")
         _capture(page, "05-home-wide")
+        page.set_viewport_size({"width": 880, "height": 900})
+        page.goto("https://studio.local/app", wait_until="load")
+        page.wait_for_timeout(500)
+        if page.evaluate("document.documentElement.scrollWidth > window.innerWidth"):
+            failures.append("desktop Telegram viewport has horizontal overflow")
+        if page.eval_on_selector(".wrap", "el => el.getBoundingClientRect().width") < 840:
+            failures.append("workspace does not use the expanded desktop viewport")
+        if page.locator("#quick button:not(.hidden)").count() < 3:
+            failures.append("desktop home is missing the three core actions")
+        _capture(page, "06-home-desktop")
         page.goto("https://studio.local/app?view=crate", wait_until="load")
         page.wait_for_timeout(600)
         if page.eval_on_selector("#v-crate", "el => el.classList.contains('hidden')"):
