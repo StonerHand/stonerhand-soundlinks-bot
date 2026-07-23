@@ -352,6 +352,15 @@ class PrivateSpotifyTrackMessageStub(PrivateMessageStub):
     text = "https://open.spotify.com/track/abc"
 
 
+class PrivateSpotifyCollectionMessageStub(PrivateMessageStub):
+    text = (
+        "@StonerHandBot "
+        "https://open.spotify.com/track/abc?si=one\n"
+        "https://open.spotify.com/track/def?si=two\n"
+        "https://open.spotify.com/track/ghi?si=three"
+    )
+
+
 class PrivateSoundCloudMessageStub(PrivateMessageStub):
     text = "https://soundcloud.com/bondage-fairies/star-signs"
 
@@ -1106,6 +1115,33 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
             "Подборка · 2 релиза",
         )
 
+    async def test_inline_direct_urls_return_one_collection_card(self) -> None:
+        from music_links_bot.bot import inline_query_handler
+
+        class InlineQueryStub:
+            query = (
+                "https://open.spotify.com/track/abc?si=one "
+                "https://open.spotify.com/track/def?si=two "
+                "https://open.spotify.com/track/ghi?si=three"
+            )
+            from_user = None
+
+            def __init__(self) -> None:
+                self.answers: list[list] = []
+
+            async def answer(self, results, **kwargs) -> None:
+                del kwargs
+                self.answers.append(list(results))
+
+        inline_query = InlineQueryStub()
+        update = type("InlineUpdateStub", (), {"inline_query": inline_query})()
+
+        await inline_query_handler(update, ContextStub())
+
+        self.assertEqual(len(inline_query.answers), 1)
+        self.assertEqual(len(inline_query.answers[0]), 1)
+        self.assertEqual(inline_query.answers[0][0].title, "Подборка · 3 релиза")
+
     async def test_inline_youtube_result_uses_video_card(self) -> None:
         result = await _build_inline_result(
             "https://www.youtube.com/watch?v=abc123",
@@ -1445,6 +1481,34 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(len(context.application.bot_data["drafts"]), 1)
 
+    async def test_multiple_spotify_links_use_one_collection_post(self) -> None:
+        class DistinctLookupClient:
+            async def lookup_track(self, source_url: str) -> TrackMatch:
+                track_id = source_url.split("/track/", 1)[-1].split("?", 1)[0]
+                return TrackMatch(
+                    title=f"Track {track_id}",
+                    artist="Artist",
+                    links={"spotify": source_url},
+                    page_url=f"https://song.link/{track_id}",
+                )
+
+        message = PrivateSpotifyCollectionMessageStub()
+        context = ContextStub(songlink_client=DistinctLookupClient())
+
+        await track_lookup_message(UpdateStub(message), context)
+
+        self.assertEqual(len(message.replies), 1)
+        keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
+        release_buttons = [
+            button
+            for row in keyboard
+            for button in row
+            if button.text.startswith("🎧 ")
+        ]
+        self.assertEqual(len(release_buttons), 3)
+        labels = [button.text for row in keyboard for button in row]
+        self.assertIn("Подборка · 3/10", labels)
+
     async def test_youtube_video_links_use_video_post(self) -> None:
         message = PrivateYouTubeMessageStub()
         context = ContextStub()
@@ -1721,6 +1785,39 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(tracks[0].genre, "Industrial")
+
+    async def test_lookup_tracks_retries_transient_batch_failures(self) -> None:
+        class FlakyBatchLookupClient:
+            def __init__(self) -> None:
+                self.calls: dict[str, int] = {}
+
+            async def lookup_track(self, source_url: str) -> TrackMatch:
+                self.calls[source_url] = self.calls.get(source_url, 0) + 1
+                if self.calls[source_url] == 1:
+                    raise SonglinkError("rate limited")
+                track_id = source_url.rsplit("/", 1)[-1]
+                return TrackMatch(
+                    title=f"Track {track_id}",
+                    artist="Artist",
+                    links={"spotify": source_url},
+                    page_url=f"https://song.link/{track_id}",
+                )
+
+        urls = [
+            "https://open.spotify.com/track/abc",
+            "https://open.spotify.com/track/def",
+            "https://open.spotify.com/track/ghi",
+        ]
+        client = FlakyBatchLookupClient()
+
+        tracks, unavailable_urls = await _lookup_tracks(client, urls)
+
+        self.assertEqual(unavailable_urls, [])
+        self.assertEqual(
+            [track.title for track in tracks],
+            ["Track abc", "Track def", "Track ghi"],
+        )
+        self.assertEqual(client.calls, {url: 2 for url in urls})
 
     async def test_lookup_tracks_guarantees_spotify_button_first(self) -> None:
         class NoSpotifyLookupClient:

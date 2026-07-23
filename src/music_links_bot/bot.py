@@ -777,8 +777,14 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     )
     query_text = inline_query.query or ""
     shared_urls = parse_share_query(query_text)
-    if shared_urls is not None:
-        if not shared_urls:
+    source_urls = extract_supported_urls(query_text)[:MAX_LINKS_PER_MESSAGE]
+    collection_urls = (
+        shared_urls
+        if shared_urls is not None
+        else source_urls if len(source_urls) > 1 else None
+    )
+    if collection_urls is not None:
+        if not collection_urls:
             await _answer_inline_hint(
                 inline_query, get_text(lang, "inline_hint_not_found")
             )
@@ -786,11 +792,11 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
         try:
             shared_result = await _build_inline_collection_result(
-                shared_urls, context, lang=lang
+                collection_urls, context, lang=lang
             )
         except Exception as exc:
             LOGGER.error(
-                "Inline shared collection lookup failed",
+                "Inline collection lookup failed",
                 exc_info=(type(exc), exc, exc.__traceback__),
             )
             shared_result = None
@@ -811,10 +817,10 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                 ),
             )
         except TelegramError:
-            LOGGER.debug("Could not answer shared inline query", exc_info=True)
+            LOGGER.debug("Could not answer inline collection query", exc_info=True)
         return
 
-    source_urls = extract_supported_urls(query_text)[:1]
+    source_urls = source_urls[:1]
     if not source_urls:
         search_query = normalize_search_query(query_text)
         if search_query is None:
@@ -1832,7 +1838,11 @@ async def _track_lookup_message_impl(
         await runtime.remember_action(
             user_id,
             kind="resolve" if source_urls else "search",
-            value=(source_urls[0] if source_urls else message_text or ""),
+            value=(
+                message_text or ""
+                if len(source_urls) > 1
+                else source_urls[0] if source_urls else message_text or ""
+            ),
             lang=lang,
         )
     found_via_search = False
