@@ -53,6 +53,8 @@ NOT_FOUND_DETAIL = (
 )
 _track_result_sender: Callable[..., Awaitable[Any]] | None = None
 _BACKGROUND_TASKS: set[asyncio.Task[Any]] = set()
+_BATCH_LOOKUP_CONCURRENCY = 2
+_BATCH_RETRY_DELAY_SECONDS = 0.2
 
 
 def configure_track_result_sender(sender: Callable[..., Awaitable[Any]]) -> None:
@@ -683,9 +685,33 @@ async def _lookup_tracks(
     soundcloud_client: SoundCloudClient | None = None,
     search_client: SearchClient | None = None,
 ) -> tuple[list[TrackMatch], list[str]]:
+    # Song.link can throttle a burst of otherwise valid URLs. Keep batch
+    # lookups bounded and retry transient provider failures once so a
+    # three-link collection cannot silently collapse into a one-track post.
+    semaphore = asyncio.Semaphore(_BATCH_LOOKUP_CONCURRENCY)
+
+    async def lookup_one(index: int, source_url: str) -> TrackMatch | Exception:
+        for attempt in range(2):
+            try:
+                async with semaphore:
+                    return await client.lookup_track(source_url)
+            except SonglinkLookupError as exc:
+                return exc
+            except SonglinkError as exc:
+                if attempt == 1:
+                    return exc
+                await asyncio.sleep(
+                    _BATCH_RETRY_DELAY_SECONDS + (index % 3) * 0.05
+                )
+            except Exception as exc:
+                return exc
+        return SonglinkError("Song.link is unavailable right now.")
+
     results = await asyncio.gather(
-        *(client.lookup_track(source_url) for source_url in source_urls),
-        return_exceptions=True,
+        *(
+            lookup_one(index, source_url)
+            for index, source_url in enumerate(source_urls)
+        ),
     )
 
     tracks: list[TrackMatch] = []
