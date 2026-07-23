@@ -84,9 +84,31 @@ body::before { opacity: .014; }
 
 .light .home-hero {
   background:
-    radial-gradient(circle at 86% 14%, rgba(147,160,255,.28), transparent 24%),
-    linear-gradient(145deg, #202944, #111624 70%);
+    radial-gradient(circle at 86% 14%, rgba(83,101,218,.16), transparent 25%),
+    radial-gradient(circle at 12% 110%, rgba(36,127,98,.11), transparent 33%),
+    linear-gradient(145deg, #ffffff, #eef1f8 72%);
+  border-color: #cdd4e7;
+  color: var(--fg);
+  box-shadow: 0 18px 44px rgba(43,52,84,.12);
 }
+
+.light .home-hero h1 { color: var(--fg); }
+.light .home-hero h1 em { color: var(--acid); }
+.light .home-hero p,
+.light .hero-flow small { color: var(--muted); }
+.light .hero-flow { border-top-color: rgba(23,26,36,.1); }
+.light .hero-flow > i { color: rgba(23,26,36,.24); }
+.light .hero-flow b {
+  color: var(--primary);
+  background: color-mix(in srgb,var(--primary) 11%,transparent);
+  border-color: color-mix(in srgb,var(--primary) 32%,transparent);
+}
+.light .home-hero::before {
+  border-color: color-mix(in srgb,var(--primary) 15%,transparent);
+  box-shadow: 0 0 0 12px rgba(83,101,218,.035), 0 0 0 42px rgba(83,101,218,.022);
+}
+.light .home-hero::after { border-color: rgba(23,26,36,.06); }
+.light .home-hero .hero-noise { opacity: .08; mix-blend-mode: multiply; }
 
 .home-hero::before {
   right: -38px;
@@ -280,6 +302,23 @@ body::before { opacity: .014; }
   border-radius: 27px;
   box-shadow: 0 18px 50px rgba(0,0,0,.2);
 }
+.crate-cover > div:nth-child(2) {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.crate-cover > div:nth-child(2) > span,
+.crate-cover > div:nth-child(2) > strong,
+.crate-cover > div:nth-child(2) > small {
+  display: block;
+  max-width: 100%;
+}
+.crate-cover > div:nth-child(2) > span { line-height: 1.45; }
+.crate-cover > div:nth-child(2) > strong { margin-block: 7px 4px; }
 .crate-health {
   --health: 0;
   width: 48px;
@@ -455,6 +494,26 @@ body::before { opacity: .014; }
    grids become large, scannable actions. */
 @media (max-width: 719px) {
   body { font-size: 16px; }
+  #v-home {
+    overflow-x: hidden;
+    overflow-y: auto;
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
+  }
+  #v-home > * { flex-shrink: 0; }
+  #v-home > .scroll {
+    flex: 0 0 auto;
+    min-height: 0;
+    overflow: visible;
+  }
+  .view > .scroll,
+  .result-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
+  }
   button,
   a[href],
   input,
@@ -719,6 +778,10 @@ body::before { opacity: .014; }
   .screen-intro small { margin-top: 6px; font-size: 14px; line-height: 1.45; }
   .crate-cover { margin: 0 12px 16px; min-height: 166px; padding: 20px; }
   .crate-cover > div:nth-child(2) { min-width: 0; flex: 1; }
+  .crate-cover > div:nth-child(2) > span {
+    font-size: 9px;
+    line-height: 1.5;
+  }
   .crate-cover strong { overflow-wrap: anywhere; font-size: 18px; line-height: 1.3; }
   .crate-cover small { font-size: 13px; line-height: 1.4; }
   .crate-cover .crate-health { display: none !important; }
@@ -774,12 +837,28 @@ body::before { opacity: .014; }
     border-radius: 25px;
   }
   .tabbar button {
+    position: relative;
     min-width: 0;
     min-height: 62px;
     padding: 6px 4px;
     gap: 5px;
     border-radius: 17px;
     font-size: 12px;
+  }
+  .tabbar button[data-tab].active {
+    background: transparent;
+    box-shadow: none;
+  }
+  .tabbar button[data-tab].active::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: 1px;
+    width: 20px;
+    height: 3px;
+    border-radius: 999px;
+    background: currentColor;
+    transform: translateX(-50%);
   }
   .tabbar button[data-tab] .icon { width: 22px; height: 22px; }
   .tabbar .create-tab { min-height: 88px; margin-top: -26px; }
