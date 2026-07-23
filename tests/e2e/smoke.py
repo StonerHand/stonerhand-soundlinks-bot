@@ -17,7 +17,7 @@ from playwright.sync_api import sync_playwright
 
 HTML = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "index.html").read_text()
 CSS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "styles.css").read_text()
-STUDIO_8_CSS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "studio-8.css").read_text()
+STUDIO_SHELL_CSS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "studio-shell.css").read_text()
 JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "app.js").read_text()
 API_JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "api-client.js").read_text()
 CLOUD_JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "cloud-storage.js").read_text()
@@ -53,7 +53,10 @@ RESPONSES = {
     "preview": {"ok": True, "preview": None},
     "crate": {"ok": True, "count": 0, "max": 10, "items": []},
     "queue": {"ok": True, "items": []},
-    "resolve_batch": {"ok": True, "count": 2, "max": 10, "items": [
+    "resolve_batch": {
+        "ok": True, "count": 2, "max": 10,
+        "requested_count": 2, "resolved_count": 2, "failed_count": 0,
+        "items": [
         {"artist": "Sleep", "title": "Dopesmoker", "emoji": "📻", "artwork": None,
          "data": {"artist": "Sleep", "title": "Dopesmoker", "kind": "song",
                   "page_url": "https://song.link/a", "thumbnail_url": None}},
@@ -138,7 +141,7 @@ def main() -> int:
         page.route("**/api/webapp", _route_api)
         page.route("https://studio.local/app*", lambda r: r.fulfill(body=HTML, content_type="text/html"))
         page.route("https://studio.local/webapp/styles.css", lambda r: r.fulfill(body=CSS, content_type="text/css"))
-        page.route("https://studio.local/webapp/studio-8.css", lambda r: r.fulfill(body=STUDIO_8_CSS, content_type="text/css"))
+        page.route("https://studio.local/webapp/studio-shell.css", lambda r: r.fulfill(body=STUDIO_SHELL_CSS, content_type="text/css"))
         page.route("https://studio.local/webapp/app.js", lambda r: r.fulfill(body=JS, content_type="application/javascript"))
         page.route("https://studio.local/webapp/api-client.js", lambda r: r.fulfill(body=API_JS, content_type="application/javascript"))
         page.route("https://studio.local/webapp/cloud-storage.js", lambda r: r.fulfill(body=CLOUD_JS, content_type="application/javascript"))
@@ -161,6 +164,8 @@ def main() -> int:
             failures.append("Telegram content safe area was not applied")
         if page.eval_on_selector("#quick", "el => el.classList.contains('hidden')"):
             failures.append("quick actions are hidden for an ordinary user")
+        if not page.eval_on_selector("#search-go", "el => el.disabled"):
+            failures.append("empty search can be submitted")
         if not page.eval_on_selector("#q-queue", "el => el.classList.contains('hidden')"):
             failures.append("admin queue shortcut is visible to an ordinary user")
         _capture(page, "01-home-dark")
@@ -194,7 +199,10 @@ def main() -> int:
         page.set_viewport_size({"width": 390, "height": 800})
 
         # 2. a search renders the result card with the track title
-        page.evaluate("document.getElementById('query').value = 'sleep dopesmoker'")
+        page.eval_on_selector(
+            "#query",
+            "el => {el.value='sleep dopesmoker';el.dispatchEvent(new Event('input'))}",
+        )
         page.eval_on_selector("#query", "el => el.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter'}))")
         page.wait_for_timeout(900)
         if page.eval_on_selector("#v-result", "el => el.classList.contains('hidden')"):
@@ -206,6 +214,10 @@ def main() -> int:
         score = int(page.eval_on_selector("#result-score-value", "el => el.textContent"))
         if score < 75:
             failures.append(f"result readiness score is unexpectedly low: {score}")
+        if page.locator("#post-card .cover-fallback").count() != 1:
+            failures.append("broken artwork did not switch to the compact fallback")
+        if score >= 100:
+            failures.append("broken artwork is incorrectly counted as fully ready")
         if not page.evaluate("Telegram.WebApp.MainButton.visible && Telegram.WebApp.MainButton.text.length > 0"):
             failures.append("native Telegram MainButton is not active on the result")
         if page.evaluate("document.documentElement.scrollWidth > window.innerWidth"):
@@ -225,6 +237,14 @@ def main() -> int:
         if not page.eval_on_selector('#format-nav [data-target="format-copy"]', "el => el.classList.contains('active')"):
             failures.append("format editor navigation does not expose its active section")
         page.wait_for_timeout(350)
+        nav_bottom, input_top = page.evaluate(
+            """() => [
+              document.getElementById('format-nav').getBoundingClientRect().bottom,
+              document.getElementById('cta-input').getBoundingClientRect().top,
+            ]"""
+        )
+        if input_top < nav_bottom - 2:
+            failures.append("format navigation scrolls the field under its sticky header")
         _capture(page, "03-format-dark")
         page.eval_on_selector("#cta-input", "el => {el.value='новый текст';el.dispatchEvent(new Event('input'))}")
         page.wait_for_timeout(650)
@@ -294,10 +314,17 @@ def main() -> int:
         # 6. pasting multiple links builds a crate automatically
         page.eval_on_selector('#tabbar [data-tab="home"]', "el => el.click()")
         page.wait_for_timeout(200)
-        page.evaluate(
-            "document.getElementById('query').value = "
-            "'https://open.spotify.com/track/a https://open.spotify.com/track/b'"
+        page.eval_on_selector(
+            "#query",
+            """el => {
+              el.value='https://open.spotify.com/track/a https://open.spotify.com/track/b';
+              el.dispatchEvent(new Event('input'));
+            }""",
         )
+        if not page.eval_on_selector("#searchbar", "el => el.classList.contains('batch')"):
+            failures.append("multiple links do not expose batch mode before submission")
+        if "2" not in page.eval_on_selector("#batch-label", "el => el.textContent"):
+            failures.append("batch mode does not explain how many links will be imported")
         page.eval_on_selector("#query", "el => el.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter'}))")
         page.wait_for_timeout(700)
         if page.eval_on_selector("#v-crate", "el => el.classList.contains('hidden')"):
@@ -343,7 +370,10 @@ def main() -> int:
         # A failed search must lead back to an editable query, not repeat itself.
         page.eval_on_selector('#tabbar [data-tab="home"]', "el => el.click()")
         page.wait_for_timeout(200)
-        page.evaluate("document.getElementById('query').value = 'missing'")
+        page.eval_on_selector(
+            "#query",
+            "el => {el.value='missing';el.dispatchEvent(new Event('input'))}",
+        )
         page.eval_on_selector("#query", "el => el.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter'}))")
         page.wait_for_timeout(350)
         if page.eval_on_selector("#v-notfound", "el => el.classList.contains('hidden')"):

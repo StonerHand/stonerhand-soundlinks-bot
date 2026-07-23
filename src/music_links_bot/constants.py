@@ -25,6 +25,7 @@ SUPPORTED_INPUT_HOSTS = {
 }
 
 HTTP_USER_AGENT = "StonerHandBot/0.1 (+https://t.me/stonerhand)"
+MAX_LINKS_PER_MESSAGE = 12
 
 PLATFORM_LABELS = {
     "spotify": "🟢 Spotify",

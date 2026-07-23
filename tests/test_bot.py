@@ -470,9 +470,9 @@ class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
 
 class BotKeyboardTests(unittest.TestCase):
     def test_profile_descriptions_are_current_and_fit_telegram_limits(self) -> None:
-        self.assertIn("Подборки /crate", BOT_DESCRIPTIONS[""])
-        self.assertIn("выбор точного релиза", BOT_DESCRIPTIONS[""])
-        self.assertIn("редактор, подборки", BOT_SHORT_DESCRIPTIONS[""])
+        self.assertIn("Несколько ссылок", BOT_DESCRIPTIONS[""])
+        self.assertIn("точный релиз", BOT_DESCRIPTIONS[""])
+        self.assertIn("несколько треков", BOT_SHORT_DESCRIPTIONS[""])
         self.assertTrue(all(len(value) <= 512 for value in BOT_DESCRIPTIONS.values()))
         self.assertTrue(
             all(len(value) <= 120 for value in BOT_SHORT_DESCRIPTIONS.values())
@@ -1061,12 +1061,23 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsNotNone(result)
         self.assertEqual(result.title, "Youth Code — Transitions")
+        self.assertEqual(result.description, "Пост с кнопками всех площадок")
         self.assertEqual(len(result.id), 32)
         self.assertIn("<b>Youth Code</b>", result.input_message_content.message_text)
         keyboard = result.reply_markup.inline_keyboard
         self.assertEqual(keyboard[0][0].text, "🟢 Spotify")
         self.assertEqual(keyboard[-1][0].text, "↗️ Поделиться с кнопками")
         self.assertTrue(keyboard[-1][0].switch_inline_query.startswith("sh|"))
+
+    async def test_inline_result_localizes_english_description(self) -> None:
+        result = await _build_inline_result(
+            "https://open.spotify.com/track/abc",
+            ContextStub(),
+            lang="en",
+        )
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result.description, "Post with every platform button")
 
     async def test_inline_share_query_keeps_collection_in_one_result(self) -> None:
         query = build_share_query(
@@ -1229,10 +1240,10 @@ class PostEditorTests(unittest.TestCase):
     def test_editor_rows_show_toggle_states_and_actions(self) -> None:
         rows = _editor_rows("abc123", self._draft(hashtags=True))
 
-        self.assertEqual(rows[0][0].text, "Отправить себе")
+        self.assertEqual(rows[0][0].text, "✉️ Отправить себе")
         self.assertEqual(rows[0][0].callback_data, "v2|editor|s|abc123")
-        self.assertEqual(rows[1][0].text, "+ В подборку")
-        self.assertEqual(rows[2][0].text, "••• Ещё")
+        self.assertEqual(rows[1][0].text, "🧺 В подборку")
+        self.assertEqual(rows[2][0].text, "⚙️ Настроить")
         more = _editor_more_rows("abc123", self._draft(hashtags=True))
         self.assertEqual(more[0][0].text, "# Хэштеги ✓")
         self.assertEqual(more[0][0].callback_data, "v2|editor|h|abc123")

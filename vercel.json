@@ -42,7 +42,7 @@
       "use": "@vercel/static"
     },
     {
-      "src": "webapp/studio-8.css",
+      "src": "webapp/studio-shell.css",
       "use": "@vercel/static"
     }
   ],
@@ -102,8 +102,8 @@
       "dest": "webapp/studio-core.js"
     },
     {
-      "src": "/webapp/studio-8.css",
-      "dest": "webapp/studio-8.css"
+      "src": "/webapp/studio-shell.css",
+      "dest": "webapp/studio-shell.css"
     }
   ],
   "crons": [

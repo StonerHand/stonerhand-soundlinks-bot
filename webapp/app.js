@@ -1,6 +1,7 @@
 import { createApiClient } from "/webapp/api-client.js";
 import { createCloudStorage } from "/webapp/cloud-storage.js";
 import {
+  analyzeQuery,
   assessCollection,
   assessDraft,
   createDraftSnapshot,
@@ -319,15 +320,23 @@ import {
     button.addEventListener("click", () => {
       hap.pick();
       document.querySelectorAll("#format-nav button").forEach((item) => item.classList.toggle("active", item === button));
-      $(button.dataset.target)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      const target = $(button.dataset.target);
+      const scroller = $("v-format").querySelector(".scroll");
+      if (!target || !scroller) return;
+      const stickyBottom = $("format-nav").getBoundingClientRect().bottom;
+      const targetTop = target.getBoundingClientRect().top;
+      scroller.scrollBy({
+        top: targetTop - stickyBottom - 12,
+        behavior: "smooth",
+      });
     });
   });
 
-  SUGGESTIONS.forEach((s) => {
+  SUGGESTIONS.forEach((s, index) => {
     const b = document.createElement("button");
     b.className = "row"; b.style.opacity = "1";
-    b.innerHTML = '<div class="row-art">'+ico("music","suggestion-note")+'</div><div class="row-meta"><div class="row-title">'+esc(s)+"</div></div>"+ico("cr","s16 suggestion-arrow");
-    b.addEventListener("click", () => { $("query").value = s; search(); });
+    b.innerHTML = '<div class="row-art">'+ico("music","suggestion-note")+'</div><span class="suggestion-index">'+String(index+1).padStart(2,"0")+'</span><div class="row-meta"><div class="row-title">'+esc(s)+"</div></div>"+ico("cr","s16 suggestion-arrow");
+    b.addEventListener("click", () => { $("query").value = s; updateSearchMode(); search(); });
     $("suggestions").appendChild(b);
   });
 
@@ -508,9 +517,13 @@ import {
     const r = state.release, f = state.flags;
     const photo = Boolean(f.as_photo), mode = photo || f.large_preview ? "large" : "compact";
     const card = $("post-card");
-    const artSrc = safeUrl(r.artwork);
+    const artSrc = r.artwork_failed ? "" : safeUrl(r.artwork);
     const acc = r.accentColor || "var(--primary)";
     dyn = null;
+    const artEmoji = esc(r.emoji || "🎵");
+    const artAlt = esc(
+      (EN ? "Cover: " : "Обложка: ") + r.artist + " — " + r.title,
+    );
 
     const playSvg =
       '<button class="play-btn" id="play-btn"><svg width="60" height="60" viewBox="0 0 64 64">'+
@@ -522,7 +535,9 @@ import {
     if (mode === "large") {
       coverBlock =
         '<div class="cover">'+
-        (artSrc ? '<img crossorigin="anonymous" alt="" src="'+artSrc+'">' : '<div style="width:100%;aspect-ratio:1/1;background:var(--surface)"></div>')+
+        (artSrc
+          ? '<img class="cover-art" data-card-art="1" data-emoji="'+artEmoji+'" crossorigin="anonymous" alt="'+artAlt+'" decoding="async" fetchpriority="high" src="'+artSrc+'">'
+          : '<div class="cover-art cover-fallback" aria-label="'+artAlt+'">'+artEmoji+"</div>")+
         '<div class="grad"></div>'+
         (r.preview ? '<div class="prev-badge">'+esc(T.preview30)+'</div>' : "")+
         (r.preview ? '<div class="eq" id="card-eq"><i></i><i></i><i></i><i></i><i></i></div>' : "")+
@@ -570,7 +585,9 @@ import {
     if (mode === "compact") {
       innerTop =
         '<div class="compact-top">'+
-        '<div class="compact-cover">'+(artSrc?'<img crossorigin="anonymous" alt="" src="'+artSrc+'">':"")+"</div>"+
+        '<div class="compact-cover">'+(artSrc
+          ? '<img class="compact-art" data-card-art="1" data-emoji="'+artEmoji+'" crossorigin="anonymous" alt="'+artAlt+'" decoding="async" src="'+artSrc+'">'
+          : '<div class="compact-art cover-fallback" aria-label="'+artAlt+'">'+artEmoji+"</div>")+"</div>"+
         '<div style="flex:1;min-width:0">'+headBlock+"</div></div>";
       card.innerHTML = coverBlock + innerTop + '<div class="post-inner" style="padding-top:12px">'+ctaBlock+tagsBlock+'<div class="plats">'+plats+"</div></div>";
     } else {
@@ -601,6 +618,13 @@ import {
     const tagsLine = $("tags-line"); if (tagsLine) tagsLine.addEventListener("click", () => openFormat());
 
     const img = card.querySelector("img");
+    card.querySelectorAll("img[data-card-art]").forEach((art) => {
+      art.addEventListener("error", () => {
+        if (!state || state.release !== r || r.artwork_failed) return;
+        r.artwork_failed = true;
+        renderCard();
+      }, { once: true });
+    });
     if (img && !r.accentColor) {
       const apply = () => {
         if (!dyn) return;
@@ -681,8 +705,16 @@ import {
       });
       persistCrate(); refreshCrateBadge(); hap.ok();
       $("query").value = "";
+      updateSearchMode();
       openCrate();
-      flash(EN?("Added "+added+" to the crate"):("Добавлено в подборку: "+added));
+      const failed = Math.max(0, Number(res.failed_count) || 0);
+      flash(
+        failed
+          ? (EN
+            ? `${added} added · ${failed} not recognized`
+            : `Добавлено: ${added} · не распознано: ${failed}`)
+          : (EN ? `Added ${added} to the crate` : `Добавлено в подборку: ${added}`),
+      );
     } catch(e) { if (seq !== loadSeq) return; $("nf-query").textContent = q; show("notfound"); hap.err(); }
   }
   function openDraftResult(res, applyDefaults) {
@@ -790,7 +822,14 @@ import {
     $("home-alert").classList.toggle("hidden", !open);
     $("home-alert").setAttribute("aria-hidden", String(!open));
   }
+  let homeLoadPromise = null;
   async function loadHome() {
+    if (homeLoadPromise) return homeLoadPromise;
+    homeLoadPromise = loadHomeData();
+    try { return await homeLoadPromise; }
+    finally { homeLoadPromise = null; }
+  }
+  async function loadHomeData() {
     $("quick").classList.remove("hidden");
     if (!isAdmin) { $("q-queue").classList.add("hidden"); $("q-stats").classList.add("hidden"); }
     const localCrate = new Promise((resolve) => loadCrate(resolve));
@@ -1608,12 +1647,35 @@ import {
   }
 
   /* ── search box events ── */
-  $("query").addEventListener("keydown", (e) => { if (e.key==="Enter") search(); });
+  function updateSearchMode() {
+    const mode = analyzeQuery($("query").value, 10);
+    const button = $("search-go");
+    button.disabled = mode.empty;
+    button.setAttribute("aria-disabled", String(mode.empty));
+    $("searchbar").classList.toggle("batch", mode.mode === "batch");
+    if (mode.mode === "batch") {
+      const suffix = mode.overflow > 0
+        ? (EN ? ` · first 10` : ` · первые 10`)
+        : "";
+      $("batch-label").textContent = EN
+        ? `${mode.linkCount} links → build crate${suffix}`
+        : `${mode.linkCount} ссылок → собрать подборку${suffix}`;
+      $("batch-label").classList.add("batch-ready");
+      button.setAttribute("aria-label", EN ? "Build a crate" : "Собрать подборку");
+      button.innerHTML = ico("layers", "s18");
+    } else {
+      $("batch-label").textContent = T.batch;
+      $("batch-label").classList.remove("batch-ready");
+      button.setAttribute("aria-label", EN ? "Find release" : "Найти релиз");
+      button.innerHTML = ico("cr", "s18");
+    }
+  }
+  $("query").addEventListener("keydown", (e) => { if (e.key==="Enter" && !$("search-go").disabled) search(); });
   $("search-go").addEventListener("click", () => search());
-  $("query").addEventListener("input", () => { $("clear").style.display = $("query").value?"block":"none"; renderTypeahead(); });
+  $("query").addEventListener("input", () => { $("clear").style.display = $("query").value?"block":"none"; updateSearchMode(); renderTypeahead(); });
   $("query").addEventListener("focus", () => $("searchbar").classList.add("focus"));
   $("query").addEventListener("blur", () => { $("searchbar").classList.remove("focus"); setTimeout(()=>$("typeahead").classList.remove("open"),180); });
-  $("clear").addEventListener("click", () => { $("query").value=""; $("clear").style.display="none"; $("query").focus(); });
+  $("clear").addEventListener("click", () => { $("query").value=""; $("clear").style.display="none"; updateSearchMode(); $("query").focus(); });
   $("paste-btn").addEventListener("click", () => {
     hap.tap();
     tryClipboard((text) => {
@@ -1621,6 +1683,7 @@ import {
       if (!value) { flash(EN?"Clipboard is empty":"В буфере ничего нет"); return; }
       $("query").value = value;
       $("clear").style.display = "block";
+      updateSearchMode();
       renderTypeahead();
       $("query").focus();
       hap.ok();
@@ -1629,6 +1692,7 @@ import {
   $("nf-retry").addEventListener("click", () => {
     hap.tap(); loadHome(); show("home");
     $("query").value = lastQuery || ""; $("clear").style.display = lastQuery ? "block" : "none";
+    updateSearchMode();
     setTimeout(() => { $("query").focus(); $("query").select(); }, 80);
   });
   $("toast-cancel").addEventListener("click", () => setToastOpen(false));
@@ -1660,7 +1724,7 @@ import {
       let host = ""; try { host = new URL(m[0]).hostname.replace(/^www\./,""); } catch(e) { return; }
       $("clip-text").innerHTML = esc(T.clipQ)+" <b>"+esc(host)+"</b>";
       $("clip-banner").classList.add("open");
-      $("clip-banner").onclick = (ev) => { if (ev.target.closest(".cb-x")) { dismissed=true; $("clip-banner").classList.remove("open"); return; } hap.ok(); $("clip-banner").classList.remove("open"); $("query").value=m[0]; search(); };
+      $("clip-banner").onclick = (ev) => { if (ev.target.closest(".cb-x")) { dismissed=true; $("clip-banner").classList.remove("open"); return; } hap.ok(); $("clip-banner").classList.remove("open"); $("query").value=m[0]; updateSearchMode(); search(); };
     });
   })();
 
@@ -1703,6 +1767,7 @@ import {
 
   /* ── boot ── */
   const params = new URLSearchParams(window.location.search);
+  updateSearchMode();
   const draftParam = params.get("draft") || tg.initDataUnsafe?.start_param;
   const viewParam = params.get("view");
   const localDemo = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && params.get("demo");

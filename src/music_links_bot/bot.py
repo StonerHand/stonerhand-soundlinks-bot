@@ -14,9 +14,6 @@ from telegram import (
     BotCommand,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
-    InlineQueryResultArticle,
-    InlineQueryResultsButton,
-    InputTextMessageContent,
     MenuButtonWebApp,
     Message,
     Update,
@@ -43,6 +40,11 @@ from music_links_bot.bot_stats import (
     record_radio_items as _record_radios_safely,
     record_tracks as _record_matches_safely,
     record_video_items as _record_videos_safely,
+)
+from music_links_bot.bot_inline import (
+    _build_inline_collection_result,
+    _build_inline_result,
+    inline_query_handler,
 )
 
 from music_links_bot import bot_lookup as _bot_lookup
@@ -144,14 +146,10 @@ from music_links_bot.search import (
     SearchLookupError,
     normalize_search_query,
 )
-from music_links_bot.constants import PLATFORM_LABELS
+from music_links_bot.constants import MAX_LINKS_PER_MESSAGE, PLATFORM_LABELS
 from music_links_bot.formatter import (
-    format_artist_message,
     format_collection_message,
-    format_playlist_message,
-    format_radio_message,
     format_track_message,
-    format_video_message,
 )
 from music_links_bot.models import (
     TrackMatch,
@@ -176,22 +174,20 @@ from music_links_bot.stats import (
 from music_links_bot.sharing import (
     add_share_button,
     build_share_query,
-    parse_share_query,
-    render_inline_share_card,
     track_share_url,
 )
 from music_links_bot.text_utils import normalize_hashtag
 from music_links_bot.url_utils import (
     extract_supported_urls,
-    is_nts_url,
-    is_spotify_artist_url,
-    is_spotify_playlist_url,
-    is_youtube_video_url,
 )
 from music_links_bot.youtube import YouTubeClient
 
 LOGGER = logging.getLogger(__name__)
-__all__ = ["_release_fingerprint"]
+__all__ = [
+    "_build_inline_collection_result",
+    "_build_inline_result",
+    "_release_fingerprint",
+]
 CHANNEL_USERNAME = "stonerhand"
 CHANNEL_URL = f"https://t.me/{CHANNEL_USERNAME}"
 CHANNEL_BUTTON_TEXT = "🪨 Открыть канал"
@@ -203,8 +199,6 @@ MENU_DEMO = "menu:demo"
 MENU_KEYS = frozenset((MENU_START, MENU_HELP, MENU_GUIDE, MENU_PLATFORMS, MENU_DEMO))
 DEFAULT_UI_MODE = "stonerhand"
 MAX_BUTTON_TEXT_LENGTH = 64
-MAX_LINKS_PER_MESSAGE = 12
-INLINE_CACHE_SECONDS = 1800
 DRAFT_TTL_SECONDS = 48 * 3600
 MAX_MEMORY_DRAFTS = 300
 STATS_KV_KEY = "stats:v1"
@@ -323,35 +317,35 @@ def build_application(settings: Settings) -> Application:
 BOT_DESCRIPTIONS = {
     "": (
         "Музыкальный редактор для Telegram.\n\n"
-        "• Ссылка или название → выбор точного релиза\n"
-        "• Карточка с обложкой и кнопками площадок\n"
-        "• Хэштеги, цитата, размер превью и отправка себе\n"
-        "• Подборки /crate и перестановка треков\n"
-        "• Inline: @StonerHandBot + запрос в любом чате\n"
-        "• Studio: live-preview, очередь и публикация в канал\n\n"
+        "• Ссылка или название → точный релиз и готовая карточка\n"
+        "• Несколько ссылок → одна редактируемая подборка\n"
+        "• Обложка, хэштеги, цитата и кнопки всех площадок\n"
+        "• Нативная отправка поста с кнопками в любой чат\n"
+        "• Inline: @StonerHandBot + запрос прямо в переписке\n"
+        "• Студия: live-preview, пресеты, очередь и канал\n\n"
         "Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
         "Yandex Music, NTS Radio."
     ),
     "en": (
         "A music post editor for Telegram.\n\n"
-        "• Paste a link or title and choose the exact release\n"
-        "• Get a card with cover art and platform buttons\n"
-        "• Tune hashtags, quote, preview size and send to yourself\n"
-        "• Build and reorder crates with /crate\n"
-        "• Inline: @StonerHandBot + a query in any chat\n"
-        "• Studio: live preview, queue and channel publishing\n\n"
+        "• A link or title → the exact release and a finished card\n"
+        "• Several links → one editable crate\n"
+        "• Artwork, hashtags, quote and every platform button\n"
+        "• Native sharing that preserves buttons in any chat\n"
+        "• Inline: @StonerHandBot + a query inside any conversation\n"
+        "• Studio: live preview, presets, queue and publishing\n\n"
         "Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
         "Yandex Music and NTS Radio."
     ),
 }
 BOT_SHORT_DESCRIPTIONS = {
     "": (
-        "Ссылка или название → точный релиз и готовый пост. "
-        "Обложка, площадки, редактор, подборки и очередь — в 🎛 Студии."
+        "Ссылка, название или несколько треков → готовый пост. "
+        "Обложка, площадки, подборки и публикация — в 🎛 Студии."
     ),
     "en": (
-        "A link or title → the exact release and a finished post. "
-        "Cover art, platforms, editing, crates and queue — in 🎛 Studio."
+        "A link, title or several tracks → a finished post. "
+        "Artwork, platforms, crates and publishing — in 🎛 Studio."
     ),
 }
 
@@ -765,302 +759,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         if "Message is not modified" in str(exc):
             return
         raise
-
-
-async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    inline_query = update.inline_query
-    if inline_query is None:
-        return
-
-    lang = resolve_lang(
-        inline_query.from_user.language_code if inline_query.from_user else None
-    )
-    query_text = inline_query.query or ""
-    shared_urls = parse_share_query(query_text)
-    source_urls = extract_supported_urls(query_text)[:MAX_LINKS_PER_MESSAGE]
-    is_direct_collection = shared_urls is None and len(source_urls) > 1
-    collection_urls = (
-        shared_urls
-        if shared_urls is not None
-        else source_urls if is_direct_collection else None
-    )
-    if collection_urls is not None:
-        if not collection_urls:
-            await _answer_inline_hint(
-                inline_query, get_text(lang, "inline_hint_not_found")
-            )
-            return
-
-        try:
-            shared_result = await _build_inline_collection_result(
-                collection_urls, context, lang=lang
-            )
-        except Exception as exc:
-            LOGGER.error(
-                "Inline collection lookup failed",
-                exc_info=(type(exc), exc, exc.__traceback__),
-            )
-            shared_result = None
-
-        if shared_result is None:
-            await _answer_inline_hint(
-                inline_query, get_text(lang, "inline_hint_not_found")
-            )
-            return
-
-        try:
-            await inline_query.answer(
-                [shared_result],
-                cache_time=0 if is_direct_collection else INLINE_CACHE_SECONDS,
-                is_personal=is_direct_collection,
-                button=InlineQueryResultsButton(
-                    text=get_text(lang, "open_studio"), start_parameter="studio"
-                ),
-            )
-        except TelegramError:
-            LOGGER.debug("Could not answer inline collection query", exc_info=True)
-        return
-
-    source_urls = source_urls[:1]
-    if not source_urls:
-        search_query = normalize_search_query(query_text)
-        if search_query is None:
-            await _answer_inline_hint(inline_query, get_text(lang, "inline_hint_empty"))
-            return
-
-        search_client: SearchClient = context.application.bot_data["search_client"]
-        try:
-            if hasattr(search_client, "search_release_candidates"):
-                candidates = await search_client.search_release_candidates(search_query)
-            else:
-                source_url = await search_client.search_release_url(search_query)
-                candidates = [
-                    type(
-                        "SearchChoice",
-                        (),
-                        {"url": source_url, "artist": "", "title": search_query},
-                    )()
-                ]
-        except SearchLookupError:
-            await _answer_inline_hint(
-                inline_query,
-                get_text(lang, "inline_hint_not_found"),
-            )
-            return
-
-        source_urls = [candidate.url for candidate in candidates]
-
-    outcomes = await asyncio.gather(
-        *(_build_inline_result(source_url, context, lang=lang) for source_url in source_urls),
-        return_exceptions=True,
-    )
-    results = []
-    for source_url, outcome in zip(source_urls, outcomes, strict=False):
-        if isinstance(outcome, InlineQueryResultArticle):
-            results.append(outcome)
-        elif isinstance(outcome, Exception):
-            LOGGER.error(
-                "Inline lookup failed for %s",
-                source_url,
-                exc_info=(type(outcome), outcome, outcome.__traceback__),
-            )
-
-    if not results:
-        await _answer_inline_hint(inline_query, get_text(lang, "inline_hint_not_found"))
-        return
-
-    try:
-        await inline_query.answer(
-            results[:6],
-            cache_time=INLINE_CACHE_SECONDS,
-            is_personal=False,
-            button=InlineQueryResultsButton(
-                text=get_text(lang, "open_studio"), start_parameter="studio"
-            ),
-        )
-    except TelegramError:
-        LOGGER.debug("Could not answer inline query", exc_info=True)
-
-
-async def _answer_inline_hint(inline_query, button_text: str) -> None:
-    try:
-        await inline_query.answer(
-            [],
-            cache_time=10,
-            button=InlineQueryResultsButton(text=button_text, start_parameter="inline"),
-        )
-    except TelegramError:
-        LOGGER.debug("Could not answer inline query with hint", exc_info=True)
-
-
-async def _build_inline_result(
-    source_url: str,
-    context: ContextTypes.DEFAULT_TYPE,
-    *,
-    lang: str = "ru",
-) -> InlineQueryResultArticle | None:
-    bot_data = context.application.bot_data
-    share_query = build_share_query([source_url])
-    share_label = get_text(lang, "share_post")
-
-    if is_spotify_artist_url(source_url):
-        artists = await _lookup_artists(bot_data["artist_client"], [source_url])
-        artist = artists[0]
-        return _inline_article(
-            source_url,
-            title=artist.title,
-            description=f"Карточка артиста · {artist.platform}",
-            text=format_artist_message(artist, include_hashtags=True),
-            keyboard=add_share_button(
-                _build_artist_keyboard(artist.url),
-                share_query=share_query,
-                label=share_label,
-            ),
-            preview_url=artist.url,
-        )
-
-    if is_spotify_playlist_url(source_url):
-        playlists = await _lookup_playlists(bot_data["playlist_client"], [source_url])
-        playlist = playlists[0]
-        return _inline_article(
-            source_url,
-            title=playlist.title,
-            description=f"Плейлист · {playlist.platform}",
-            text=format_playlist_message(playlist, include_hashtags=True),
-            keyboard=add_share_button(
-                _build_playlist_keyboard(playlist.url),
-                share_query=share_query,
-                label=share_label,
-            ),
-            preview_url=playlist.url,
-        )
-
-    if is_youtube_video_url(source_url):
-        videos = await _lookup_youtube_videos(bot_data["youtube_client"], [source_url])
-        video = videos[0]
-        return _inline_article(
-            source_url,
-            title=video.title,
-            description=f"Видео · {video.author}",
-            text=format_video_message(video, include_hashtags=True),
-            keyboard=add_share_button(
-                _build_youtube_keyboard(video.url),
-                share_query=share_query,
-                label=share_label,
-            ),
-            preview_url=video.url,
-        )
-
-    if is_nts_url(source_url):
-        radios = await _lookup_nts_radios(bot_data["nts_client"], [source_url])
-        if not radios:
-            return None
-
-        radio = radios[0]
-        return _inline_article(
-            source_url,
-            title=radio.title,
-            description=f"Эфир · {radio.station}",
-            text=format_radio_message(radio, include_hashtags=True),
-            keyboard=add_share_button(
-                _build_nts_keyboard(radio.url),
-                share_query=share_query,
-                label=share_label,
-            ),
-            preview_url=radio.url,
-        )
-
-    tracks, _unavailable = await _lookup_tracks(
-        bot_data["songlink_client"],
-        [source_url],
-        soundcloud_client=bot_data["soundcloud_client"],
-        search_client=bot_data.get("search_client"),
-    )
-    tracks = [track for track in tracks if track.links]
-    if not tracks:
-        return None
-
-    track = tracks[0]
-    return _inline_article(
-        source_url,
-        title=f"{track.artist} — {track.title}",
-        description="Пост с кнопками всех площадок",
-        text=format_track_message(track, include_hashtags=True),
-        keyboard=add_share_button(
-            _build_link_keyboard(
-                track.links,
-                context=context,
-                release_page_url=track.page_url,
-                release_kind=track.kind,
-                release_format=track.release_format,
-            ),
-            share_query=share_query,
-            label=share_label,
-        ),
-        preview_url=_select_preview_url(track.links, context) or track.thumbnail_url,
-        thumbnail_url=track.thumbnail_url,
-    )
-
-
-async def _build_inline_collection_result(
-    source_urls: list[str],
-    context: ContextTypes.DEFAULT_TYPE,
-    *,
-    lang: str,
-) -> InlineQueryResultArticle | None:
-    if len(source_urls) == 1:
-        return await _build_inline_result(source_urls[0], context, lang=lang)
-
-    bundle = await _bot_lookup.resolve_sources(
-        context.application.bot_data, source_urls
-    )
-    if bundle.item_count == 0:
-        return None
-
-    share_query = build_share_query(source_urls)
-    share_label = get_text(lang, "share_post")
-    card = render_inline_share_card(
-        bundle,
-        context=context,
-        lang=lang,
-        share_query=share_query,
-        share_label=share_label,
-    )
-    return _inline_article(
-        "|".join(source_urls),
-        title=card.title,
-        description=card.description,
-        text=card.text,
-        keyboard=card.keyboard,
-        preview_url=card.preview_url,
-    )
-
-
-def _inline_article(
-    source_url: str,
-    *,
-    title: str,
-    description: str,
-    text: str,
-    keyboard: InlineKeyboardMarkup,
-    preview_url: str | None,
-    thumbnail_url: str | None = None,
-) -> InlineQueryResultArticle:
-    return InlineQueryResultArticle(
-        id=hashlib.sha256(source_url.encode("utf-8")).hexdigest()[:32],
-        title=title,
-        description=description,
-        thumbnail_url=thumbnail_url,
-        input_message_content=InputTextMessageContent(
-            message_text=text,
-            parse_mode=ParseMode.HTML,
-            link_preview_options=_build_link_preview_options(
-                preview_url,
-                prefer_large_media=True,
-            ),
-        ),
-        reply_markup=keyboard,
-    )
 
 
 async def _send_track_draft(

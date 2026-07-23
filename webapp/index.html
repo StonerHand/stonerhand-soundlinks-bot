@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600&family=Golos+Text:wght@400;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/webapp/styles.css">
-<link rel="stylesheet" href="/webapp/studio-8.css">
+<link rel="stylesheet" href="/webapp/studio-shell.css">
 </head>
 <body class="dark">
 
@@ -55,14 +55,10 @@
       </div>
       <section class="home-hero" aria-labelledby="home-title">
         <div class="hero-noise"></div>
+        <div class="hero-signal" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
         <span class="hero-kicker" id="hero-kicker">MUSIC POST WORKSHOP</span>
         <h1 id="home-title">Собери пост,<br><em>который звучит.</em></h1>
         <p id="home-hint">Вставь ссылку или найди релиз — остальное Студия соберёт сама.</p>
-        <div class="hero-status" aria-label="Возможности Студии">
-          <span><i></i> Telegram native</span>
-          <span>RU / EN</span>
-          <span>light + dark</span>
-        </div>
         <div class="hero-flow" aria-label="Три шага создания поста">
           <span><b>01</b><small id="flow-find">Найти</small></span><i>→</i>
           <span><b>02</b><small id="flow-style">Оформить</small></span><i>→</i>
@@ -72,12 +68,12 @@
       <div class="searchbox home-search">
         <div class="searchbar" id="searchbar">
           <svg class="icon s18" style="color:var(--muted)"><use href="#i-search"/></svg>
-          <input id="query" aria-label="Ссылка или название релиза" placeholder="Ссылка или название…" autocomplete="off" enterkeyhint="search">
+          <input id="query" aria-label="Ссылка или название релиза" aria-describedby="support-label batch-label" placeholder="Ссылка или название…" autocomplete="off" enterkeyhint="search">
           <button class="paste-btn" id="paste-btn" type="button" aria-label="Вставить из буфера" title="Вставить из буфера"><svg class="icon s16"><use href="#i-clipboard"/></svg></button>
           <button class="clear" id="clear" type="button" aria-label="Очистить поиск"><svg class="icon s16"><use href="#i-x"/></svg></button>
-          <button class="search-go" id="search-go" type="button" aria-label="Найти релиз"><svg class="icon s18"><use href="#i-cr"/></svg></button>
+          <button class="search-go" id="search-go" type="button" aria-label="Найти релиз" disabled><svg class="icon s18"><use href="#i-cr"/></svg></button>
         </div>
-        <div class="search-support"><span><i></i><span id="support-label">Все музыкальные сервисы</span></span><small id="batch-label">Несколько ссылок → подборка</small></div>
+        <div class="search-support"><span><i></i><span id="support-label">Все музыкальные сервисы</span></span><small id="batch-label" aria-live="polite">Несколько ссылок → подборка</small></div>
         <div class="inline-alert hidden" id="home-alert" role="status">
           <span class="alert-icon"><svg class="icon s16"><use href="#i-undo"/></svg></span>
           <span><b id="home-alert-title">Не удалось обновить</b><small id="home-alert-copy">Проверь соединение и повтори</small></span>

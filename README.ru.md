@@ -2,9 +2,9 @@
 
 # 🎧 StonerHand Soundlinks Bot
 
-### Ссылка или название → точный релиз и готовый Telegram-пост
+### Ссылка, название или несколько треков → готовый Telegram-пост
 
-Обложка, автохэштеги, кнопки площадок, редактор, подборки и очередь — в 🎛 Студии.
+Обложка, умные теги, все площадки, нативная отправка и публикация — в 🎛 Студии.
 
 [Открыть бота](https://t.me/StonerHandBot) · [Канал](https://t.me/stonerhand) · [English](README.md) · [Архитектура](ARCHITECTURE.ru.md)
 
@@ -21,12 +21,12 @@
 
 | Telegram-бот | Mini App «Студия» |
 | --- | --- |
-| Поиск по ссылке или названию с выбором точного релиза | Live-preview поста и 30-секундная прослушка |
-| Готовая карточка с обложкой, CTA, тегами и площадками | CTA, теги, цитата, обложка и порядок кнопок |
-| Персональное `/start`-меню, inline и быстрый редактор | Активный черновик, пресеты, светлая и тёмная темы |
-| Несколько ссылок → один пост-подборка | Crate до 10 треков с drag-and-drop |
-| Ошибки с прямым возвратом в поиск или Студию | Preflight публикации, undo и очередь до 50 постов |
-| Работа в личке, группах и каналах, RU/EN | История и admin-статистика |
+| Ссылка или название → точный релиз → редактируемая карточка | Live-карточка и необязательная 30-секундная прослушка |
+| 2–12 ссылок → одна нумерованная подборка | Умный импорт нескольких ссылок в crate до 10 треков |
+| Обложка, CTA, теги и компактные кнопки площадок | CTA, цитата, теги, режим обложки и порядок площадок |
+| Нативная отправка сохраняет пост вместе с кнопками | Пресеты, восстановление черновика и preflight публикации |
+| Inline-поиск в любом чате; автозамена ссылок в группах/каналах | Drag/reorder, разделы, заметки и оформление подборки |
+| Единое `/start`-меню, RU/EN и понятное восстановление после ошибок | Очередь, перенос/undo, история и admin-аналитика |
 
 ```text
 Spotify / Apple Music / YouTube / SoundCloud / Bandcamp / Deezer / Tidal
@@ -39,10 +39,11 @@ Spotify / Apple Music / YouTube / SoundCloud / Bandcamp / Deezer / Tidal
 
 ```mermaid
 flowchart LR
-    A["Ссылка или название"] --> B["Выбор релиза"]
-    B --> C["Обложка + площадки"]
-    C --> D["Редактор / подборка"]
-    D --> E["Себе · канал · очередь"]
+    A["Ссылка / название"] --> B["Выбор релиза"]
+    A2["2–12 ссылок"] --> C["Сборка подборки"]
+    B --> D["Предпросмотр + редактор"]
+    C --> D
+    D --> E["Поделиться · себе · канал · очередь"]
 ```
 
 Обычный пользователь может искать, редактировать, собирать подборки и отправлять посты себе. Публикация в канал, очередь, undo и статистика доступны владельцу из `ADMIN_CHAT_ID`.
@@ -108,9 +109,9 @@ python tests/e2e/smoke.py
 
 ```text
 api/                    Vercel webhook, Studio API, health, setup
-src/music_links_bot/    handlers, lookup, formatter, runtime, queue, storage
-webapp/                 Mini App без build-step: HTML, CSS, ES modules
-tests/                  322 offline tests + Playwright smoke
+src/music_links_bot/    bot UI, inline, lookup, delivery, queue, storage
+webapp/                 Mini App без build-step: semantic HTML, design system, ES modules
+tests/                  offline unit/integration suite + adaptive Playwright smoke
 ```
 
 Подробные потоки, API actions, Redis keyspace, безопасность и правила расширения: [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).

@@ -47,6 +47,7 @@ api/
 
 src/music_links_bot/
   bot.py               composition root, handlers, chat editor, delivery
+  bot_inline.py        inline query, карточки и коллекции для любого чата
   bot_lookup.py        параллельный lookup и fallback разных типов URL
   bot_runtime.py       сессии, callback v2, action leases, диагностика
   bot_crate.py         подборка внутри Telegram-чата
@@ -83,10 +84,11 @@ src/music_links_bot/
 webapp/
   index.html           семантическая разметка экранов и dialog sheets
   styles.css           responsive темы и визуальная система
+  studio-shell.css     адаптивный Telegram workspace и component polish
   app.js               state machine, UI, Telegram WebApp integration
   api-client.js        JSON transport, timeout/cancel, request_id
   cloud-storage.js     Promise/callback adapter Telegram CloudStorage
-  studio-core.js       UX-правила, preflight и snapshot черновика
+  studio-core.js       query mode, UX-правила, preflight и snapshot черновика
 
 tests/
   test_*.py            unit и integration tests без внешней сети
@@ -156,7 +158,7 @@ sequenceDiagram
 1. команды `/start`, `/help`, `/guide`, `/platforms`, `/channel`, `/id`, `/stats`, `/crate`;
 2. callback v2 (`v2|scope|action|payload`);
 3. legacy callback (`menu:*`, `ed|*`) для уже отправленных сообщений;
-4. inline query;
+4. inline query, делегированный в `bot_inline.py`;
 5. обычный текст или caption.
 
 `detect_action()` классифицирует вход до дорогих вызовов: `help`, `search`, `resolve`, `crate` или `ignore`. До 12 URL из одного сообщения нормализуются и распределяются по типам.
@@ -252,14 +254,18 @@ Studio не требует Node build:
 - `app.js` управляет state/view transitions, Telegram WebApp API, player, formatting, presets, crate, queue и stats;
 - `api-client.js` создаёт `request_id`, ставит timeout, поддерживает abort и нормализует ошибки;
 - `cloud-storage.js` хранит тему, onboarding, presets, active draft и client-authoritative crate;
-- `studio-core.js` независимо от транспорта оценивает готовность поста/подборки и сериализует active draft snapshot.
+- `studio-core.js` независимо от транспорта распознаёт single/batch query, оценивает готовность поста/подборки и сериализует active draft snapshot.
 
 Home загружается одним action `dashboard`: history, зеркало crate и очередь читаются
 параллельно на сервере. Это убирает прежний waterfall из трёх запросов. Последний
 открытый draft сохраняется в CloudStorage и показывается отдельной карточкой
 «Продолжить». Перед отправкой единый preflight показывает состояние площадок,
 подводки, обложки и хэштегов; блокирующим условием остаётся только отсутствие
-доступной площадки.
+доступной площадки. Повторный вызов загрузки Home объединяется с уже выполняющимся,
+а новый lookup отменяет предыдущий abortable-запрос. Две и более ссылки до отправки
+переключают поиск в явный batch-режим; API возвращает число распознанных и
+нераспознанных позиций. Ошибка изображения заменяет его спокойным fallback и не
+засчитывается как стопроцентная готовность.
 
 Сервер не доверяет отображаемому клиентом admin-state. Каждое privileged действие снова проверяет `user.id == ADMIN_CHAT_ID`.
 
@@ -422,7 +428,7 @@ Endpoint:
 - `base-uri` и `object-src` запрещены;
 - динамический текст экранируется;
 - внешние URL проходят scheme validation;
-- запросы отменяются при уходе с экрана, stale responses отбрасываются sequence guard;
+- новый lookup отменяет предыдущий запрос, а stale responses отбрасываются sequence guard;
 - reduced-motion и keyboard focus поддерживаются.
 
 ## 12. Конфигурация и права
@@ -444,10 +450,10 @@ Endpoint:
 - Python 3.12;
 - `pyflakes` для `src`, `api`, `tests`;
 - полный `unittest` suite;
-- `node --check` для трёх ES modules;
+- `node --check` для всех четырёх ES modules;
 - отдельный Playwright/Chromium smoke: boot → search → candidate/result → crate и batch flow.
 
-Vercel Git Integration создаёт Preview для feature branch и Production deployment после merge в `main`. `vercel.json` отдельно объявляет четыре Python functions, пять static assets, routes, security headers и daily cron.
+Vercel Git Integration создаёт Preview для feature branch и Production deployment после merge в `main`. `vercel.json` отдельно объявляет Python functions и static assets, routes, security headers и daily cron.
 
 ## 14. Правила изменения системы
 
@@ -482,7 +488,7 @@ Vercel Git Integration создаёт Preview для feature branch и Productio
 
 - Vercel Functions не дают постоянного процесса: очередь тикает оппортунистически, а не отдельным worker;
 - без Redis состояние является best-effort и привязано к тёплому инстансу;
-- `bot.py` и `api/webapp.py` остаются крупнейшими orchestration-модулями; новые provider/storage/UI обязанности нужно выносить в отдельные файлы;
+- `bot.py` и `api/webapp.py` остаются orchestration-модулями; inline уже вынесен в `bot_inline.py`, новые provider/storage/UI обязанности также нужно добавлять отдельными файлами;
 - Studio — vanilla JS state machine без статической типизации, поэтому API contract защищают runtime validation и E2E;
 - Telegram удаляет inline keyboard при пересылке сообщения; универсальная Song.link-ссылка остаётся в тексте как fallback;
 - публичный iTunes Search не гарантирует одинаковый каталог во всех регионах;
