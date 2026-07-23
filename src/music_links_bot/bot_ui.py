@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from html import escape
-from urllib.parse import quote
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
@@ -91,48 +90,25 @@ def build_start_keyboard(
                 )
             )
         rows.append(admin_row)
-    discovery_row = [
-        InlineKeyboardButton(
-            get_text(lang, "home_result"),
-            callback_data=encode_callback("menu", "demo"),
-        )
-    ]
     if show_tour:
-        discovery_row.insert(
-            0,
-            InlineKeyboardButton(
-                get_text(lang, "quick_tour"),
-                callback_data=encode_callback("menu", "onboard1"),
-            ),
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "quick_tour"),
+                    callback_data=encode_callback("menu", "onboard1"),
+                    api_kwargs={"style": "primary"},
+                )
+            ]
         )
-    else:
-        discovery_row.append(
-            InlineKeyboardButton(
-                get_text(lang, "tab_help"),
-                callback_data=encode_callback("menu", "help"),
-            )
-        )
-    rows.append(discovery_row)
     rows.append(
         [
             InlineKeyboardButton(
-                get_text(lang, "tab_guide"),
-                callback_data=encode_callback("menu", "guide"),
+                get_text(lang, "tab_help"),
+                callback_data=encode_callback("menu", "help"),
             ),
             _channel_button(),
         ]
     )
-    if bot_username:
-        bot_url = f"https://t.me/{bot_username}"
-        share_url = "https://t.me/share/url?url=" + quote(bot_url, safe="")
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    get_text(lang, "share_button"),
-                    url=share_url,
-                )
-            ]
-        )
     return InlineKeyboardMarkup(rows)
 
 
@@ -240,33 +216,6 @@ def build_onboarding_keyboard(step: int, lang: str) -> InlineKeyboardMarkup:
 def editor_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
     lang = draft.get("lang") or "ru"
 
-    def state(flag: str) -> str:
-        return get_text(lang, "ed_on" if draft.get(flag) else "ed_off")
-
-    toggle_row = [
-        InlineKeyboardButton(
-            f"{get_text(lang, 'ed_hashtags')} {state('hashtags')}",
-            callback_data=encode_callback("editor", "h", draft_id),
-        )
-    ]
-    if draft.get("prefix"):
-        toggle_row.append(
-            InlineKeyboardButton(
-                f"{get_text(lang, 'ed_quote')} {state('quote')}",
-                callback_data=encode_callback("editor", "q", draft_id),
-            )
-        )
-    preview_state = get_text(
-        lang,
-        "ed_preview_large" if draft.get("large_preview") else "ed_preview_small",
-    )
-    toggle_row.append(
-        InlineKeyboardButton(
-            f"{get_text(lang, 'ed_preview')} {preview_state}",
-            callback_data=encode_callback("editor", "v", draft_id),
-        )
-    )
-
     primary_row = [
         InlineKeyboardButton(
             get_text(lang, "ed_send_self"),
@@ -292,24 +241,55 @@ def editor_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
                 web_app=WebAppInfo(url=f"{studio_url}?draft={draft_id}"),
             )
         )
-    secondary_row.extend(
+    secondary_row.append(
+        InlineKeyboardButton(
+            get_text(lang, "ed_add_crate"),
+            callback_data=encode_callback("editor", "c", draft_id),
+        )
+    )
+    return [
+        primary_row,
+        secondary_row,
         [
-            InlineKeyboardButton(
-                get_text(lang, "ed_add_crate"),
-                callback_data=encode_callback("editor", "c", draft_id),
-            ),
             InlineKeyboardButton(
                 get_text(lang, "ed_more"),
                 callback_data=encode_callback("editor", "m", draft_id),
-            ),
-        ]
-    )
-    return [primary_row, toggle_row, secondary_row]
+            )
+        ],
+    ]
 
 
 def editor_more_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
     lang = draft.get("lang") or "ru"
+
+    def state(flag: str) -> str:
+        return get_text(lang, "ed_on" if draft.get(flag) else "ed_off")
+
+    toggles = [
+        InlineKeyboardButton(
+            f"{get_text(lang, 'ed_hashtags')} {state('hashtags')}",
+            callback_data=encode_callback("editor", "h", draft_id),
+        )
+    ]
+    if draft.get("prefix"):
+        toggles.append(
+            InlineKeyboardButton(
+                f"{get_text(lang, 'ed_quote')} {state('quote')}",
+                callback_data=encode_callback("editor", "q", draft_id),
+            )
+        )
+    preview_state = get_text(
+        lang,
+        "ed_preview_large" if draft.get("large_preview") else "ed_preview_small",
+    )
+    toggles.append(
+        InlineKeyboardButton(
+            f"{get_text(lang, 'ed_preview')} {preview_state}",
+            callback_data=encode_callback("editor", "v", draft_id),
+        )
+    )
     return [
+        toggles,
         [
             InlineKeyboardButton(
                 get_text(lang, "ed_done"),

@@ -48,7 +48,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
       saved:"Saved", saving:"Saving…", saveError:"Not saved", onePlatform:"Keep at least one platform", done:"Done", content:"Content", ownText:"Your text", hashtags:"Hashtags", platforms:"Platforms & order",
       crate:"Crate", crateKicker:"CURATED BY STONERHAND", crateHero:"Your next set", queue:"Queue", stats:"Analytics", period:"All time", breakdown:"Breakdown", create:"Create",
       close:"Close", publishKicker:"FINAL STEP", publishTitle:"Where should the post go?",
-      destinations:[["To channel","Publish for everyone"],["Send to me","Check in your private chat"],["Add to queue","Choose a date and time"],["Share a link","Choose a music platform"]],
+      destinations:[["To channel","Publish for everyone"],["Send to me","Check in your private chat"],["Add to queue","Choose a date and time"],["Send to another chat","Ready post with every button"]],
       successNext:"Create another", successClose:"Back to the post",
     },
     shareTitle: "Share where?", shareAll: "All platforms",
@@ -61,6 +61,11 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     queueEmptyT: "Queue is empty", queueEmptyS: "Scheduled posts will show up here",
     statsEmptyT: "No stats yet", statsEmptyS: "Numbers appear once you start posting",
     nowPlaying: "Preview", confirmRemove: "Remove this item?", confirmClear: "Clear the whole crate?",
+    crateEdit: "Style", crateEditor: "Collection editor", crateSave: "Save collection",
+    continueAction: "Continue",
+    crateTitleLabel: "Title", crateIntroLabel: "Introduction", crateOutroLabel: "Closing line", crateTagsLabel: "Hashtags",
+    crateItemEditor: "Track details", crateSection: "Group", crateNote: "Comment", crateItemSave: "Save track",
+    tagRecommended: "RECOMMENDED", tagHealthy: "Good set: clear and relevant", tagTooMany: "Keep up to 6–8 focused tags",
   } : {
     ph: "Ссылка или название…", recent: "НЕДАВНИЕ", popular: "ПОПУЛЯРНЫЕ ЗАПРОСЫ",
     hint: "Вставь ссылку или найди релиз — остальное Студия соберёт сама.",
@@ -94,7 +99,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
       saved:"Сохранено", saving:"Сохраняю…", saveError:"Не сохранено", onePlatform:"Оставь хотя бы одну площадку", done:"Готово", content:"Содержимое", ownText:"Свой текст", hashtags:"Хэштеги", platforms:"Площадки и порядок",
       crate:"Подборка", crateKicker:"СОБРАНО STONERHAND", crateHero:"Следующий сет", queue:"Очередь", stats:"Статистика", period:"За всё время", breakdown:"Разбивка", create:"Создать",
       close:"Закрыть", publishKicker:"ФИНАЛЬНЫЙ ШАГ", publishTitle:"Куда отправить пост?",
-      destinations:[["В канал","Опубликовать для всех"],["Отправить себе","Проверить в личном чате"],["Добавить в очередь","Выбрать дату и время"],["Поделиться ссылкой","Выбрать музыкальную площадку"]],
+      destinations:[["В канал","Опубликовать для всех"],["Отправить себе","Проверить в личном чате"],["Добавить в очередь","Выбрать дату и время"],["Отправить в другой чат","Готовый пост со всеми кнопками"]],
       successNext:"Создать следующий", successClose:"Вернуться к посту",
     },
     shareTitle: "Куда поделиться?", shareAll: "Все площадки",
@@ -107,6 +112,11 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     queueEmptyT: "Очередь пуста", queueEmptyS: "Отложенные посты появятся здесь",
     statsEmptyT: "Пока нет статистики", statsEmptyS: "Цифры появятся, как начнёшь постить",
     nowPlaying: "Превью", confirmRemove: "Удалить этот элемент?", confirmClear: "Очистить всю подборку?",
+    crateEdit: "Оформить", crateEditor: "Редактор подборки", crateSave: "Сохранить оформление",
+    continueAction: "Продолжить",
+    crateTitleLabel: "Название", crateIntroLabel: "Вступление", crateOutroLabel: "Финальная фраза", crateTagsLabel: "Хэштеги",
+    crateItemEditor: "Настройка трека", crateSection: "Группа", crateNote: "Комментарий", crateItemSave: "Сохранить трек",
+    tagRecommended: "РЕКОМЕНДУЕМ", tagHealthy: "Хороший набор: понятно и по теме", tagTooMany: "Лучше оставить 6–8 точных тегов",
   };
 
   const SUGGESTIONS = ["Black Sabbath – Paranoid","Sleep – Dragonaut","Electric Wizard – Funeralopolis","Kyuss – Green Machine"];
@@ -122,6 +132,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   const TAB_SCREENS = ["home","crate","queue","stats"];
   let state = null, isAdmin = false, playingBtn = null, syncTimer = null, undoTimer = null;
   let historyItems = [], crateItems = [], crateCount = 0;
+  let collectionMeta = { title:"", intro:"", outro:"", tags:[] }, editingCrateIndex = -1, publishMode = "draft";
   let navStack = ["home"];
   let loadSeq = 0, syncSeq = 0, previewFetching = false, lastQuery = "";
   const apiTransport = createApiClient({
@@ -131,8 +142,10 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
 
   const hap = {
     tap(){try{tg.HapticFeedback.impactOccurred("light")}catch(e){}},
+    medium(){try{tg.HapticFeedback.impactOccurred("medium")}catch(e){}},
     pick(){try{tg.HapticFeedback.selectionChanged()}catch(e){}},
     ok(){try{tg.HapticFeedback.notificationOccurred("success")}catch(e){}},
+    warn(){try{tg.HapticFeedback.notificationOccurred("warning")}catch(e){}},
     err(){try{tg.HapticFeedback.notificationOccurred("error")}catch(e){}},
   };
   function esc(v){const d=document.createElement("div");d.textContent=v==null?"":String(v);return d.innerHTML;}
@@ -250,6 +263,10 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   $("cta-input").placeholder = T.ui.ctaPlaceholder;
   $("format-content").textContent = T.ui.content; $("format-text").textContent = T.ui.ownText; $("format-tags").textContent = T.ui.hashtags; $("format-platforms").textContent = T.ui.platforms;
   $("crate-label").textContent = T.ui.crate; $("crate-kicker").textContent = T.ui.crateKicker; $("crate-hero-title").textContent = T.ui.crateHero;
+  $("crate-edit-label").textContent = T.crateEdit;
+  $("crate-editor-title").textContent = T.crateEditor; $("crate-editor-save").textContent = T.crateSave;
+  $("crate-title-label").textContent = T.crateTitleLabel; $("crate-intro-label").textContent = T.crateIntroLabel; $("crate-outro-label").textContent = T.crateOutroLabel; $("crate-tags-label").textContent = T.crateTagsLabel;
+  $("crate-item-title").textContent = T.crateItemEditor; $("crate-section-label").textContent = T.crateSection; $("crate-note-label").textContent = T.crateNote; $("crate-item-save").textContent = T.crateItemSave;
   $("queue-label").textContent = T.ui.queue; $("stats-title").textContent = T.ui.stats; $("stats-period").textContent = T.ui.period; $("stats-breakdown-label").textContent = T.ui.breakdown;
   $("create-label").textContent = T.ui.create; $("fmt-apply").textContent = T.ui.done;
   $("publish-kicker").textContent = T.ui.publishKicker; $("publish-title").textContent = T.ui.publishTitle;
@@ -293,6 +310,8 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   }
   try { tg.BackButton.onClick(() => { hap.tap(); goBack(); }); } catch(e) {}
   function goBack() {
+    if ($("crate-item-sheet").classList.contains("open")) { closeCrateItemEditor(); return; }
+    if ($("crate-editor-sheet").classList.contains("open")) { closeCrateEditor(); return; }
     if ($("publish-sheet").classList.contains("open")) { closePublish(); return; }
     if ($("share-sheet").classList.contains("open")) { closeShare(); return; }
     if ($("sheet").classList.contains("open")) { closeSheet(); return; }
@@ -346,6 +365,10 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     if (error === "network") return T.network;
     if (error === "timeout") return T.timeout;
     if (error === "request_in_progress" || error === "queue_busy") return T.busy;
+    if (error === "draft not found") return EN?"This draft expired. Find the release again.":"Черновик устарел. Найди релиз ещё раз.";
+    if (error === "need more tracks") return T.needMore;
+    if (error === "unauthorized") return EN?"Reopen Studio from the bot.":"Закрой и снова открой Студию из бота.";
+    if (error === "save_failed") return EN?"Changes were not saved. Check the connection and retry.":"Изменения не сохранены. Проверь соединение и повтори.";
     return T.err;
   }
   function confirmAction(message) {
@@ -526,12 +549,14 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     if (img && !r.accentColor) {
       const apply = () => {
         if (!dyn) return;
+        card.style.setProperty("--release-accent",dyn);
         const g = $("genre-badge");
         if (g) { g.style.background = dyn.replace("rgb(", "rgba(").replace(")", ",0.13)"); g.style.color = dyn; g.style.border = "1px solid " + dyn.replace("rgb(", "rgba(").replace(")", ",0.4)"); }
         card.style.boxShadow = "0 8px 32px " + dyn.replace("rgb(", "rgba(").replace(")", ",0.25)");
       };
       if (img.complete) extractAccent(img, apply); else img.addEventListener("load", () => extractAccent(img, apply));
     } else if (r.accentColor) {
+      card.style.setProperty("--release-accent",acc);
       const g=$("genre-badge"); if(g){g.style.background=acc+"22";g.style.color=acc;g.style.border="1px solid "+acc+"44";}
     }
 
@@ -597,7 +622,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
       let added = 0;
       found.forEach((it) => {
         const key = ((it.data.artist||"")+"|"+(it.data.title||"")).toLowerCase();
-        if (!have.has(key) && crateItems.length < 10) { have.add(key); crateItems.push(it); added++; }
+        if (!have.has(key) && crateItems.length < 10) { have.add(key); crateItems.push(normalizeCrateItem(it)); added++; }
       });
       persistCrate(); refreshCrateBadge(); hap.ok();
       $("query").value = "";
@@ -720,7 +745,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     } catch(e) { $("q-queue-sub").textContent = T.quick.queue[1]; }
   }
   function refreshCrateBadge(data) {
-    if (data && Array.isArray(data.items)) crateItems = data.items;
+    if (data && Array.isArray(data.items)) crateItems = adoptCrateItems(data.items);
     crateCount = crateItems.length;
     const b=$("q-crate-n"); b.style.display=crateCount>0?"flex":"none"; b.textContent=crateCount;
   }
@@ -817,6 +842,10 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   }
   function drawTags() {
     const cloud = $("tag-cloud"); cloud.innerHTML = "";
+    editTags = [...new Set(editTags.map((tag) => {
+      const clean=String(tag||"").trim().replace(/\s+/g,"").replace(/^#+/,"");
+      return clean ? "#"+clean.toLowerCase() : "";
+    }).filter(Boolean))].slice(0,8);
     editTags.forEach((t, i) => {
       const p = document.createElement("button"); p.className = "chip";
       p.innerHTML = esc(t)+'<span class="x">✕</span>';
@@ -826,6 +855,18 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     const inp = document.createElement("input"); inp.className = "chip-input"; inp.placeholder = "+ "+T.addTag;
     inp.addEventListener("keydown", (e) => { if (e.key==="Enter" && inp.value.trim()) { e.preventDefault(); hap.pick(); editTags.push(inp.value.trim()); drawTags(); syncDraft({tags:editTags.slice()}); } });
     cloud.appendChild(inp);
+    const recommended = (state?.release?.auto_hashtags||"").split(/\s+/).filter((tag)=>tag && !editTags.includes(tag));
+    const suggestions = $("tag-suggestions"); suggestions.innerHTML = "";
+    if (recommended.length) {
+      const label=document.createElement("span"); label.textContent=T.tagRecommended; suggestions.appendChild(label);
+      recommended.slice(0,5).forEach((tag)=>{
+        const button=document.createElement("button"); button.type="button"; button.textContent="+ "+tag;
+        button.addEventListener("click",()=>{hap.pick();editTags.push(tag);drawTags();syncDraft({tags:editTags.slice()});});
+        suggestions.appendChild(button);
+      });
+    }
+    const health=$("tag-health"); health.textContent=editTags.length>6?T.tagTooMany:T.tagHealthy;
+    health.classList.toggle("warn", editTags.length>6);
   }
   function drawPm() {
     const list = $("pm-list"); list.innerHTML = "";
@@ -921,11 +962,26 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     finally { setNativeMainBusy(false); if ($("dock-done").classList.contains("hidden")) $("action-main").disabled = false; }
   }
   function closePublish() { setSheetOpen("publish-sheet", "publish-mask", false); }
-  function openPublish() {
+  function openPublish(mode) {
+    publishMode=mode==="crate"?"crate":"draft";
     hap.tap();
-    $("publish-channel").classList.toggle("hidden", !state.can_publish);
-    $("publish-later").classList.toggle("hidden", !state.can_publish);
-    setSheetOpen("publish-sheet", "publish-mask", true, $("action-main"));
+    const canPublish=publishMode==="crate"?isAdmin:Boolean(state?.can_publish);
+    $("publish-channel").classList.toggle("hidden", !canPublish);
+    $("publish-later").classList.toggle("hidden", !canPublish || publishMode==="crate");
+    if(publishMode==="crate"){
+      const first=crateItems[0]||{}, title=collectionMeta.title||(EN?"Collection":"Подборка");
+      $("publish-summary").innerHTML=artHtml(first.artwork,first.emoji,"publish-art")+
+        '<div><b>'+esc(title)+'</b><small>'+esc(crateItems.length+" "+plural(crateItems.length,"track","tracks","трек","трека","треков"))+
+        '</small></div><span class="publish-ready">'+ico("check","s14")+(EN?"READY":"ГОТОВО")+"</span>";
+    }else{
+      const release=state.release, platforms=(release.platforms||[]).filter((p)=>p.enabled!==false).length;
+      $("publish-summary").innerHTML =
+        artHtml(release.artwork,release.emoji,"publish-art")+
+        '<div><b>'+esc(release.artist)+" — "+esc(release.title)+'</b><small>'+
+        esc(platforms+" "+T.readyPlatforms+" · "+(state.flags.hashtags?T.readyHashtags:T.readyClean))+
+        '</small></div><span class="publish-ready">'+ico("check","s14")+(EN?"READY":"ГОТОВО")+"</span>";
+    }
+    setSheetOpen("publish-sheet", "publish-mask", true, publishMode==="crate"?$("crate-main"):$("action-main"));
   }
   function showSuccess(action) {
     $("success-stamp").textContent = action === "publish" ? T.ui.publishedStamp : T.ui.sentStamp;
@@ -936,13 +992,13 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     requestAnimationFrame(() => $("success-next").focus());
   }
   function hideSuccess() { document.querySelector(".wrap").inert = false; $("success-screen").classList.remove("open"); $("success-screen").setAttribute("aria-hidden", "true"); if (!$("v-result").classList.contains("hidden") && state) renderCard(); }
-  $("action-main").addEventListener("click", openPublish);
+  $("action-main").addEventListener("click", () => openPublish("draft"));
   $("publish-mask").addEventListener("click", closePublish);
   $("publish-close").addEventListener("click", closePublish);
-  $("publish-channel").addEventListener("click", () => { closePublish(); deliver("publish"); });
-  $("publish-self").addEventListener("click", () => { closePublish(); deliver("send"); });
+  $("publish-channel").addEventListener("click", () => { const crate=publishMode==="crate"; closePublish(); if(crate)deliverCrate("crate_publish");else deliver("publish"); });
+  $("publish-self").addEventListener("click", () => { const crate=publishMode==="crate"; closePublish(); if(crate)deliverCrate("crate_send");else deliver("send"); });
   $("publish-later").addEventListener("click", () => { closePublish(); openSheet(); });
-  $("publish-copy").addEventListener("click", () => { closePublish(); $("action-share").click(); });
+  $("publish-copy").addEventListener("click", () => { const crate=publishMode==="crate"; closePublish(); if(crate)shareCratePrepared();else $("action-share").click(); });
   $("success-close").addEventListener("click", hideSuccess);
   $("success-next").addEventListener("click", () => { hideSuccess(); loadHome(); show("home"); setTimeout(()=>$("query").focus(),80); });
   $("action-crate").addEventListener("click", async () => {
@@ -954,7 +1010,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     if (!item.page_url) { const p = (r.platforms||[]).find((x)=>/^https?:\/\//i.test(String(x.url||""))); if (p) item.page_url = p.url; }
     try {
       const res = await api("crate_add", { item, items: crateItems.map((x)=>x.data), draft_id: state.draft_id });
-      if (res.ok) { hap.ok(); crateItems = res.items||[]; persistCrate(); refreshCrateBadge(); $("status").textContent = T.toCrate.toUpperCase()+" · "+res.count; }
+      if (res.ok) { hap.ok(); crateItems = adoptCrateItems(res.items||[]); persistCrate(); refreshCrateBadge(); $("status").textContent = T.toCrate.toUpperCase()+" · "+res.count; }
       else { hap.err(); $("status").textContent = res.error==="crate full"?T.crateFull:T.err; }
     } catch(e) { hap.err(); }
   });
@@ -1117,13 +1173,15 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     if (e.key === "Escape") {
       if ($("coach").classList.contains("open")) closeCoach();
       else if ($("success-screen").classList.contains("open")) hideSuccess();
+      else if ($("crate-item-sheet").classList.contains("open")) closeCrateItemEditor();
+      else if ($("crate-editor-sheet").classList.contains("open")) closeCrateEditor();
       else if ($("publish-sheet").classList.contains("open")) closePublish();
       else if ($("share-sheet").classList.contains("open")) closeShare();
       else if ($("sheet").classList.contains("open")) closeSheet();
       return;
     }
     if (e.key !== "Tab") return;
-    const dialog = $("publish-sheet").classList.contains("open") ? $("publish-sheet") : ($("share-sheet").classList.contains("open") ? $("share-sheet") : ($("sheet").classList.contains("open") ? $("sheet") : null));
+    const dialog = $("crate-item-sheet").classList.contains("open") ? $("crate-item-sheet") : ($("crate-editor-sheet").classList.contains("open") ? $("crate-editor-sheet") : ($("publish-sheet").classList.contains("open") ? $("publish-sheet") : ($("share-sheet").classList.contains("open") ? $("share-sheet") : ($("sheet").classList.contains("open") ? $("sheet") : null))));
     if (!dialog) return;
     const focusable = [...dialog.querySelectorAll('button:not([disabled]),input:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter((el)=>el.offsetParent !== null);
     if (!focusable.length) return;
@@ -1134,13 +1192,44 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
 
   /* ── crate (client-authoritative: the list lives in CloudStorage and rides
      along with every request, so a serverless cold start can't lose tracks) ── */
-  function crateSerialize() { return JSON.stringify(crateItems.map((x)=>({ d:x.data, e:x.emoji }))); }
+  function normalizeCrateItem(item) {
+    return { ...item, meta: item?.meta && typeof item.meta==="object" ? {section:String(item.meta.section||""),note:String(item.meta.note||"")} : {section:"",note:""} };
+  }
+  function adoptCrateItems(items) {
+    const previous=new Map(crateItems.map((item)=>[((item.data?.artist||"")+"|"+(item.data?.title||"")).toLowerCase(),item.meta||{}]));
+    return (items||[]).map((item)=>{
+      const normalized=normalizeCrateItem(item);
+      const key=((normalized.data?.artist||"")+"|"+(normalized.data?.title||"")).toLowerCase();
+      normalized.meta=previous.get(key)||normalized.meta;
+      return normalized;
+    });
+  }
+  function crateSerialize() {
+    return JSON.stringify({
+      items:crateItems.map((x)=>({ d:x.data, e:x.emoji, m:x.meta||{} })),
+      meta:collectionMeta,
+    });
+  }
   function crateHydrate(raw) {
-    let arr = []; try { arr = JSON.parse(raw)||[]; } catch(e) { arr = []; }
+    let stored = []; try { stored = JSON.parse(raw)||[]; } catch(e) { stored = []; }
+    const arr = Array.isArray(stored) ? stored : (Array.isArray(stored.items)?stored.items:[]);
+    if (!Array.isArray(stored) && stored.meta && typeof stored.meta==="object") {
+      collectionMeta = {
+        title:String(stored.meta.title||""), intro:String(stored.meta.intro||""),
+        outro:String(stored.meta.outro||""), tags:Array.isArray(stored.meta.tags)?stored.meta.tags.slice(0,8):[],
+      };
+    }
     if (!Array.isArray(arr)) return [];
-    return arr.filter((o)=>o && o.d).map((o)=>({ artist:o.d.artist, title:o.d.title, emoji:o.e||"📀", artwork:o.d.thumbnail_url, data:o.d }));
+    return arr.filter((o)=>o && o.d).map((o)=>normalizeCrateItem({ artist:o.d.artist, title:o.d.title, emoji:o.e||"📀", artwork:o.d.thumbnail_url, data:o.d, meta:o.m }));
   }
   function persistCrate() { cloud.set("crate1", crateSerialize()); }
+  function crateRequestPayload() {
+    return {
+      items:crateItems.map((x)=>x.data),
+      collection:collectionMeta,
+      item_meta:crateItems.map((x)=>x.meta||{}),
+    };
+  }
   function loadCrate(cb) {
     cloud.get("crate1", (err, val) => { if (!err && val) crateItems = crateHydrate(val); cb && cb(); });
   }
@@ -1150,7 +1239,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     loadCrate(async () => {
       let loadFailed = false;
       if (!crateItems.length) {
-        try { const res = await api("crate", {}); if (!res.ok) throw new Error(res.error || "network"); if (res.items && res.items.length) { crateItems = res.items; persistCrate(); } } catch(e) { loadFailed = true; }
+        try { const res = await api("crate", {}); if (!res.ok) throw new Error(res.error || "network"); if (res.items && res.items.length) { crateItems = adoptCrateItems(res.items); persistCrate(); } } catch(e) { loadFailed = true; }
       }
       drawCrate();
       if (loadFailed && !crateItems.length) {
@@ -1163,6 +1252,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     const crateWord = plural(crateItems.length,"track","tracks","трек","трека","треков");
     $("crate-count").textContent = crateItems.length + " " + crateWord;
     $("crate-cover-count").textContent = crateItems.length + " " + crateWord;
+    $("crate-hero-title").textContent=collectionMeta.title||T.ui.crateHero;
     const stack = $("crate-stack").querySelectorAll("i");
     stack.forEach((tile, index) => {
       const item = crateItems[index];
@@ -1172,11 +1262,15 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     $("crate-empty").textContent = crateItems.length===1 ? T.needMore : "";
     crateItems.forEach((it, i) => {
       const row = document.createElement("div"); row.className = "row"; row.style.opacity = "1"; row.dataset.i = i;
+      const group=it.meta?.section?'<span class="crate-group">'+esc(it.meta.section)+"</span>":"";
+      const note=it.meta?.note?'<div class="row-note">'+esc(it.meta.note)+"</div>":"";
       row.innerHTML =
         '<div class="grip">'+ico("grip","s18")+"</div>"+
         '<span class="crate-idx">'+(i+1)+"</span>"+ artHtml(it.artwork, it.emoji, "row-art sm")+
-        '<div class="row-meta"><div class="row-title">'+esc(it.title)+'</div><div class="row-sub">'+esc(it.artist)+"</div></div>"+
+        '<div class="row-meta">'+group+'<div class="row-title">'+esc(it.title)+'</div><div class="row-sub">'+esc(it.artist)+"</div>"+note+"</div>"+
+        '<button class="rowbtn edit" aria-label="'+(EN?"Edit track":"Настроить трек")+'">'+ico("sliders","s14")+"</button>"+
         '<button class="rowbtn danger del" aria-label="'+(EN?"Remove track":"Удалить трек")+'">'+ico("trash","s14")+"</button>";
+      row.querySelector(".edit").addEventListener("click",()=>openCrateItemEditor(i));
       row.querySelector(".del").addEventListener("click", async () => {
         if (!await confirmAction(T.confirmRemove)) return;
         hap.tap();
@@ -1200,8 +1294,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     share.title = T.crateShare; share.setAttribute("aria-label", T.crateShare);
     clear.classList.toggle("hidden", crateItems.length===0);
     clear.textContent = "🗑 "+T.crateClear;
-    if (isAdmin) { main.innerHTML = ico("send","s18")+T.cratePublish+" ("+crateItems.length+")"; main.dataset.action="crate_publish"; }
-    else { main.innerHTML = ico("send","s18")+T.crateSend; main.dataset.action="crate_send"; }
+    main.innerHTML = ico("send","s18")+T.continueAction;
   }
   async function reorderCrate(from, to) {
     if (from === to) return;
@@ -1239,16 +1332,17 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
       window.addEventListener("pointerup", up);
     });
   }
-  $("crate-main").addEventListener("click", async () => {
+  async function deliverCrate(action) {
     const main = $("crate-main"); main.disabled = true;
-    try { const res = await api(main.dataset.action, { items: crateItems.map((x)=>x.data) }); if (res.ok) { hap.ok(); main.classList.add("done"); main.textContent = main.dataset.action==="crate_publish"?T.published:T.sent; if (main.dataset.action==="crate_publish") { crateItems=[]; persistCrate(); } setTimeout(()=>{refreshCrateBadge();drawCrate();},1600); } else { hap.err(); $("crate-empty").textContent = res.error==="need more tracks"?T.needMore:T.err; } } catch(e) { hap.err(); } finally { main.disabled = false; }
-  });
-  $("crate-share").addEventListener("click", async () => {
+    try { const res = await api(action, crateRequestPayload()); if (res.ok) { hap.ok(); main.classList.add("done"); main.textContent = action==="crate_publish"?T.published:T.sent; if (action==="crate_publish") { crateItems=[]; collectionMeta={title:"",intro:"",outro:"",tags:[]}; persistCrate(); } setTimeout(()=>{refreshCrateBadge();drawCrate();},1600); } else { hap.err(); $("crate-empty").textContent = res.error==="need more tracks"?T.needMore:T.err; } } catch(e) { hap.err(); } finally { main.disabled = false; }
+  }
+  $("crate-main").addEventListener("click", () => openPublish("crate"));
+  async function shareCratePrepared() {
     if (crateItems.length < 2) return;
     const button = $("crate-share");
     button.disabled = true; hap.tap();
     try {
-      const res = await api("prepare_crate_share", { items: crateItems.map((x)=>x.data) });
+      const res = await api("prepare_crate_share", crateRequestPayload());
       if (!res?.ok || !res.prepared_message_id || typeof tg.shareMessage !== "function") {
         const urls = crateItems.map((x)=>x.data.page_url).filter((url)=>/^https?:\/\//i.test(String(url||"")));
         try { tg.switchInlineQuery(urls.join(" "), ["users","groups","channels"]); }
@@ -1260,19 +1354,57 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
       });
     } catch(e) { hap.err(); flash(T.shareFailed); }
     finally { button.disabled = false; }
-  });
+  }
+  $("crate-share").addEventListener("click", shareCratePrepared);
   $("crate-clear").addEventListener("click", async () => {
     if (!await confirmAction(T.confirmClear)) return;
     hap.tap();
-    const before = crateItems.slice();
-    crateItems=[]; persistCrate(); refreshCrateBadge(); drawCrate();
+    const before = crateItems.slice(), beforeMeta={...collectionMeta,tags:[...collectionMeta.tags]};
+    crateItems=[]; collectionMeta={title:"",intro:"",outro:"",tags:[]}; persistCrate(); refreshCrateBadge(); drawCrate();
     try {
       const res = await api("crate_clear", {});
       if (!res.ok) throw new Error(res.error || "save_failed");
     } catch (e) {
-      crateItems = before; persistCrate(); refreshCrateBadge(); drawCrate();
+      crateItems = before; collectionMeta=beforeMeta; persistCrate(); refreshCrateBadge(); drawCrate();
       hap.err(); flash(errorText(e.message));
     }
+  });
+  function openCrateEditor() {
+    hap.medium();
+    $("crate-title-input").value=collectionMeta.title;
+    $("crate-intro-input").value=collectionMeta.intro;
+    $("crate-outro-input").value=collectionMeta.outro;
+    $("crate-tags-input").value=collectionMeta.tags.join(" ");
+    setSheetOpen("crate-editor-sheet","crate-editor-mask",true,$("crate-edit"));
+  }
+  function closeCrateEditor(){setSheetOpen("crate-editor-sheet","crate-editor-mask",false);}
+  function openCrateItemEditor(index) {
+    editingCrateIndex=index; const meta=crateItems[index]?.meta||{};
+    $("crate-section-input").value=meta.section||"";
+    $("crate-note-input").value=meta.note||"";
+    setSheetOpen("crate-item-sheet","crate-item-mask",true,$("crate-list"));
+  }
+  function closeCrateItemEditor(){setSheetOpen("crate-item-sheet","crate-item-mask",false);editingCrateIndex=-1;}
+  $("crate-edit").addEventListener("click",openCrateEditor);
+  $("crate-editor-mask").addEventListener("click",closeCrateEditor);
+  $("crate-editor-close").addEventListener("click",closeCrateEditor);
+  $("crate-editor-save").addEventListener("click",()=>{
+    collectionMeta={
+      title:$("crate-title-input").value.trim(),
+      intro:$("crate-intro-input").value.trim(),
+      outro:$("crate-outro-input").value.trim(),
+      tags:[...new Set($("crate-tags-input").value.split(/\s+/).map((tag)=>tag.trim()).filter(Boolean).map((tag)=>"#"+tag.replace(/^#+/,"").toLowerCase()))].slice(0,8),
+    };
+    persistCrate();hap.ok();closeCrateEditor();
+    $("crate-hero-title").textContent=collectionMeta.title||T.ui.crateHero;
+    flash(EN?"Collection style saved":"Оформление подборки сохранено");
+  });
+  $("crate-item-mask").addEventListener("click",closeCrateItemEditor);
+  $("crate-item-close").addEventListener("click",closeCrateItemEditor);
+  $("crate-item-save").addEventListener("click",()=>{
+    if(editingCrateIndex<0||!crateItems[editingCrateIndex])return;
+    crateItems[editingCrateIndex].meta={section:$("crate-section-input").value.trim(),note:$("crate-note-input").value.trim()};
+    persistCrate();hap.ok();closeCrateItemEditor();drawCrate();
   });
 
   /* ── queue ── */

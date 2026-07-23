@@ -58,6 +58,11 @@ class WebAppAssetTests(unittest.TestCase):
             "share-post",
             "share-links-label",
             "crate-share",
+            "crate-edit",
+            "crate-editor-sheet",
+            "crate-item-sheet",
+            "publish-summary",
+            "tag-suggestions",
         ):
             self.assertIn(f'id="{element_id}"', html)
         self.assertNotIn('data-tab="stats"', html)

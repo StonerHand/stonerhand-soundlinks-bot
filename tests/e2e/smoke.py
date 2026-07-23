@@ -269,6 +269,26 @@ def main() -> int:
             failures.append("batch paste crate is missing items")
         if page.evaluate("document.documentElement.scrollWidth > window.innerWidth"):
             failures.append("crate view has horizontal overflow")
+        page.eval_on_selector("#crate-edit", "el => el.click()")
+        page.eval_on_selector("#crate-title-input", "el => el.value='Тяжёлый вечер'")
+        page.eval_on_selector("#crate-intro-input", "el => el.value='Два релиза рядом'")
+        page.eval_on_selector("#crate-tags-input", "el => el.value='#stonerhand #doom'")
+        page.eval_on_selector("#crate-editor-save", "el => el.click()")
+        page.eval_on_selector("#crate-list .edit", "el => el.click()")
+        page.eval_on_selector("#crate-section-input", "el => el.value='Новинки'")
+        page.eval_on_selector("#crate-note-input", "el => el.value='Начинаем здесь'")
+        page.eval_on_selector("#crate-item-save", "el => el.click()")
+        if "Тяжёлый вечер" not in page.eval_on_selector("#crate-cover", "el => el.innerText"):
+            failures.append("collection editor did not update the crate title")
+        crate_text = page.eval_on_selector("#crate-list", "el => el.innerText")
+        if "новинки" not in crate_text.lower():
+            failures.append("collection item grouping did not render: " + crate_text[:160])
+        page.eval_on_selector("#crate-main", "el => el.click()")
+        if not page.eval_on_selector("#publish-sheet", "el => el.classList.contains('open')"):
+            failures.append("crate does not use the unified publish sheet")
+        elif "Тяжёлый вечер" not in page.eval_on_selector("#publish-summary", "el => el.innerText"):
+            failures.append("unified publish sheet lost the collection summary")
+        page.eval_on_selector("#publish-close", "el => el.click()")
         if page.eval_on_selector("#crate-share", "el => el.classList.contains('hidden')"):
             failures.append("ready crate has no share action")
         else:
@@ -276,6 +296,12 @@ def main() -> int:
             page.wait_for_timeout(250)
             if page.evaluate("window.__preparedMessage") != "prepared-crate-1":
                 failures.append("crate share did not keep the prepared collection")
+            crate_share_requests = [body for body in REQUEST_BODIES if body.get("action") == "prepare_crate_share"]
+            payload = (crate_share_requests[-1].get("payload") or {}) if crate_share_requests else {}
+            if (payload.get("collection") or {}).get("title") != "Тяжёлый вечер":
+                failures.append("crate share lost collection styling")
+            if not payload.get("item_meta") or payload["item_meta"][0].get("section") != "Новинки":
+                failures.append("crate share lost track grouping")
 
         # A failed search must lead back to an editable query, not repeat itself.
         page.eval_on_selector('#tabbar [data-tab="home"]', "el => el.click()")

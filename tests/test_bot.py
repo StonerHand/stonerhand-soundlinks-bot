@@ -45,6 +45,7 @@ from music_links_bot.bot import (
     _strip_bot_mention,
     _release_fingerprint,
     _editor_rows,
+    _editor_more_rows,
     _render_bot_crate,
     _render_track_draft,
     track_lookup_message,
@@ -812,7 +813,8 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[2][1].text, "🗓 Очередь")
         self.assertEqual(rows[2][1].web_app.url, "https://studio.example/app?view=queue")
         self.assertEqual(rows[3][0].text, "▶ Как всё работает")
-        self.assertEqual(rows[-1][0].text, "↗ Поделиться ботом")
+        self.assertEqual(rows[-1][0].text, "❓ Помощь")
+        self.assertEqual(rows[-1][1].text, "🪨 Открыть канал")
 
     def test_home_text_is_personal_and_escapes_telegram_html(self) -> None:
         text = _build_home_text(
@@ -1180,9 +1182,11 @@ class PostEditorTests(unittest.TestCase):
 
         self.assertEqual(rows[0][0].text, "Отправить себе")
         self.assertEqual(rows[0][0].callback_data, "v2|editor|s|abc123")
-        self.assertEqual(rows[1][0].text, "# Хэштеги ✓")
-        self.assertEqual(rows[1][0].callback_data, "v2|editor|h|abc123")
-        self.assertEqual(rows[2][-1].text, "••• Ещё")
+        self.assertEqual(rows[1][0].text, "+ В подборку")
+        self.assertEqual(rows[2][0].text, "••• Ещё")
+        more = _editor_more_rows("abc123", self._draft(hashtags=True))
+        self.assertEqual(more[0][0].text, "# Хэштеги ✓")
+        self.assertEqual(more[0][0].callback_data, "v2|editor|h|abc123")
 
     def test_editor_rows_add_publish_button_for_admin(self) -> None:
         rows = _editor_rows("abc123", self._draft(can_publish=True))
@@ -1191,17 +1195,17 @@ class PostEditorTests(unittest.TestCase):
         self.assertEqual(rows[0][1].callback_data, "v2|editor|p|abc123")
 
     def test_editor_rows_show_quote_toggle_only_with_prefix(self) -> None:
-        rows_without_quote = _editor_rows("abc123", self._draft())
-        rows_with_quote = _editor_rows(
+        rows_without_quote = _editor_more_rows("abc123", self._draft())
+        rows_with_quote = _editor_more_rows(
             "abc123",
             self._draft(prefix="<blockquote>интро</blockquote>\n", quote=True),
         )
 
-        self.assertEqual(len(rows_without_quote[1]), 2)
-        self.assertEqual(len(rows_with_quote[1]), 3)
-        self.assertEqual(rows_with_quote[1][1].text, "💬 Цитата ✓")
-        self.assertEqual(rows_without_quote[1][1].text, "🖼 Обложка большая")
-        self.assertEqual(rows_without_quote[1][1].callback_data, "v2|editor|v|abc123")
+        self.assertEqual(len(rows_without_quote[0]), 2)
+        self.assertEqual(len(rows_with_quote[0]), 3)
+        self.assertEqual(rows_with_quote[0][1].text, "💬 Цитата ✓")
+        self.assertEqual(rows_without_quote[0][1].text, "🖼 Обложка большая")
+        self.assertEqual(rows_without_quote[0][1].callback_data, "v2|editor|v|abc123")
 
     def test_editor_rows_add_studio_webapp_button_when_configured(self) -> None:
         import os
@@ -1214,7 +1218,7 @@ class PostEditorTests(unittest.TestCase):
         ):
             rows = _editor_rows("abc123", self._draft())
 
-        studio = rows[2][0]
+        studio = rows[1][0]
         self.assertEqual(studio.text, "🎛 Студия")
         self.assertEqual(studio.web_app.url, "https://studio.example/app?draft=abc123")
 
@@ -1235,7 +1239,7 @@ class PostEditorTests(unittest.TestCase):
             for button in row
             if button.callback_data
         ]
-        self.assertIn("v2|editor|h|abc123", editor_buttons)
+        self.assertIn("v2|editor|m|abc123", editor_buttons)
 
         draft["quote"] = False
         draft["hashtags"] = False
@@ -1343,7 +1347,8 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertIn("Не получилось собрать пост", message.replies[0])
+        self.assertIn("Пост пока не собран", message.replies[0])
+        self.assertIn("<code>артист — название</code>", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "Повторить")
         self.assertEqual(keyboard[1][0].text, "Что поддерживается")
@@ -1428,7 +1433,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         ]
         self.assertIn(
             True,
-            [data.startswith("v2|editor|h|") for data in callback_data],
+            [data.startswith("v2|editor|m|") for data in callback_data],
         )
         self.assertEqual(len(context.application.bot_data["drafts"]), 1)
 

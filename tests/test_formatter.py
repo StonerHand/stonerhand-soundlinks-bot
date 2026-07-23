@@ -220,6 +220,39 @@ class FormatterTests(unittest.TestCase):
 
         self.assertIn("#stonerhand #collection #track #album #single #ep", message)
 
+    def test_collection_editor_formats_groups_notes_and_custom_copy(self) -> None:
+        tracks = [
+            TrackMatch(
+                title="One",
+                artist="Sleep",
+                links={},
+                page_url="https://song.link/one",
+            ),
+            TrackMatch(
+                title="Two",
+                artist="Kyuss",
+                links={},
+                page_url="https://song.link/two",
+            ),
+        ]
+
+        message = format_collection_message(
+            tracks,
+            title="Тяжёлый <вечер>",
+            intro="Два важных релиза",
+            outro="Слушать по порядку",
+            hashtags="#stonerhand #doom",
+            item_sections=["Новинки", "Финал"],
+            item_notes=["Начинаем отсюда", "Закрывает сет"],
+        )
+
+        self.assertIn("<b>Тяжёлый &lt;вечер&gt;</b>", message)
+        self.assertIn("<b>Новинки</b>", message)
+        self.assertIn("<i>↳ Начинаем отсюда</i>", message)
+        self.assertIn("<b>Финал</b>", message)
+        self.assertIn("<i>Слушать по порядку</i>", message)
+        self.assertTrue(message.endswith("#stonerhand #doom"))
+
     def test_prepend_user_text_formats_username_prefix(self) -> None:
         self.assertEqual(
             prepend_user_text("Твой текст", author_label="@username"),
