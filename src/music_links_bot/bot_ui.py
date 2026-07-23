@@ -72,10 +72,21 @@ def build_start_keyboard(
                 get_text(lang, "quick_search"),
                 switch_inline_query_current_chat="",
                 api_kwargs={"style": "primary"},
-            ),
-            _crate_button(lang, crate_count),
+            )
         ]
     )
+    secondary_action = (
+        InlineKeyboardButton(
+            get_text(lang, "quick_tour"),
+            callback_data=encode_callback("menu", "onboard1"),
+        )
+        if show_tour
+        else InlineKeyboardButton(
+            get_text(lang, "home_result"),
+            callback_data=encode_callback("menu", "demo"),
+        )
+    )
+    rows.append([_crate_button(lang, crate_count), secondary_action])
     if is_admin:
         admin_row = [
             InlineKeyboardButton(
@@ -91,16 +102,6 @@ def build_start_keyboard(
                 )
             )
         rows.append(admin_row)
-    if show_tour:
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    get_text(lang, "quick_tour"),
-                    callback_data=encode_callback("menu", "onboard1"),
-                    api_kwargs={"style": "primary"},
-                )
-            ]
-        )
     rows.append(
         [
             InlineKeyboardButton(

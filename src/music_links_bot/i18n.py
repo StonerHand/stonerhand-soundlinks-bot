@@ -57,27 +57,29 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
     },
     "home_title_new": {
-        RU: "🎧 <b>Твоя музыкальная мастерская</b>",
-        EN: "🎧 <b>Your music post workshop</b>",
+        RU: "🎚 <b>StonerHand Studio</b>",
+        EN: "🎚 <b>StonerHand Studio</b>",
     },
     "home_title": {
-        RU: "🎛 <b>Студия готова{name}</b>",
-        EN: "🎛 <b>Studio is ready{name}</b>",
+        RU: "🎚 <b>Твоя Студия{name}</b>",
+        EN: "🎚 <b>Your Studio{name}</b>",
     },
     "home_body": {
         RU: (
             "{greeting}\n\n"
-            "<i>Ссылка или название → точный релиз → готовый Telegram-пост.</i>\n\n"
-            "<blockquote>🧺 <b>Подборка:</b> {crate_count}/10\n{mode}</blockquote>\n"
-            "<b>Начни здесь:</b> пришли ссылку или напиши\n"
-            "<code>артист — название трека</code>"
+            "<i>Из музыкальной ссылки — в готовый пост с обложкой и кнопками.</i>\n\n"
+            "<blockquote>◉ <b>Рабочее состояние</b>\n"
+            "Подборка · {crate_count}/10\n{mode}</blockquote>\n"
+            "<b>Быстрый старт</b>\n"
+            "Пришли ссылку или напиши <code>артист — трек</code>"
         ),
         EN: (
             "{greeting}\n\n"
-            "<i>A link or title → the exact release → a finished Telegram post.</i>\n\n"
-            "<blockquote>🧺 <b>Crate:</b> {crate_count}/10\n{mode}</blockquote>\n"
-            "<b>Start here:</b> send a link or type\n"
-            "<code>artist — track title</code>"
+            "<i>Turn a music link into a finished post with artwork and buttons.</i>\n\n"
+            "<blockquote>◉ <b>Workspace status</b>\n"
+            "Crate · {crate_count}/10\n{mode}</blockquote>\n"
+            "<b>Quick start</b>\n"
+            "Send a link or type <code>artist — track</code>"
         ),
     },
     "home_mode_admin": {
@@ -135,7 +137,7 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
     },
     "quick_tour": {RU: "▶ Как всё работает", EN: "▶ How it works"},
-    "quick_search": {RU: "🔎 Найти релиз", EN: "🔎 Find a release"},
+    "quick_search": {RU: "🔎 Создать новый пост", EN: "🔎 Create a new post"},
     "open_studio": {RU: "🎛 Открыть Студию", EN: "🎛 Open Studio"},
     "home_crate": {RU: "🧺 Подборка · {count}", EN: "🧺 Crate · {count}"},
     "home_stats": {RU: "📊 Статистика канала", EN: "📊 Channel stats"},

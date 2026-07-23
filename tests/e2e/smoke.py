@@ -9,6 +9,7 @@ directly (`python tests/e2e/smoke.py`). Exits non-zero on the first failure.
 from __future__ import annotations
 
 import glob
+import os
 import pathlib
 import sys
 
@@ -16,6 +17,7 @@ from playwright.sync_api import sync_playwright
 
 HTML = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "index.html").read_text()
 CSS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "styles.css").read_text()
+STUDIO_8_CSS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "studio-8.css").read_text()
 JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "app.js").read_text()
 API_JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "api-client.js").read_text()
 CLOUD_JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "cloud-storage.js").read_text()
@@ -63,6 +65,7 @@ RESPONSES = {
 REQUEST_BODIES: list[dict] = []
 ACTION_ATTEMPTS: dict[str, int] = {}
 FAIL_ACTIONS: set[str] = set()
+CAPTURE_DIR = os.environ.get("STUDIO_CAPTURE_DIR")
 
 INIT = """window.Telegram={WebApp:{initData:"x",initDataUnsafe:{user:{language_code:"ru"}},colorScheme:"dark",
 ready(){},expand(){},close(){},setHeaderColor(){},setBackgroundColor(){},onEvent(){},contentSafeAreaInset:{top:7,right:0,bottom:11,left:0},BackButton:{show(){},hide(){},onClick(){}},
@@ -116,6 +119,14 @@ def _theme_contrast(page) -> float:
     )
 
 
+def _capture(page, name: str) -> None:
+    if not CAPTURE_DIR:
+        return
+    target = pathlib.Path(CAPTURE_DIR)
+    target.mkdir(parents=True, exist_ok=True)
+    page.screenshot(path=str(target / f"{name}.png"), full_page=True)
+
+
 def main() -> int:
     failures: list[str] = []
     with sync_playwright() as p:
@@ -127,6 +138,7 @@ def main() -> int:
         page.route("**/api/webapp", _route_api)
         page.route("https://studio.local/app*", lambda r: r.fulfill(body=HTML, content_type="text/html"))
         page.route("https://studio.local/webapp/styles.css", lambda r: r.fulfill(body=CSS, content_type="text/css"))
+        page.route("https://studio.local/webapp/studio-8.css", lambda r: r.fulfill(body=STUDIO_8_CSS, content_type="text/css"))
         page.route("https://studio.local/webapp/app.js", lambda r: r.fulfill(body=JS, content_type="application/javascript"))
         page.route("https://studio.local/webapp/api-client.js", lambda r: r.fulfill(body=API_JS, content_type="application/javascript"))
         page.route("https://studio.local/webapp/cloud-storage.js", lambda r: r.fulfill(body=CLOUD_JS, content_type="application/javascript"))
@@ -151,6 +163,7 @@ def main() -> int:
             failures.append("quick actions are hidden for an ordinary user")
         if not page.eval_on_selector("#q-queue", "el => el.classList.contains('hidden')"):
             failures.append("admin queue shortcut is visible to an ordinary user")
+        _capture(page, "01-home-dark")
 
         # Clipboard paste and inline mode are first-class shortcuts on home.
         page.eval_on_selector("#paste-btn", "el => el.click()")
@@ -190,6 +203,9 @@ def main() -> int:
             failures.append("result card missing track title")
         if page.locator("#result-readiness span").count() != 3:
             failures.append("result readiness summary is incomplete")
+        score = int(page.eval_on_selector("#result-score-value", "el => el.textContent"))
+        if score < 75:
+            failures.append(f"result readiness score is unexpectedly low: {score}")
         if not page.evaluate("Telegram.WebApp.MainButton.visible && Telegram.WebApp.MainButton.text.length > 0"):
             failures.append("native Telegram MainButton is not active on the result")
         if page.evaluate("document.documentElement.scrollWidth > window.innerWidth"):
@@ -199,9 +215,17 @@ def main() -> int:
         page.keyboard.press("Escape")
         if page.eval_on_selector("#coach", "el => el.classList.contains('open')"):
             failures.append("first-run coach cannot be dismissed with Escape")
+        _capture(page, "02-result-dark")
 
         # Formatting auto-saves and never allows a post without platforms.
         page.eval_on_selector("#open-format", "el => el.click()")
+        if page.locator("#format-nav button").count() != 4:
+            failures.append("format editor navigation is incomplete")
+        page.eval_on_selector('#format-nav [data-target="format-copy"]', "el => el.click()")
+        if not page.eval_on_selector('#format-nav [data-target="format-copy"]', "el => el.classList.contains('active')"):
+            failures.append("format editor navigation does not expose its active section")
+        page.wait_for_timeout(350)
+        _capture(page, "03-format-dark")
         page.eval_on_selector("#cta-input", "el => {el.value='новый текст';el.dispatchEvent(new Event('input'))}")
         page.wait_for_timeout(650)
         if page.eval_on_selector("#fmt-sync", "el => el.textContent") != "Сохранено":
@@ -335,6 +359,15 @@ def main() -> int:
             failures.append("theme toggle did not switch to light mode")
         if _theme_contrast(page) < 4.5:
             failures.append("light theme foreground contrast is below WCAG AA")
+        _capture(page, "04-home-light")
+        page.set_viewport_size({"width": 620, "height": 900})
+        page.goto("https://studio.local/app", wait_until="load")
+        page.wait_for_timeout(500)
+        if page.evaluate("document.documentElement.scrollWidth > window.innerWidth"):
+            failures.append("wide Telegram viewport has horizontal overflow")
+        if page.eval_on_selector(".wrap", "el => el.getBoundingClientRect().width") < 580:
+            failures.append("workspace does not adapt to a wide Telegram viewport")
+        _capture(page, "05-home-wide")
         page.goto("https://studio.local/app?view=crate", wait_until="load")
         page.wait_for_timeout(600)
         if page.eval_on_selector("#v-crate", "el => el.classList.contains('hidden')"):

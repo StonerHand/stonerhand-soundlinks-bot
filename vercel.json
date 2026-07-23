@@ -40,6 +40,10 @@
     {
       "src": "webapp/studio-core.js",
       "use": "@vercel/static"
+    },
+    {
+      "src": "webapp/studio-8.css",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
@@ -96,6 +100,10 @@
     {
       "src": "/webapp/studio-core.js",
       "dest": "webapp/studio-core.js"
+    },
+    {
+      "src": "/webapp/studio-8.css",
+      "dest": "webapp/studio-8.css"
     }
   ],
   "crons": [

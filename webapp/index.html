@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600&family=Golos+Text:wght@400;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/webapp/styles.css">
+<link rel="stylesheet" href="/webapp/studio-8.css">
 </head>
 <body class="dark">
 
@@ -46,7 +47,7 @@
     <div class="view" id="v-home">
       <div class="head">
         <div class="logo"><svg class="icon s16"><use href="#i-disc"/></svg></div>
-        <div class="brand-lockup"><span class="brand-name">STONERHAND</span><span class="wordmark">Studio / 04</span></div>
+        <div class="brand-lockup"><span class="brand-name">STONERHAND</span><span class="wordmark">Studio / 08</span></div>
         <span class="badge-admin hidden" id="admin-badge">ADMIN</span>
         <button class="theme-btn hidden" id="admin-tools" type="button" aria-label="Открыть статистику"><svg class="icon s16"><use href="#i-bar"/></svg></button>
         <button class="theme-btn" id="theme-btn" type="button" aria-label="Включить светлую тему"><svg class="icon s16"><use href="#i-sun"/></svg></button>
@@ -57,6 +58,11 @@
         <span class="hero-kicker" id="hero-kicker">MUSIC POST WORKSHOP</span>
         <h1 id="home-title">Собери пост,<br><em>который звучит.</em></h1>
         <p id="home-hint">Вставь ссылку или найди релиз — остальное Студия соберёт сама.</p>
+        <div class="hero-status" aria-label="Возможности Студии">
+          <span><i></i> Telegram native</span>
+          <span>RU / EN</span>
+          <span>light + dark</span>
+        </div>
         <div class="hero-flow" aria-label="Три шага создания поста">
           <span><b>01</b><small id="flow-find">Найти</small></span><i>→</i>
           <span><b>02</b><small id="flow-style">Оформить</small></span><i>→</i>
@@ -153,7 +159,13 @@
         <button class="format-pill" id="open-format"><svg class="icon s14"><use href="#i-sliders"/></svg>Оформление</button></div>
       <div class="result-scroll">
         <div class="result-intro"><span id="result-kicker">READY TO AIR</span><strong id="result-copy">Так пост увидит аудитория</strong></div>
-        <div class="result-readiness" id="result-readiness" aria-label="Готовность поста"></div>
+        <div class="result-health">
+          <div class="health-score" id="result-score" aria-label="Готовность поста">
+            <strong id="result-score-value">0</strong><span>%</span>
+            <small id="result-score-label">готово</small>
+          </div>
+          <div class="result-readiness" id="result-readiness" aria-label="Проверка готовности поста"></div>
+        </div>
         <div class="post-card" id="post-card"></div>
         <div class="status-note" id="status"></div>
       </div>
@@ -168,18 +180,24 @@
           <div class="format-preview-art" id="fmt-preview-art">♪</div>
           <div><span id="format-kicker">LIVE PREVIEW</span><strong id="fmt-preview-title">Релиз</strong><div class="format-meta"><small id="fmt-preview-sub">Исполнитель</small><small class="sync-state" id="fmt-sync" role="status">Сохранено</small></div></div>
         </div>
-        <div class="fsec">
+        <nav class="format-nav" id="format-nav" aria-label="Разделы оформления">
+          <button type="button" data-target="format-presets"><span>01</span><b id="format-nav-presets">Стиль</b></button>
+          <button type="button" data-target="format-copy"><span>02</span><b id="format-nav-copy">Текст</b></button>
+          <button type="button" data-target="tags-sec"><span>03</span><b id="format-nav-tags">Теги</b></button>
+          <button type="button" data-target="format-services"><span>04</span><b id="format-nav-services">Сервисы</b></button>
+        </nav>
+        <div class="fsec" id="format-presets">
           <div class="fsec-head" style="display:flex;align-items:center;justify-content:space-between">
             <span class="seclabel" id="t-presets">Пресеты</span>
             <button id="preset-save" style="background:none;border:none;color:var(--primary);font-family:'JetBrains Mono';font-size:11px">+ <span id="t-preset-save">сохранить</span></button>
           </div>
           <div class="fsec-body pad"><div class="chips" id="preset-list"></div></div>
         </div>
-        <div class="fsec">
+        <div class="fsec" id="format-content-section">
           <div class="fsec-head"><span class="seclabel" id="format-content">Содержимое</span></div>
           <div class="fsec-body" id="toggles"></div>
         </div>
-        <div class="fsec">
+        <div class="fsec" id="format-copy">
           <div class="fsec-head"><span class="seclabel" id="format-text">Свой текст</span></div>
           <div class="fsec-body pad">
             <textarea id="cta-input" rows="3" maxlength="200" placeholder="Добавь свой комментарий…"></textarea>
@@ -190,7 +208,7 @@
           <div class="fsec-head"><span class="seclabel" id="format-tags">Хэштеги</span></div>
           <div class="fsec-body pad"><div class="chips" id="tag-cloud"></div><div class="tag-suggestions" id="tag-suggestions"></div><div class="field-health" id="tag-health" role="status"></div></div>
         </div>
-        <div class="fsec">
+        <div class="fsec" id="format-services">
           <div class="fsec-head"><span class="seclabel" id="format-platforms">Платформы и порядок</span></div>
           <div class="fsec-body pad" id="pm-list"></div>
         </div>
@@ -202,7 +220,7 @@
     <div class="view hidden" id="v-crate">
       <div class="head"><button class="back" id="crate-back" aria-label="Назад"><svg class="icon s18"><use href="#i-cl"/></svg></button>
         <div class="sub"><span class="seclabel" id="crate-label">Подборка</span><div class="lbl" id="crate-count">0 треков</div></div><button class="format-pill" id="crate-edit" type="button"><svg class="icon s14"><use href="#i-sliders"/></svg><span id="crate-edit-label">Оформить</span></button></div>
-      <div class="scroll"><div class="crate-cover" id="crate-cover"><div class="crate-stack" id="crate-stack"><i></i><i></i><i></i></div><div><span id="crate-kicker">CURATED BY STONERHAND</span><strong id="crate-hero-title">Следующий сет</strong><small id="crate-cover-count">0 треков</small></div></div><div class="list" id="crate-list"></div><div class="status-note" id="crate-empty"></div></div>
+      <div class="scroll"><div class="crate-cover" id="crate-cover"><div class="crate-stack" id="crate-stack"><i></i><i></i><i></i></div><div><span id="crate-kicker">CURATED BY STONERHAND</span><strong id="crate-hero-title">Следующий сет</strong><small id="crate-cover-count">0 треков</small></div><div class="crate-health" id="crate-health"></div></div><div class="list" id="crate-list"></div><div class="status-note" id="crate-empty"></div></div>
       <div class="dock" id="crate-dock"><div class="dock-row"><button class="dock-primary hidden" id="crate-main"></button><button class="dock-ico hidden" id="crate-share" type="button" title="Поделиться подборкой" aria-label="Поделиться подборкой"><svg class="icon"><use href="#i-share"/></svg></button></div>
         <button class="crate-clear hidden" id="crate-clear" style="width:100%;margin-top:10px;background:none;border:none;color:var(--muted);font-size:12px;font-family:inherit;padding:8px"></button></div>
     </div>
@@ -211,6 +229,7 @@
     <div class="view hidden" id="v-queue">
       <div class="head"><button class="back" id="queue-back" aria-label="Назад"><svg class="icon s18"><use href="#i-cl"/></svg></button>
         <div class="sub"><span class="seclabel" id="queue-label">Очередь</span><div class="lbl" id="queue-count">0 постов</div></div></div>
+      <div class="screen-intro"><span>ON AIR NEXT</span><strong id="queue-intro-title">План эфира</strong><small id="queue-intro-copy">Все запланированные публикации в одном таймлайне</small></div>
       <div class="scroll"><div class="list" id="queue-list"></div><div class="status-note" id="queue-empty"></div></div>
     </div>
 
@@ -218,6 +237,7 @@
     <div class="view hidden" id="v-stats">
       <div class="head"><button class="back" id="stats-back" aria-label="Назад"><svg class="icon s18"><use href="#i-cl"/></svg></button>
         <div class="sub"><div class="lbl" id="stats-title">Статистика</div><span class="head-meta" id="stats-period">За всё время</span></div></div>
+      <div class="screen-intro stats-intro"><span>CHANNEL PULSE</span><strong id="stats-intro-title">Ритм канала</strong><small id="stats-intro-copy">Публикации, форматы и активность без лишнего шума</small></div>
       <div class="scroll" style="padding:0 16px 16px">
         <div class="kpi-grid" id="kpi-grid"></div>
         <div class="statcard"><div class="statcard-head"><span class="seclabel" id="stats-breakdown-label">Разбивка</span></div><div class="statcard-body" id="stat-breakdown"></div></div>
