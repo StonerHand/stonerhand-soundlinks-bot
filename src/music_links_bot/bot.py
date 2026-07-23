@@ -174,6 +174,13 @@ from music_links_bot.stats import (
     load_stats,
     merge_stats,
 )
+from music_links_bot.sharing import (
+    add_share_button,
+    build_share_query,
+    parse_share_query,
+    render_inline_share_card,
+    track_share_url,
+)
 from music_links_bot.text_utils import normalize_hashtag
 from music_links_bot.url_utils import (
     extract_supported_urls,
@@ -770,6 +777,44 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         inline_query.from_user.language_code if inline_query.from_user else None
     )
     query_text = inline_query.query or ""
+    shared_urls = parse_share_query(query_text)
+    if shared_urls is not None:
+        if not shared_urls:
+            await _answer_inline_hint(
+                inline_query, get_text(lang, "inline_hint_not_found")
+            )
+            return
+
+        try:
+            shared_result = await _build_inline_collection_result(
+                shared_urls, context, lang=lang
+            )
+        except Exception as exc:
+            LOGGER.error(
+                "Inline shared collection lookup failed",
+                exc_info=(type(exc), exc, exc.__traceback__),
+            )
+            shared_result = None
+
+        if shared_result is None:
+            await _answer_inline_hint(
+                inline_query, get_text(lang, "inline_hint_not_found")
+            )
+            return
+
+        try:
+            await inline_query.answer(
+                [shared_result],
+                cache_time=INLINE_CACHE_SECONDS,
+                is_personal=False,
+                button=InlineQueryResultsButton(
+                    text=get_text(lang, "open_studio"), start_parameter="studio"
+                ),
+            )
+        except TelegramError:
+            LOGGER.debug("Could not answer shared inline query", exc_info=True)
+        return
+
     source_urls = extract_supported_urls(query_text)[:1]
     if not source_urls:
         search_query = normalize_search_query(query_text)
@@ -800,7 +845,7 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         source_urls = [candidate.url for candidate in candidates]
 
     outcomes = await asyncio.gather(
-        *(_build_inline_result(source_url, context) for source_url in source_urls),
+        *(_build_inline_result(source_url, context, lang=lang) for source_url in source_urls),
         return_exceptions=True,
     )
     results = []
@@ -845,8 +890,12 @@ async def _answer_inline_hint(inline_query, button_text: str) -> None:
 async def _build_inline_result(
     source_url: str,
     context: ContextTypes.DEFAULT_TYPE,
+    *,
+    lang: str = "ru",
 ) -> InlineQueryResultArticle | None:
     bot_data = context.application.bot_data
+    share_query = build_share_query([source_url])
+    share_label = get_text(lang, "share_post")
 
     if is_spotify_artist_url(source_url):
         artists = await _lookup_artists(bot_data["artist_client"], [source_url])
@@ -856,7 +905,11 @@ async def _build_inline_result(
             title=artist.title,
             description=f"Карточка артиста · {artist.platform}",
             text=format_artist_message(artist, include_hashtags=True),
-            keyboard=_build_artist_keyboard(artist.url),
+            keyboard=add_share_button(
+                _build_artist_keyboard(artist.url),
+                share_query=share_query,
+                label=share_label,
+            ),
             preview_url=artist.url,
         )
 
@@ -868,7 +921,11 @@ async def _build_inline_result(
             title=playlist.title,
             description=f"Плейлист · {playlist.platform}",
             text=format_playlist_message(playlist, include_hashtags=True),
-            keyboard=_build_playlist_keyboard(playlist.url),
+            keyboard=add_share_button(
+                _build_playlist_keyboard(playlist.url),
+                share_query=share_query,
+                label=share_label,
+            ),
             preview_url=playlist.url,
         )
 
@@ -880,7 +937,11 @@ async def _build_inline_result(
             title=video.title,
             description=f"Видео · {video.author}",
             text=format_video_message(video, include_hashtags=True),
-            keyboard=_build_youtube_keyboard(video.url),
+            keyboard=add_share_button(
+                _build_youtube_keyboard(video.url),
+                share_query=share_query,
+                label=share_label,
+            ),
             preview_url=video.url,
         )
 
@@ -895,7 +956,11 @@ async def _build_inline_result(
             title=radio.title,
             description=f"Эфир · {radio.station}",
             text=format_radio_message(radio, include_hashtags=True),
-            keyboard=_build_nts_keyboard(radio.url),
+            keyboard=add_share_button(
+                _build_nts_keyboard(radio.url),
+                share_query=share_query,
+                label=share_label,
+            ),
             preview_url=radio.url,
         )
 
@@ -915,15 +980,53 @@ async def _build_inline_result(
         title=f"{track.artist} — {track.title}",
         description="Пост с кнопками всех площадок",
         text=format_track_message(track, include_hashtags=True),
-        keyboard=_build_link_keyboard(
-            track.links,
-            context=context,
-            release_page_url=track.page_url,
-            release_kind=track.kind,
-            release_format=track.release_format,
+        keyboard=add_share_button(
+            _build_link_keyboard(
+                track.links,
+                context=context,
+                release_page_url=track.page_url,
+                release_kind=track.kind,
+                release_format=track.release_format,
+            ),
+            share_query=share_query,
+            label=share_label,
         ),
         preview_url=_select_preview_url(track.links, context) or track.thumbnail_url,
         thumbnail_url=track.thumbnail_url,
+    )
+
+
+async def _build_inline_collection_result(
+    source_urls: list[str],
+    context: ContextTypes.DEFAULT_TYPE,
+    *,
+    lang: str,
+) -> InlineQueryResultArticle | None:
+    if len(source_urls) == 1:
+        return await _build_inline_result(source_urls[0], context, lang=lang)
+
+    bundle = await _bot_lookup.resolve_sources(
+        context.application.bot_data, source_urls
+    )
+    if bundle.item_count == 0:
+        return None
+
+    share_query = build_share_query(source_urls)
+    share_label = get_text(lang, "share_post")
+    card = render_inline_share_card(
+        bundle,
+        context=context,
+        lang=lang,
+        share_query=share_query,
+        share_label=share_label,
+    )
+    return _inline_article(
+        "|".join(source_urls),
+        title=card.title,
+        description=card.description,
+        text=card.text,
+        keyboard=card.keyboard,
+        preview_url=card.preview_url,
     )
 
 
@@ -1016,6 +1119,13 @@ def _render_track_draft(
         release_kind=track.kind,
         release_format=track.release_format,
         platform_selection=_draft_platform_selection(draft),
+    )
+    keyboard = add_share_button(
+        keyboard,
+        share_query=build_share_query(
+            [url] if (url := track_share_url(track)) else []
+        ),
+        label=get_text(draft.get("lang") or "ru", "share_post"),
     )
     if draft_id is None:
         return text, keyboard
@@ -1866,6 +1976,16 @@ async def _track_lookup_message_impl(
                 tracks,
                 include_channel_button=include_channel_button,
             )
+            collection_keyboard = add_share_button(
+                collection_keyboard,
+                share_query=build_share_query(
+                    [
+                        track_share_url(track) or ""
+                        for track in tracks
+                    ]
+                ),
+                label=get_text(lang, "share_post"),
+            )
             if is_private:
                 crate_items = await load_crate(context.application.bot_data, user_id)
                 for track in tracks:
@@ -1937,13 +2057,19 @@ async def _track_lookup_message_impl(
                 ),
                 preview_url=_select_preview_url(track.links, context)
                 or track.thumbnail_url,
-                reply_markup=_build_link_keyboard(
-                    track.links,
-                    context=context,
-                    include_channel_button=include_channel_button,
-                    release_page_url=track.page_url,
-                    release_kind=track.kind,
-                    release_format=track.release_format,
+                reply_markup=add_share_button(
+                    _build_link_keyboard(
+                        track.links,
+                        context=context,
+                        include_channel_button=include_channel_button,
+                        release_page_url=track.page_url,
+                        release_kind=track.kind,
+                        release_format=track.release_format,
+                    ),
+                    share_query=build_share_query(
+                        [url] if (url := track_share_url(track)) else []
+                    ),
+                    label=get_text(lang, "share_post"),
                 ),
                 )
         _record_matches_safely([track], message, context=context)
@@ -1957,6 +2083,7 @@ async def _track_lookup_message_impl(
             user_prefix=user_prefix,
             include_channel_button=include_channel_button,
             include_hashtags=include_hashtags,
+            lang=lang,
         )
         _record_videos_safely(videos, message, context=context)
         return
@@ -1969,6 +2096,7 @@ async def _track_lookup_message_impl(
             user_prefix=user_prefix,
             include_channel_button=include_channel_button,
             include_hashtags=include_hashtags,
+            lang=lang,
         )
         _record_radios_safely(radios, message, context=context)
         return
@@ -1981,6 +2109,7 @@ async def _track_lookup_message_impl(
             user_prefix=user_prefix,
             include_channel_button=include_channel_button,
             include_hashtags=include_hashtags,
+            lang=lang,
         )
         _record_playlists_safely(playlists, message, context=context)
         return
@@ -1993,6 +2122,7 @@ async def _track_lookup_message_impl(
             user_prefix=user_prefix,
             include_channel_button=include_channel_button,
             include_hashtags=include_hashtags,
+            lang=lang,
         )
         _record_artists_safely(artists, message, context=context)
         return
@@ -2009,6 +2139,7 @@ async def _track_lookup_message_impl(
         include_channel_button=include_channel_button,
         include_hashtags=include_hashtags,
         context=context,
+        lang=lang,
     )
     _record_mixed_safely(
         tracks,

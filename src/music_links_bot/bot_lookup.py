@@ -29,6 +29,7 @@ from music_links_bot.keyboards import (
     _select_preview_url,
 )
 from music_links_bot.models import ArtistMatch, PlaylistMatch, RadioMatch, TrackMatch, VideoMatch
+from music_links_bot.sharing import add_share_button, build_share_query, track_share_url
 from music_links_bot.nts import NTSClient, NTSLookupError, build_nts_fallback
 from music_links_bot.phrases import pick_phrase
 from music_links_bot.playlist import PlaylistClient, PlaylistLookupError
@@ -396,6 +397,7 @@ async def _send_youtube_result(
     user_prefix: str,
     include_channel_button: bool,
     include_hashtags: bool,
+    lang: str,
 ) -> None:
     if not videos:
         return
@@ -407,9 +409,13 @@ async def _send_youtube_result(
             message,
             user_prefix + format_video_message(video, include_hashtags=include_hashtags),
             preview_url=video.url,
-            reply_markup=_build_youtube_keyboard(
-                video.url,
-                include_channel_button=include_channel_button,
+            reply_markup=add_share_button(
+                _build_youtube_keyboard(
+                    video.url,
+                    include_channel_button=include_channel_button,
+                ),
+                share_query=build_share_query([video.url]),
+                label=get_text(lang, "share_post"),
             ),
         )
         return
@@ -420,9 +426,13 @@ async def _send_youtube_result(
         user_prefix
         + format_video_collection_message(videos, include_hashtags=include_hashtags),
         preview_url=videos[0].url,
-        reply_markup=_build_youtube_collection_keyboard(
-            videos,
-            include_channel_button=include_channel_button,
+        reply_markup=add_share_button(
+            _build_youtube_collection_keyboard(
+                videos,
+                include_channel_button=include_channel_button,
+            ),
+            share_query=build_share_query([video.url for video in videos]),
+            label=get_text(lang, "share_post"),
         ),
     )
 
@@ -435,6 +445,7 @@ async def _send_nts_result(
     user_prefix: str,
     include_channel_button: bool,
     include_hashtags: bool,
+    lang: str,
 ) -> None:
     if not radios:
         return
@@ -446,9 +457,13 @@ async def _send_nts_result(
             message,
             user_prefix + format_radio_message(radio, include_hashtags=include_hashtags),
             preview_url=radio.url,
-            reply_markup=_build_nts_keyboard(
-                radio.url,
-                include_channel_button=include_channel_button,
+            reply_markup=add_share_button(
+                _build_nts_keyboard(
+                    radio.url,
+                    include_channel_button=include_channel_button,
+                ),
+                share_query=build_share_query([radio.url]),
+                label=get_text(lang, "share_post"),
             ),
         )
         return
@@ -459,9 +474,13 @@ async def _send_nts_result(
         user_prefix
         + format_radio_collection_message(radios, include_hashtags=include_hashtags),
         preview_url=radios[0].url,
-        reply_markup=_build_nts_collection_keyboard(
-            radios,
-            include_channel_button=include_channel_button,
+        reply_markup=add_share_button(
+            _build_nts_collection_keyboard(
+                radios,
+                include_channel_button=include_channel_button,
+            ),
+            share_query=build_share_query([radio.url for radio in radios]),
+            label=get_text(lang, "share_post"),
         ),
     )
 
@@ -474,6 +493,7 @@ async def _send_playlist_result(
     user_prefix: str,
     include_channel_button: bool,
     include_hashtags: bool,
+    lang: str,
 ) -> None:
     if not playlists:
         return
@@ -486,9 +506,13 @@ async def _send_playlist_result(
             user_prefix
             + format_playlist_message(playlist, include_hashtags=include_hashtags),
             preview_url=playlist.url,
-            reply_markup=_build_playlist_keyboard(
-                playlist.url,
-                include_channel_button=include_channel_button,
+            reply_markup=add_share_button(
+                _build_playlist_keyboard(
+                    playlist.url,
+                    include_channel_button=include_channel_button,
+                ),
+                share_query=build_share_query([playlist.url]),
+                label=get_text(lang, "share_post"),
             ),
         )
         return
@@ -502,9 +526,13 @@ async def _send_playlist_result(
             include_hashtags=include_hashtags,
         ),
         preview_url=playlists[0].url,
-        reply_markup=_build_playlist_collection_keyboard(
-            playlists,
-            include_channel_button=include_channel_button,
+        reply_markup=add_share_button(
+            _build_playlist_collection_keyboard(
+                playlists,
+                include_channel_button=include_channel_button,
+            ),
+            share_query=build_share_query([playlist.url for playlist in playlists]),
+            label=get_text(lang, "share_post"),
         ),
     )
 
@@ -517,6 +545,7 @@ async def _send_artist_result(
     user_prefix: str,
     include_channel_button: bool,
     include_hashtags: bool,
+    lang: str,
 ) -> None:
     if not artists:
         return
@@ -528,9 +557,13 @@ async def _send_artist_result(
             message,
             user_prefix + format_artist_message(artist, include_hashtags=include_hashtags),
             preview_url=artist.url,
-            reply_markup=_build_artist_keyboard(
-                artist.url,
-                include_channel_button=include_channel_button,
+            reply_markup=add_share_button(
+                _build_artist_keyboard(
+                    artist.url,
+                    include_channel_button=include_channel_button,
+                ),
+                share_query=build_share_query([artist.url]),
+                label=get_text(lang, "share_post"),
             ),
         )
         return
@@ -544,9 +577,13 @@ async def _send_artist_result(
             include_hashtags=include_hashtags,
         ),
         preview_url=artists[0].url,
-        reply_markup=_build_artist_collection_keyboard(
-            artists,
-            include_channel_button=include_channel_button,
+        reply_markup=add_share_button(
+            _build_artist_collection_keyboard(
+                artists,
+                include_channel_button=include_channel_button,
+            ),
+            share_query=build_share_query([artist.url for artist in artists]),
+            label=get_text(lang, "share_post"),
         ),
     )
 
@@ -564,6 +601,7 @@ async def _send_mixed_result(
     include_channel_button: bool,
     include_hashtags: bool,
     context: ContextTypes.DEFAULT_TYPE,
+    lang: str,
 ) -> None:
     preview_url = _select_mixed_preview_url(
         tracks,
@@ -586,13 +624,28 @@ async def _send_mixed_result(
             include_hashtags=include_hashtags,
         ),
         preview_url=preview_url,
-        reply_markup=_build_mixed_collection_keyboard(
-            tracks,
-            videos,
-            playlists,
-            artists,
-            radios,
-            include_channel_button=include_channel_button,
+        reply_markup=add_share_button(
+            _build_mixed_collection_keyboard(
+                tracks,
+                videos,
+                playlists,
+                artists,
+                radios,
+                include_channel_button=include_channel_button,
+            ),
+            share_query=build_share_query(
+                [
+                    *[
+                        track_share_url(track) or ""
+                        for track in tracks
+                    ],
+                    *[playlist.url for playlist in playlists],
+                    *[artist.url for artist in artists],
+                    *[radio.url for radio in radios],
+                    *[video.url for video in videos],
+                ]
+            ),
+            label=get_text(lang, "share_post"),
         ),
     )
 
