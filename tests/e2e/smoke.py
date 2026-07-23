@@ -40,6 +40,8 @@ RESPONSES = {
     "resolve": DRAFT,
     "draft": DRAFT,
     "update": DRAFT,
+    "prepare_share": {"ok": True, "prepared_message_id": "prepared-1"},
+    "prepare_crate_share": {"ok": True, "prepared_message_id": "prepared-crate-1"},
     "preview": {"ok": True, "preview": None},
     "crate": {"ok": True, "count": 0, "max": 10, "items": []},
     "queue": {"ok": True, "items": []},
@@ -61,7 +63,7 @@ ready(){},expand(){},close(){},setHeaderColor(){},setBackgroundColor(){},onEvent
 HapticFeedback:{impactOccurred(){},selectionChanged(){},notificationOccurred(){}},
 CloudStorage:{getItem(k,cb){cb(null,null)},setItem(){}},isVersionAtLeast(){return false},
 MainButton:{text:"",visible:false,handler:null,setText(t){this.text=t},show(){this.visible=true},hide(){this.visible=false},enable(){},disable(){},showProgress(){},hideProgress(){},onClick(fn){this.handler=fn},offClick(fn){if(this.handler===fn)this.handler=null}},
-switchInlineQuery(q){window.__inlineQuery=q},readTextFromClipboard(cb){cb("https://open.spotify.com/track/pasted")}}};"""
+shareMessage(id,cb){window.__preparedMessage=id;if(cb)cb(true)},switchInlineQuery(q){window.__inlineQuery=q},readTextFromClipboard(cb){cb("https://open.spotify.com/track/pasted")}}};"""
 
 
 def _launch(p):
@@ -216,6 +218,19 @@ def main() -> int:
             failures.append("publication success state did not open")
         page.eval_on_selector("#success-close", "el => el.click()")
 
+        # Native sharing sends the exact prepared post, including its keyboard.
+        page.eval_on_selector("#action-share", "el => el.click()")
+        page.wait_for_timeout(100)
+        if not page.eval_on_selector("#share-sheet", "el => el.classList.contains('open')"):
+            failures.append("share sheet did not open")
+        page.eval_on_selector("#share-post", "el => el.click()")
+        page.wait_for_timeout(250)
+        if page.evaluate("window.__preparedMessage") != "prepared-1":
+            failures.append("native Telegram share did not use prepared message")
+        prepare_requests = [body for body in REQUEST_BODIES if body.get("action") == "prepare_share"]
+        if not prepare_requests or (prepare_requests[-1].get("payload") or {}).get("draft_id") != "d1":
+            failures.append("native share did not prepare the active draft")
+
         # 4. crate tab opens
         page.eval_on_selector('#tabbar [data-tab="crate"]', "el => el.click()")
         page.wait_for_timeout(500)
@@ -254,6 +269,13 @@ def main() -> int:
             failures.append("batch paste crate is missing items")
         if page.evaluate("document.documentElement.scrollWidth > window.innerWidth"):
             failures.append("crate view has horizontal overflow")
+        if page.eval_on_selector("#crate-share", "el => el.classList.contains('hidden')"):
+            failures.append("ready crate has no share action")
+        else:
+            page.eval_on_selector("#crate-share", "el => el.click()")
+            page.wait_for_timeout(250)
+            if page.evaluate("window.__preparedMessage") != "prepared-crate-1":
+                failures.append("crate share did not keep the prepared collection")
 
         # A failed search must lead back to an editable query, not repeat itself.
         page.eval_on_selector('#tabbar [data-tab="home"]', "el => el.click()")

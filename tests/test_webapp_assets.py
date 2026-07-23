@@ -55,6 +55,9 @@ class WebAppAssetTests(unittest.TestCase):
             "coach-skip",
             "publish-close",
             "fmt-sync",
+            "share-post",
+            "share-links-label",
+            "crate-share",
         ):
             self.assertIn(f'id="{element_id}"', html)
         self.assertNotIn('data-tab="stats"', html)
@@ -63,6 +66,9 @@ class WebAppAssetTests(unittest.TestCase):
         self.assertIn("showSuccess", js)
         self.assertIn("contentSafeAreaInset", js)
         self.assertIn("MainButton", js)
+        self.assertIn("shareMessage", js)
+        self.assertIn('"prepare_share"', js)
+        self.assertIn('"prepare_crate_share"', js)
         self.assertIn('["crate","queue","stats"].includes(viewParam)', js)
 
     def test_html_ids_are_unique(self) -> None:

@@ -89,6 +89,13 @@ def format_track_heading(track: TrackMatch) -> str:
     )
 
 
+def _linked_heading(url: str | None, heading: str) -> str:
+    """Keep collection entries useful after Telegram strips their keyboard."""
+    if not url:
+        return heading
+    return f'<a href="{escape(url, quote=True)}">{heading}</a>'
+
+
 def format_release_heading(track: TrackMatch) -> str:
     if track.kind == "album":
         return f"💿 · <b>{_display_text(track.artist)}</b>\n{_display_text(track.title)}"
@@ -215,9 +222,10 @@ def format_artist_collection_message(
     )
     lines = ["сегодня по артистам:", ""]
     for index, artist in enumerate(artists, start=1):
+        heading = f"<b>{_display_text(artist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
         lines.append(
             f"{index}. 🧬 · "
-            f"<b>{_display_text(artist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
+            f"{_linked_heading(artist.url, heading)}"
         )
 
     lines.extend(["", f"<i>{escape(signature)}</i>"])
@@ -235,9 +243,10 @@ def format_playlist_collection_message(
     )
     lines = ["сегодня в плейлистах:", ""]
     for index, playlist in enumerate(playlists, start=1):
+        heading = f"<b>{_display_text(playlist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
         lines.append(
             f"{index}. 🎛 · "
-            f"<b>{_display_text(playlist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
+            f"{_linked_heading(playlist.url, heading)}"
         )
 
     lines.extend(
@@ -260,9 +269,10 @@ def format_video_collection_message(
     )
     lines = ["сегодня на экране:", ""]
     for index, video in enumerate(videos, start=1):
+        heading = f"<b>{_display_text(video.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
         lines.append(
             f"{index}. 📺 · "
-            f"<b>{_display_text(video.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
+            f"{_linked_heading(video.url, heading)}"
         )
 
     lines.extend(
@@ -285,9 +295,10 @@ def format_radio_collection_message(
     )
     lines = ["сегодня на NTS:", ""]
     for index, radio in enumerate(radios, start=1):
+        heading = f"<b>{_display_text(radio.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
         lines.append(
             f"{index}. 📡 · "
-            f"<b>{_display_text(radio.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
+            f"{_linked_heading(radio.url, heading)}"
         )
 
     lines.extend(
@@ -328,34 +339,41 @@ def format_mixed_collection_message(
     index = 1
     for track in tracks:
         emoji = pick_track_emoji(track)
-        lines.append(f"{index}. {emoji} · {format_track_heading(track)}")
+        lines.append(
+            f"{index}. {emoji} · "
+            f"{_linked_heading(track.page_url, format_track_heading(track))}"
+        )
         index += 1
 
     for playlist in playlists:
+        heading = f"<b>{_display_text(playlist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
         lines.append(
             f"{index}. 🎛 · "
-            f"<b>{_display_text(playlist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
+            f"{_linked_heading(playlist.url, heading)}"
         )
         index += 1
 
     for artist in artists:
+        heading = f"<b>{_display_text(artist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
         lines.append(
             f"{index}. 🧬 · "
-            f"<b>{_display_text(artist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
+            f"{_linked_heading(artist.url, heading)}"
         )
         index += 1
 
     for radio in radios:
+        heading = f"<b>{_display_text(radio.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
         lines.append(
             f"{index}. 📡 · "
-            f"<b>{_display_text(radio.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
+            f"{_linked_heading(radio.url, heading)}"
         )
         index += 1
 
     for video in videos:
+        heading = f"<b>{_display_text(video.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
         lines.append(
             f"{index}. 📺 · "
-            f"<b>{_display_text(video.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
+            f"{_linked_heading(video.url, heading)}"
         )
         index += 1
 
@@ -392,7 +410,10 @@ def format_collection_message(
 
     for index, track in enumerate(tracks, start=1):
         emoji = pick_track_emoji(track)
-        lines.append(f"{index}. {emoji} · {format_track_heading(track)}")
+        lines.append(
+            f"{index}. {emoji} · "
+            f"{_linked_heading(track.page_url, format_track_heading(track))}"
+        )
 
     lines.extend(
         [
