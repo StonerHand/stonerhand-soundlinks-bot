@@ -1576,7 +1576,11 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 1)
         self.assertTrue(message.replies[0].startswith("<blockquote>вечерний набор</blockquote>\n\n"))
         self.assertIn("<b>Youth Code</b> - Transitions", message.replies[0])
-        self.assertIn("📺 · <b>SANSAE Live Session Vol.3 - Melon</b>", message.replies[0])
+        self.assertIn(
+            '<a href="https://www.youtube.com/watch?v=abc123">'
+            "<b>SANSAE Live Session Vol.3 - Melon</b></a>",
+            message.replies[0],
+        )
         self.assertNotIn("#stonerhand", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         preview_options = message.reply_kwargs[0]["link_preview_options"]
@@ -1596,8 +1600,16 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(message.replies), 1)
         self.assertTrue(message.replies[0].startswith("<blockquote>пачка ссылок</blockquote>\n\n"))
-        self.assertIn("🎛 · <b>Women of Punk</b>", message.replies[0])
-        self.assertIn("📺 · <b>SANSAE Live Session Vol.3 - Melon</b>", message.replies[0])
+        self.assertIn(
+            '<a href="https://open.spotify.com/playlist/'
+            '37i9dQZF1DX51TD2wakW3K"><b>Women of Punk</b></a>',
+            message.replies[0],
+        )
+        self.assertIn(
+            '<a href="https://www.youtube.com/watch?v=abc123">'
+            "<b>SANSAE Live Session Vol.3 - Melon</b></a>",
+            message.replies[0],
+        )
         self.assertNotIn("#playlist #video", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "🎛 1. Women of Punk")
@@ -1613,8 +1625,16 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(message.replies), 1)
         self.assertTrue(message.replies[0].startswith("<blockquote>радио и видео</blockquote>\n\n"))
-        self.assertIn("📡 · <b>Dark Energy w/ Guest</b>", message.replies[0])
-        self.assertIn("📺 · <b>SANSAE Live Session Vol.3 - Melon</b>", message.replies[0])
+        self.assertIn(
+            '<a href="https://www.nts.live/shows/example">'
+            "<b>Dark Energy w/ Guest</b></a>",
+            message.replies[0],
+        )
+        self.assertIn(
+            '<a href="https://www.youtube.com/watch?v=abc123">'
+            "<b>SANSAE Live Session Vol.3 - Melon</b></a>",
+            message.replies[0],
+        )
         self.assertNotIn("#radio #video", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "📡 1. Dark Energy w/ Guest")

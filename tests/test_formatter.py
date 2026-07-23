@@ -345,8 +345,8 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_playlist_collection_message(playlists),
             "сегодня в плейлистах:\n\n"
-            "1. 🎛 · <b>Women of Punk</b>\n"
-            "2. 🎛 · <b>Dark Wave</b>\n\n"
+            '1. 🎛 · <a href="https://open.spotify.com/playlist/1"><b>Women of Punk</b></a>\n'
+            '2. 🎛 · <a href="https://open.spotify.com/playlist/2"><b>Dark Wave</b></a>\n\n'
             f"<i>{signature}</i>\n\n"
             "#stonerhand #collection #playlist",
         )
@@ -364,8 +364,8 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_artist_collection_message(artists),
             "сегодня по артистам:\n\n"
-            "1. 🧬 · <b>1.Kla$</b>\n"
-            "2. 🧬 · <b>Hotbox</b>\n\n"
+            '1. 🧬 · <a href="https://open.spotify.com/artist/1"><b>1.Kla$</b></a>\n'
+            '2. 🧬 · <a href="https://open.spotify.com/artist/2"><b>Hotbox</b></a>\n\n'
             f"<i>{signature}</i>\n\n"
             "#stonerhand #collection #artist",
         )
@@ -383,8 +383,8 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_video_collection_message(videos),
             "сегодня на экране:\n\n"
-            "1. 📺 · <b>First</b>\n"
-            "2. 📺 · <b>Second</b>\n\n"
+            '1. 📺 · <a href="https://youtu.be/1"><b>First</b></a>\n'
+            '2. 📺 · <a href="https://youtu.be/2"><b>Second</b></a>\n\n'
             f"<i>{signature}</i>\n\n"
             "#stonerhand #collection #video",
         )
@@ -402,8 +402,8 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_radio_collection_message(radios),
             "сегодня на NTS:\n\n"
-            "1. 📡 · <b>First</b>\n"
-            "2. 📡 · <b>Second</b>\n\n"
+            '1. 📡 · <a href="https://nts.live/1"><b>First</b></a>\n'
+            '2. 📡 · <a href="https://nts.live/2"><b>Second</b></a>\n\n'
             f"<i>{signature}</i>\n\n"
             "#stonerhand #collection #radio",
         )
@@ -419,7 +419,7 @@ class FormatterTests(unittest.TestCase):
         message = format_mixed_collection_message(tracks, videos)
 
         self.assertIn(f"1. {pick_track_emoji(tracks[0])} · <b>Artist</b> - Song", message)
-        self.assertIn("2. 📺 · <b>Live</b>", message)
+        self.assertIn('2. 📺 · <a href="https://youtu.be/1"><b>Live</b></a>', message)
         self.assertIn("#stonerhand #collection #track #video", message)
 
     def test_format_mixed_collection_message_lists_playlists(self) -> None:
@@ -436,8 +436,8 @@ class FormatterTests(unittest.TestCase):
 
         message = format_mixed_collection_message([], videos, playlists)
 
-        self.assertIn("1. 🎛 · <b>Women of Punk</b>", message)
-        self.assertIn("2. 📺 · <b>Live</b>", message)
+        self.assertIn('<a href="https://open.spotify.com/playlist/1"><b>Women of Punk</b></a>', message)
+        self.assertIn('<a href="https://youtu.be/1"><b>Live</b></a>', message)
         self.assertIn("#stonerhand #collection #playlist #video", message)
 
     def test_format_mixed_collection_message_lists_artists(self) -> None:
@@ -454,8 +454,8 @@ class FormatterTests(unittest.TestCase):
 
         message = format_mixed_collection_message([], videos, artists=artists)
 
-        self.assertIn("1. 🧬 · <b>1.Kla$</b>", message)
-        self.assertIn("2. 📺 · <b>Live</b>", message)
+        self.assertIn('<a href="https://open.spotify.com/artist/1"><b>1.Kla$</b></a>', message)
+        self.assertIn('<a href="https://youtu.be/1"><b>Live</b></a>', message)
         self.assertIn("#stonerhand #collection #artist #video", message)
 
     def test_format_mixed_collection_message_lists_radios(self) -> None:
@@ -472,8 +472,8 @@ class FormatterTests(unittest.TestCase):
 
         message = format_mixed_collection_message([], videos, radios=radios)
 
-        self.assertIn("1. 📡 · <b>Dark Energy</b>", message)
-        self.assertIn("2. 📺 · <b>Live</b>", message)
+        self.assertIn('<a href="https://nts.live/1"><b>Dark Energy</b></a>', message)
+        self.assertIn('<a href="https://youtu.be/1"><b>Live</b></a>', message)
         self.assertIn("#stonerhand #collection #radio #video", message)
 
 

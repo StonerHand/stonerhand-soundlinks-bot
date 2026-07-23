@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import threading
@@ -85,7 +86,9 @@ _crate_response = _studio_storage._crate_response
 
 from music_links_bot.url_utils import extract_supported_urls
 from music_links_bot.webapp_auth import validate_init_data
+from telegram import InlineQueryResultArticle, InputTextMessageContent
 from telegram.constants import ParseMode
+from telegram.error import TelegramError
 
 LOGGER = logging.getLogger(__name__)
 MAX_BODY_BYTES = 64 * 1024
@@ -112,6 +115,8 @@ IDEMPOTENT_ACTIONS = frozenset(
         "crate_clear",
         "crate_send",
         "crate_publish",
+        "prepare_share",
+        "prepare_crate_share",
     }
 )
 
@@ -266,6 +271,12 @@ async def _handle_action(application, settings: Settings, user: dict, payload: d
         "resolve_batch": lambda: _action_resolve_batch(context, body, user_id),
         "draft": lambda: _action_draft(context, body, user_id, is_admin),
         "update": lambda: _action_update(context, body, user_id, is_admin),
+        "prepare_share": lambda: _action_prepare_share(
+            context, body, user_id, is_admin
+        ),
+        "prepare_crate_share": lambda: _action_prepare_crate_share(
+            context, body, user_id
+        ),
         "preview": lambda: _action_preview(context, body, user_id),
         "history": lambda: _action_history(context, user_id, is_admin),
         "send": lambda: _action_deliver(context, action, body, user_id, is_admin),
@@ -449,6 +460,103 @@ async def _action_update(context, body: dict, user_id: int, is_admin: bool) -> d
     _apply_draft_patch(draft, body)
     await _store_draft(context, draft_id, draft)
     return await _draft_response(context, draft_id, draft, is_admin)
+
+
+async def _action_prepare_share(
+    context, body: dict, user_id: int, is_admin: bool
+) -> dict:
+    """Prepare the exact Studio draft for Telegram's native share dialog.
+
+    Native forwarding deliberately drops inline keyboards. Bot API 8.0's
+    prepared messages are the supported way for a Mini App to send the whole
+    post — formatted text, link preview and buttons — into another chat.
+    """
+    draft_id = str(body.get("draft_id") or "")
+    draft = await _load_draft(context, draft_id)
+    if draft is None or draft.get("chat_id") != user_id:
+        return {"ok": False, "error": "draft not found"}
+
+    _apply_draft_patch(draft, body)
+    await _store_draft(context, draft_id, draft)
+    track = TrackMatch(**draft["item"])
+
+    from music_links_bot.bot import _build_link_preview_options
+
+    text, keyboard = _render_track_draft(draft, context, draft_id=None)
+    result_id = hashlib.sha256(
+        f"{user_id}:{draft_id}:{text}".encode("utf-8")
+    ).hexdigest()[:32]
+    result = InlineQueryResultArticle(
+        id=result_id,
+        title=f"{track.artist} — {track.title}",
+        description="Готовый пост с кнопками всех площадок",
+        thumbnail_url=track.thumbnail_url,
+        input_message_content=InputTextMessageContent(
+            message_text=text,
+            parse_mode=ParseMode.HTML,
+            link_preview_options=_build_link_preview_options(
+                _select_preview_url(track.links, context) or track.thumbnail_url,
+                prefer_large_media=bool(draft.get("large_preview")),
+            ),
+        ),
+        reply_markup=keyboard,
+    )
+
+    return await _save_prepared_share(context, user_id, result)
+
+
+async def _action_prepare_crate_share(context, body: dict, user_id: int) -> dict:
+    """Prepare the current collection for native Mini App sharing."""
+    from music_links_bot.bot import _build_collection_keyboard, _build_link_preview_options
+
+    items = await _crate_base_items(context, body, user_id)
+    if len(items) < 2:
+        return {"ok": False, "error": "need more tracks"}
+
+    tracks = [_track_from_item(item) for item in items]
+    text = format_collection_message(tracks, include_hashtags=True)
+    keyboard = _build_collection_keyboard(tracks, include_channel_button=True)
+    result = InlineQueryResultArticle(
+        id=hashlib.sha256(f"{user_id}:{text}".encode("utf-8")).hexdigest()[:32],
+        title=f"Подборка · {len(tracks)}",
+        description="Готовая подборка с кнопками всех релизов",
+        thumbnail_url=tracks[0].thumbnail_url,
+        input_message_content=InputTextMessageContent(
+            message_text=text,
+            parse_mode=ParseMode.HTML,
+            link_preview_options=_build_link_preview_options(
+                _select_preview_url(tracks[0].links, context)
+                or tracks[0].thumbnail_url,
+                prefer_large_media=True,
+            ),
+        ),
+        reply_markup=keyboard,
+    )
+    return await _save_prepared_share(context, user_id, result)
+
+
+async def _save_prepared_share(
+    context, user_id: int, result: InlineQueryResultArticle
+) -> dict:
+    try:
+        prepared = await context.bot.save_prepared_inline_message(
+            user_id=user_id,
+            result=result,
+            allow_user_chats=True,
+            allow_bot_chats=True,
+            allow_group_chats=True,
+            allow_channel_chats=True,
+        )
+    except TelegramError:
+        LOGGER.warning("Preparing native share failed", exc_info=True)
+        return {"ok": False, "error": "share unavailable", "retryable": True}
+
+    expiration = getattr(prepared, "expiration_date", None)
+    return {
+        "ok": True,
+        "prepared_message_id": prepared.id,
+        "expires_at": int(expiration.timestamp()) if expiration else None,
+    }
 
 
 async def _action_deliver(context, action: str, body: dict, user_id: int, is_admin: bool) -> dict:

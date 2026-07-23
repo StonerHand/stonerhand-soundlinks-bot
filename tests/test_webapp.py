@@ -203,6 +203,22 @@ class _CrateBotStub:
         self.photos.append(kwargs)
 
 
+class _PreparedShareBotStub(_CrateBotStub):
+    def __init__(self) -> None:
+        super().__init__()
+        self.prepared: list[dict] = []
+
+    async def save_prepared_inline_message(self, **kwargs):
+        from datetime import datetime, timedelta, timezone
+        from types import SimpleNamespace
+
+        self.prepared.append(kwargs)
+        return SimpleNamespace(
+            id="prepared-message-1",
+            expiration_date=datetime.now(timezone.utc) + timedelta(hours=24),
+        )
+
+
 def _crate_context():
     from types import SimpleNamespace
 
@@ -245,6 +261,89 @@ class CrateApiTests(unittest.TestCase):
         self.assertEqual(again["count"], 1)
         self.assertEqual(second["count"], 2)
         self.assertEqual(second["items"][1]["title"], "Dragonaut")
+
+    def test_prepare_share_keeps_exact_post_and_keyboard(self) -> None:
+        import asyncio
+        from types import SimpleNamespace
+        from api.webapp import _action_prepare_share
+
+        bot = _PreparedShareBotStub()
+        application = SimpleNamespace(bot_data={"drafts": {}}, bot=bot)
+        context = SimpleNamespace(application=application, bot=bot)
+        application.bot_data["drafts"]["draft-1"] = {
+            "v": 1,
+            "type": "track",
+            "item": _crate_track("Dopesmoker"),
+            "prefix": "",
+            "hashtags": True,
+            "quote": False,
+            "large_preview": True,
+            "chat_id": 7,
+            "lang": "ru",
+            "can_publish": False,
+        }
+
+        result = asyncio.run(
+            _action_prepare_share(context, {"draft_id": "draft-1"}, 7, False)
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["prepared_message_id"], "prepared-message-1")
+        prepared = bot.prepared[0]
+        self.assertTrue(prepared["allow_user_chats"])
+        self.assertTrue(prepared["allow_group_chats"])
+        self.assertTrue(prepared["allow_channel_chats"])
+        self.assertIn("Dopesmoker", prepared["result"].input_message_content.message_text)
+        self.assertIsNotNone(prepared["result"].reply_markup)
+
+    def test_prepare_share_rejects_someone_elses_draft(self) -> None:
+        import asyncio
+        from types import SimpleNamespace
+        from api.webapp import _action_prepare_share
+
+        bot = _PreparedShareBotStub()
+        application = SimpleNamespace(
+            bot_data={
+                "drafts": {
+                    "draft-1": {
+                        "item": _crate_track("Dopesmoker"),
+                        "chat_id": 8,
+                    }
+                }
+            },
+            bot=bot,
+        )
+        context = SimpleNamespace(application=application, bot=bot)
+
+        result = asyncio.run(
+            _action_prepare_share(context, {"draft_id": "draft-1"}, 7, False)
+        )
+
+        self.assertEqual(result["error"], "draft not found")
+        self.assertEqual(bot.prepared, [])
+
+    def test_prepare_crate_share_keeps_every_release_button(self) -> None:
+        import asyncio
+        from types import SimpleNamespace
+        from api.webapp import _action_prepare_crate_share
+
+        bot = _PreparedShareBotStub()
+        application = SimpleNamespace(bot_data={"drafts": {}}, bot=bot)
+        context = SimpleNamespace(application=application, bot=bot)
+        body = {"items": [_crate_track("One"), _crate_track("Two")]}
+
+        result = asyncio.run(_action_prepare_crate_share(context, body, 7))
+
+        self.assertTrue(result["ok"])
+        prepared = bot.prepared[0]["result"]
+        self.assertIn("One", prepared.input_message_content.message_text)
+        self.assertIn("Two", prepared.input_message_content.message_text)
+        buttons = [
+            button
+            for row in prepared.reply_markup.inline_keyboard
+            for button in row
+        ]
+        self.assertGreaterEqual(len(buttons), 2)
 
     def test_crate_reorder_and_remove(self) -> None:
         import asyncio

@@ -193,7 +193,7 @@
       <div class="head"><button class="back" id="crate-back" aria-label="Назад"><svg class="icon s18"><use href="#i-cl"/></svg></button>
         <div class="sub"><span class="seclabel" id="crate-label">Подборка</span><div class="lbl" id="crate-count">0 треков</div></div></div>
       <div class="scroll"><div class="crate-cover" id="crate-cover"><div class="crate-stack" id="crate-stack"><i></i><i></i><i></i></div><div><span id="crate-kicker">CURATED BY STONERHAND</span><strong id="crate-hero-title">Следующий сет</strong><small id="crate-cover-count">0 треков</small></div></div><div class="list" id="crate-list"></div><div class="status-note" id="crate-empty"></div></div>
-      <div class="dock" id="crate-dock"><div class="dock-row"><button class="dock-primary hidden" id="crate-main"></button></div>
+      <div class="dock" id="crate-dock"><div class="dock-row"><button class="dock-primary hidden" id="crate-main"></button><button class="dock-ico hidden" id="crate-share" type="button" title="Поделиться подборкой" aria-label="Поделиться подборкой"><svg class="icon"><use href="#i-share"/></svg></button></div>
         <button class="crate-clear hidden" id="crate-clear" style="width:100%;margin-top:10px;background:none;border:none;color:var(--muted);font-size:12px;font-family:inherit;padding:8px"></button></div>
     </div>
 
@@ -252,7 +252,13 @@
 <!-- Share picker sheet -->
 <div class="mask" id="share-mask" aria-hidden="true"></div>
 <div class="sheet" id="share-sheet" role="dialog" aria-modal="true" aria-labelledby="share-title" aria-hidden="true" inert>
-  <div class="grab"></div><div class="sheet-head"><h3 id="share-title">Куда поделиться?</h3><button class="sheet-close" id="share-close" type="button" aria-label="Закрыть"><svg class="icon s16"><use href="#i-x"/></svg></button></div>
+  <div class="grab"></div><div class="sheet-head"><div><span class="sheet-kicker" id="share-kicker">ГОТОВЫЙ ПОСТ</span><h3 id="share-title">Куда поделиться?</h3></div><button class="sheet-close" id="share-close" type="button" aria-label="Закрыть"><svg class="icon s16"><use href="#i-x"/></svg></button></div>
+  <button class="native-share" id="share-post" type="button">
+    <span class="native-share-icon"><svg class="icon s18"><use href="#i-send"/></svg></span>
+    <span><b id="share-post-title">Отправить пост с кнопками</b><small id="share-post-copy">Выбрать чат, группу или канал в Telegram</small></span>
+    <svg class="icon s16 native-share-arrow"><use href="#i-cr"/></svg>
+  </button>
+  <div class="share-divider"><span id="share-links-label">ИЛИ ПОДЕЛИТЬСЯ ССЫЛКОЙ</span></div>
   <div id="share-list"></div>
 </div>
 

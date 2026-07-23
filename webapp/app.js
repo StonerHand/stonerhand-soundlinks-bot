@@ -29,7 +29,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     secContent: "Content", secText: "Your text", secTags: "Hashtags", secPm: "Platforms & order",
     rHashtags: "Hashtags", rQuote: "Quote / CTA", rPhoto: "Photo mode (no player)", rBig: "Large preview",
     addTrack: "Add track", crateEmpty: "ADD TRACKS FROM ANY CARD", needMore: "ADD AT LEAST 2 TRACKS",
-    crateSend: "Send to me", cratePublish: "Publish collection", crateClear: "Clear crate",
+    crateSend: "Send to me", cratePublish: "Publish collection", crateClear: "Clear crate", crateShare: "Share collection",
     crateTitle: "tracks", queueTitle: "posts", queueEmpty: "QUEUE IS EMPTY",
     topUsers: "TOP USERS", topChats: "TOP CHATS", posted: "in channel",
     sheetTitle: "When to publish?", in1h: "In 1 hour", in3h: "In 3 hours", tonight: "Tonight 19:00", tomorrow: "Tomorrow 10:00",
@@ -52,6 +52,10 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
       successNext:"Create another", successClose:"Back to the post",
     },
     shareTitle: "Share where?", shareAll: "All platforms",
+    shareKicker: "READY POST", sharePost: "Send post with buttons",
+    sharePostCopy: "Choose a Telegram chat, group or channel",
+    sharePreparing: "Preparing post…", shareFailed: "Could not open sharing. Try again.",
+    shareLinks: "OR SHARE A LINK",
     presets: "Presets", presetSave: "save", presetEmpty: "Save the current look to reuse it",
     presetName: "Preset", reschedule: "Reschedule",
     queueEmptyT: "Queue is empty", queueEmptyS: "Scheduled posts will show up here",
@@ -71,7 +75,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     secContent: "Содержимое", secText: "Свой текст", secTags: "Хэштеги", secPm: "Платформы и порядок",
     rHashtags: "Хэштеги", rQuote: "Цитата / CTA", rPhoto: "Фото-режим (без плеера)", rBig: "Большое превью",
     addTrack: "Добавить трек", crateEmpty: "ДОБАВЛЯЙ ТРЕКИ С ЛЮБОЙ КАРТОЧКИ", needMore: "НУЖНО МИНИМУМ 2 ТРЕКА",
-    crateSend: "Отправить себе", cratePublish: "Опубликовать подборку", crateClear: "Очистить подборку",
+    crateSend: "Отправить себе", cratePublish: "Опубликовать подборку", crateClear: "Очистить подборку", crateShare: "Поделиться подборкой",
     crateTitle: "треков", queueTitle: "постов", queueEmpty: "ОЧЕРЕДЬ ПУСТА",
     topUsers: "ТОП ПОЛЬЗОВАТЕЛЕЙ", topChats: "ТОП ЧАТОВ", posted: "в канале",
     sheetTitle: "Когда опубликовать?", in1h: "Через час", in3h: "Через 3 часа", tonight: "Сегодня 19:00", tomorrow: "Завтра 10:00",
@@ -94,6 +98,10 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
       successNext:"Создать следующий", successClose:"Вернуться к посту",
     },
     shareTitle: "Куда поделиться?", shareAll: "Все площадки",
+    shareKicker: "ГОТОВЫЙ ПОСТ", sharePost: "Отправить пост с кнопками",
+    sharePostCopy: "Выбрать чат, группу или канал в Telegram",
+    sharePreparing: "Готовим пост…", shareFailed: "Не удалось открыть отправку. Попробуй ещё раз.",
+    shareLinks: "ИЛИ ПОДЕЛИТЬСЯ ССЫЛКОЙ",
     presets: "Пресеты", presetSave: "сохранить", presetEmpty: "Сохрани текущее оформление, чтобы применять в один тап",
     presetName: "Пресет", reschedule: "Перенести",
     queueEmptyT: "Очередь пуста", queueEmptyS: "Отложенные посты появятся здесь",
@@ -219,6 +227,10 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   $("t-presets").textContent = T.presets;
   $("t-preset-save").textContent = T.presetSave;
   $("share-title").textContent = T.shareTitle;
+  $("share-kicker").textContent = T.shareKicker;
+  $("share-post-title").textContent = T.sharePost;
+  $("share-post-copy").textContent = T.sharePostCopy;
+  $("share-links-label").textContent = T.shareLinks;
   $("flow-find").textContent = T.flow[0];
   $("flow-style").textContent = T.flow[1];
   $("flow-send").textContent = T.flow[2];
@@ -951,6 +963,35 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
     closeShare();
     try { tg.switchInlineQuery(url, ["users","groups","channels"]); } catch(e) { try { tg.switchInlineQuery(url); } catch(x){} }
   }
+  function fallbackShare() {
+    const enabled = (state?.release?.platforms||[]).find((p)=>p.enabled!==false && /^https?:\/\//i.test(String(p.url||"")));
+    shareUrl(state?.release?.page_url || enabled?.url);
+  }
+  async function sharePreparedPost() {
+    if (!state?.draft_id) { fallbackShare(); return; }
+    const button = $("share-post");
+    if (button.disabled) return;
+    button.disabled = true; button.classList.add("busy");
+    $("share-post-title").textContent = T.sharePreparing;
+    try {
+      const res = await api("prepare_share", { draft_id: state.draft_id });
+      if (!res?.ok || !res.prepared_message_id || typeof tg.shareMessage !== "function") {
+        fallbackShare();
+        return;
+      }
+      closeShare();
+      tg.shareMessage(res.prepared_message_id, (sent) => {
+        if (sent) { hap.ok(); flash(EN ? "Post sent with buttons" : "Пост отправлен с кнопками"); }
+      });
+    } catch(e) {
+      hap.err();
+      flash(T.shareFailed);
+      fallbackShare();
+    } finally {
+      button.disabled = false; button.classList.remove("busy");
+      $("share-post-title").textContent = T.sharePost;
+    }
+  }
   let lastSheetTrigger = null;
   function setSheetOpen(sheetId, maskId, open, trigger) {
     const sheet = $(sheetId), mask = $(maskId);
@@ -969,6 +1010,7 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   function closeShare(){ setSheetOpen("share-sheet", "share-mask", false); }
   $("share-mask").addEventListener("click", closeShare);
   $("share-close").addEventListener("click", closeShare);
+  $("share-post").addEventListener("click", () => { hap.tap(); sharePreparedPost(); });
   $("action-share").addEventListener("click", () => {
     hap.tap();
     const en = (state.release.platforms||[]).filter((p)=>p.enabled!==false && /^https?:\/\//i.test(String(p.url||"")));
@@ -1152,8 +1194,10 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
       bindSwipe(row, () => row.querySelector(".del").click(), () => { if (i > 0) reorderCrate(i, i - 1); });
       list.appendChild(row);
     });
-    const main = $("crate-main"), clear = $("crate-clear"), enough = crateItems.length>=2;
+    const main = $("crate-main"), share = $("crate-share"), clear = $("crate-clear"), enough = crateItems.length>=2;
     main.classList.toggle("hidden", !enough);
+    share.classList.toggle("hidden", !enough);
+    share.title = T.crateShare; share.setAttribute("aria-label", T.crateShare);
     clear.classList.toggle("hidden", crateItems.length===0);
     clear.textContent = "🗑 "+T.crateClear;
     if (isAdmin) { main.innerHTML = ico("send","s18")+T.cratePublish+" ("+crateItems.length+")"; main.dataset.action="crate_publish"; }
@@ -1198,6 +1242,24 @@ import { createCloudStorage } from "/webapp/cloud-storage.js";
   $("crate-main").addEventListener("click", async () => {
     const main = $("crate-main"); main.disabled = true;
     try { const res = await api(main.dataset.action, { items: crateItems.map((x)=>x.data) }); if (res.ok) { hap.ok(); main.classList.add("done"); main.textContent = main.dataset.action==="crate_publish"?T.published:T.sent; if (main.dataset.action==="crate_publish") { crateItems=[]; persistCrate(); } setTimeout(()=>{refreshCrateBadge();drawCrate();},1600); } else { hap.err(); $("crate-empty").textContent = res.error==="need more tracks"?T.needMore:T.err; } } catch(e) { hap.err(); } finally { main.disabled = false; }
+  });
+  $("crate-share").addEventListener("click", async () => {
+    if (crateItems.length < 2) return;
+    const button = $("crate-share");
+    button.disabled = true; hap.tap();
+    try {
+      const res = await api("prepare_crate_share", { items: crateItems.map((x)=>x.data) });
+      if (!res?.ok || !res.prepared_message_id || typeof tg.shareMessage !== "function") {
+        const urls = crateItems.map((x)=>x.data.page_url).filter((url)=>/^https?:\/\//i.test(String(url||"")));
+        try { tg.switchInlineQuery(urls.join(" "), ["users","groups","channels"]); }
+        catch(e) { try { tg.switchInlineQuery(urls[0]||""); } catch(x) { flash(T.shareFailed); } }
+        return;
+      }
+      tg.shareMessage(res.prepared_message_id, (sent) => {
+        if (sent) { hap.ok(); flash(EN ? "Collection sent with buttons" : "Подборка отправлена с кнопками"); }
+      });
+    } catch(e) { hap.err(); flash(T.shareFailed); }
+    finally { button.disabled = false; }
   });
   $("crate-clear").addEventListener("click", async () => {
     if (!await confirmAction(T.confirmClear)) return;
