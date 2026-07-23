@@ -11,6 +11,8 @@ class WebAppAssetTests(unittest.TestCase):
         self.assertIn('href="/webapp/styles.css"', html)
         self.assertIn('href="/webapp/studio-8.css"', html)
         self.assertIn('type="module" src="/webapp/app.js"', html)
+        self.assertIn('<span class="wordmark">Studio</span>', html)
+        self.assertNotIn("Studio / 08", html)
         self.assertNotIn("<style>", html)
 
     def test_modules_and_security_headers_are_deployed(self) -> None:
