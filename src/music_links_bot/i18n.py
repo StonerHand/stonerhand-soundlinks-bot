@@ -151,6 +151,10 @@ STRINGS: dict[str, dict[str, str]] = {
     "tab_guide": {RU: "📣 Для каналов", EN: "📣 For channels"},
     "tab_demo": {RU: "🧪 Пример поста", EN: "🧪 Example post"},
     "share_button": {RU: "↗ Поделиться ботом", EN: "↗ Share the bot"},
+    "share_post": {
+        RU: "↗️ Поделиться с кнопками",
+        EN: "↗️ Share with buttons",
+    },
     "error_platforms_button": {RU: "Что поддерживается", EN: "What is supported"},
     "menu_start": {
         RU: (

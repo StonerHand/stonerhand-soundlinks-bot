@@ -14,6 +14,7 @@ from music_links_bot.bot import (
     PUBLIC_BOT_COMMANDS,
     _build_collection_keyboard,
     _build_inline_result,
+    _build_inline_collection_result,
     _build_artist_keyboard,
     _build_error_keyboard,
     _build_intro_keyboard,
@@ -63,6 +64,10 @@ from music_links_bot.nts import NTSLookupError
 from music_links_bot.playlist import PlaylistLookupError
 from music_links_bot.search import SearchCandidate, SearchLookupError
 from music_links_bot.songlink import SonglinkError
+from music_links_bot.sharing import (
+    build_share_query,
+    parse_share_query,
+)
 from music_links_bot.soundcloud import SoundCloudLookupError
 from music_links_bot.youtube import YouTubeLookupError
 
@@ -1042,6 +1047,55 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("<b>Youth Code</b>", result.input_message_content.message_text)
         keyboard = result.reply_markup.inline_keyboard
         self.assertEqual(keyboard[0][0].text, "🟢 Spotify")
+        self.assertEqual(keyboard[-1][0].text, "↗️ Поделиться с кнопками")
+        self.assertTrue(keyboard[-1][0].switch_inline_query.startswith("sh|"))
+
+    async def test_inline_share_query_keeps_collection_in_one_result(self) -> None:
+        query = build_share_query(
+            [
+                "https://open.spotify.com/track/abc",
+                "https://open.spotify.com/track/def",
+            ]
+        )
+        self.assertIsNotNone(query)
+
+        result = await _build_inline_collection_result(
+            parse_share_query(query) or [],
+            ContextStub(),
+            lang="ru",
+        )
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result.title, "Подборка · 2 релиза")
+        self.assertIn("1.", result.input_message_content.message_text)
+        self.assertIn("2.", result.input_message_content.message_text)
+        self.assertEqual(result.reply_markup.inline_keyboard[-1][0].switch_inline_query, query)
+
+    async def test_inline_share_handler_returns_one_collection_card(self) -> None:
+        from music_links_bot.bot import inline_query_handler
+
+        class InlineQueryStub:
+            query = "sh|tabc|tdef"
+            from_user = None
+
+            def __init__(self) -> None:
+                self.answers: list[list] = []
+
+            async def answer(self, results, **kwargs) -> None:
+                del kwargs
+                self.answers.append(list(results))
+
+        inline_query = InlineQueryStub()
+        update = type("InlineUpdateStub", (), {"inline_query": inline_query})()
+
+        await inline_query_handler(update, ContextStub())
+
+        self.assertEqual(len(inline_query.answers), 1)
+        self.assertEqual(len(inline_query.answers[0]), 1)
+        self.assertEqual(
+            inline_query.answers[0][0].title,
+            "Подборка · 2 релиза",
+        )
 
     async def test_inline_youtube_result_uses_video_card(self) -> None:
         result = await _build_inline_result(
