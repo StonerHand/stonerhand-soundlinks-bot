@@ -298,6 +298,15 @@ import {
   $("crate-item-title").textContent = T.crateItemEditor; $("crate-section-label").textContent = T.crateSection; $("crate-note-label").textContent = T.crateNote; $("crate-item-save").textContent = T.crateItemSave;
   $("queue-label").textContent = T.ui.queue; $("stats-title").textContent = T.ui.stats; $("stats-period").textContent = T.ui.period; $("stats-breakdown-label").textContent = T.ui.breakdown;
   $("create-label").textContent = T.ui.create; $("fmt-apply").textContent = T.ui.done;
+  $("format-nav-presets").textContent = EN ? "Style" : "Стиль";
+  $("format-nav-copy").textContent = EN ? "Copy" : "Текст";
+  $("format-nav-tags").textContent = EN ? "Tags" : "Теги";
+  $("format-nav-services").textContent = EN ? "Services" : "Сервисы";
+  $("result-score-label").textContent = EN ? "ready" : "готово";
+  $("queue-intro-title").textContent = EN ? "Broadcast plan" : "План эфира";
+  $("queue-intro-copy").textContent = EN ? "Every scheduled publication in one timeline" : "Все запланированные публикации в одном таймлайне";
+  $("stats-intro-title").textContent = EN ? "Channel pulse" : "Пульс канала";
+  $("stats-intro-copy").textContent = EN ? "The essential numbers without dashboard noise" : "Главные цифры без перегруженного дашборда";
   $("publish-kicker").textContent = T.ui.publishKicker; $("publish-title").textContent = T.ui.publishTitle;
   [["publish-channel",0],["publish-self",1],["publish-later",2],["publish-copy",3]].forEach(([prefix,index]) => { $(prefix+"-title").textContent=T.ui.destinations[index][0]; $(prefix+"-copy").textContent=T.ui.destinations[index][1]; });
   $("success-next").textContent = T.ui.successNext; $("success-close").textContent = T.ui.successClose;
@@ -305,6 +314,14 @@ import {
   document.querySelector('#tabbar [data-tab="home"] span').textContent = EN?"Home":"Главная";
   document.querySelector('#tabbar [data-tab="crate"] span').textContent = EN?"Crate":"Подборка";
   document.querySelector('#tabbar [data-tab="queue"] span').textContent = EN?"Queue":"Очередь";
+  document.querySelectorAll("#format-nav button").forEach((button, index) => {
+    button.classList.toggle("active", index === 0);
+    button.addEventListener("click", () => {
+      hap.pick();
+      document.querySelectorAll("#format-nav button").forEach((item) => item.classList.toggle("active", item === button));
+      $(button.dataset.target)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
 
   SUGGESTIONS.forEach((s) => {
     const b = document.createElement("button");
@@ -532,6 +549,15 @@ import {
       [Boolean(f.hashtags && r.hashtags), f.hashtags && r.hashtags ? T.readyHashtags : T.readyClean, "sliders"],
     ];
     readiness.innerHTML = readyItems.map(([ok,label,icon]) => '<span class="'+(ok?'ok':'muted')+'">'+ico(icon,"s14")+esc(label)+"</span>").join("");
+    const health = assessDraft(state, PREFLIGHT.draft);
+    const score = $("result-score");
+    $("result-score-value").textContent = health.score;
+    score.style.setProperty("--health", String(health.score));
+    score.dataset.level = health.score >= 100 ? "ready" : (health.score >= 50 ? "progress" : "attention");
+    score.setAttribute(
+      "aria-label",
+      (EN ? "Post readiness: " : "Готовность поста: ") + health.score + "%",
+    );
     let plats = "";
     enabled.forEach((p) => {
       if (!/^https?:\/\//i.test(String(p.url||""))) return;
@@ -834,6 +860,7 @@ import {
   function openFormat() {
     hap.tap();
     const release = state.release;
+    document.querySelectorAll("#format-nav button").forEach((button, index) => button.classList.toggle("active", index === 0));
     $("fmt-preview-title").textContent = release.title;
     $("fmt-preview-sub").textContent = release.artist;
     const previewArt = $("fmt-preview-art");
@@ -1338,6 +1365,14 @@ import {
     $("crate-count").textContent = crateItems.length + " " + crateWord;
     $("crate-cover-count").textContent = crateItems.length + " " + crateWord;
     $("crate-hero-title").textContent=collectionMeta.title||T.ui.crateHero;
+    const crateHealth = assessCollection(crateItems, collectionMeta, PREFLIGHT.collection);
+    $("crate-health").textContent = crateHealth.score + "%";
+    $("crate-health").style.setProperty("--health", String(crateHealth.score));
+    $("crate-health").dataset.level = crateHealth.score >= 100 ? "ready" : (crateHealth.score >= 50 ? "progress" : "attention");
+    $("crate-health").setAttribute(
+      "aria-label",
+      (EN ? "Collection readiness: " : "Готовность подборки: ") + crateHealth.score + "%",
+    );
     const stack = $("crate-stack").querySelectorAll("i");
     stack.forEach((tile, index) => {
       const item = crateItems[index];

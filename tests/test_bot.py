@@ -417,7 +417,7 @@ class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 1)
         self.assertEqual(len(context.bot.edited_messages), 1)
         self.assertEqual(context.bot.edited_messages[0]["message_id"], 1000)
-        self.assertIn("Твоя музыкальная мастерская", message.replies[0])
+        self.assertIn("StonerHand Studio", message.replies[0])
 
     async def test_help_reuses_the_live_home_message(self) -> None:
         message = PrivateMessageStub()
@@ -629,7 +629,7 @@ class BotKeyboardTests(unittest.TestCase):
     def test_error_keyboard_points_to_supported_services(self) -> None:
         keyboard = _build_error_keyboard("StonerHandBot")
 
-        self.assertEqual(keyboard.inline_keyboard[0][0].text, "🔎 Найти релиз")
+        self.assertEqual(keyboard.inline_keyboard[0][0].text, "🔎 Создать новый пост")
         self.assertEqual(
             keyboard.inline_keyboard[0][0].switch_inline_query_current_chat,
             "",
@@ -752,7 +752,7 @@ class BotKeyboardTests(unittest.TestCase):
 
         rows = keyboard.inline_keyboard
         self.assertEqual(len(rows), 3)
-        self.assertEqual(rows[0][0].text, "🔎 Найти релиз")
+        self.assertEqual(rows[0][0].text, "🔎 Создать новый пост")
         self.assertEqual(rows[0][1].text, "🧺 Подборка · 0")
         self.assertEqual([button.text for button in rows[1]], ["❓ Помощь", "🎛 Сервисы"])
         self.assertEqual(rows[2][0].text, "← Главное меню")
@@ -812,13 +812,14 @@ class BotKeyboardTests(unittest.TestCase):
         rows = keyboard.inline_keyboard
         self.assertEqual(rows[0][0].text, "🎛 Открыть Студию")
         self.assertEqual(rows[0][0].api_kwargs, {"style": "success"})
-        self.assertEqual(rows[1][0].text, "🔎 Найти релиз")
-        self.assertEqual(rows[1][1].text, "🧺 Подборка · 3")
-        self.assertEqual(rows[1][1].api_kwargs, {"style": "success"})
-        self.assertEqual(rows[2][0].text, "📊 Статистика канала")
-        self.assertEqual(rows[2][1].text, "🗓 Очередь")
-        self.assertEqual(rows[2][1].web_app.url, "https://studio.example/app?view=queue")
-        self.assertEqual(rows[3][0].text, "▶ Как всё работает")
+        self.assertEqual(rows[1][0].text, "🔎 Создать новый пост")
+        self.assertEqual(len(rows[1]), 1)
+        self.assertEqual(rows[2][0].text, "🧺 Подборка · 3")
+        self.assertEqual(rows[2][0].api_kwargs, {"style": "success"})
+        self.assertEqual(rows[2][1].text, "▶ Как всё работает")
+        self.assertEqual(rows[3][0].text, "📊 Статистика канала")
+        self.assertEqual(rows[3][1].text, "🗓 Очередь")
+        self.assertEqual(rows[3][1].web_app.url, "https://studio.example/app?view=queue")
         self.assertEqual(rows[-1][0].text, "❓ Помощь")
         self.assertEqual(rows[-1][1].text, "🪨 Открыть канал")
 
@@ -830,11 +831,11 @@ class BotKeyboardTests(unittest.TestCase):
             is_admin=True,
         )
 
-        self.assertIn("Студия готова, &lt;Артём&gt;", text)
-        self.assertIn("<b>Подборка:</b> 4/10", text)
+        self.assertIn("Твоя Студия, &lt;Артём&gt;", text)
+        self.assertIn("Подборка · 4/10", text)
         self.assertIn("Канал, очередь и статистика доступны", text)
         self.assertIn("<i>", text)
-        self.assertIn("<code>артист — название трека</code>", text)
+        self.assertIn("<code>артист — трек</code>", text)
 
     def test_home_keyboard_omits_webapp_button_outside_private_chat(self) -> None:
         with patch.dict(os.environ, {"WEBAPP_URL": "https://studio.example/app"}):
@@ -1357,7 +1358,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("<code>артист — название</code>", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "Повторить")
-        self.assertEqual(keyboard[1][0].text, "🔎 Найти релиз")
+        self.assertEqual(keyboard[1][0].text, "🔎 Создать новый пост")
         self.assertEqual(keyboard[2][0].text, "Что поддерживается")
         self.assertEqual(context.bot.sent_messages, [])
         self.assertEqual(context.bot.chat_actions, [])

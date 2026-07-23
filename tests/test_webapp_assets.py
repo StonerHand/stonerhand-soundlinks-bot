@@ -9,6 +9,7 @@ class WebAppAssetTests(unittest.TestCase):
     def test_page_loads_split_assets(self) -> None:
         html = (ROOT / "webapp" / "index.html").read_text()
         self.assertIn('href="/webapp/styles.css"', html)
+        self.assertIn('href="/webapp/studio-8.css"', html)
         self.assertIn('type="module" src="/webapp/app.js"', html)
         self.assertNotIn("<style>", html)
 
@@ -21,8 +22,10 @@ class WebAppAssetTests(unittest.TestCase):
         self.assertIn("webapp/api-client.js", build_sources)
         self.assertIn("webapp/cloud-storage.js", build_sources)
         self.assertIn("webapp/studio-core.js", build_sources)
+        self.assertIn("webapp/studio-8.css", build_sources)
         self.assertIn("/webapp/api-client.js", route_sources)
         self.assertIn("/webapp/studio-core.js", route_sources)
+        self.assertIn("/webapp/studio-8.css", route_sources)
         app_route = next(item for item in config["routes"] if item["src"] == "/app")
         self.assertIn("Content-Security-Policy", app_route["headers"])
         self.assertIn("frame-ancestors", app_route["headers"]["Content-Security-Policy"])
@@ -68,6 +71,11 @@ class WebAppAssetTests(unittest.TestCase):
             "tag-suggestions",
             "resume-card",
             "resume-open",
+            "result-score",
+            "format-nav",
+            "crate-health",
+            "queue-intro-title",
+            "stats-intro-title",
         ):
             self.assertIn(f'id="{element_id}"', html)
         self.assertNotIn('data-tab="stats"', html)
@@ -81,6 +89,8 @@ class WebAppAssetTests(unittest.TestCase):
         self.assertIn('"prepare_crate_share"', js)
         self.assertIn('"dashboard"', js)
         self.assertIn("assessDraft", js)
+        self.assertIn("assessCollection", js)
+        self.assertIn("button.dataset.target", js)
         self.assertIn("createDraftSnapshot", js)
         self.assertIn('["crate","queue","stats"].includes(viewParam)', js)
 
