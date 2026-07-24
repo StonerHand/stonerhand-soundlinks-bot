@@ -1,6 +1,6 @@
 # Pinned for reproducible deploys — a surprise minor bump shouldn't reach prod
 # untested. Bump deliberately and let CI verify.
-python-telegram-bot==21.11.1
+python-telegram-bot==22.8
 httpx==0.27.2
 python-dotenv==1.2.2
 Pillow==10.4.0
