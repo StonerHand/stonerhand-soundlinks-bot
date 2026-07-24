@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from urllib.parse import urlparse
+
 from music_links_bot.constants import PLATFORM_LABELS
 from music_links_bot.formatter import pick_track_emoji
 from music_links_bot.models import TrackMatch
@@ -12,7 +14,10 @@ MAX_CRATE_ITEMS = 10
 
 
 def is_web_url(value: object) -> bool:
-    return isinstance(value, str) and value.startswith(("http://", "https://"))
+    if not isinstance(value, str) or any(character.isspace() for character in value):
+        return False
+    parsed = urlparse(value)
+    return parsed.scheme in {"http", "https"} and bool(parsed.hostname)
 
 
 def compact_track_data(item: dict) -> dict:

@@ -2,9 +2,9 @@
 
 # 🎧 StonerHand Soundlinks Bot
 
-### A link, title or a handful of tracks → a finished Telegram post
+### A link, title or several releases → a finished Telegram post
 
-Artwork, smart tags, every platform, native sharing and publishing — in 🎛 Studio.
+Artwork, polished copy, every platform, collections and publishing — in 🎛 Studio.
 
 [Open the bot](https://t.me/StonerHandBot) · [Channel](https://t.me/stonerhand) · [Русская версия](README.ru.md) · [Architecture (RU)](ARCHITECTURE.ru.md)
 
@@ -21,19 +21,19 @@ Artwork, smart tags, every platform, native sharing and publishing — in 🎛 S
 
 | Telegram bot | Studio Mini App |
 | --- | --- |
-| Link or title → exact-release picker → editable card | Live card and optional 30-second audio preview |
-| 2–12 links → one numbered collection | Smart multi-link import into a 10-track crate |
-| Artwork, CTA, tags and compact platform buttons | CTA, quote, tags, cover mode and platform ordering |
-| Native share keeps the post and its buttons together | Presets, active-draft recovery and publish preflight |
-| Inline search inside any chat; automatic replacement in groups/channels | Drag/reorder, sections, notes and collection styling |
-| One `/start` workspace, RU/EN and recoverable errors | Queue, reschedule/undo, history and admin analytics |
+| Link or title → exact release picker → finished card | Search, candidates, live preview and optional 30-second audio |
+| 2–12 links → one complete numbered collection | Multi-link import and a crate of up to 10 releases |
+| Artwork, CTA, hashtags and compact platform buttons | CTA, quote, tags, cover mode and platform ordering |
+| Inline search with `@StonerHandBot` in any chat | Draft recovery, presets and a delivery preflight |
+| Automatic link replacement in groups and channels | Reordering, sections, notes and collection styling |
+| RU/EN workspace, actionable errors and retry | History, queue, reschedule, undo and owner analytics |
 
 ```text
 Spotify / Apple Music / YouTube / SoundCloud / Bandcamp / Deezer / Tidal
 Yandex Music / Spotify playlists & artists / podcasts / NTS Radio
 ```
 
-Metadata and universal links come from Song.link/Odesli, iTunes Search and oEmbed. Inline mode works in any chat with `@StonerHandBot query`.
+Metadata and universal links come from Song.link/Odesli, iTunes Search and oEmbed. Use Studio's Share action to send text and platform buttons as one prepared Telegram message. Telegram's ordinary forward action removes inline keyboards.
 
 ## Flow
 
@@ -46,7 +46,7 @@ flowchart LR
     D --> E["Share · self · channel · queue"]
 ```
 
-Every user can search, edit, build crates and send finished posts to themselves. Channel publishing, scheduling, undo and stats are restricted to `ADMIN_CHAT_ID`.
+Every user can search, edit, build crates and send finished posts to themselves or another chat. Channel publishing, scheduling, undo and stats are restricted to `ADMIN_CHAT_ID`. Keyboards are channel-safe: unsupported inline actions are removed while music-platform URL buttons remain.
 
 ## Quick start on Vercel
 
@@ -76,7 +76,8 @@ Set `ADMIN_CHAT_ID` and `PUBLISH_CHAT_ID` for channel publishing. Add Upstash Re
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt pyflakes
+pip install -r requirements.txt pyflakes playwright
+python -m playwright install chromium
 cp .env.example .env
 PYTHONPATH=src python -m music_links_bot
 ```
@@ -97,8 +98,9 @@ python tests/e2e/smoke.py
 - `POST /api/telegram`: signed Telegram webhook with update deduplication;
 - `POST /api/webapp`: Studio API with HMAC `initData`, rate limiting and idempotency;
 - `GET /api/health`: Telegram, webhook, Redis, queue state and due-job delivery;
+- a Redis outage falls back to bounded in-memory deduplication instead of dropping updates;
 - the queue uses a distributed lock, per-job lease, three attempts and backoff;
-- Vercel Cron restores the webhook, commands, profile and Studio button daily;
+- Vercel Cron restores the webhook without dropping pending updates, plus commands, profile and the Studio button;
 - critical failures are sent to the owner with hourly alert deduplication.
 
 Ping `/api/health` every five minutes for timely scheduled posts.
@@ -114,7 +116,7 @@ webapp/                 build-free Mini App: semantic HTML, design system, ES mo
 tests/                  offline unit/integration suite + adaptive Playwright smoke
 ```
 
-For request flows, API actions, Redis keys, security and extension rules, see [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
+CI verifies Python modules, deployment JSON, JavaScript, the complete offline suite and the mobile Studio flow in Chromium at multiple widths and in both themes. For request flows, API actions, Redis keys, security and extension rules, see [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
 
 ## License
 

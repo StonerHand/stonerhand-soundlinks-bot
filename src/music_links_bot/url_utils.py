@@ -231,6 +231,8 @@ def spotify_url_type(url: str) -> str | None:
         return None
 
     parts = [part for part in parsed.path.split("/") if part]
+    if parts and parts[0].lower().startswith("intl-"):
+        parts = parts[1:]
     if len(parts) < 2:
         return None
 

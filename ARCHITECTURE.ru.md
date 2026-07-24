@@ -146,7 +146,7 @@ sequenceDiagram
 - JSON должен быть объектом;
 - `X-Telegram-Bot-Api-Secret-Token` сравнивается constant-time;
 - секрет берётся из `TELEGRAM_WEBHOOK_SECRET`, либо стабильно выводится из `BOT_TOKEN`;
-- update claim хранится 10 минут в Redis, при его отсутствии — в памяти;
+- update claim хранится 10 минут в Redis; при отсутствии или временной недоступности Redis запрос переходит на bounded memory fallback, чтобы update не был молча потерян;
 - если обработка упала, claim освобождается, чтобы Telegram retry мог повторить update;
 - каждый запрос выполняется с timeout, после серии ошибок warm Application пересоздаётся;
 - падение webhook отправляет дедуплицированный alert владельцу.
@@ -192,7 +192,7 @@ flowchart LR
 Ключевые свойства:
 
 - Song.link использует локальный TTL cache и Redis cache на 7 дней;
-- одинаковые одновременные запросы объединяются single-flight;
+- одинаковые одновременные запросы объединяются single-flight; завершившаяся задача удаляется даже после timeout/cancel вызывающего запроса;
 - основной регион запрашивается первым, дополнительные — только если результат неполный;
 - Search имеет positive cache на 6 часов и negative cache на 10 минут;
 - жанр подгружается быстро для первой карточки, медленное enrichment может продолжиться в фоне;
@@ -453,7 +453,7 @@ Endpoint:
 - `node --check` для всех четырёх ES modules;
 - отдельный Playwright/Chromium smoke: boot → search → candidate/result → crate и batch flow.
 
-Vercel Git Integration создаёт Preview для feature branch и Production deployment после merge в `main`. `vercel.json` отдельно объявляет Python functions и static assets, routes, security headers и daily cron.
+Vercel Git Integration создаёт Preview для feature branch и Production deployment после merge в `main`. `vercel.json` отдельно объявляет Python functions, Web App assets и README-анимацию, routes, security headers и daily cron. Повторная регистрация webhook не удаляет ожидающие updates.
 
 ## 14. Правила изменения системы
 
@@ -490,7 +490,7 @@ Vercel Git Integration создаёт Preview для feature branch и Productio
 - без Redis состояние является best-effort и привязано к тёплому инстансу;
 - `bot.py` и `api/webapp.py` остаются orchestration-модулями; inline уже вынесен в `bot_inline.py`, новые provider/storage/UI обязанности также нужно добавлять отдельными файлами;
 - Studio — vanilla JS state machine без статической типизации, поэтому API contract защищают runtime validation и E2E;
-- Telegram удаляет inline keyboard при пересылке сообщения; универсальная Song.link-ссылка остаётся в тексте как fallback;
+- Telegram удаляет inline keyboard при обычной пересылке; Студия использует prepared message для отправки текста вместе с URL-кнопками, а каналам не отдаёт запрещённые `switch_inline_query`-действия;
 - публичный iTunes Search не гарантирует одинаковый каталог во всех регионах;
 - точность отложенной публикации зависит от частоты внешних health pings.
 

@@ -22,6 +22,11 @@ jobs:
       - name: Lint
         run: python -m pyflakes src api tests
 
+      - name: Compile and deployment config
+        run: |
+          python -m compileall -q src api tests
+          python -m json.tool vercel.json >/dev/null
+
       - name: Tests
         run: python -m unittest discover -s tests -v
         env:

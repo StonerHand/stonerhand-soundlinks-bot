@@ -96,12 +96,14 @@ def _telegram_set_webhook_url(
     webhook_url: str,
     *,
     secret_token: str | None = None,
+    drop_pending_updates: bool = False,
 ) -> str:
     params = {
         "url": webhook_url,
         "allowed_updates": json.dumps(ALLOWED_UPDATES),
-        "drop_pending_updates": "true",
     }
+    if drop_pending_updates:
+        params["drop_pending_updates"] = "true"
     if secret_token:
         params["secret_token"] = secret_token
 

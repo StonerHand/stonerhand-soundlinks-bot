@@ -66,6 +66,13 @@ class WebAppAuthTests(unittest.TestCase):
 
         self.assertIsNone(validate_init_data(init_data, BOT_TOKEN))
 
+    def test_far_future_auth_date_is_rejected(self) -> None:
+        params = self._valid_params()
+        params["auth_date"] = str(int(time.time()) + 3600)
+        init_data = _sign_init_data(params)
+
+        self.assertIsNone(validate_init_data(init_data, BOT_TOKEN))
+
     def test_missing_hash_is_rejected(self) -> None:
         params = self._valid_params()
 
@@ -258,6 +265,33 @@ class DashboardApiTests(unittest.TestCase):
         self.assertEqual(result["crate"]["count"], 1)
         self.assertEqual(result["queue"], {"count": 0, "next_at": None})
 
+    def test_queue_screen_skips_corrupt_jobs(self) -> None:
+        import asyncio
+        from api.webapp import _action_queue
+
+        jobs = [
+            {
+                "id": "valid",
+                "publish_at": 123,
+                "draft": {"item": _crate_track("Dopesmoker")},
+            },
+            {
+                "id": "bad-track",
+                "publish_at": 456,
+                "draft": {"item": {"unexpected": True}},
+            },
+            {
+                "id": "bad-date",
+                "publish_at": "tomorrow",
+                "draft": {"item": _crate_track("Dragonaut")},
+            },
+        ]
+        with patch("api.webapp.load_jobs", new=AsyncMock(return_value=jobs)):
+            result = asyncio.run(_action_queue(_crate_context(), True))
+
+        self.assertTrue(result["ok"])
+        self.assertEqual([item["id"] for item in result["items"]], ["valid"])
+
 
 class CrateApiTests(unittest.TestCase):
     def _add(self, context, title: str) -> dict:
@@ -317,6 +351,13 @@ class CrateApiTests(unittest.TestCase):
         self.assertTrue(prepared["allow_channel_chats"])
         self.assertIn("Dopesmoker", prepared["result"].input_message_content.message_text)
         self.assertIsNotNone(prepared["result"].reply_markup)
+        buttons = [
+            button
+            for row in prepared["result"].reply_markup.inline_keyboard
+            for button in row
+        ]
+        self.assertTrue(any(button.url for button in buttons))
+        self.assertFalse(any(button.switch_inline_query for button in buttons))
 
     def test_prepare_share_rejects_someone_elses_draft(self) -> None:
         import asyncio
@@ -396,6 +437,10 @@ class CrateApiTests(unittest.TestCase):
 
         bad = asyncio.run(_action_crate_order(context, {"indices": [0, 0]}, 7))
         self.assertFalse(bad["ok"])
+        mixed = asyncio.run(
+            _action_crate_order(context, {"indices": [0, 1, "oops"]}, 7)
+        )
+        self.assertEqual(mixed["error"], "bad order")
 
         removed = asyncio.run(_action_crate_remove(context, {"index": 0}, 7))
         self.assertEqual(removed["count"], 1)
@@ -485,6 +530,12 @@ class CrateApiTests(unittest.TestCase):
             }
         )
         self.assertEqual(with_fallback["page_url"], "https://open.spotify.com/ok")
+        for malformed in ("https://", "https://evil.example/has space", "//example.com"):
+            self.assertIsNone(
+                _compact_track_data(
+                    {"artist": "X", "title": "Y", "page_url": malformed, "links": {}}
+                )["page_url"]
+            )
 
     def test_crate_deliver_client_items_deduped_and_need_two(self) -> None:
         import asyncio
@@ -498,6 +549,21 @@ class CrateApiTests(unittest.TestCase):
 
 
 class PreviewAndRateLimitTests(unittest.TestCase):
+    def test_resolve_handles_empty_search_result(self) -> None:
+        import asyncio
+        from api.webapp import _action_resolve
+
+        class _Search:
+            async def search_release_candidates(self, _query):
+                return []
+
+        context = _crate_context()
+        context.application.bot_data["search_client"] = _Search()
+
+        result = asyncio.run(_action_resolve(context, {"query": "unknown"}, 7, False, "ru"))
+
+        self.assertEqual(result, {"ok": False, "error": "not found"})
+
     def test_action_preview_looks_up_lazily(self) -> None:
         import asyncio
         from api.webapp import _action_preview

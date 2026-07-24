@@ -126,6 +126,19 @@ class VercelWebhookTests(unittest.TestCase):
 
         self.assertEqual(query["secret_token"], ["telegram-secret"])
         self.assertEqual(query["url"], ["https://bot.example/api/telegram"])
+        self.assertNotIn("drop_pending_updates", query)
+
+    def test_set_webhook_can_explicitly_drop_pending_updates(self) -> None:
+        webhook_url = _telegram_set_webhook_url(
+            "bot-token",
+            "https://bot.example/api/telegram",
+            drop_pending_updates=True,
+        )
+
+        self.assertEqual(
+            parse_qs(urlparse(webhook_url).query)["drop_pending_updates"],
+            ["true"],
+        )
 
     def test_telegram_secret_rejects_invalid_characters(self) -> None:
         with patch.dict(
