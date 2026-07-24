@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import sys
 from unittest.mock import patch
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import BadRequest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -66,6 +67,7 @@ from music_links_bot.playlist import PlaylistLookupError
 from music_links_bot.search import SearchCandidate, SearchLookupError
 from music_links_bot.songlink import SonglinkError
 from music_links_bot.sharing import (
+    add_share_button,
     build_share_query,
     parse_share_query,
 )
@@ -317,6 +319,15 @@ class GroupMessageStub(ChannelMessageStub):
 
 
 class ReplaceableMessageStub(GroupMessageStub):
+    def __init__(self) -> None:
+        super().__init__()
+        self.deleted = False
+
+    async def delete(self) -> None:
+        self.deleted = True
+
+
+class ReplaceableChannelMessageStub(ChannelMessageStub):
     def __init__(self) -> None:
         super().__init__()
         self.deleted = False
@@ -1332,6 +1343,44 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(bot.sent_messages), 1)
         self.assertTrue(message.deleted)
         self.assertEqual(message.replies, [])
+
+    async def test_channel_result_keeps_url_buttons_and_drops_inline_share(self) -> None:
+        message = ReplaceableChannelMessageStub()
+        bot = BotStub()
+        keyboard = add_share_button(
+            InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton(
+                            "Spotify",
+                            url="https://open.spotify.com/track/abc",
+                        )
+                    ]
+                ]
+            ),
+            share_query="sh|tabc",
+            label="↗️ Поделиться с кнопками",
+        )
+
+        await _send_track_result(
+            bot,
+            message,
+            "готовый пост",
+            preview_url="https://open.spotify.com/track/abc",
+            reply_markup=keyboard,
+        )
+
+        self.assertEqual(len(bot.sent_messages), 1)
+        sent_keyboard = bot.sent_messages[0]["reply_markup"]
+        self.assertEqual(sent_keyboard.inline_keyboard[0][0].text, "Spotify")
+        self.assertFalse(
+            any(
+                button.switch_inline_query is not None
+                for row in sent_keyboard.inline_keyboard
+                for button in row
+            )
+        )
+        self.assertTrue(message.deleted)
 
     async def test_group_ephemeral_reply_skips_public_post_when_enabled(self) -> None:
         import os

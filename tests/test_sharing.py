@@ -6,6 +6,7 @@ from music_links_bot.sharing import (
     MAX_SHARE_QUERY_LENGTH,
     add_share_button,
     build_share_query,
+    make_channel_safe_keyboard,
     parse_share_query,
 )
 
@@ -76,3 +77,23 @@ class SharingTests(unittest.TestCase):
 
         self.assertEqual(result.inline_keyboard[0][0].text, "Spotify")
         self.assertEqual(result.inline_keyboard[1][0].switch_inline_query, "sh|tabc")
+
+    def test_channel_keyboard_keeps_urls_and_removes_inline_switches(self) -> None:
+        keyboard = add_share_button(
+            InlineKeyboardMarkup(
+                [[InlineKeyboardButton("Spotify", url="https://open.spotify.com/track/abc")]]
+            ),
+            share_query="sh|tabc",
+            label="↗️ Поделиться с кнопками",
+        )
+
+        result = make_channel_safe_keyboard(keyboard)
+
+        self.assertIsNotNone(result)
+        assert result is not None
+        self.assertEqual(len(result.inline_keyboard), 1)
+        self.assertEqual(result.inline_keyboard[0][0].text, "Spotify")
+        self.assertEqual(
+            result.inline_keyboard[0][0].url,
+            "https://open.spotify.com/track/abc",
+        )
