@@ -174,6 +174,7 @@ from music_links_bot.stats import (
 from music_links_bot.sharing import (
     add_share_button,
     build_share_query,
+    make_channel_safe_keyboard,
     track_share_url,
 )
 from music_links_bot.text_utils import normalize_hashtag
@@ -1870,6 +1871,8 @@ async def _send_track_result(
     prefer_large_preview: bool = True,
 ) -> None:
     if message.chat.type in {"group", "supergroup", "channel"}:
+        if message.chat.type == "channel":
+            reply_markup = make_channel_safe_keyboard(reply_markup)
         preview_options = _build_link_preview_options(
             preview_url,
             prefer_large_media=prefer_large_preview,

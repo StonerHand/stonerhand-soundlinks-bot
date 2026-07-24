@@ -128,6 +128,37 @@ def add_share_button(
     )
 
 
+def make_channel_safe_keyboard(
+    keyboard: InlineKeyboardMarkup | None,
+) -> InlineKeyboardMarkup | None:
+    """Remove inline-mode buttons that Telegram rejects in channel posts."""
+    if keyboard is None:
+        return None
+
+    safe_rows = [
+        [
+            button
+            for button in row
+            if not any(
+                (
+                    button.switch_inline_query is not None,
+                    button.switch_inline_query_current_chat is not None,
+                    button.switch_inline_query_chosen_chat is not None,
+                )
+            )
+        ]
+        for row in keyboard.inline_keyboard
+    ]
+    safe_rows = [row for row in safe_rows if row]
+    if not safe_rows:
+        return None
+
+    if safe_rows == [list(row) for row in keyboard.inline_keyboard]:
+        return keyboard
+
+    return InlineKeyboardMarkup(safe_rows)
+
+
 def render_inline_share_card(
     bundle: Any,
     *,
