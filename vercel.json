@@ -44,6 +44,10 @@
     {
       "src": "webapp/studio-shell.css",
       "use": "@vercel/static"
+    },
+    {
+      "src": "assets/studio-demo.svg",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
@@ -104,6 +108,13 @@
     {
       "src": "/webapp/studio-shell.css",
       "dest": "webapp/studio-shell.css"
+    },
+    {
+      "src": "/assets/studio-demo.svg",
+      "dest": "assets/studio-demo.svg",
+      "headers": {
+        "Cache-Control": "public, max-age=3600, s-maxage=86400"
+      }
     }
   ],
   "crons": [

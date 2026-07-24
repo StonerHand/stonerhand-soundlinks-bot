@@ -1090,6 +1090,47 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(result)
         self.assertEqual(result.description, "Post with every platform button")
 
+    async def test_inline_channel_result_keeps_urls_and_drops_switch_button(self) -> None:
+        result = await _build_inline_result(
+            "https://open.spotify.com/track/abc",
+            ContextStub(),
+            channel_safe=True,
+        )
+
+        self.assertIsNotNone(result)
+        buttons = [
+            button
+            for row in result.reply_markup.inline_keyboard
+            for button in row
+        ]
+        self.assertTrue(any(button.url for button in buttons))
+        self.assertFalse(any(button.switch_inline_query for button in buttons))
+
+    async def test_inline_channel_handler_disables_cross_chat_cache(self) -> None:
+        from music_links_bot.bot import inline_query_handler
+
+        class InlineQueryStub:
+            query = "https://open.spotify.com/track/abc"
+            from_user = None
+            chat_type = "channel"
+
+            def __init__(self) -> None:
+                self.results = []
+                self.kwargs = {}
+
+            async def answer(self, results, **kwargs) -> None:
+                self.results = list(results)
+                self.kwargs = kwargs
+
+        inline_query = InlineQueryStub()
+        update = type("InlineUpdateStub", (), {"inline_query": inline_query})()
+
+        await inline_query_handler(update, ContextStub())
+
+        self.assertEqual(len(inline_query.results), 1)
+        self.assertEqual(inline_query.kwargs["cache_time"], 0)
+        self.assertTrue(inline_query.kwargs["is_personal"])
+
     async def test_inline_share_query_keeps_collection_in_one_result(self) -> None:
         query = build_share_query(
             [

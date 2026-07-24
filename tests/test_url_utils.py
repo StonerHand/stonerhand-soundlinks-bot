@@ -150,6 +150,16 @@ class UrlUtilsTests(unittest.TestCase):
             "show",
         )
 
+    def test_spotify_url_type_accepts_locale_prefixed_share_links(self) -> None:
+        self.assertEqual(
+            spotify_url_type("https://open.spotify.com/intl-de/playlist/abc"),
+            "playlist",
+        )
+        self.assertEqual(
+            spotify_url_type("https://open.spotify.com/intl-pt-BR/artist/abc"),
+            "artist",
+        )
+
     def test_is_spotify_playlist_url_detects_playlists(self) -> None:
         self.assertTrue(
             is_spotify_playlist_url("https://open.spotify.com/playlist/abc?si=123")

@@ -60,6 +60,7 @@ from music_links_bot.publish_queue import (
 )
 from music_links_bot.request_guard import rate_limited, run_idempotent
 from music_links_bot.search import SearchLookupError, normalize_search_query
+from music_links_bot.sharing import make_channel_safe_keyboard
 from music_links_bot.stats import load_stats, merge_stats
 from music_links_bot.studio_models import (
     MAX_CRATE_ITEMS,
@@ -330,6 +331,9 @@ async def _action_resolve(context, body: dict, user_id: int, is_admin: bool, lan
         except SearchLookupError:
             return {"ok": False, "error": "not found"}
 
+        if not candidates:
+            return {"ok": False, "error": "not found"}
+
         if len(candidates) > 1 and not body.get("pick"):
             return {
                 "ok": True,
@@ -491,6 +495,9 @@ async def _action_prepare_share(
     from music_links_bot.bot import _build_link_preview_options
 
     text, keyboard = _render_track_draft(draft, context, draft_id=None)
+    # Prepared messages may be sent to channels. Telegram rejects inline-mode
+    # switch buttons there, while ordinary URL buttons remain fully supported.
+    keyboard = make_channel_safe_keyboard(keyboard)
     result_id = hashlib.sha256(
         f"{user_id}:{draft_id}:{text}".encode("utf-8")
     ).hexdigest()[:32]
@@ -703,11 +710,20 @@ async def _action_queue(context, is_admin: bool) -> dict:
         if not isinstance(draft, dict) or not isinstance(draft.get("item"), dict):
             continue
 
-        track = TrackMatch(**draft["item"])
+        try:
+            track = TrackMatch(**draft["item"])
+        except (TypeError, ValueError):
+            LOGGER.warning("Skipping malformed queued draft %s", job.get("id"))
+            continue
+        try:
+            publish_at = int(job.get("publish_at") or 0)
+        except (TypeError, ValueError):
+            LOGGER.warning("Skipping queued draft with invalid date %s", job.get("id"))
+            continue
         items.append(
             {
                 "id": job.get("id"),
-                "publish_at": int(job.get("publish_at") or 0),
+                "publish_at": publish_at,
                 "artist": track.artist,
                 "title": track.title,
                 "emoji": pick_track_emoji(track),
@@ -892,8 +908,9 @@ async def _action_crate_order(context, body: dict, user_id: int) -> dict:
     items = await _crate_base_items(context, body, user_id)
     if (
         not isinstance(indices, list)
-        or sorted(index for index in indices if isinstance(index, int))
-        != list(range(len(items)))
+        or len(indices) != len(items)
+        or any(type(index) is not int for index in indices)
+        or sorted(indices) != list(range(len(items)))
     ):
         return {"ok": False, "error": "bad order"}
 

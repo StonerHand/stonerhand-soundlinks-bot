@@ -88,6 +88,22 @@ class OverallHealthTests(unittest.TestCase):
 
         self.assertEqual(status, {"configured": False, "size": 0, "overdue": 0})
 
+    def test_queue_summary_skips_corrupt_jobs(self) -> None:
+        from api.health import _summarize_queue_jobs
+
+        self.assertEqual(
+            _summarize_queue_jobs(
+                [
+                    {"publish_at": 100},
+                    {"publish_at": "broken"},
+                    None,
+                    {"publish_at": 950},
+                ],
+                now=1000,
+            ),
+            {"configured": True, "size": 2, "overdue": 1},
+        )
+
 
 class AlertHelperTests(unittest.TestCase):
     def test_dedup_digest_is_stable_and_short(self) -> None:

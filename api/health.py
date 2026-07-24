@@ -210,13 +210,25 @@ def _queue_status(*, now: float | None = None) -> dict:
     if not isinstance(jobs, list):
         jobs = []
 
+    return _summarize_queue_jobs(jobs, now=now)
+
+
+def _summarize_queue_jobs(jobs: list, *, now: float | None = None) -> dict:
+    """Ignore corrupt queue entries so monitoring itself stays available."""
     current = now if now is not None else time.time()
-    overdue = sum(
-        1
-        for job in jobs
-        if isinstance(job, dict) and int(job.get("publish_at") or 0) < current - 120
-    )
-    return {"configured": True, "size": len(jobs), "overdue": overdue}
+    overdue = 0
+    valid_jobs = 0
+    for job in jobs:
+        if not isinstance(job, dict):
+            continue
+        try:
+            publish_at = int(job.get("publish_at") or 0)
+        except (TypeError, ValueError):
+            continue
+        valid_jobs += 1
+        if publish_at < current - 120:
+            overdue += 1
+    return {"configured": True, "size": valid_jobs, "overdue": overdue}
 
 
 def _tick_queue(request_host: str | None) -> int:

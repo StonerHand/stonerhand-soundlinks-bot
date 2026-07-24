@@ -38,6 +38,7 @@ from music_links_bot.search import SearchClient, SearchLookupError, normalize_se
 from music_links_bot.sharing import (
     add_share_button,
     build_share_query,
+    make_channel_safe_keyboard,
     parse_share_query,
     render_inline_share_card,
 )
@@ -65,6 +66,7 @@ async def inline_query_handler(
         inline_query.from_user.language_code if inline_query.from_user else None
     )
     query_text = inline_query.query or ""
+    channel_safe = getattr(inline_query, "chat_type", None) == "channel"
     shared_urls = parse_share_query(query_text)
     source_urls = extract_supported_urls(query_text)[:MAX_LINKS_PER_MESSAGE]
     is_direct_collection = shared_urls is None and len(source_urls) > 1
@@ -80,6 +82,7 @@ async def inline_query_handler(
             collection_urls,
             lang=lang,
             is_direct=is_direct_collection,
+            channel_safe=channel_safe,
         )
         return
 
@@ -104,7 +107,9 @@ async def inline_query_handler(
 
     outcomes = await asyncio.gather(
         *(
-            _build_inline_result(source_url, context, lang=lang)
+            _build_inline_result(
+                source_url, context, lang=lang, channel_safe=channel_safe
+            )
             for source_url in source_urls
         ),
         return_exceptions=True,
@@ -130,8 +135,8 @@ async def inline_query_handler(
     try:
         await inline_query.answer(
             results[:6],
-            cache_time=INLINE_CACHE_SECONDS,
-            is_personal=False,
+            cache_time=0 if channel_safe else INLINE_CACHE_SECONDS,
+            is_personal=channel_safe,
             button=_studio_button(lang),
         )
     except TelegramError:
@@ -145,6 +150,7 @@ async def _answer_inline_collection(
     *,
     lang: str,
     is_direct: bool,
+    channel_safe: bool,
 ) -> None:
     if not source_urls:
         await _answer_inline_hint(
@@ -158,6 +164,7 @@ async def _answer_inline_collection(
             source_urls,
             context,
             lang=lang,
+            channel_safe=channel_safe,
         )
     except Exception as exc:
         LOGGER.error(
@@ -176,8 +183,8 @@ async def _answer_inline_collection(
     try:
         await inline_query.answer(
             [result],
-            cache_time=0 if is_direct else INLINE_CACHE_SECONDS,
-            is_personal=is_direct,
+            cache_time=0 if (is_direct or channel_safe) else INLINE_CACHE_SECONDS,
+            is_personal=is_direct or channel_safe,
             button=_studio_button(lang),
         )
     except TelegramError:
@@ -240,6 +247,7 @@ async def _build_inline_result(
     context: ContextTypes.DEFAULT_TYPE,
     *,
     lang: str = "ru",
+    channel_safe: bool = False,
 ) -> InlineQueryResultArticle | None:
     bot_data = context.application.bot_data
     share_query = build_share_query([source_url])
@@ -266,6 +274,7 @@ async def _build_inline_result(
                 label=share_label,
             ),
             preview_url=artist.url,
+            channel_safe=channel_safe,
         )
 
     if is_spotify_playlist_url(source_url):
@@ -289,6 +298,7 @@ async def _build_inline_result(
                 label=share_label,
             ),
             preview_url=playlist.url,
+            channel_safe=channel_safe,
         )
 
     if is_youtube_video_url(source_url):
@@ -312,6 +322,7 @@ async def _build_inline_result(
                 label=share_label,
             ),
             preview_url=video.url,
+            channel_safe=channel_safe,
         )
 
     if is_nts_url(source_url):
@@ -338,6 +349,7 @@ async def _build_inline_result(
                 label=share_label,
             ),
             preview_url=radio.url,
+            channel_safe=channel_safe,
         )
 
     tracks, _unavailable = await bot_lookup._lookup_tracks(
@@ -373,6 +385,7 @@ async def _build_inline_result(
         ),
         preview_url=_select_preview_url(track.links, context) or track.thumbnail_url,
         thumbnail_url=track.thumbnail_url,
+        channel_safe=channel_safe,
     )
 
 
@@ -381,9 +394,12 @@ async def _build_inline_collection_result(
     context: ContextTypes.DEFAULT_TYPE,
     *,
     lang: str,
+    channel_safe: bool = False,
 ) -> InlineQueryResultArticle | None:
     if len(source_urls) == 1:
-        return await _build_inline_result(source_urls[0], context, lang=lang)
+        return await _build_inline_result(
+            source_urls[0], context, lang=lang, channel_safe=channel_safe
+        )
 
     bundle = await bot_lookup.resolve_sources(
         context.application.bot_data,
@@ -407,6 +423,7 @@ async def _build_inline_collection_result(
         text=card.text,
         keyboard=card.keyboard,
         preview_url=card.preview_url,
+        channel_safe=channel_safe,
     )
 
 
@@ -419,7 +436,10 @@ def _inline_article(
     keyboard: InlineKeyboardMarkup,
     preview_url: str | None,
     thumbnail_url: str | None = None,
+    channel_safe: bool = False,
 ) -> InlineQueryResultArticle:
+    if channel_safe:
+        keyboard = make_channel_safe_keyboard(keyboard)
     return InlineQueryResultArticle(
         id=hashlib.sha256(source_url.encode("utf-8")).hexdigest()[:32],
         title=title,

@@ -7,6 +7,7 @@ import time
 from urllib.parse import parse_qsl
 
 MAX_INIT_DATA_AGE_SECONDS = 24 * 3600
+MAX_INIT_DATA_FUTURE_SKEW_SECONDS = 300
 
 
 def validate_init_data(
@@ -49,7 +50,11 @@ def validate_init_data(
         return None
 
     current_time = now if now is not None else time.time()
-    if auth_date <= 0 or current_time - auth_date > max_age_seconds:
+    if (
+        auth_date <= 0
+        or current_time - auth_date > max_age_seconds
+        or auth_date - current_time > MAX_INIT_DATA_FUTURE_SKEW_SECONDS
+    ):
         return None
 
     try:

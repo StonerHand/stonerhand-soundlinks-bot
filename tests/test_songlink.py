@@ -188,6 +188,37 @@ class SonglinkClientTests(unittest.TestCase):
 
 
 class SonglinkClientAsyncTests(unittest.IsolatedAsyncioTestCase):
+    async def test_cancelled_waiter_does_not_leak_completed_inflight_task(self) -> None:
+        client = SonglinkClient(user_countries=("US",))
+        started = asyncio.Event()
+        release = asyncio.Event()
+
+        async def delayed_lookup(_source_url: str, _cache_key: str) -> TrackMatch:
+            started.set()
+            await release.wait()
+            return TrackMatch(
+                title="Song",
+                artist="Artist",
+                links={"spotify": "https://spotify.example"},
+            )
+
+        client._lookup_and_cache = delayed_lookup
+        waiter = asyncio.create_task(
+            client.lookup_track("https://open.spotify.com/track/1")
+        )
+        try:
+            await started.wait()
+            waiter.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await waiter
+            release.set()
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+            self.assertEqual(client._inflight, {})
+        finally:
+            release.set()
+            await client.aclose()
+
     async def test_lookup_track_coalesces_concurrent_identical_requests(self) -> None:
         client = FakeSonglinkClient(
             {

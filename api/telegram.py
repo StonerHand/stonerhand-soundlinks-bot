@@ -55,7 +55,7 @@ _FAILURE_LOCK = threading.Lock()
 # Telegram re-sends an update if it doesn't get a prompt 200, so identical
 # update_ids are ignored to avoid double replies / double publishes.
 UPDATE_DEDUP_TTL_SECONDS = 600
-_SEEN_UPDATE_IDS: "OrderedDict[int, None]" = OrderedDict()
+_SEEN_UPDATE_IDS: "OrderedDict[int, float]" = OrderedDict()
 _SEEN_UPDATE_MAX = 1024
 
 
@@ -178,13 +178,35 @@ async def _claim_update(application, update_id: int) -> bool:
     Returns False when it was already claimed."""
     kv = application.bot_data.get("kv_store")
     if kv is not None:
-        return await kv.set(
-            f"seen_update:{update_id}", "1", ttl_seconds=UPDATE_DEDUP_TTL_SECONDS, nx=True
+        key = f"seen_update:{update_id}"
+        if await kv.set(
+            key, "1", ttl_seconds=UPDATE_DEDUP_TTL_SECONDS, nx=True
+        ):
+            return True
+        # KVStore deliberately swallows transport errors. Distinguish a real
+        # duplicate from an unavailable Redis instance so an outage cannot
+        # make the webhook acknowledge and silently discard every update.
+        if await kv.get(key) is not None:
+            return False
+        LOGGER.warning(
+            "Redis update deduplication unavailable; using warm-instance fallback"
         )
+
+    return _claim_update_in_memory(update_id)
+
+
+def _claim_update_in_memory(update_id: int, *, now: float | None = None) -> bool:
+    claimed_at = time.monotonic() if now is None else now
+    cutoff = claimed_at - UPDATE_DEDUP_TTL_SECONDS
+    while _SEEN_UPDATE_IDS:
+        _oldest_id, oldest_at = next(iter(_SEEN_UPDATE_IDS.items()))
+        if oldest_at > cutoff:
+            break
+        _SEEN_UPDATE_IDS.popitem(last=False)
 
     if update_id in _SEEN_UPDATE_IDS:
         return False
-    _SEEN_UPDATE_IDS[update_id] = None
+    _SEEN_UPDATE_IDS[update_id] = claimed_at
     while len(_SEEN_UPDATE_IDS) > _SEEN_UPDATE_MAX:
         _SEEN_UPDATE_IDS.popitem(last=False)
     return True
@@ -194,8 +216,7 @@ async def _release_update(application, update_id: int) -> None:
     kv = application.bot_data.get("kv_store")
     if kv is not None:
         await kv.delete(f"seen_update:{update_id}")
-    else:
-        _SEEN_UPDATE_IDS.pop(update_id, None)
+    _SEEN_UPDATE_IDS.pop(update_id, None)
 
 
 def _note_success_locked() -> None:
