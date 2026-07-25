@@ -81,6 +81,12 @@ class WebAppAssetTests(unittest.TestCase):
             "crate-health",
             "queue-intro-title",
             "stats-intro-title",
+            "publication-mode",
+            "longread-edit",
+            "v-longread",
+            "longread-blocks",
+            "block-toolbar",
+            "longread-done",
         ):
             self.assertIn(f'id="{element_id}"', html)
         self.assertNotIn('data-tab="stats"', html)
@@ -98,6 +104,9 @@ class WebAppAssetTests(unittest.TestCase):
         self.assertIn("button.dataset.target", js)
         self.assertIn("createDraftSnapshot", js)
         self.assertIn("analyzeQuery", js)
+        self.assertIn("markdownToLongread", js)
+        self.assertIn("publication_mode", js)
+        self.assertIn("TELEGRAM RICH MESSAGE", js)
         self.assertIn("cover-fallback", css)
         self.assertIn("hero-signal", html)
         self.assertNotIn('content:"04"', css)

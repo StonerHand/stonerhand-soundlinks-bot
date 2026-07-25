@@ -1,5 +1,8 @@
 const HTTP_URL = /^https?:\/\//i;
 const QUERY_URL = /https?:\/\/[^\s<>"']+/gi;
+const LONGREAD_BLOCK_TYPES = new Set([
+  "paragraph", "heading", "quote", "list", "details", "divider",
+]);
 
 export function escapeHtml(value) {
   const node = document.createElement("div");
@@ -50,6 +53,13 @@ export function assessDraft(state, copy) {
   const tags = flags.hashtags
     ? String(release.hashtags || "").split(/\s+/).filter(Boolean)
     : [];
+  const publication = state?.publication || {};
+  const longread = publication.mode === "longread"
+    ? normalizeLongread(publication.longread, release)
+    : null;
+  const hasEditorialText = longread
+    ? Boolean(longread.title && longread.blocks.length)
+    : Boolean(String(release.cta || "").trim());
   const checks = [
     {
       key: "platforms",
@@ -61,9 +71,9 @@ export function assessDraft(state, copy) {
     },
     {
       key: "text",
-      ok: Boolean(String(release.cta || "").trim()),
+      ok: hasEditorialText,
       blocking: false,
-      label: String(release.cta || "").trim() ? copy.textReady : copy.noText,
+      label: hasEditorialText ? copy.textReady : copy.noText,
     },
     {
       key: "artwork",
@@ -95,6 +105,126 @@ export function assessDraft(state, copy) {
     enabledPlatforms: enabledPlatforms.length,
     ready: checks.every((check) => !check.blocking),
   };
+}
+
+function cleanText(value, limit = 1800) {
+  return String(value == null ? "" : value)
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n")
+    .slice(0, limit);
+}
+
+function blockId(value, index) {
+  const candidate = String(value || "");
+  return /^[A-Za-z0-9_-]{1,32}$/.test(candidate)
+    ? candidate
+    : `block-${index + 1}`;
+}
+
+export function normalizeLongread(value, release = {}) {
+  const source = value && typeof value === "object" ? value : {};
+  const defaultTitle = [release.artist, release.title].filter(Boolean).join(" — ");
+  const title = cleanText(source.title || defaultTitle, 140);
+  const lead = cleanText(source.lead, 420);
+  let remaining = Math.max(0, 22_000 - title.length - lead.length);
+  const budgeted = (input, limit = 1800) => {
+    if (remaining <= 0) return "";
+    const result = cleanText(input, Math.min(limit, remaining));
+    remaining -= result.length;
+    return result;
+  };
+  const rawBlocks = Array.isArray(source.blocks) ? source.blocks : [];
+  const blocks = rawBlocks.slice(0, 24).flatMap((raw, index) => {
+    if (remaining <= 0) return [];
+    if (!raw || typeof raw !== "object" || !LONGREAD_BLOCK_TYPES.has(raw.type)) return [];
+    const id = blockId(raw.id, index);
+    if (raw.type === "divider") return [{ id, type: "divider" }];
+    if (raw.type === "list") {
+      const items = (Array.isArray(raw.items) ? raw.items : [])
+        .slice(0, 16).map((item) => budgeted(item, 320)).filter(Boolean);
+      return items.length ? [{ id, type: "list", ordered: Boolean(raw.ordered), items }] : [];
+    }
+    if (raw.type === "details") {
+      const detailsTitle = budgeted(raw.title, 120), text = budgeted(raw.text);
+      return detailsTitle && text
+        ? [{ id, type: "details", title: detailsTitle, text, open: Boolean(raw.open) }]
+        : [];
+    }
+    const text = budgeted(raw.text);
+    return text ? [{ id, type: raw.type, text }] : [];
+  });
+  return {
+    title,
+    lead,
+    blocks: blocks.length ? blocks : [{
+      id: "opening",
+      type: "paragraph",
+      text: cleanText(release.cta || "Новый релиз уже собран — осталось включить звук."),
+    }],
+  };
+}
+
+export function markdownToLongread(markdown, release = {}) {
+  const lines = String(markdown || "").replace(/\r/g, "").split("\n");
+  const blocks = [];
+  let title = "";
+  let lead = "";
+  let paragraph = [];
+  let list = [];
+  let ordered = false;
+  const flushParagraph = () => {
+    const text = cleanText(paragraph.join("\n"));
+    if (text) blocks.push({ id: `block-${blocks.length + 1}`, type: "paragraph", text });
+    paragraph = [];
+  };
+  const flushList = () => {
+    if (list.length) blocks.push({
+      id: `block-${blocks.length + 1}`, type: "list", ordered, items: list.slice(0, 16),
+    });
+    list = []; ordered = false;
+  };
+  lines.forEach((raw) => {
+    const line = raw.trim();
+    const heading = line.match(/^(#{1,6})\s+(.+)$/);
+    const bullet = line.match(/^[-*+]\s+(.+)$/);
+    const numbered = line.match(/^\d+[.)]\s+(.+)$/);
+    const quote = line.match(/^>\s?(.*)$/);
+    if (!line) { flushParagraph(); flushList(); return; }
+    if (heading) {
+      flushParagraph(); flushList();
+      if (!title && heading[1].length === 1) title = cleanText(heading[2], 140);
+      else blocks.push({ id: `block-${blocks.length + 1}`, type: "heading", text: cleanText(heading[2]) });
+      return;
+    }
+    if (bullet || numbered) {
+      flushParagraph();
+      const nextOrdered = Boolean(numbered);
+      if (list.length && ordered !== nextOrdered) flushList();
+      ordered = nextOrdered;
+      list.push(cleanText((bullet || numbered)[1], 320));
+      return;
+    }
+    if (quote) {
+      flushParagraph(); flushList();
+      blocks.push({ id: `block-${blocks.length + 1}`, type: "quote", text: cleanText(quote[1]) });
+      return;
+    }
+    if (/^([-*_])\1\1+$/.test(line.replace(/\s/g, ""))) {
+      flushParagraph(); flushList();
+      blocks.push({ id: `block-${blocks.length + 1}`, type: "divider" });
+      return;
+    }
+    if (!lead && title && blocks.length === 0 && paragraph.length === 0) {
+      lead = cleanText(line, 420);
+      return;
+    }
+    paragraph.push(line);
+  });
+  flushParagraph(); flushList();
+  return normalizeLongread({ title, lead, blocks }, release);
 }
 
 export function assessCollection(items, meta, copy) {

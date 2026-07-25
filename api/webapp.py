@@ -23,6 +23,7 @@ from music_links_bot.bot import (
     CHANNEL_USERNAME,
     DRAFT_TTL_SECONDS,
     STATS_KV_KEY,
+    _deliver_draft,
     _load_draft,
     _lookup_tracks,
     _publish_draft,
@@ -59,6 +60,12 @@ from music_links_bot.publish_queue import (
     reschedule_job,
 )
 from music_links_bot.request_guard import rate_limited, run_idempotent
+from music_links_bot.rich_publications import (
+    build_fallback_html,
+    build_rich_html,
+    is_longread,
+    save_prepared_rich_publication,
+)
 from music_links_bot.search import SearchLookupError, normalize_search_query
 from music_links_bot.sharing import make_channel_safe_keyboard
 from music_links_bot.stats import load_stats, merge_stats
@@ -91,7 +98,10 @@ from telegram.constants import ParseMode
 from telegram.error import TelegramError
 
 LOGGER = logging.getLogger(__name__)
-MAX_BODY_BYTES = 64 * 1024
+# Rich publication drafts can contain up to ~22K Unicode characters. Cyrillic
+# JSON is larger in UTF-8, so 128 KiB keeps the editor usable while still
+# bounding every request well below Vercel's function payload limits.
+MAX_BODY_BYTES = 128 * 1024
 MAX_HISTORY_ITEMS = 10
 HISTORY_TTL_SECONDS = 90 * 24 * 3600
 CRATE_TTL_SECONDS = 14 * 24 * 3600
@@ -501,6 +511,73 @@ async def _action_prepare_share(
     result_id = hashlib.sha256(
         f"{user_id}:{draft_id}:{text}".encode("utf-8")
     ).hexdigest()[:32]
+    if is_longread(draft):
+        custom_tags = draft.get("custom_tags")
+        hashtags = (
+            " ".join(custom_tags)
+            if draft.get("hashtags") and isinstance(custom_tags, list)
+            else None
+        )
+        if draft.get("hashtags") and hashtags is None:
+            from music_links_bot.formatter import build_auto_hashtags
+
+            hashtags = build_auto_hashtags(track)
+        rich_html = build_rich_html(
+            draft,
+            track,
+            cta=draft.get("custom_cta"),
+            hashtags=hashtags,
+        )
+        result_id = hashlib.sha256(
+            f"{user_id}:{draft_id}:{rich_html}".encode("utf-8")
+        ).hexdigest()[:32]
+        try:
+            prepared = await save_prepared_rich_publication(
+                context.bot,
+                user_id=user_id,
+                result_id=result_id,
+                title=f"{track.artist} — {track.title}",
+                description="Музыкальный лонгрид с кнопками всех площадок",
+                thumbnail_url=track.thumbnail_url,
+                rich_html=rich_html,
+                reply_markup=keyboard,
+            )
+        except TelegramError:
+            LOGGER.info(
+                "Preparing rich native share failed; using HTML fallback",
+                exc_info=True,
+            )
+            fallback = InlineQueryResultArticle(
+                id=hashlib.sha256(
+                    f"{user_id}:{draft_id}:fallback:{rich_html}".encode("utf-8")
+                ).hexdigest()[:32],
+                title=f"{track.artist} — {track.title}",
+                description="Музыкальный лонгрид с кнопками всех площадок",
+                thumbnail_url=track.thumbnail_url,
+                input_message_content=InputTextMessageContent(
+                    message_text=build_fallback_html(
+                        draft,
+                        track,
+                        cta=draft.get("custom_cta"),
+                        hashtags=hashtags,
+                    ),
+                    parse_mode=ParseMode.HTML,
+                    link_preview_options=_build_link_preview_options(
+                        _select_preview_url(track.links, context)
+                        or track.thumbnail_url,
+                        prefer_large_media=True,
+                    ),
+                ),
+                reply_markup=keyboard,
+            )
+            return await _save_prepared_share(context, user_id, fallback)
+        expiration = prepared.get("expiration_date")
+        return {
+            "ok": bool(prepared.get("id")),
+            "prepared_message_id": prepared.get("id"),
+            "expires_at": int(expiration) if expiration else None,
+        }
+
     result = InlineQueryResultArticle(
         id=result_id,
         title=f"{track.artist} — {track.title}",
@@ -605,34 +682,18 @@ async def _action_deliver(context, action: str, body: dict, user_id: int, is_adm
             "message_id": getattr(published, "message_id", None),
         }
 
-    from music_links_bot.bot import _build_link_preview_options
-
-    text, keyboard = _render_track_draft(draft, context, draft_id=None)
     try:
-        if draft.get("as_photo") and track.thumbnail_url:
-            await context.bot.send_photo(
-                chat_id=user_id,
-                photo=track.thumbnail_url,
-                caption=text,
-                parse_mode=ParseMode.HTML,
-                reply_markup=keyboard,
-            )
-        else:
-            await context.bot.send_message(
-                chat_id=user_id,
-                text=text,
-                parse_mode=ParseMode.HTML,
-                link_preview_options=_build_link_preview_options(
-                    _select_preview_url(track.links, context) or track.thumbnail_url,
-                    prefer_large_media=bool(draft.get("large_preview")),
-                ),
-                reply_markup=keyboard,
-            )
+        delivered = await _deliver_draft(
+            context,
+            draft,
+            target=user_id,
+            channel_style=False,
+        )
     except Exception:
         LOGGER.exception("Studio send failed")
         return {"ok": False, "error": "send failed"}
 
-    return {"ok": True}
+    return {"ok": bool(delivered), "error": None if delivered else "send failed"}
 
 
 async def _action_unpublish(context, body: dict, user_id: int, is_admin: bool) -> dict:

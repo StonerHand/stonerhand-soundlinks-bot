@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 500" role="img" aria-labelledby="title desc">
   <title id="title">StonerHand Studio — animated product demo</title>
-  <desc id="desc">A looping demonstration of the current Studio: smart single or multi-link search, lookup, live post editing and native sharing or publishing.</desc>
+  <desc id="desc">A looping demonstration of the current Studio: smart search, Card or Longread mode, Telegram Rich Message preview and native sharing or publishing.</desc>
   <defs>
     <linearGradient id="hero" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#C97A1E" stop-opacity=".24"/>
@@ -153,9 +153,10 @@
     <g class="result" opacity="0">
       <text x="48" y="116" fill="#C97A1E" font-size="9" class="mono">READY TO AIR</text>
       <text x="48" y="138" fill="#F4F4F1" font-size="16" font-weight="700">Так пост увидит аудитория</text>
-      <rect x="624" y="105" width="208" height="39" rx="13" fill="#17181A" stroke="#2B2D31"/>
-      <path d="M644 120h15m-12-5v10m9-13v16" stroke="#C97A1E" stroke-width="1.6" stroke-linecap="round"/>
-      <text x="671" y="130" fill="#C97A1E" font-size="12" class="mono">ОФОРМЛЕНИЕ</text>
+      <rect x="600" y="105" width="108" height="39" rx="13" fill="#17181A" stroke="#2B2D31"/>
+      <text x="654" y="130" text-anchor="middle" fill="#8C8C88" font-size="10" class="mono">КАРТОЧКА</text>
+      <rect x="716" y="105" width="116" height="39" rx="13" fill="#C97A1E"/>
+      <text x="774" y="130" text-anchor="middle" fill="#0D0D0E" font-size="10" class="mono" font-weight="700">ЛОНГРИД</text>
 
       <rect x="48" y="158" width="784" height="244" rx="24" fill="#202226" stroke="#2B2D31"/>
       <g>
@@ -174,10 +175,12 @@
         </g>
       </g>
 
-      <text x="302" y="201" fill="#F4F4F1" font-size="26" class="display">Dopesmoker</text>
-      <text x="302" y="225" fill="#8C8C88" font-size="13">Sleep · 1999 · Album</text>
-      <text x="302" y="258" fill="#E5C38A" font-size="13" font-style="italic">слушать обязательно ✎</text>
-      <text x="302" y="285" fill="#8C8C88" font-size="11" class="mono">#stonerhand  #doom  #metal  #1999</text>
+      <text x="302" y="201" fill="#F4F4F1" font-size="22" class="display">Почему Dopesmoker важен</text>
+      <text x="302" y="225" fill="#8C8C88" font-size="12" font-style="italic">Stoner Metal · 1999 · музыкальный разбор</text>
+      <rect x="302" y="242" width="510" height="51" rx="13" fill="#17181A" stroke="#C97A1E" stroke-opacity=".5"/>
+      <rect x="302" y="242" width="3" height="51" rx="1.5" fill="#C97A1E"/>
+      <text x="318" y="263" fill="#E5C38A" font-size="12" font-style="italic">«Drop out of life with bong in hand»</text>
+      <text x="318" y="281" fill="#8C8C88" font-size="10">цитата и блочная структура Telegram Rich Message</text>
 
       <g class="p1">
         <rect x="302" y="310" width="157" height="35" rx="12" fill="#1DB954" fill-opacity=".11" stroke="#1DB954" stroke-opacity=".4"/>
@@ -203,7 +206,7 @@
       <path d="M744 376v4l3 2" fill="none" stroke="#8C8C88" stroke-width="1.5" stroke-linecap="round"/>
       <rect x="778" y="357" width="34" height="45" rx="15" fill="#17181A" stroke="#2B2D31"/>
       <path d="M789 379l10-7v14z" fill="none" stroke="#8C8C88" stroke-width="1.4"/>
-      <text x="48" y="455" fill="#8C8C88" font-size="9" class="mono">03 / EDIT</text>
+      <text x="48" y="455" fill="#8C8C88" font-size="9" class="mono">03 / RICH LONGREAD</text>
     </g>
 
     <!-- 04 publish sheet -->

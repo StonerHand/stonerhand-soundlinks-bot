@@ -6,6 +6,8 @@ import {
   assessDraft,
   createDraftSnapshot,
   escapeHtml,
+  markdownToLongread,
+  normalizeLongread,
   parseDraftSnapshot,
   pluralize,
   safeHttpUrl,
@@ -76,6 +78,17 @@ import {
     crateTitleLabel: "Title", crateIntroLabel: "Introduction", crateOutroLabel: "Closing line", crateTagsLabel: "Hashtags",
     crateItemEditor: "Track details", crateSection: "Group", crateNote: "Comment", crateItemSave: "Save track",
     tagRecommended: "RECOMMENDED", tagHealthy: "Good set: clear and relevant", tagTooMany: "Keep up to 6–8 focused tags",
+    longread: {
+      card:["Card","Quick music post"], article:["Longread","Music article"],
+      edit:["Edit article","Headings, quotes, lists and sections"],
+      kicker:"BLOCK EDITOR", title:"Music publication", import:"Markdown",
+      note:["Build it block by block","The order here exactly matches the final Telegram message."],
+      titleLabel:"Title", leadLabel:"Lead", blocks:"ARTICLE BLOCKS",
+      labels:{paragraph:"Text",heading:"Heading",quote:"Quote",list:"List",details:"Section",divider:"Divider"},
+      placeholders:{paragraph:"Write a paragraph…",heading:"Section heading",quote:"A memorable quote…",list:"One item per line",detailsTitle:"Collapsed section title",detailsText:"Section content…"},
+      done:"Show preview", saved:"Saved", saving:"Saving…", error:"Not saved",
+      imported:"Markdown imported", importError:"Could not read this file", max:"Maximum 24 blocks",
+    },
   } : {
     ph: "Ссылка или название…", recent: "НЕДАВНИЕ", popular: "ПОПУЛЯРНЫЕ ЗАПРОСЫ",
     hint: "Ссылка, название или несколько треков — Студия распознает сценарий сама.",
@@ -127,6 +140,17 @@ import {
     crateTitleLabel: "Название", crateIntroLabel: "Вступление", crateOutroLabel: "Финальная фраза", crateTagsLabel: "Хэштеги",
     crateItemEditor: "Настройка трека", crateSection: "Группа", crateNote: "Комментарий", crateItemSave: "Сохранить трек",
     tagRecommended: "РЕКОМЕНДУЕМ", tagHealthy: "Хороший набор: понятно и по теме", tagTooMany: "Лучше оставить 6–8 точных тегов",
+    longread: {
+      card:["Карточка","Быстрый музыкальный пост"], article:["Лонгрид","Музыкальная статья"],
+      edit:["Редактировать материал","Заголовки, цитаты, списки и секции"],
+      kicker:"БЛОЧНЫЙ РЕДАКТОР", title:"Музыкальная публикация", import:"Markdown",
+      note:["Собери материал блоками","Порядок здесь полностью совпадает с будущим сообщением в Telegram."],
+      titleLabel:"Заголовок", leadLabel:"Лид", blocks:"БЛОКИ МАТЕРИАЛА",
+      labels:{paragraph:"Текст",heading:"Заголовок",quote:"Цитата",list:"Список",details:"Секция",divider:"Линия"},
+      placeholders:{paragraph:"Напиши абзац…",heading:"Название раздела",quote:"Запоминающаяся цитата…",list:"Один пункт на строку",detailsTitle:"Название сворачиваемой секции",detailsText:"Содержимое секции…"},
+      done:"Показать превью", saved:"Сохранено", saving:"Сохраняю…", error:"Не сохранено",
+      imported:"Markdown импортирован", importError:"Не удалось прочитать файл", max:"Максимум 24 блока",
+    },
   };
 
   const SUGGESTIONS = ["Black Sabbath – Paranoid","Sleep – Dragonaut","Electric Wizard – Funeralopolis","Kyuss – Green Machine"];
@@ -163,7 +187,7 @@ import {
   };
 
   const $ = (id) => document.getElementById(id);
-  const VIEWS = ["home","candidates","loading","notfound","result","format","crate","queue","stats"];
+  const VIEWS = ["home","candidates","loading","notfound","result","format","longread","crate","queue","stats"];
   const TAB_SCREENS = ["home","crate","queue","stats"];
   let state = null, isAdmin = false, playingBtn = null, syncTimer = null, undoTimer = null;
   let historyItems = [], crateItems = [], crateCount = 0;
@@ -305,6 +329,25 @@ import {
   $("format-nav-tags").textContent = EN ? "Tags" : "Теги";
   $("format-nav-services").textContent = EN ? "Services" : "Сервисы";
   $("result-score-label").textContent = EN ? "ready" : "готово";
+  $("mode-card-title").textContent = T.longread.card[0];
+  $("mode-card-copy").textContent = T.longread.card[1];
+  $("mode-longread-title").textContent = T.longread.article[0];
+  $("mode-longread-copy").textContent = T.longread.article[1];
+  $("longread-edit-title").textContent = T.longread.edit[0];
+  $("longread-edit-copy").textContent = T.longread.edit[1];
+  $("longread-kicker").textContent = T.longread.kicker;
+  $("longread-title").textContent = T.longread.title;
+  $("longread-import-label").textContent = T.longread.import;
+  $("longread-note-title").textContent = T.longread.note[0];
+  $("longread-note-copy").textContent = T.longread.note[1];
+  $("longread-title-label").textContent = T.longread.titleLabel;
+  $("longread-lead-label").textContent = T.longread.leadLabel;
+  $("longread-blocks-label").textContent = T.longread.blocks;
+  $("longread-done").textContent = T.longread.done;
+  Object.entries(T.longread.labels).forEach(([key, value]) => {
+    const label = $("block-" + key + "-label");
+    if (label) label.textContent = value;
+  });
   $("queue-intro-title").textContent = EN ? "Broadcast plan" : "План эфира";
   $("queue-intro-copy").textContent = EN ? "Every scheduled publication in one timeline" : "Все запланированные публикации в одном таймлайне";
   $("stats-intro-title").textContent = EN ? "Channel pulse" : "Пульс канала";
@@ -379,7 +422,7 @@ import {
     if (prev === "home") loadHome();
     show(prev, false);
   }
-  ["cand-back","nf-back","res-back","fmt-back","crate-back","queue-back","stats-back"].forEach((id) => $(id).addEventListener("click", () => { hap.tap(); goBack(); }));
+  ["cand-back","nf-back","res-back","fmt-back","longread-back","crate-back","queue-back","stats-back"].forEach((id) => $(id).addEventListener("click", () => { hap.tap(); goBack(); }));
   $("loading-cancel").addEventListener("click", () => { hap.tap(); goBack(); });
   document.querySelectorAll("#tabbar button").forEach((b) => b.addEventListener("click", () => {
     hap.tap(); cancelPending(); const t = b.dataset.tab;
@@ -520,13 +563,80 @@ import {
     } catch(e) {}
   }
 
+  function currentPublication() {
+    if (!state) return { mode:"card", longread:null };
+    const source = state.publication && typeof state.publication === "object"
+      ? state.publication
+      : {};
+    const publication = {
+      mode: source.mode === "longread" ? "longread" : "card",
+      rich_supported: source.rich_supported !== false,
+      longread: normalizeLongread(source.longread, state.release || {}),
+    };
+    state.publication = publication;
+    return publication;
+  }
+  function publicationPayload() {
+    const publication = currentPublication();
+    return {
+      publication_mode: publication.mode,
+      longread: publication.longread,
+    };
+  }
+  function drawPublicationMode() {
+    const publication = currentPublication();
+    document.querySelectorAll("#publication-mode [data-mode]").forEach((button) => {
+      const active = button.dataset.mode === publication.mode;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+    $("longread-edit").classList.toggle("hidden", publication.mode !== "longread");
+  }
+  function previewLongreadBlocks(longread) {
+    return longread.blocks.map((block) => {
+      if (block.type === "divider") return '<hr class="longread-divider">';
+      if (block.type === "heading") return '<h3>'+esc(block.text)+"</h3>";
+      if (block.type === "quote") return '<blockquote>'+esc(block.text).replace(/\n/g,"<br>")+"</blockquote>";
+      if (block.type === "list") {
+        const tag = block.ordered ? "ol" : "ul";
+        return "<"+tag+">"+block.items.map((item)=>"<li>"+esc(item)+"</li>").join("")+"</"+tag+">";
+      }
+      if (block.type === "details") {
+        return '<details'+(block.open?" open":"")+'><summary>'+esc(block.title)+'</summary><p>'+esc(block.text).replace(/\n/g,"<br>")+"</p></details>";
+      }
+      return "<p>"+esc(block.text).replace(/\n/g,"<br>")+"</p>";
+    }).join("");
+  }
+  function longreadCardHtml(r, f, artSrc, artAlt, artEmoji, plats) {
+    const longread = currentPublication().longread;
+    const tags = f.hashtags && r.hashtags
+      ? '<footer>'+r.hashtags.split(/\s+/).filter(Boolean).map((tag)=>"<span>"+esc(tag)+"</span>").join("")+"</footer>"
+      : "";
+    const cover = artSrc
+      ? '<figure><img data-card-art="1" data-emoji="'+artEmoji+'" crossorigin="anonymous" alt="'+artAlt+'" decoding="async" src="'+artSrc+'"><figcaption>'+esc(r.artist)+" — "+esc(r.title)+"</figcaption></figure>"
+      : "";
+    return '<article class="longread-preview">'+
+      '<div class="longread-preview-kicker"><span>TELEGRAM RICH MESSAGE</span><i></i></div>'+
+      "<h1>"+esc(longread.title)+"</h1>"+
+      (longread.lead?'<p class="longread-lead">'+esc(longread.lead).replace(/\n/g,"<br>")+"</p>":"")+
+      cover+
+      '<div class="longread-body">'+previewLongreadBlocks(longread)+"</div>"+
+      tags+
+      '<div class="plats longread-platforms">'+plats+"</div>"+
+      "</article>";
+  }
+
   /* ── render result ── */
   function renderCard() {
     const r = state.release, f = state.flags;
+    const publication = currentPublication();
+    const longreadMode = publication.mode === "longread";
+    drawPublicationMode();
     const photo = Boolean(f.as_photo), mode = photo || f.large_preview ? "large" : "compact";
     const card = $("post-card");
-    card.classList.toggle("large", mode === "large");
-    card.classList.toggle("compact", mode === "compact");
+    card.classList.toggle("large", !longreadMode && mode === "large");
+    card.classList.toggle("compact", !longreadMode && mode === "compact");
+    card.classList.toggle("longread", longreadMode);
     const artSrc = r.artwork_failed ? "" : safeUrl(r.artwork);
     const acc = r.accentColor || "var(--primary)";
     dyn = null;
@@ -592,7 +702,9 @@ import {
     if (/^https?:\/\//i.test(String(r.page_url||""))) plats += '<a class="plat hub" href="'+safeUrl(r.page_url)+'" target="_blank" rel="noopener">+ '+esc(T.allPlatforms)+"</a>";
 
     let innerTop = "";
-    if (mode === "compact") {
+    if (longreadMode) {
+      card.innerHTML = longreadCardHtml(r, f, artSrc, artAlt, artEmoji, plats);
+    } else if (mode === "compact") {
       innerTop =
         '<div class="compact-top">'+
         '<div class="compact-cover">'+(artSrc
@@ -659,6 +771,193 @@ import {
     showNativeMain(state.can_publish ? T.publish : T.send, openPublish);
     $("status").textContent = "";
   }
+
+  /* ── rich music publication editor ── */
+  let editingLongread = null;
+  function setLongreadSync(mode) {
+    const el = $("longread-sync");
+    if (!el) return;
+    el.className = "sync-state "+mode;
+    el.textContent = mode === "saving"
+      ? T.longread.saving
+      : (mode === "error" ? T.longread.error : T.longread.saved);
+  }
+  function newLongreadBlock(type) {
+    const id = "b-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,6);
+    if (type === "divider") return { id, type };
+    if (type === "list") return { id, type, ordered:false, items:[] };
+    if (type === "details") return { id, type, title:"", text:"", open:false };
+    return { id, type, text:"" };
+  }
+  function longreadBlockFields(block, index) {
+    const p = T.longread.placeholders;
+    if (block.type === "divider") {
+      return '<div class="block-divider-preview"><span></span><b>DIVIDER</b><span></span></div>';
+    }
+    if (block.type === "details") {
+      return '<label><span>'+esc(T.longread.labels.details)+'</span><input data-field="title" maxlength="120" placeholder="'+esc(p.detailsTitle)+'" value="'+esc(block.title||"")+'"></label>'+
+        '<label><span>'+esc(T.longread.labels.paragraph)+'</span><textarea data-field="text" maxlength="1800" rows="4" placeholder="'+esc(p.detailsText)+'">'+esc(block.text||"")+"</textarea></label>"+
+        '<button class="block-option'+(block.open?" active":"")+'" type="button" data-action="toggle-open" aria-pressed="'+String(Boolean(block.open))+'">'+
+        (block.open?(EN?"Expanded by default":"Открыта по умолчанию"):(EN?"Collapsed by default":"Свёрнута по умолчанию"))+"</button>";
+    }
+    if (block.type === "list") {
+      return '<textarea data-field="items" maxlength="5200" rows="5" placeholder="'+esc(p.list)+'">'+esc((block.items||[]).join("\n"))+"</textarea>"+
+        '<button class="block-option'+(block.ordered?" active":"")+'" type="button" data-action="toggle-order" aria-pressed="'+String(Boolean(block.ordered))+'">'+
+        (block.ordered?(EN?"Numbered list":"Нумерованный список"):(EN?"Bulleted list":"Маркированный список"))+"</button>";
+    }
+    const rows = block.type === "heading" ? 2 : 5;
+    return '<textarea data-field="text" maxlength="1800" rows="'+rows+'" placeholder="'+esc(p[block.type]||p.paragraph)+'">'+esc(block.text||"")+"</textarea>";
+  }
+  function drawLongreadEditor() {
+    if (!editingLongread) return;
+    $("longread-title-input").value = editingLongread.title || "";
+    $("longread-lead-input").value = editingLongread.lead || "";
+    $("longread-block-count").textContent = editingLongread.blocks.length+" / 24";
+    const list = $("longread-blocks");
+    list.innerHTML = "";
+    editingLongread.blocks.forEach((block, index) => {
+      const item = document.createElement("section");
+      item.className = "longread-block";
+      item.dataset.index = String(index);
+      item.innerHTML =
+        '<header><span class="block-type"><b>'+String(index+1).padStart(2,"0")+'</b>'+esc(T.longread.labels[block.type]||block.type)+'</span>'+
+        '<span class="block-actions">'+
+        '<button type="button" data-action="up" aria-label="'+(EN?"Move block up":"Поднять блок")+'"'+(index===0?" disabled":"")+">"+ico("up","s14")+"</button>"+
+        '<button type="button" data-action="down" aria-label="'+(EN?"Move block down":"Опустить блок")+'"'+(index===editingLongread.blocks.length-1?" disabled":"")+">"+ico("down","s14")+"</button>"+
+        '<button type="button" class="danger" data-action="delete" aria-label="'+(EN?"Delete block":"Удалить блок")+'">'+ico("trash","s14")+"</button>"+
+        "</span></header>"+
+        '<div class="longread-block-fields">'+longreadBlockFields(block,index)+"</div>";
+      item.querySelectorAll("[data-field]").forEach((field) => {
+        field.addEventListener("input", () => {
+          const target = editingLongread.blocks[index];
+          if (!target) return;
+          if (field.dataset.field === "items") {
+            target.items = field.value.split("\n").map((value)=>value.trim()).filter(Boolean).slice(0,16);
+          } else {
+            target[field.dataset.field] = field.value;
+          }
+          queueLongreadSave();
+        });
+      });
+      item.querySelectorAll("[data-action]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const action = button.dataset.action;
+          if (action === "up" && index > 0) {
+            [editingLongread.blocks[index-1],editingLongread.blocks[index]] = [editingLongread.blocks[index],editingLongread.blocks[index-1]];
+          } else if (action === "down" && index < editingLongread.blocks.length-1) {
+            [editingLongread.blocks[index+1],editingLongread.blocks[index]] = [editingLongread.blocks[index],editingLongread.blocks[index+1]];
+          } else if (action === "delete") {
+            editingLongread.blocks.splice(index,1);
+          } else if (action === "toggle-order") {
+            editingLongread.blocks[index].ordered = !editingLongread.blocks[index].ordered;
+          } else if (action === "toggle-open") {
+            editingLongread.blocks[index].open = !editingLongread.blocks[index].open;
+          } else {
+            return;
+          }
+          hap.pick(); drawLongreadEditor(); queueLongreadSave();
+        });
+      });
+      list.appendChild(item);
+    });
+    document.querySelectorAll("#block-toolbar button").forEach((button) => {
+      button.disabled = editingLongread.blocks.length >= 24;
+    });
+  }
+  function queueLongreadSave(immediate) {
+    if (!state || !editingLongread) return;
+    const publication = currentPublication();
+    publication.mode = "longread";
+    publication.longread = editingLongread;
+    setLongreadSync("saving");
+    syncDraft({
+      publication_mode:"longread",
+      longread:editingLongread,
+    }, Boolean(immediate));
+  }
+  function openLongreadEditor() {
+    if (!state) return;
+    hap.tap();
+    const publication = currentPublication();
+    editingLongread = JSON.parse(JSON.stringify(publication.longread));
+    setLongreadSync("saved");
+    drawLongreadEditor();
+    show("longread");
+  }
+  function setPublicationMode(mode) {
+    if (!state || !["card","longread"].includes(mode)) return;
+    hap.pick();
+    const publication = currentPublication();
+    if (publication.mode === mode) {
+      if (mode === "longread") openLongreadEditor();
+      return;
+    }
+    publication.mode = mode;
+    renderCard();
+    syncDraft({
+      publication_mode:mode,
+      longread:publication.longread,
+    }, true);
+    if (mode === "longread") flash(EN?"Longread mode enabled":"Режим лонгрида включён");
+  }
+  document.querySelectorAll("#publication-mode [data-mode]").forEach((button) => {
+    button.addEventListener("click", () => setPublicationMode(button.dataset.mode));
+  });
+  $("longread-edit").addEventListener("click", openLongreadEditor);
+  $("longread-title-input").addEventListener("input", () => {
+    if (!editingLongread) return;
+    editingLongread.title = $("longread-title-input").value;
+    queueLongreadSave();
+  });
+  $("longread-lead-input").addEventListener("input", () => {
+    if (!editingLongread) return;
+    editingLongread.lead = $("longread-lead-input").value;
+    queueLongreadSave();
+  });
+  document.querySelectorAll("#block-toolbar [data-block]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (!editingLongread) return;
+      if (editingLongread.blocks.length >= 24) {
+        hap.warn(); flash(T.longread.max); return;
+      }
+      hap.pick();
+      editingLongread.blocks.push(newLongreadBlock(button.dataset.block));
+      drawLongreadEditor();
+      queueLongreadSave();
+      requestAnimationFrame(() => {
+        const last = $("longread-blocks").lastElementChild;
+        last?.scrollIntoView({behavior:"smooth",block:"center"});
+        last?.querySelector("textarea,input")?.focus();
+      });
+    });
+  });
+  $("longread-done").addEventListener("click", () => {
+    if (!state || !editingLongread) return;
+    hap.ok();
+    const publication = currentPublication();
+    publication.mode = "longread";
+    publication.longread = normalizeLongread(editingLongread,state.release);
+    editingLongread = publication.longread;
+    syncDraft(publicationPayload(),true);
+    goBack();
+    renderCard();
+  });
+  $("longread-import").addEventListener("click", () => {
+    hap.tap(); $("longread-file").click();
+  });
+  $("longread-file").addEventListener("change", async () => {
+    const file = $("longread-file").files?.[0];
+    $("longread-file").value = "";
+    if (!file || !state) return;
+    try {
+      editingLongread = markdownToLongread(await file.text(),state.release);
+      drawLongreadEditor();
+      queueLongreadSave(true);
+      hap.ok(); flash(T.longread.imported);
+    } catch(e) {
+      hap.err(); flash(T.longread.importError);
+    }
+  });
 
   /* ── flows ── */
   async function search(pick) {
@@ -1063,15 +1362,17 @@ import {
       const seq = ++syncSeq;
       const draftId = state && state.draft_id;
       if (!$("v-format").classList.contains("hidden")) setFormatSync("saving");
+      if (!$("v-longread").classList.contains("hidden")) setLongreadSync("saving");
       try {
         const res = await api("update", { draft_id: draftId, ...patch });
         // a newer edit already fired — don't let this stale response revert it
         if (seq !== syncSeq) return;
-        if (!res || !res.ok) { setFormatSync("error"); return; }
+        if (!res || !res.ok) { setFormatSync("error"); setLongreadSync("error"); return; }
         state = res; saveActiveDraft();
         setFormatSync("saved");
+        setLongreadSync("saved");
         if (!$("v-result").classList.contains("hidden")) renderCard();
-      } catch(e) { if (seq === syncSeq) { setFormatSync("error"); flash(errorText(e.message)); } }
+      } catch(e) { if (seq === syncSeq) { setFormatSync("error"); setLongreadSync("error"); flash(errorText(e.message)); } }
     };
     if (immediate) run(); else syncTimer = setTimeout(run, 350);
   }
@@ -1094,7 +1395,7 @@ import {
   async function deliver(action, extra) {
     const main = $("action-main"); main.disabled = true; setNativeMainBusy(true);
     try {
-      const res = await api(action, { draft_id: state.draft_id, hashtags: state.flags.hashtags, quote: state.flags.quote, large_preview: state.flags.large_preview, as_photo: Boolean(state.flags.as_photo), ...(extra||{}) });
+      const res = await api(action, { draft_id: state.draft_id, hashtags: state.flags.hashtags, quote: state.flags.quote, large_preview: state.flags.large_preview, as_photo: Boolean(state.flags.as_photo), ...publicationPayload(), ...(extra||{}) });
       if (res.ok) {
         hap.ok();
         main.disabled = false;
@@ -1136,10 +1437,13 @@ import {
         '</small></div><span class="publish-ready">'+ico("check","s14")+(EN?"READY":"ГОТОВО")+"</span>";
     }else{
       const release=state.release, platforms=(release.platforms||[]).filter((p)=>p.enabled!==false).length;
+      const formatLabel=currentPublication().mode==="longread"
+        ? (EN?"Longread":"Лонгрид")
+        : (EN?"Card":"Карточка");
       $("publish-summary").innerHTML =
         artHtml(release.artwork,release.emoji,"publish-art")+
         '<div><b>'+esc(release.artist)+" — "+esc(release.title)+'</b><small>'+
-        esc(platforms+" "+T.readyPlatforms+" · "+(state.flags.hashtags?T.readyHashtags:T.readyClean))+
+        esc(formatLabel+" · "+platforms+" "+T.readyPlatforms+" · "+(state.flags.hashtags?T.readyHashtags:T.readyClean))+
         '</small></div><span class="publish-ready">'+ico("check","s14")+(EN?"READY":"ГОТОВО")+"</span>";
     }
     setSheetOpen("publish-sheet", "publish-mask", true, publishMode==="crate"?$("crate-main"):$("action-main"));
@@ -1191,7 +1495,7 @@ import {
     button.disabled = true; button.classList.add("busy");
     $("share-post-title").textContent = T.sharePreparing;
     try {
-      const res = await api("prepare_share", { draft_id: state.draft_id });
+      const res = await api("prepare_share", { draft_id: state.draft_id, ...publicationPayload() });
       if (!res?.ok || !res.prepared_message_id || typeof tg.shareMessage !== "function") {
         fallbackShare();
         return;
@@ -1313,7 +1617,7 @@ import {
     schedulePending = true;
     closeSheet();
     try {
-      const res = await api("schedule", { draft_id: state.draft_id, at, force: Boolean(force), hashtags: state.flags.hashtags, quote: state.flags.quote, large_preview: state.flags.large_preview, as_photo: Boolean(state.flags.as_photo) });
+      const res = await api("schedule", { draft_id: state.draft_id, at, force: Boolean(force), hashtags: state.flags.hashtags, quote: state.flags.quote, large_preview: state.flags.large_preview, as_photo: Boolean(state.flags.as_photo), ...publicationPayload() });
       if (res.ok) { hap.ok(); $("status").textContent = T.scheduled + fmtWhen(res.publish_at); refreshQueueBadge(); }
       else if (res.error==="duplicate") { hap.err(); $("toast-msg").innerHTML=T.dupA+"<b>"+esc(res.posted_date)+"</b>"+T.dupB; setToastOpen(true); $("toast-confirm").textContent=T.confirm; $("toast-confirm").onclick=()=>{setToastOpen(false);schedule(at,true);}; }
       else { hap.err(); $("status").textContent = errorText(res.error); }
@@ -1793,7 +2097,8 @@ import {
     openDraftResult({
       ok:true, draft_id:"demo", can_publish:true,
       flags:{hashtags:true,quote:false,large_preview:true,as_photo:false,has_prefix:false},
-      release:{artist:"Electric Wizard",title:"Funeralopolis",kind:"song",emoji:"⚡",year:"2000",genre:"Doom Metal",artwork:location.origin+"/assets/studio-demo.svg",page_url:"https://song.link/demo",preview:null,preview_pending:false,cta:"громкость выше — мир тише",hashtags:"#stonerhand #doom #electricwizard",platforms:[{key:"spotify",label:"Spotify",url:"https://open.spotify.com",enabled:true},{key:"appleMusic",label:"Apple Music",url:"https://music.apple.com",enabled:true},{key:"youtubeMusic",label:"YouTube",url:"https://music.youtube.com",enabled:true}]}
+      release:{artist:"Electric Wizard",title:"Funeralopolis",kind:"song",emoji:"⚡",year:"2000",genre:"Doom Metal",artwork:location.origin+"/assets/studio-demo.svg",page_url:"https://song.link/demo",preview:null,preview_pending:false,cta:"громкость выше — мир тише",hashtags:"#stonerhand #doom #electricwizard",platforms:[{key:"spotify",label:"Spotify",url:"https://open.spotify.com",enabled:true},{key:"appleMusic",label:"Apple Music",url:"https://music.apple.com",enabled:true},{key:"youtubeMusic",label:"YouTube",url:"https://music.youtube.com",enabled:true}]},
+      publication:{mode:"card",rich_supported:true,longread:{title:"Electric Wizard — Funeralopolis",lead:"Doom Metal · 2000",blocks:[{id:"opening",type:"paragraph",text:"громкость выше — мир тише"}]}}
     }, false);
   } else if (localDemo === "crate") {
     isAdmin = true;

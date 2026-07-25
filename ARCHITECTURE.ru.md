@@ -61,6 +61,7 @@ src/music_links_bot/
   nts.py               Open Graph страниц NTS
   models.py            нормализованные модели контента
   formatter.py         HTML-текст постов, CTA и хэштеги
+  rich_publications.py валидация блоков, Rich HTML, fallback и raw Bot API transport
   keyboards.py         кнопки платформ и Telegram actions
   i18n.py              RU/EN интерфейсные строки
   telegram_text.py     безопасное сохранение rich-text подводок
@@ -88,7 +89,7 @@ webapp/
   app.js               state machine, UI, Telegram WebApp integration
   api-client.js        JSON transport, timeout/cancel, request_id
   cloud-storage.js     Promise/callback adapter Telegram CloudStorage
-  studio-core.js       query mode, UX-правила, preflight и snapshot черновика
+  studio-core.js       query mode, preflight, нормализация лонгрида и Markdown import
 
 tests/
   test_*.py            unit и integration tests без внешней сети
@@ -222,6 +223,8 @@ draft:<id> → {
   custom_cta,
   custom_hashtags,
   platform_order,
+  publication_mode: card | longread,
+  longread: { title, lead, blocks[] },
   preview,
   preview_pending
 }
@@ -241,7 +244,7 @@ Draft живёт 48 часов в Redis и в bounded memory cache до 300 эл
 
 ### Delivery pipeline
 
-`_deliver_draft()` — единая точка отправки себе и публикации в канал. Она формирует HTML/keyboard, применяет link preview или photo mode и возвращает результат доставки. Антидубль строится по fingerprint исполнителя и названия. Удаление исходной ссылки в группе/канале выполняется только после успешного нового поста.
+`_deliver_draft()` — единая точка отправки себе и публикации в канал. Для `card` она формирует обычный HTML/keyboard и применяет link preview или photo mode. Для `longread` собирает безопасный Rich HTML (`h1/h2`, paragraph, blockquote, list, details, figure, footer) и вызывает `sendRichMessage` с той же inline-клавиатурой. Если Telegram сообщает, что Rich API недоступен или не поддержан, доставка автоматически повторяется как ограниченный HTML без разрыва тегов. Антидубль строится по fingerprint исполнителя и названия. Удаление исходной ссылки в группе/канале выполняется только после успешного нового поста.
 
 ## 7. Studio Mini App
 
@@ -249,12 +252,12 @@ Draft живёт 48 часов в Redis и в bounded memory cache до 300 эл
 
 Studio не требует Node build:
 
-- `index.html` содержит экраны Home, Candidates, Loading, Result, Format, Crate, Queue, Stats и bottom sheets;
+- `index.html` содержит экраны Home, Candidates, Loading, Result, Format, Longread Editor, Crate, Queue, Stats и bottom sheets;
 - `styles.css` задаёт editorial design system, CSS variables, light/dark theme, safe areas, touch targets и reduced motion;
-- `app.js` управляет state/view transitions, Telegram WebApp API, player, formatting, presets, crate, queue и stats;
+- `app.js` управляет state/view transitions, Telegram WebApp API, player, Card/Longread, блочным редактором, preview, crate, queue и stats;
 - `api-client.js` создаёт `request_id`, ставит timeout, поддерживает abort и нормализует ошибки;
 - `cloud-storage.js` хранит тему, onboarding, presets, active draft и client-authoritative crate;
-- `studio-core.js` независимо от транспорта распознаёт single/batch query, оценивает готовность поста/подборки и сериализует active draft snapshot.
+- `studio-core.js` независимо от транспорта распознаёт single/batch query, оценивает готовность поста/подборки, нормализует лонгрид, импортирует Markdown и сериализует active draft snapshot.
 
 Home загружается одним action `dashboard`: history, зеркало crate и очередь читаются
 параллельно на сервере. Это убирает прежний waterfall из трёх запросов. Последний
@@ -265,7 +268,10 @@ Home загружается одним action `dashboard`: history, зеркал
 а новый lookup отменяет предыдущий abortable-запрос. Две и более ссылки до отправки
 переключают поиск в явный batch-режим; API возвращает число распознанных и
 нераспознанных позиций. Ошибка изображения заменяет его спокойным fallback и не
-засчитывается как стопроцентная готовность.
+засчитывается как стопроцентная готовность. Режим лонгрида хранится в том же
+draft, поэтому одинаково работает для отправки себе, канала, очереди и нативного
+`shareMessage`. Markdown-файл разбирается локально в разрешённые блоки, а сервер
+повторно проверяет типы, длины, URL и общий бюджет текста.
 
 Сервер не доверяет отображаемому клиентом admin-state. Каждое privileged действие снова проверяет `user.id == ADMIN_CHAT_ID`.
 
@@ -282,7 +288,7 @@ Home загружается одним action `dashboard`: history, зеркал
 }
 ```
 
-`initData` валидируется официальным HMAC-SHA256 алгоритмом Telegram. Данные старше 24 часов не принимаются. Максимальный body — 64 KiB, action timeout — 25 секунд.
+`initData` валидируется официальным HMAC-SHA256 алгоритмом Telegram. Данные старше 24 часов не принимаются. Максимальный body — 128 KiB (с запасом для Unicode-лонгрида), action timeout — 25 секунд.
 
 | Action | Доступ | Назначение |
 | --- | --- | --- |
@@ -290,10 +296,11 @@ Home загружается одним action `dashboard`: history, зеркал
 | `resolve_batch` | пользователь | 2+ URL → дедуплицированные элементы crate |
 | `draft` | владелец draft | открыть draft из Telegram |
 | `preview` | владелец draft | лениво получить audio preview |
-| `update` | владелец draft | применить flags, CTA, tags и platform order |
+| `update` | владелец draft | применить flags, CTA, tags, platform order и Card/Longread blocks |
 | `dashboard` | пользователь | history + crate + краткое состояние очереди одним запросом |
 | `history` | пользователь | последние 10 релизов и published state |
-| `send` | пользователь | отправить пост себе |
+| `send` | пользователь | отправить карточку или Rich Message себе |
+| `prepare_share` | владелец draft | подготовить карточку/Rich Message с кнопками для `shareMessage` |
 | `publish` / `unpublish` | админ | публикация в канал / undo |
 | `schedule` | админ | поставить draft в очередь |
 | `queue` / `unschedule` / `reschedule` | админ | управление очередью |

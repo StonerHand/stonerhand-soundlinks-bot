@@ -2,7 +2,7 @@
 
 # 🎧 StonerHand Soundlinks Bot
 
-### A link, title or several releases → a finished Telegram post
+### A link, title or several releases → a card, longread or collection
 
 Artwork, polished copy, every platform, collections and publishing — in 🎛 Studio.
 
@@ -23,7 +23,8 @@ Artwork, polished copy, every platform, collections and publishing — in 🎛 S
 | --- | --- |
 | Link or title → exact release picker → finished card | Search, candidates, live preview and optional 30-second audio |
 | 2–12 links → one complete numbered collection | Multi-link import and a crate of up to 10 releases |
-| Artwork, CTA, hashtags and compact platform buttons | CTA, quote, tags, cover mode and platform ordering |
+| Artwork, CTA, hashtags and compact platform buttons | Card / Longread mode with an exact Telegram preview |
+| Native Telegram Rich Messages with safe HTML fallback | Block editor: headings, text, quotes, lists, sections and dividers |
 | Inline search with `@StonerHandBot` in any chat | Draft recovery, presets and a delivery preflight |
 | Automatic link replacement in groups and channels | Reordering, sections, notes and collection styling |
 | RU/EN workspace, actionable errors and retry | History, queue, reschedule, undo and owner analytics |
@@ -33,7 +34,7 @@ Spotify / Apple Music / YouTube / SoundCloud / Bandcamp / Deezer / Tidal
 Yandex Music / Spotify playlists & artists / podcasts / NTS Radio
 ```
 
-Metadata and universal links come from Song.link/Odesli, iTunes Search and oEmbed. Use Studio's Share action to send text and platform buttons as one prepared Telegram message. Telegram's ordinary forward action removes inline keyboards.
+Metadata and universal links come from Song.link/Odesli, iTunes Search and oEmbed. Longreads use Telegram Rich Messages (up to 32K, artwork and structured blocks); if Rich Messages are unavailable in a target client or chat, the bot sends a bounded HTML version with the same platform keyboard. Use Studio's Share action to send the full post and buttons as one prepared Telegram message. Telegram's ordinary forward action removes inline keyboards.
 
 ## Flow
 
@@ -41,7 +42,7 @@ Metadata and universal links come from Song.link/Odesli, iTunes Search and oEmbe
 flowchart LR
     A["Link / title"] --> B["Choose release"]
     A2["2–12 links"] --> C["Build crate"]
-    B --> D["Preview + edit"]
+    B --> D["Card / Longread editor"]
     C --> D
     D --> E["Share · self · channel · queue"]
 ```
@@ -111,8 +112,8 @@ Ping `/api/health` every five minutes for timely scheduled posts.
 
 ```text
 api/                    Vercel webhook, Studio API, health and setup
-src/music_links_bot/    bot UI, inline mode, lookup, delivery, queue and storage
-webapp/                 build-free Mini App: semantic HTML, design system, ES modules
+src/music_links_bot/    bot UI, lookup, Rich Messages, delivery, queue and storage
+webapp/                 build-free Mini App: block editor, preview, design system
 tests/                  offline unit/integration suite + adaptive Playwright smoke
 ```
 

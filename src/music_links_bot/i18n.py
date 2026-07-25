@@ -46,13 +46,13 @@ STRINGS: dict[str, dict[str, str]] = {
         RU: (
             "🎧 <b>Соберём музыкальный пост за минуту</b>\n\n"
             "Пришли ссылку или напиши <i>артист — трек</i>. Я найду релиз, "
-            "соберу площадки и дам отредактировать карточку перед отправкой.\n\n"
+            "соберу площадки и дам выбрать карточку или блочный лонгрид.\n\n"
             "Начать можно с короткого знакомства или сразу с поиска 👇"
         ),
         EN: (
             "🎧 <b>Build a music post in a minute</b>\n\n"
             "Send a link or type <i>artist — track</i>. I will find the release, "
-            "collect its platforms and let you edit the card before sending.\n\n"
+            "collect its platforms and let you choose a card or block-based longread.\n\n"
             "Take the quick tour or jump straight into search 👇"
         ),
     },
@@ -67,7 +67,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "home_body": {
         RU: (
             "{greeting}\n\n"
-            "<i>Из музыкальной ссылки — в готовый пост с обложкой и кнопками.</i>\n\n"
+            "<i>Из музыкальной ссылки — в карточку или лонгрид с кнопками.</i>\n\n"
             "<blockquote>◉ <b>Рабочее состояние</b>\n"
             "Подборка · {crate_count}/10\n{mode}</blockquote>\n"
             "<b>Быстрый старт</b>\n"
@@ -76,7 +76,7 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         EN: (
             "{greeting}\n\n"
-            "<i>Turn a music link into a finished post with artwork and buttons.</i>\n\n"
+            "<i>Turn a music link into a card or longread with artwork and buttons.</i>\n\n"
             "<blockquote>◉ <b>Workspace status</b>\n"
             "Crate · {crate_count}/10\n{mode}</blockquote>\n"
             "<b>Quick start</b>\n"
@@ -112,16 +112,16 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "onboarding_2": {
         RU: (
-            "🎛 <b>Шаг 2 из 3 · Настрой карточку</b>\n\n"
+            "🎛 <b>Шаг 2 из 3 · Выбери формат</b>\n\n"
             "<blockquote>Бот найдёт обложку, площадки и подготовит хэштеги.</blockquote>\n"
             "В чате можно быстро изменить цитату и превью. В <b>Студии</b> — "
-            "полностью настроить текст, обложку и порядок кнопок."
+            "собрать карточку или блочный лонгрид, настроить текст и кнопки."
         ),
         EN: (
-            "🎛 <b>Step 2 of 3 · Shape the card</b>\n\n"
+            "🎛 <b>Step 2 of 3 · Choose the format</b>\n\n"
             "<blockquote>The bot finds artwork, platforms and prepares hashtags.</blockquote>\n"
             "Quickly change the quote and preview in chat. Use <b>Studio</b> to "
-            "customize the text, cover and button order."
+            "build a card or block-based longread and tune its text and buttons."
         ),
     },
     "onboarding_3": {
@@ -171,6 +171,7 @@ STRINGS: dict[str, dict[str, str]] = {
             "• Поиск по названию: просто напиши <i>artist - track</i>\n"
             "• Несколько ссылок разом → нумерованная подборка\n"
             "• Подводка над ссылкой → цитата в посте\n"
+            "• Студия → карточка или музыкальный Rich-лонгрид\n"
             "• Inline: набери @StonerHandBot + ссылку в любом чате\n\n"
             "Пришли ссылку или название 👇"
         ),
@@ -184,6 +185,7 @@ STRINGS: dict[str, dict[str, str]] = {
             "• Search by name: just type <i>artist - track</i>\n"
             "• Several links at once → a numbered collection\n"
             "• Text above a link → a quote in the post\n"
+            "• Studio → a card or a music Rich longread\n"
             "• Inline: type @StonerHandBot + a link in any chat\n\n"
             "Send a link or a name 👇"
         ),
