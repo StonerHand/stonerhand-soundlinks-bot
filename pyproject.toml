@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "stonerhand-soundlinks-bot"
 version = "0.1.0"
-description = "Telegram music-post studio with universal links, collections, inline search, scheduling and a mobile Mini App."
+description = "Telegram music publishing studio with Rich Messages, universal links, collections, scheduling and a mobile Mini App."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

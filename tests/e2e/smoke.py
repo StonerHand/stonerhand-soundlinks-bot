@@ -37,7 +37,15 @@ RELEASE = {
 }
 DRAFT = {"ok": True, "draft_id": "d1", "ttl": 3600,
          "flags": {"hashtags": True, "quote": False, "large_preview": True, "as_photo": False, "has_prefix": False},
-         "can_publish": False, "release": RELEASE}
+         "can_publish": False, "release": RELEASE,
+         "publication": {
+             "mode": "card", "rich_supported": True,
+             "longread": {
+                 "title": "Sleep — Dopesmoker",
+                 "lead": "Stoner Metal · 1999",
+                 "blocks": [{"id": "opening", "type": "paragraph", "text": "слушать обязательно"}],
+             },
+         }}
 RESPONSES = {
     "dashboard": {
         "ok": True, "is_admin": False, "history": [],
@@ -105,6 +113,15 @@ def _route_api(route):
             json={"ok": False, "error": "internal", "retryable": True},
             content_type="application/json",
         )
+        return
+    if action == "update":
+        payload = body.get("payload") or {}
+        publication = {
+            "mode": payload.get("publication_mode", DRAFT["publication"]["mode"]),
+            "rich_supported": True,
+            "longread": payload.get("longread", DRAFT["publication"]["longread"]),
+        }
+        route.fulfill(json={**DRAFT, "publication": publication}, content_type="application/json")
         return
     route.fulfill(json=RESPONSES.get(action, {"ok": True}), content_type="application/json")
 
@@ -380,6 +397,69 @@ def main() -> int:
         page.eval_on_selector("#fmt-apply", "el => el.click()")
         page.wait_for_timeout(250)
 
+        # Card/Longread is a real publication mode with a touch-first block
+        # editor and an exact Telegram Rich Message preview.
+        page.eval_on_selector('#publication-mode [data-mode="longread"]', "el => el.click()")
+        page.wait_for_timeout(250)
+        if page.eval_on_selector("#longread-edit", "el => el.classList.contains('hidden')"):
+            failures.append("longread mode does not expose the block editor")
+        page.eval_on_selector("#longread-edit", "el => el.click()")
+        if page.eval_on_selector("#v-longread", "el => el.classList.contains('hidden')"):
+            failures.append("longread editor did not open")
+        page.eval_on_selector('#block-toolbar [data-block="heading"]', "el => el.click()")
+        page.eval_on_selector(
+            '#longread-blocks .longread-block:last-child textarea',
+            "el => {el.value='Почему это важно';el.dispatchEvent(new Event('input'))}",
+        )
+        page.wait_for_timeout(650)
+        if page.eval_on_selector("#longread-sync", "el => el.textContent") != "Сохранено":
+            failures.append("longread changes do not reach the saved state")
+        if page.evaluate("document.documentElement.scrollWidth > window.innerWidth"):
+            failures.append("longread editor has horizontal overflow")
+        editor_scroll = page.evaluate(
+            """() => {
+              const el=document.querySelector('.longread-editor-scroll');
+              return {
+                overflowY:getComputedStyle(el).overflowY,
+                touchAction:getComputedStyle(el).touchAction,
+                scrollHeight:el.scrollHeight,
+                clientHeight:el.clientHeight,
+              };
+            }"""
+        )
+        if editor_scroll["overflowY"] not in ("auto","scroll") or editor_scroll["touchAction"] != "pan-y":
+            failures.append("longread editor is not touch-scrollable: " + str(editor_scroll))
+        small_targets = _small_touch_targets(page)
+        if small_targets:
+            failures.append("longread editor has undersized touch targets: " + ", ".join(small_targets))
+        _capture(page, "03a-longread-editor")
+        page.eval_on_selector("#longread-done", "el => el.click()")
+        page.wait_for_timeout(250)
+        if page.eval_on_selector("#v-result", "el => el.classList.contains('hidden')"):
+            failures.append("longread editor did not return to preview")
+        elif "Почему это важно" not in page.eval_on_selector("#post-card", "el => el.innerText"):
+            failures.append("Telegram longread preview lost an edited block")
+        _capture(page, "03aa-longread-preview")
+        page.evaluate("document.body.classList.remove('dark');document.body.classList.add('light')")
+        page.wait_for_timeout(350)
+        rich_light = page.evaluate(
+            """() => {
+              const card=document.getElementById('post-card');
+              const heading=card.querySelector('h1');
+              const probe=document.createElement('i');
+              document.body.appendChild(probe);
+              const rgb=(value)=>{probe.style.color=value;return getComputedStyle(probe).color.match(/\\d+(?:\\.\\d+)?/g).slice(0,3).map(Number)};
+              const lum=(values)=>values.map(v=>v/255).map(v=>v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4)).reduce((s,v,i)=>s+v*[.2126,.7152,.0722][i],0);
+              const a=lum(rgb(getComputedStyle(heading).color)),b=lum(rgb(getComputedStyle(card).backgroundColor));
+              probe.remove();
+              return {contrast:(Math.max(a,b)+.05)/(Math.min(a,b)+.05),overflow:document.documentElement.scrollWidth>innerWidth};
+            }"""
+        )
+        if rich_light["contrast"] < 4.5 or rich_light["overflow"]:
+            failures.append("light longread preview has poor contrast or overflow: " + str(rich_light))
+        _capture(page, "03ab-longread-preview-light")
+        page.evaluate("document.body.classList.remove('light');document.body.classList.add('dark')")
+
         # 3. publication uses a destination sheet and a success state
         page.eval_on_selector("#action-main", "el => el.click()")
         page.wait_for_timeout(150)
@@ -411,6 +491,8 @@ def main() -> int:
         prepare_requests = [body for body in REQUEST_BODIES if body.get("action") == "prepare_share"]
         if not prepare_requests or (prepare_requests[-1].get("payload") or {}).get("draft_id") != "d1":
             failures.append("native share did not prepare the active draft")
+        elif (prepare_requests[-1].get("payload") or {}).get("publication_mode") != "longread":
+            failures.append("native share lost the longread publication mode")
 
         # 4. crate tab opens
         page.eval_on_selector('#tabbar [data-tab="crate"]', "el => el.click()")

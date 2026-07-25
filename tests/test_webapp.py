@@ -225,6 +225,17 @@ class _PreparedShareBotStub(_CrateBotStub):
             expiration_date=datetime.now(timezone.utc) + timedelta(hours=24),
         )
 
+    async def _post(self, endpoint, data):
+        self.prepared.append({"endpoint": endpoint, "data": data})
+        return {"id": "prepared-rich-1", "expiration_date": 123456}
+
+
+class _PreparedRichFallbackBotStub(_PreparedShareBotStub):
+    async def _post(self, endpoint, data):
+        from telegram.error import BadRequest
+
+        raise BadRequest("Method not found")
+
 
 def _crate_context():
     from types import SimpleNamespace
@@ -358,6 +369,90 @@ class CrateApiTests(unittest.TestCase):
         ]
         self.assertTrue(any(button.url for button in buttons))
         self.assertFalse(any(button.switch_inline_query for button in buttons))
+
+    def test_prepare_share_supports_rich_longread_and_keyboard(self) -> None:
+        import asyncio
+        from types import SimpleNamespace
+        from api.webapp import _action_prepare_share
+
+        bot = _PreparedShareBotStub()
+        application = SimpleNamespace(bot_data={"drafts": {}}, bot=bot)
+        context = SimpleNamespace(application=application, bot=bot)
+        application.bot_data["drafts"]["draft-rich"] = {
+            "v": 1,
+            "type": "track",
+            "item": _crate_track("Dopesmoker"),
+            "prefix": "",
+            "hashtags": True,
+            "quote": False,
+            "large_preview": True,
+            "chat_id": 7,
+            "lang": "ru",
+            "can_publish": False,
+            "publication_mode": "longread",
+            "longread": {
+                "title": "Почему Dopesmoker важен",
+                "lead": "Музыкальный разбор",
+                "blocks": [
+                    {"id": "p1", "type": "paragraph", "text": "Большой текст"},
+                    {"id": "q1", "type": "quote", "text": "Drop out of life"},
+                ],
+            },
+        }
+
+        result = asyncio.run(
+            _action_prepare_share(
+                context,
+                {"draft_id": "draft-rich", "publication_mode": "longread"},
+                7,
+                False,
+            )
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["prepared_message_id"], "prepared-rich-1")
+        prepared = bot.prepared[0]
+        self.assertEqual(prepared["endpoint"], "savePreparedInlineMessage")
+        rich = prepared["data"]["result"]["input_message_content"]["rich_message"]["html"]
+        self.assertIn("<h1>Почему Dopesmoker важен</h1>", rich)
+        self.assertIn("<blockquote>Drop out of life</blockquote>", rich)
+        keyboard = prepared["data"]["result"]["reply_markup"]["inline_keyboard"]
+        self.assertTrue(any(button.get("url") for row in keyboard for button in row))
+
+    def test_prepare_share_falls_back_to_regular_prepared_message(self) -> None:
+        import asyncio
+        from types import SimpleNamespace
+        from api.webapp import _action_prepare_share
+
+        bot = _PreparedRichFallbackBotStub()
+        application = SimpleNamespace(bot_data={"drafts": {}}, bot=bot)
+        context = SimpleNamespace(application=application, bot=bot)
+        application.bot_data["drafts"]["draft-rich"] = {
+            "v": 1,
+            "type": "track",
+            "item": _crate_track("Dopesmoker"),
+            "hashtags": True,
+            "quote": False,
+            "large_preview": True,
+            "chat_id": 7,
+            "lang": "ru",
+            "can_publish": False,
+            "publication_mode": "longread",
+            "longread": {
+                "title": "Большой материал",
+                "blocks": [{"id": "p", "type": "paragraph", "text": "Текст"}],
+            },
+        }
+
+        result = asyncio.run(
+            _action_prepare_share(context, {"draft_id": "draft-rich"}, 7, False)
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["prepared_message_id"], "prepared-message-1")
+        prepared = bot.prepared[0]["result"]
+        self.assertIn("<b>Большой материал</b>", prepared.input_message_content.message_text)
+        self.assertIsNotNone(prepared.reply_markup)
 
     def test_prepare_share_rejects_someone_elses_draft(self) -> None:
         import asyncio

@@ -148,6 +148,7 @@ from music_links_bot.search import (
 )
 from music_links_bot.constants import MAX_LINKS_PER_MESSAGE, PLATFORM_LABELS
 from music_links_bot.formatter import (
+    build_auto_hashtags,
     format_collection_message,
     format_track_message,
 )
@@ -160,6 +161,13 @@ from music_links_bot.publication_state import (
     mark_posted as _schedule_mark_posted,
     release_fingerprint as _release_fingerprint,
     webapp_url as _webapp_url,
+)
+from music_links_bot.rich_publications import (
+    build_fallback_html,
+    build_rich_html,
+    is_longread,
+    rich_api_unavailable,
+    send_rich_publication,
 )
 from music_links_bot.playlist import PlaylistClient
 from music_links_bot.songlink import SonglinkClient
@@ -323,7 +331,7 @@ BOT_DESCRIPTIONS = {
         "• Обложка, хэштеги, цитата и кнопки всех площадок\n"
         "• Нативная отправка поста с кнопками в любой чат\n"
         "• Inline: @StonerHandBot + запрос прямо в переписке\n"
-        "• Студия: live-preview, пресеты, очередь и канал\n\n"
+        "• Студия: карточка или Rich-лонгрид, preview, очередь и канал\n\n"
         "Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
         "Yandex Music, NTS Radio."
     ),
@@ -334,19 +342,19 @@ BOT_DESCRIPTIONS = {
         "• Artwork, hashtags, quote and every platform button\n"
         "• Native sharing that preserves buttons in any chat\n"
         "• Inline: @StonerHandBot + a query inside any conversation\n"
-        "• Studio: live preview, presets, queue and publishing\n\n"
+        "• Studio: card or Rich longread, preview, queue and publishing\n\n"
         "Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
         "Yandex Music and NTS Radio."
     ),
 }
 BOT_SHORT_DESCRIPTIONS = {
     "": (
-        "Ссылка, название или несколько треков → готовый пост. "
-        "Обложка, площадки, подборки и публикация — в 🎛 Студии."
+        "Ссылка или несколько треков → карточка, лонгрид или подборка. "
+        "Обложка, площадки и публикация — в 🎛 Студии."
     ),
     "en": (
-        "A link, title or several tracks → a finished post. "
-        "Artwork, platforms, crates and publishing — in 🎛 Studio."
+        "A link or tracks → a card, longread or crate. "
+        "Artwork, platforms and publishing — in 🎛 Studio."
     ),
 }
 
@@ -1226,7 +1234,47 @@ async def _deliver_draft(
         platform_selection=_draft_platform_selection(draft),
     )
     try:
-        if draft.get("as_photo") and track.thumbnail_url:
+        if is_longread(draft):
+            cta = overrides.get("cta_text")
+            hashtags = overrides.get("hashtags")
+            if include_hashtags and not hashtags:
+                hashtags = build_auto_hashtags(track)
+            rich_html = build_rich_html(
+                draft,
+                track,
+                cta=cta,
+                hashtags=hashtags if include_hashtags else None,
+            )
+            try:
+                sent = await send_rich_publication(
+                    context.bot,
+                    chat_id=target,
+                    rich_html=rich_html,
+                    reply_markup=keyboard,
+                )
+            except TelegramError as exc:
+                if not rich_api_unavailable(exc):
+                    raise
+                LOGGER.info(
+                    "Rich Messages unavailable for %s; using HTML fallback", target
+                )
+                sent = await context.bot.send_message(
+                    chat_id=target,
+                    text=build_fallback_html(
+                        draft,
+                        track,
+                        cta=cta,
+                        hashtags=hashtags if include_hashtags else None,
+                    ),
+                    parse_mode=ParseMode.HTML,
+                    link_preview_options=_build_link_preview_options(
+                        _select_preview_url(track.links, context)
+                        or track.thumbnail_url,
+                        prefer_large_media=True,
+                    ),
+                    reply_markup=keyboard,
+                )
+        elif draft.get("as_photo") and track.thumbnail_url:
             # Photo posts pin the artwork on top on every Telegram client,
             # at the cost of the preview-size toggle.
             photo = track.thumbnail_url

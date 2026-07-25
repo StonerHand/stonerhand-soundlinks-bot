@@ -6,6 +6,7 @@ from music_links_bot.constants import PLATFORM_LABELS
 from music_links_bot.formatter import pick_track_emoji
 from music_links_bot.models import TrackMatch
 from music_links_bot.publication_state import release_fingerprint
+from music_links_bot.rich_publications import apply_publication_patch
 from music_links_bot.text_utils import normalize_hashtag
 
 MAX_CUSTOM_CTA_LENGTH = 200
@@ -121,6 +122,7 @@ def apply_draft_patch(draft: dict, body: dict) -> None:
             draft["platforms"] = selection
         else:
             draft.pop("platforms", None)
+    apply_publication_patch(draft, body)
 
 
 def top_entries(value: object, *, limit: int = 8) -> list[dict]:
