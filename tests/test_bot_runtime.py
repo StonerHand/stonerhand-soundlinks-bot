@@ -2,6 +2,7 @@ import asyncio
 import unittest
 
 from music_links_bot.bot_crate import (
+    add_many_to_crate,
     add_to_crate,
     load_crate,
     move_crate_item,
@@ -125,3 +126,32 @@ class BotCrateTests(unittest.IsolatedAsyncioTestCase):
         items = await remove_crate_item(bot_data, 7, 0)
         self.assertEqual([item["draft_id"] for item in items], ["d1"])
         self.assertEqual(len(await load_crate(bot_data, 7)), 1)
+
+    async def test_batch_add_dedupes_and_persists_once(self) -> None:
+        class KVStub:
+            def __init__(self) -> None:
+                self.writes = 0
+
+            async def get_json(self, key: str):
+                del key
+                return []
+
+            async def set_json(self, key: str, value, *, ttl_seconds: int):
+                del key, value, ttl_seconds
+                self.writes += 1
+                return True
+
+        kv = KVStub()
+        first = {"artist": "Sleep", "title": "Dopesmoker", "links": {"spotify": "https://s/1"}}
+        duplicate = dict(first)
+        second = {"artist": "Boris", "title": "Flood", "links": {"spotify": "https://s/2"}}
+
+        items, added_count = await add_many_to_crate(
+            {"kv_store": kv},
+            7,
+            entries=[("d1", first), ("d1x", duplicate), ("d2", second)],
+        )
+
+        self.assertEqual(added_count, 2)
+        self.assertEqual([item["draft_id"] for item in items], ["d1", "d2"])
+        self.assertEqual(kv.writes, 1)

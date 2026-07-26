@@ -34,6 +34,9 @@ class TTLCache(Generic[T]):
 
     def set(self, key: str, value: T) -> None:
         self._drop_expired()
+        # Refreshing an existing entry must not evict an unrelated value when
+        # the cache is full. Reinsert it below so its TTL is renewed in place.
+        self._items.pop(key, None)
         while len(self._items) >= self._max_size:
             self._items.pop(next(iter(self._items)))
 

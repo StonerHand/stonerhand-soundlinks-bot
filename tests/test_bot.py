@@ -1,3 +1,4 @@
+import asyncio
 import unittest
 import os
 from pathlib import Path
@@ -11,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from music_links_bot.bot import (
     BOT_DESCRIPTIONS,
     BOT_SHORT_DESCRIPTIONS,
+    MAX_MEMORY_DRAFTS,
     MAX_BUTTON_TEXT_LENGTH,
     PUBLIC_BOT_COMMANDS,
     _build_collection_keyboard,
@@ -44,6 +46,7 @@ from music_links_bot.bot import (
     _split_source_urls,
     _send_track_result,
     _strip_bot_mention,
+    _store_draft,
     _release_fingerprint,
     _editor_rows,
     _editor_more_rows,
@@ -1505,6 +1508,64 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(keyboard[2][0].text, "Что поддерживается")
         self.assertEqual(context.bot.sent_messages, [])
         self.assertEqual(context.bot.chat_actions, [])
+        self.assertEqual(context.application.bot_data["runtime"].active_tasks, {})
+
+    async def test_search_candidate_heading_escapes_user_html(self) -> None:
+        class HtmlQueryMessageStub(PrivateMessageStub):
+            text = "<b>Sleep</b>"
+
+        message = HtmlQueryMessageStub()
+        context = ContextStub(search_client=SuccessfulSearchClientStub())
+
+        await track_lookup_message(UpdateStub(message), context)
+
+        self.assertIn("&lt;b&gt;Sleep&lt;/b&gt;", message.replies[0])
+        self.assertNotIn("<b>Sleep</b>", message.replies[0])
+
+    async def test_draft_write_waits_for_durable_storage(self) -> None:
+        class BlockingKV:
+            def __init__(self) -> None:
+                self.started = asyncio.Event()
+                self.release = asyncio.Event()
+
+            async def set_json(self, key: str, value: dict, *, ttl_seconds: int):
+                del key, value, ttl_seconds
+                self.started.set()
+                await self.release.wait()
+                return True
+
+        context = ContextStub()
+        kv = BlockingKV()
+        context.application.bot_data["kv_store"] = kv
+        write = asyncio.create_task(
+            _store_draft(context, "durable", {"type": "track"})
+        )
+
+        await kv.started.wait()
+        self.assertFalse(write.done())
+        kv.release.set()
+        await write
+
+    async def test_updating_draft_at_capacity_keeps_other_drafts(self) -> None:
+        context = ContextStub()
+        context.application.bot_data["drafts"] = {
+            f"draft-{index}": {"type": "track", "index": index}
+            for index in range(MAX_MEMORY_DRAFTS)
+        }
+
+        await _store_draft(
+            context,
+            f"draft-{MAX_MEMORY_DRAFTS - 1}",
+            {"type": "track", "index": "updated"},
+        )
+
+        drafts = context.application.bot_data["drafts"]
+        self.assertEqual(len(drafts), MAX_MEMORY_DRAFTS)
+        self.assertIn("draft-0", drafts)
+        self.assertEqual(
+            drafts[f"draft-{MAX_MEMORY_DRAFTS - 1}"]["index"],
+            "updated",
+        )
 
     async def test_messages_via_own_inline_mode_are_ignored(self) -> None:
         class ViaBotStub:

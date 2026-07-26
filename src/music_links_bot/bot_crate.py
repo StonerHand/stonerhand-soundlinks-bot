@@ -37,15 +37,39 @@ async def save_crate(bot_data: dict, user_id: int, items: list[dict[str, Any]]) 
 async def add_to_crate(
     bot_data: dict, user_id: int, *, draft_id: str, item: dict[str, Any]
 ) -> tuple[list[dict[str, Any]], bool]:
+    items, added_count = await add_many_to_crate(
+        bot_data,
+        user_id,
+        entries=[(draft_id, item)],
+    )
+    return items, added_count == 1
+
+
+async def add_many_to_crate(
+    bot_data: dict,
+    user_id: int,
+    *,
+    entries: list[tuple[str, dict[str, Any]]],
+) -> tuple[list[dict[str, Any]], int]:
+    """Add several releases with one crate load and at most one Redis write."""
     items = await load_crate(bot_data, user_id)
-    fingerprint = _fingerprint(item)
-    if any(_fingerprint(existing.get("item") or {}) == fingerprint for existing in items):
-        return items, False
-    if len(items) >= MAX_CRATE_ITEMS:
-        return items, False
-    items.append({"draft_id": draft_id, "item": item})
-    await save_crate(bot_data, user_id, items)
-    return items, True
+    fingerprints = {
+        _fingerprint(existing.get("item") or {}) for existing in items
+    }
+    added_count = 0
+    for draft_id, item in entries:
+        if len(items) >= MAX_CRATE_ITEMS:
+            break
+        fingerprint = _fingerprint(item)
+        if fingerprint in fingerprints:
+            continue
+        fingerprints.add(fingerprint)
+        items.append({"draft_id": draft_id, "item": item})
+        added_count += 1
+
+    if added_count:
+        await save_crate(bot_data, user_id, items)
+    return items, added_count
 
 
 async def move_crate_item(
