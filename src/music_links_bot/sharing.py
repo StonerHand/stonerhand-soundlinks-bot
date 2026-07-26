@@ -5,9 +5,8 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from telegram import InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-from music_links_bot.button_styles import bot_button
 from music_links_bot.formatter import (
     format_artist_collection_message,
     format_collection_message,
@@ -119,9 +118,10 @@ def add_share_button(
         [
             *keyboard.inline_keyboard,
             [
-                bot_button(
+                InlineKeyboardButton(
                     label,
                     switch_inline_query=share_query,
+                    api_kwargs={"style": "primary"},
                 )
             ],
         ]
