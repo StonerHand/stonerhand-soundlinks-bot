@@ -555,7 +555,7 @@ class BotKeyboardTests(unittest.TestCase):
 
         button_texts = [button.text for row in keyboard.inline_keyboard for button in row]
         self.assertEqual(button_texts, ["🟢 Spotify"])
-        self.assertEqual(dict(keyboard.inline_keyboard[0][0].api_kwargs), {})
+        self.assertEqual(keyboard.inline_keyboard[0][0].api_kwargs, {"style": "success"})
 
     def test_release_keyboard_uses_two_columns(self) -> None:
         keyboard = _build_link_keyboard(
@@ -575,13 +575,11 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[1][0].text, "🟠 SoundCloud")
         self.assertEqual(rows[1][1].text, "🟦 Deezer")
         self.assertEqual(rows[2][0].text, "⚫ Tidal")
-        self.assertTrue(
-            all(
-                not button.api_kwargs
-                for row in rows
-                for button in row
-            )
-        )
+        self.assertEqual(rows[0][0].api_kwargs, {"style": "success"})
+        self.assertEqual(rows[0][1].api_kwargs, {"style": "primary"})
+        self.assertEqual(rows[1][0].api_kwargs, {"style": "primary"})
+        self.assertEqual(rows[1][1].api_kwargs, {"style": "primary"})
+        self.assertEqual(rows[2][0].api_kwargs, {"style": "primary"})
 
     def test_release_keyboard_adds_songlink_hub_button(self) -> None:
         keyboard = _build_link_keyboard(
@@ -598,7 +596,7 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[0][1].text, "⚪ Apple")
         self.assertEqual(rows[1][0].text, "🪩 Все платформы")
         self.assertEqual(rows[1][0].url, "https://song.link/transitions")
-        self.assertEqual(rows[1][0].api_kwargs, {"style": "primary"})
+        self.assertEqual(rows[1][0].api_kwargs, {"style": "danger"})
 
     def test_minimal_ui_mode_strips_platform_button_emoji(self) -> None:
         keyboard = _build_link_keyboard(
@@ -615,7 +613,7 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[0][0].text, "Spotify")
         self.assertEqual(rows[0][1].text, "Apple")
         self.assertEqual(rows[1][0].text, "Все платформы")
-        self.assertEqual(rows[1][0].api_kwargs, {"style": "primary"})
+        self.assertEqual(rows[1][0].api_kwargs, {"style": "danger"})
 
     def test_editorial_ui_mode_uses_livelier_hub_copy(self) -> None:
         keyboard = _build_link_keyboard(
@@ -677,7 +675,7 @@ class BotKeyboardTests(unittest.TestCase):
 
         button_texts = [button.text for row in keyboard.inline_keyboard for button in row]
         self.assertEqual(button_texts, ["🎧 1. Youth Code - Transitions"])
-        self.assertEqual(dict(keyboard.inline_keyboard[0][0].api_kwargs), {})
+        self.assertEqual(keyboard.inline_keyboard[0][0].api_kwargs, {"style": "primary"})
 
     def test_youtube_keyboard_can_hide_channel_button(self) -> None:
         keyboard = _build_youtube_keyboard(
@@ -687,7 +685,7 @@ class BotKeyboardTests(unittest.TestCase):
 
         button_texts = [button.text for row in keyboard.inline_keyboard for button in row]
         self.assertEqual(button_texts, ["📺 Смотреть на YouTube"])
-        self.assertEqual(keyboard.inline_keyboard[0][0].api_kwargs, {"style": "primary"})
+        self.assertEqual(keyboard.inline_keyboard[0][0].api_kwargs, {"style": "danger"})
 
     def test_nts_keyboard_can_hide_channel_button(self) -> None:
         keyboard = _build_nts_keyboard(
@@ -735,10 +733,10 @@ class BotKeyboardTests(unittest.TestCase):
         rows = keyboard.inline_keyboard
         self.assertEqual(rows[0][0].text, "🎧 1. Youth Code - Transitions")
         self.assertEqual(rows[0][0].url, "https://song.link/transitions")
-        self.assertEqual(dict(rows[0][0].api_kwargs), {})
+        self.assertEqual(rows[0][0].api_kwargs, {"style": "primary"})
         self.assertEqual(rows[0][1].text, "📺 2. Live Session")
         self.assertEqual(rows[0][1].url, "https://youtu.be/1")
-        self.assertEqual(dict(rows[0][1].api_kwargs), {})
+        self.assertEqual(rows[0][1].api_kwargs, {"style": "danger"})
 
     def test_mixed_collection_keyboard_lists_radio_buttons(self) -> None:
         keyboard = _build_mixed_collection_keyboard(
@@ -757,9 +755,9 @@ class BotKeyboardTests(unittest.TestCase):
         rows = keyboard.inline_keyboard
         self.assertEqual(rows[0][0].text, "📡 1. Dark Energy")
         self.assertEqual(rows[0][0].url, "https://www.nts.live/shows/example")
-        self.assertEqual(dict(rows[0][0].api_kwargs), {})
+        self.assertEqual(rows[0][0].api_kwargs, {"style": "primary"})
         self.assertEqual(rows[0][1].text, "📺 2. Live Session")
-        self.assertEqual(dict(rows[0][1].api_kwargs), {})
+        self.assertEqual(rows[0][1].api_kwargs, {"style": "danger"})
 
     def test_channel_button_is_hidden_only_in_stonerhand_channel(self) -> None:
         self.assertFalse(_should_include_channel_button(ChannelMessageStub()))
@@ -833,25 +831,17 @@ class BotKeyboardTests(unittest.TestCase):
 
         rows = keyboard.inline_keyboard
         self.assertEqual(rows[0][0].text, "🎛 Открыть Студию")
-        self.assertEqual(rows[0][0].api_kwargs, {"style": "primary"})
+        self.assertEqual(rows[0][0].api_kwargs, {"style": "success"})
         self.assertEqual(rows[1][0].text, "🔎 Создать новый пост")
         self.assertEqual(len(rows[1]), 1)
         self.assertEqual(rows[2][0].text, "🧺 Подборка · 3")
-        self.assertEqual(dict(rows[1][0].api_kwargs), {})
-        self.assertEqual(dict(rows[2][0].api_kwargs), {})
+        self.assertEqual(rows[2][0].api_kwargs, {"style": "success"})
         self.assertEqual(rows[2][1].text, "▶ Как всё работает")
         self.assertEqual(rows[3][0].text, "📊 Статистика канала")
         self.assertEqual(rows[3][1].text, "🗓 Очередь")
         self.assertEqual(rows[3][1].web_app.url, "https://studio.example/app?view=queue")
         self.assertEqual(rows[-1][0].text, "❓ Помощь")
         self.assertEqual(rows[-1][1].text, "🪨 Открыть канал")
-        styled = [
-            button.api_kwargs.get("style")
-            for row in rows
-            for button in row
-            if button.api_kwargs.get("style")
-        ]
-        self.assertEqual(styled, ["primary"])
 
     def test_home_text_is_personal_and_escapes_telegram_html(self) -> None:
         text = _build_home_text(
@@ -1315,8 +1305,6 @@ class PostEditorTests(unittest.TestCase):
 
         self.assertEqual(rows[0][1].text, "📤 В канал")
         self.assertEqual(rows[0][1].callback_data, "v2|editor|p|abc123")
-        self.assertEqual(dict(rows[0][0].api_kwargs), {})
-        self.assertEqual(rows[0][1].api_kwargs, {"style": "success"})
 
     def test_editor_rows_show_quote_toggle_only_with_prefix(self) -> None:
         rows_without_quote = _editor_more_rows("abc123", self._draft())

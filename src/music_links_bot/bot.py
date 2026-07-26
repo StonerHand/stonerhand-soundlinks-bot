@@ -31,7 +31,6 @@ from music_links_bot.branding import (
     build_branded_cover,
     photo_branding_enabled,
 )
-from music_links_bot.button_styles import bot_button
 from music_links_bot.bot_stats import (
     build_user_prefix as _build_user_prefix,
     message_text as _message_text,
@@ -1147,10 +1146,10 @@ async def _run_primary_editor_action(
         success_keyboard = InlineKeyboardMarkup(
             [
                 [
-                    bot_button(
+                    InlineKeyboardButton(
                         get_text(lang, "ed_published"),
                         callback_data=encode_callback("noop", "done"),
-                        style="success",
+                        api_kwargs={"style": "success"},
                     )
                 ],
                 [_channel_button()],
@@ -1171,7 +1170,7 @@ async def _show_action_busy(query, lang: str) -> None:
     try:
         await query.edit_message_reply_markup(
             InlineKeyboardMarkup(
-                [[bot_button("⏳ " + get_text(lang, "progress_card"), callback_data=encode_callback("noop", "busy"))]]
+                [[InlineKeyboardButton("⏳ " + get_text(lang, "progress_card"), callback_data=encode_callback("noop", "busy"))]]
             )
         )
     except (AttributeError, TelegramError):
@@ -1483,10 +1482,10 @@ async def _reply_with_flow_error(
     if error.retryable:
         rows.append(
             [
-                bot_button(
+                InlineKeyboardButton(
                     get_text(lang, "retry"),
                     callback_data=encode_callback("retry", "last"),
-                    style="primary",
+                    api_kwargs={"style": "primary"},
                 )
             ]
         )
@@ -1638,7 +1637,7 @@ async def _track_lookup_message_impl(
                 keyboard = InlineKeyboardMarkup(
                     [
                         [
-                            bot_button(
+                            InlineKeyboardButton(
                                 f"{index + 1}. {candidate.artist} — {candidate.title}"[:64],
                                 callback_data=encode_callback(
                                     "select", "pick", f"{selection_id}:{index}"
@@ -1647,11 +1646,7 @@ async def _track_lookup_message_impl(
                         ]
                         for index, candidate in enumerate(candidates[:6])
                     ]
-                    + [[bot_button(
-                        get_text(lang, "retry"),
-                        callback_data=encode_callback("retry", "last"),
-                        style="primary",
-                    )]]
+                    + [[InlineKeyboardButton(get_text(lang, "retry"), callback_data=encode_callback("retry", "last"))]]
                 )
                 if placeholder is not None:
                     await placeholder.edit_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
@@ -1776,9 +1771,10 @@ async def _track_lookup_message_impl(
                     [
                         *collection_keyboard.inline_keyboard,
                         [
-                            bot_button(
+                            InlineKeyboardButton(
                                 f"Подборка · {len(crate_items)}/10",
                                 callback_data=encode_callback("crate", "open"),
+                                api_kwargs={"style": "success"},
                             )
                         ],
                     ]
@@ -2025,10 +2021,11 @@ def _build_error_keyboard(
 
 def _menu_button(label: str, callback_data: str, active: str | None) -> InlineKeyboardButton:
     prefix = "• " if callback_data == active else ""
-    return bot_button(
+    style = "success" if callback_data == active else "primary"
+    return InlineKeyboardButton(
         f"{prefix}{label}",
         callback_data=callback_data,
-        style="primary" if callback_data == active else None,
+        api_kwargs={"style": style},
     )
 
 

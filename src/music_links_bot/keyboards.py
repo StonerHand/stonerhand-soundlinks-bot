@@ -3,7 +3,6 @@ from __future__ import annotations
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, LinkPreviewOptions, Message
 from telegram.ext import ContextTypes
 
-from music_links_bot.button_styles import ButtonStyle, bot_button
 from music_links_bot.constants import PLATFORM_BUTTON_STYLES, PLATFORM_LABELS
 from music_links_bot.models import ArtistMatch, PlaylistMatch, RadioMatch, TrackMatch, VideoMatch
 
@@ -111,7 +110,7 @@ def _build_link_keyboard(
                 _url_button(
                     _release_hub_button_label(release_kind, release_format, context),
                     url=release_page_url,
-                    style="primary",
+                    style="danger",
                 )
             ]
         )
@@ -149,6 +148,7 @@ def _build_collection_keyboard(
                     f"{_track_button_icon(track)} {index}. {track.artist} - {track.title}"
                 ),
                 url=destination,
+                style="primary",
             )
         )
 
@@ -163,7 +163,7 @@ def _build_youtube_keyboard(
     return _single_url_keyboard(
         "📺 Смотреть на YouTube",
         url=url,
-        style="primary",
+        style="danger",
         include_channel_button=include_channel_button,
     )
 
@@ -218,6 +218,7 @@ def _build_youtube_collection_keyboard(
             _url_button(
                 text=_shorten_button_text(f"📺 {index}. {video.title}"),
                 url=video.url,
+                style="danger",
             )
         )
 
@@ -235,6 +236,7 @@ def _build_nts_collection_keyboard(
             _url_button(
                 text=_shorten_button_text(f"📡 {index}. {radio.title}"),
                 url=radio.url,
+                style="primary",
             )
         )
 
@@ -252,6 +254,7 @@ def _build_playlist_collection_keyboard(
             _url_button(
                 text=_shorten_button_text(f"🎛 {index}. {playlist.title}"),
                 url=playlist.url,
+                style="primary",
             )
         )
 
@@ -269,6 +272,7 @@ def _build_artist_collection_keyboard(
             _url_button(
                 text=_shorten_button_text(f"🧬 {index}. {artist.title}"),
                 url=artist.url,
+                style="primary",
             )
         )
 
@@ -301,6 +305,7 @@ def _build_mixed_collection_keyboard(
                     f"{_track_button_icon(track)} {index}. {track.artist} - {track.title}"
                 ),
                 url=destination,
+                style="primary",
             )
         )
         index += 1
@@ -310,6 +315,7 @@ def _build_mixed_collection_keyboard(
             _url_button(
                 text=_shorten_button_text(f"🎛 {index}. {playlist.title}"),
                 url=playlist.url,
+                style="primary",
             )
         )
         index += 1
@@ -319,6 +325,7 @@ def _build_mixed_collection_keyboard(
             _url_button(
                 text=_shorten_button_text(f"🧬 {index}. {artist.title}"),
                 url=artist.url,
+                style="primary",
             )
         )
         index += 1
@@ -328,6 +335,7 @@ def _build_mixed_collection_keyboard(
             _url_button(
                 text=_shorten_button_text(f"📡 {index}. {radio.title}"),
                 url=radio.url,
+                style="primary",
             )
         )
         index += 1
@@ -337,6 +345,7 @@ def _build_mixed_collection_keyboard(
             _url_button(
                 text=_shorten_button_text(f"📺 {index}. {video.title}"),
                 url=video.url,
+                style="danger",
             )
         )
         index += 1
@@ -473,15 +482,13 @@ def _single_url_keyboard(
 
 
 def _channel_button() -> InlineKeyboardButton:
-    return _url_button(CHANNEL_BUTTON_TEXT, url=CHANNEL_URL)
+    return _url_button(CHANNEL_BUTTON_TEXT, url=CHANNEL_URL, style="primary")
 
 
-def _url_button(
-    text: str,
-    url: str,
-    style: ButtonStyle | None = None,
-) -> InlineKeyboardButton:
-    return bot_button(text, url=url, style=style)
+def _url_button(text: str, url: str, style: str | None = None) -> InlineKeyboardButton:
+    # Keep compatibility while python-telegram-bot catches up with newer Bot API fields.
+    api_kwargs = {"style": style} if style else None
+    return InlineKeyboardButton(text=text, url=url, api_kwargs=api_kwargs)
 
 
 def _get_platform_order(context: ContextTypes.DEFAULT_TYPE | None) -> tuple[str, ...]:

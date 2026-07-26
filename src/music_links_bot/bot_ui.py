@@ -6,7 +6,6 @@ from urllib.parse import quote
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
 from music_links_bot.bot_runtime import encode_callback
-from music_links_bot.button_styles import bot_button
 from music_links_bot.i18n import get_text
 from music_links_bot.keyboards import _channel_button, _url_button
 from music_links_bot.publication_state import webapp_url
@@ -15,9 +14,11 @@ from music_links_bot.publication_state import webapp_url
 def _crate_button(lang: str, crate_count: int) -> InlineKeyboardButton:
     """Make a non-empty collection visible without adding another menu row."""
     safe_count = max(0, min(10, crate_count))
-    return bot_button(
+    kwargs = {"api_kwargs": {"style": "success"}} if safe_count else {}
+    return InlineKeyboardButton(
         get_text(lang, "home_crate").format(count=safe_count),
         callback_data=encode_callback("crate", "open"),
+        **kwargs,
     )
 
 
@@ -57,30 +58,30 @@ def build_start_keyboard(
     if studio_url and include_studio:
         rows.append(
             [
-                bot_button(
+                InlineKeyboardButton(
                     get_text(lang, "open_studio"),
                     web_app=WebAppInfo(url=studio_url),
-                    style="primary",
+                    api_kwargs={"style": "success"},
                 )
             ]
         )
 
     rows.append(
         [
-            bot_button(
+            InlineKeyboardButton(
                 get_text(lang, "quick_search"),
                 switch_inline_query_current_chat="",
-                style=None if studio_url and include_studio else "primary",
+                api_kwargs={"style": "primary"},
             )
         ]
     )
     secondary_action = (
-        bot_button(
+        InlineKeyboardButton(
             get_text(lang, "quick_tour"),
             callback_data=encode_callback("menu", "onboard1"),
         )
         if show_tour
-        else bot_button(
+        else InlineKeyboardButton(
             get_text(lang, "home_result"),
             callback_data=encode_callback("menu", "demo"),
         )
@@ -88,14 +89,14 @@ def build_start_keyboard(
     rows.append([_crate_button(lang, crate_count), secondary_action])
     if is_admin:
         admin_row = [
-            bot_button(
+            InlineKeyboardButton(
                 get_text(lang, "home_stats"),
                 callback_data=encode_callback("menu", "stats"),
             )
         ]
         if studio_url:
             admin_row.append(
-                bot_button(
+                InlineKeyboardButton(
                     get_text(lang, "home_queue"),
                     web_app=WebAppInfo(url=f"{studio_url}?view=queue"),
                 )
@@ -103,7 +104,7 @@ def build_start_keyboard(
         rows.append(admin_row)
     rows.append(
         [
-            bot_button(
+            InlineKeyboardButton(
                 get_text(lang, "tab_help"),
                 callback_data=encode_callback("menu", "help"),
             ),
@@ -127,19 +128,19 @@ def build_section_keyboard(
     if studio_url and include_studio:
         rows.append(
             [
-                bot_button(
+                InlineKeyboardButton(
                     get_text(lang, "open_studio"),
                     web_app=WebAppInfo(url=studio_url),
-                    style="primary",
+                    api_kwargs={"style": "success"},
                 )
             ]
         )
     rows.append(
         [
-            bot_button(
+            InlineKeyboardButton(
                 get_text(lang, "quick_search"),
                 switch_inline_query_current_chat="",
-                style=None if studio_url and include_studio else "primary",
+                api_kwargs={"style": "primary"},
             ),
             _crate_button(lang, crate_count),
         ]
@@ -159,7 +160,7 @@ def build_section_keyboard(
     }
     rows.append(
         [
-            bot_button(
+            InlineKeyboardButton(
                 get_text(lang, label_keys[action]),
                 callback_data=encode_callback("menu", action),
             )
@@ -168,7 +169,7 @@ def build_section_keyboard(
     )
     rows.append(
         [
-            bot_button(
+            InlineKeyboardButton(
                 get_text(lang, "home_back"),
                 callback_data=encode_callback("menu", "start"),
             )
@@ -186,28 +187,29 @@ def build_error_keyboard(
     """Give every failure an immediate recovery path, not a dead-end menu."""
     rows: list[list[InlineKeyboardButton]] = [
         [
-            bot_button(
+            InlineKeyboardButton(
                 get_text(lang, "quick_search"),
                 switch_inline_query_current_chat="",
-                style="primary",
+                api_kwargs={"style": "primary"},
             )
         ]
     ]
     studio_url = webapp_url()
     if include_studio and studio_url:
         rows[0].append(
-            bot_button(
+            InlineKeyboardButton(
                 get_text(lang, "open_studio"),
                 web_app=WebAppInfo(url=studio_url),
+                api_kwargs={"style": "success"},
             )
         )
     rows.append(
         [
-            bot_button(
+            InlineKeyboardButton(
                 get_text(lang, "error_platforms_button"),
                 callback_data="menu:platforms",
             ),
-            bot_button(
+            InlineKeyboardButton(
                 get_text(lang, "home_back"),
                 callback_data="menu:start",
             ),
@@ -222,6 +224,7 @@ def build_error_keyboard(
                 _url_button(
                     get_text(lang, "share_button"),
                     url=share_url,
+                    style="primary",
                 ),
             ]
         )
@@ -232,15 +235,15 @@ def build_onboarding_keyboard(step: int, lang: str) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     if step < 3:
         row = [
-            bot_button(
+            InlineKeyboardButton(
                 get_text(lang, "next"),
                 callback_data=encode_callback("menu", f"onboard{step + 1}"),
-                style="primary",
+                api_kwargs={"style": "primary"},
             )
         ]
         row.insert(
             0,
-            bot_button(
+            InlineKeyboardButton(
                 get_text(lang, "back"),
                 callback_data=encode_callback(
                     "menu", f"onboard{step - 1}" if step > 1 else "start"
@@ -251,14 +254,14 @@ def build_onboarding_keyboard(step: int, lang: str) -> InlineKeyboardMarkup:
     else:
         rows.append(
             [
-                bot_button(
+                InlineKeyboardButton(
                     get_text(lang, "back"),
                     callback_data=encode_callback("menu", "onboard2"),
                 ),
-                bot_button(
+                InlineKeyboardButton(
                     get_text(lang, "start_using"),
                     callback_data=encode_callback("menu", "onboarddone"),
-                    style="primary",
+                    api_kwargs={"style": "success"},
                 )
             ]
         )
@@ -269,18 +272,18 @@ def editor_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
     lang = draft.get("lang") or "ru"
 
     primary_row = [
-        bot_button(
+        InlineKeyboardButton(
             get_text(lang, "ed_send_self"),
             callback_data=encode_callback("editor", "s", draft_id),
-            style=None if draft.get("can_publish") else "success",
+            api_kwargs={"style": "success"},
         )
     ]
     if draft.get("can_publish"):
         primary_row.append(
-            bot_button(
+            InlineKeyboardButton(
                 get_text(lang, "ed_publish"),
                 callback_data=encode_callback("editor", "p", draft_id),
-                style="success",
+                api_kwargs={"style": "primary"},
             )
         )
 
@@ -288,13 +291,13 @@ def editor_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
     studio_url = webapp_url()
     if studio_url:
         secondary_row.append(
-            bot_button(
+            InlineKeyboardButton(
                 get_text(lang, "ed_studio"),
                 web_app=WebAppInfo(url=f"{studio_url}?draft={draft_id}"),
             )
         )
     secondary_row.append(
-        bot_button(
+        InlineKeyboardButton(
             get_text(lang, "ed_add_crate"),
             callback_data=encode_callback("editor", "c", draft_id),
         )
@@ -303,7 +306,7 @@ def editor_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
         primary_row,
         secondary_row,
         [
-            bot_button(
+            InlineKeyboardButton(
                 get_text(lang, "ed_more"),
                 callback_data=encode_callback("editor", "m", draft_id),
             )
@@ -318,14 +321,14 @@ def editor_more_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButt
         return get_text(lang, "ed_on" if draft.get(flag) else "ed_off")
 
     toggles = [
-        bot_button(
+        InlineKeyboardButton(
             f"{get_text(lang, 'ed_hashtags')} {state('hashtags')}",
             callback_data=encode_callback("editor", "h", draft_id),
         )
     ]
     if draft.get("prefix"):
         toggles.append(
-            bot_button(
+            InlineKeyboardButton(
                 f"{get_text(lang, 'ed_quote')} {state('quote')}",
                 callback_data=encode_callback("editor", "q", draft_id),
             )
@@ -335,7 +338,7 @@ def editor_more_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButt
         "ed_preview_large" if draft.get("large_preview") else "ed_preview_small",
     )
     toggles.append(
-        bot_button(
+        InlineKeyboardButton(
             f"{get_text(lang, 'ed_preview')} {preview_state}",
             callback_data=encode_callback("editor", "v", draft_id),
         )
@@ -343,19 +346,19 @@ def editor_more_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButt
     return [
         toggles,
         [
-            bot_button(
+            InlineKeyboardButton(
                 get_text(lang, "ed_done"),
                 callback_data=encode_callback("editor", "f", draft_id),
-                style="primary",
+                api_kwargs={"style": "success"},
             ),
-            bot_button(
+            InlineKeyboardButton(
                 get_text(lang, "ed_delete"),
                 callback_data=encode_callback("editor", "d", draft_id),
-                style="danger",
+                api_kwargs={"style": "danger"},
             ),
         ],
         [
-            bot_button(
+            InlineKeyboardButton(
                 get_text(lang, "back"),
                 callback_data=encode_callback("editor", "b", draft_id),
             )
@@ -383,7 +386,7 @@ def render_crate(items: list[dict], *, lang: str) -> tuple[str, InlineKeyboardMa
         item = entry.get("item") or {}
         rows.append(
             [
-                bot_button(
+                InlineKeyboardButton(
                     f"{index + 1}. {item.get('artist') or '—'} — {item.get('title') or '—'}"[:64],
                     callback_data=encode_callback("noop", "item"),
                 )
@@ -392,23 +395,23 @@ def render_crate(items: list[dict], *, lang: str) -> tuple[str, InlineKeyboardMa
         controls: list[InlineKeyboardButton] = []
         if index > 0:
             controls.append(
-                bot_button(
+                InlineKeyboardButton(
                     get_text(lang, "crate_up"),
                     callback_data=encode_callback("crate", "up", str(index)),
                 )
             )
         if index < len(items) - 1:
             controls.append(
-                bot_button(
+                InlineKeyboardButton(
                     get_text(lang, "crate_down"),
                     callback_data=encode_callback("crate", "down", str(index)),
                 )
             )
         controls.append(
-            bot_button(
+            InlineKeyboardButton(
                 get_text(lang, "crate_remove"),
                 callback_data=encode_callback("crate", "remove", str(index)),
-                style="danger",
+                api_kwargs={"style": "danger"},
             )
         )
         rows.append(controls)
@@ -416,16 +419,16 @@ def render_crate(items: list[dict], *, lang: str) -> tuple[str, InlineKeyboardMa
     if studio_url:
         rows.append(
             [
-                bot_button(
+                InlineKeyboardButton(
                     get_text(lang, "crate_open_studio"),
                     web_app=WebAppInfo(url=f"{studio_url}?view=crate"),
-                    style="primary",
+                    api_kwargs={"style": "primary"},
                 )
             ]
         )
     rows.append(
         [
-            bot_button(
+            InlineKeyboardButton(
                 get_text(lang, "home_back"),
                 callback_data=encode_callback("menu", "start"),
             )
