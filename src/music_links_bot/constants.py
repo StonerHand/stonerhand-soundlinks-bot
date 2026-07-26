@@ -39,14 +39,10 @@ PLATFORM_LABELS = {
 }
 
 PLATFORM_BUTTON_STYLES = {
-    "spotify": "success",
-    "appleMusic": "primary",
-    "applePodcasts": "primary",
-    "youtubeMusic": "danger",
-    "soundcloud": "primary",
-    "deezer": "primary",
-    "tidal": "primary",
-    "yandexMusic": "primary",
+    # Platform identity already comes from its icon and label. Neutral
+    # backgrounds keep a release keyboard calm and make the single main action
+    # ("All platforms") immediately obvious.
+    platform_key: None for platform_key in PLATFORM_LABELS
 }
 
 PLATFORM_ALIASES = {

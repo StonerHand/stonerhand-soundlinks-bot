@@ -36,6 +36,8 @@ Yandex Music / Spotify playlists & artists / podcasts / NTS Radio
 
 Metadata and universal links come from Song.link/Odesli, iTunes Search and oEmbed. Longreads use Telegram Rich Messages (up to 32K, artwork and structured blocks); if Rich Messages are unavailable in a target client or chat, the bot sends a bounded HTML version with the same platform keyboard. Use Studio's Share action to send the full post and buttons as one prepared Telegram message. Telegram's ordinary forward action removes inline keyboards.
 
+Bot keyboards share one native Telegram hierarchy: blue marks the main action on a screen, green is reserved for successful delivery or publishing, and red is used only for destructive actions. Platforms, navigation and utilities stay neutral and follow the current Telegram theme.
+
 ## Flow
 
 ```mermaid
