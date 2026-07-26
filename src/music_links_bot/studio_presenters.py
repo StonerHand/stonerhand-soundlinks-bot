@@ -41,7 +41,7 @@ def build_draft_response(
             "key": platform_key,
             "label": PLATFORM_LABELS[platform_key],
             "url": track.links[platform_key],
-            "style": PLATFORM_BUTTON_STYLES.get(platform_key, "primary"),
+            "style": PLATFORM_BUTTON_STYLES.get(platform_key),
             "enabled": platform_key in enabled,
         }
         for platform_key in ordered
