@@ -100,6 +100,9 @@ python tests/e2e/smoke.py
 - `POST /api/webapp`: Studio API with HMAC `initData`, rate limiting and idempotency;
 - `GET /api/health`: Telegram, webhook, Redis, queue state and due-job delivery;
 - a Redis outage falls back to bounded in-memory deduplication instead of dropping updates;
+- a draft is durably written to Redis before the request completes, so it survives cold starts and opens from another serverless instance;
+- multi-link input is deduplicated and added to the crate with one batch write instead of one persistence round trip per track;
+- transient caches and active user tasks are bounded and deterministically cleaned up;
 - the queue uses a distributed lock, per-job lease, three attempts and backoff;
 - Vercel Cron restores the webhook without dropping pending updates, plus commands, profile and the Studio button;
 - critical failures are sent to the owner with hourly alert deduplication.

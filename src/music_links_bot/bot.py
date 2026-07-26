@@ -116,6 +116,7 @@ _get_platform_order = _keyboards._get_platform_order
 
 from music_links_bot.kvstore import KVStore
 from music_links_bot.bot_crate import (
+    add_many_to_crate,
     add_to_crate,
     load_crate,
     move_crate_item,
@@ -879,22 +880,39 @@ def _draft_platform_selection(draft: dict) -> list[str] | None:
     return selection or None
 
 
+def _remember_bounded(
+    items: dict,
+    key: str,
+    value: dict,
+    *,
+    max_size: int,
+) -> None:
+    """Insert or refresh a value without growing a warm-instance cache forever."""
+    items.pop(key, None)
+    while len(items) >= max_size:
+        items.pop(next(iter(items)))
+    items[key] = value
+
+
 async def _store_draft(
     context: ContextTypes.DEFAULT_TYPE,
     draft_id: str,
     draft: dict,
 ) -> None:
     drafts: dict = context.application.bot_data.setdefault("drafts", {})
-    while len(drafts) >= MAX_MEMORY_DRAFTS:
-        drafts.pop(next(iter(drafts)))
-
-    drafts[draft_id] = draft
+    _remember_bounded(
+        drafts,
+        draft_id,
+        draft,
+        max_size=MAX_MEMORY_DRAFTS,
+    )
     kv: KVStore | None = context.application.bot_data.get("kv_store")
     if kv is not None:
-        # Fire-and-forget: the in-memory copy already serves this instance,
-        # Redis only needs to catch up for other instances and restarts.
-        asyncio.get_running_loop().create_task(
-            kv.set_json(f"draft:{draft_id}", draft, ttl_seconds=DRAFT_TTL_SECONDS)
+        # A serverless instance may be frozen immediately after the handler
+        # returns. Await the durable write so Studio can open this draft from a
+        # different instance and it survives a cold start.
+        await kv.set_json(
+            f"draft:{draft_id}", draft, ttl_seconds=DRAFT_TTL_SECONDS
         )
 
 
@@ -913,7 +931,12 @@ async def _load_draft(
 
     draft = await kv.get_json(f"draft:{draft_id}")
     if isinstance(draft, dict) and draft.get("type") == "track":
-        drafts[draft_id] = draft
+        _remember_bounded(
+            drafts,
+            draft_id,
+            draft,
+            max_size=MAX_MEMORY_DRAFTS,
+        )
         return draft
 
     return None
@@ -929,9 +952,7 @@ async def _store_search_selection(
     selection_id = secrets.token_hex(5)
     payload = {"user_id": user_id, "query": query, "urls": urls}
     selections: dict = context.application.bot_data.setdefault("search_selections", {})
-    while len(selections) >= 300:
-        selections.pop(next(iter(selections)))
-    selections[selection_id] = payload
+    _remember_bounded(selections, selection_id, payload, max_size=300)
     kv: KVStore | None = context.application.bot_data.get("kv_store")
     if kv is not None:
         await kv.set_json(
@@ -950,7 +971,7 @@ async def _load_search_selection(
     kv: KVStore | None = context.application.bot_data.get("kv_store")
     payload = await kv.get_json(f"selection:v1:{selection_id}") if kv else None
     if isinstance(payload, dict):
-        selections[selection_id] = payload
+        _remember_bounded(selections, selection_id, payload, max_size=300)
         return payload
     return None
 
@@ -1546,13 +1567,304 @@ def _take_placeholder(chat_id: int) -> Message | None:
     return placeholder
 
 
+async def _resolve_search_sources(
+    message: Message,
+    context: ContextTypes.DEFAULT_TYPE,
+    message_text: str | None,
+    *,
+    user_id: int,
+    lang: str,
+) -> tuple[list[str], bool] | None:
+    """Resolve a private text query or finish the flow with a picker/error."""
+    search_query = normalize_search_query(
+        _strip_bot_mention(message_text or "", context.bot.username)
+    )
+    if search_query is None:
+        await _reply_with_error(
+            message,
+            context,
+            _format_no_url_message(message_text, message.chat_id, lang=lang),
+            lang=lang,
+        )
+        return None
+
+    await _send_loading_placeholder(message, lang)
+    search_client: SearchClient = context.application.bot_data["search_client"]
+    try:
+        if hasattr(search_client, "search_release_candidates"):
+            candidates = await search_client.search_release_candidates(search_query)
+        else:
+            source_url = await search_client.search_release_url(search_query)
+            candidates = [
+                type(
+                    "SearchChoice",
+                    (),
+                    {"url": source_url, "artist": "", "title": search_query},
+                )()
+            ]
+        if len(candidates) > 1:
+            selection_id = await _store_search_selection(
+                context,
+                user_id=user_id,
+                query=search_query,
+                urls=[candidate.url for candidate in candidates[:6]],
+            )
+            placeholder = _take_placeholder(message.chat_id)
+            target = placeholder or message
+            text = get_text(lang, "search_choose").replace(
+                "{query}", escape(search_query)
+            )
+            keyboard = InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton(
+                            f"{index + 1}. {candidate.artist} — {candidate.title}"[
+                                :64
+                            ],
+                            callback_data=encode_callback(
+                                "select", "pick", f"{selection_id}:{index}"
+                            ),
+                        )
+                    ]
+                    for index, candidate in enumerate(candidates[:6])
+                ]
+                + [
+                    [
+                        InlineKeyboardButton(
+                            get_text(lang, "retry"),
+                            callback_data=encode_callback("retry", "last"),
+                        )
+                    ]
+                ]
+            )
+            if placeholder is not None:
+                await placeholder.edit_text(
+                    text,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=keyboard,
+                )
+            else:
+                await target.reply_text(
+                    text,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=keyboard,
+                )
+            return None
+        return [candidates[0].url], True
+    except (SearchLookupError, IndexError):
+        await _reply_with_flow_error(
+            message,
+            context,
+            BotFlowError(BotErrorCode.SEARCH_NOT_FOUND, retryable=True),
+            lang=lang,
+        )
+        return None
+
+
 async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    private_user_id: int | None = None
+    if message is not None and message.chat.type == "private":
+        private_user_id = (
+            update.effective_user.id
+            if update.effective_user is not None
+            else message.chat_id
+        )
     try:
         await _track_lookup_message_impl(update, context)
     except asyncio.CancelledError:
         # A newer private-chat request superseded this one. Treat cancellation
         # as an expected UX event, not a failed Telegram webhook delivery.
         LOGGER.debug("Stale lookup cancelled in favor of a newer request")
+    finally:
+        if private_user_id is not None:
+            _runtime(context).finish_request(private_user_id)
+
+
+async def _handle_empty_lookup(
+    message: Message,
+    context: ContextTypes.DEFAULT_TYPE,
+    bundle: _bot_lookup.LookupBundle,
+    source_urls: list[str],
+    *,
+    lang: str,
+) -> bool:
+    """Report an empty provider result and return whether delivery is finished."""
+    if bundle.unavailable_urls:
+        await _notify_admin(
+            context,
+            "Song.link недоступен при обработке: "
+            + ", ".join(bundle.unavailable_urls),
+            only_for_channel_message=message,
+        )
+
+    if bundle.item_count:
+        return False
+
+    if not bundle.unavailable_urls:
+        await _notify_admin(
+            context,
+            f"Не нашел платформы для ссылок в чате {message.chat_id}: "
+            + ", ".join(source_urls),
+            only_for_channel_message=message,
+        )
+
+    if message.chat.type == "channel":
+        return True
+
+    if bundle.unavailable_urls:
+        await _reply_with_flow_error(
+            message,
+            context,
+            BotFlowError(
+                BotErrorCode.PROVIDER_UNAVAILABLE,
+                retryable=True,
+                provider="songlink",
+            ),
+            lang=lang,
+        )
+    else:
+        await _reply_with_error(
+            message,
+            context,
+            _format_not_found_message(source_urls),
+            lang=lang,
+        )
+    return True
+
+
+async def _add_track_drafts_to_crate(
+    message: Message,
+    context: ContextTypes.DEFAULT_TYPE,
+    tracks: list[TrackMatch],
+    *,
+    user_id: int,
+    lang: str,
+) -> list[dict]:
+    crate_entries: list[tuple[str, dict]] = []
+    draft_writes: list[Awaitable[None]] = []
+    for track in tracks:
+        draft_id = secrets.token_hex(8)
+        item = asdict(track)
+        draft = {
+            "v": 2,
+            "type": "track",
+            "item": item,
+            "prefix": "",
+            "hashtags": False,
+            "quote": False,
+            "large_preview": True,
+            "chat_id": message.chat_id,
+            "lang": lang,
+            "can_publish": False,
+        }
+        crate_entries.append((draft_id, item))
+        draft_writes.append(_store_draft(context, draft_id, draft))
+
+    await asyncio.gather(*draft_writes)
+    crate_items, _ = await add_many_to_crate(
+        context.application.bot_data,
+        user_id,
+        entries=crate_entries,
+    )
+    return crate_items
+
+
+async def _send_track_matches(
+    message: Message,
+    context: ContextTypes.DEFAULT_TYPE,
+    tracks: list[TrackMatch],
+    *,
+    is_private: bool,
+    user_id: int,
+    user_prefix: str,
+    lang: str,
+    include_channel_button: bool,
+    include_hashtags: bool,
+) -> None:
+    """Deliver one release or a collection without mixing lookup concerns."""
+    if len(tracks) > 1:
+        collection_keyboard = add_share_button(
+            _build_collection_keyboard(
+                tracks,
+                include_channel_button=include_channel_button,
+            ),
+            share_query=build_share_query(
+                [track_share_url(track) or "" for track in tracks]
+            ),
+            label=get_text(lang, "share_post"),
+        )
+        if is_private:
+            crate_items = await _add_track_drafts_to_crate(
+                message,
+                context,
+                tracks,
+                user_id=user_id,
+                lang=lang,
+            )
+            collection_keyboard = InlineKeyboardMarkup(
+                [
+                    *collection_keyboard.inline_keyboard,
+                    [
+                        InlineKeyboardButton(
+                            f"Подборка · {len(crate_items)}/10",
+                            callback_data=encode_callback("crate", "open"),
+                            api_kwargs={"style": "success"},
+                        )
+                    ],
+                ]
+            )
+        await _send_track_result(
+            context.bot,
+            message,
+            user_prefix
+            + format_collection_message(
+                tracks,
+                include_hashtags=include_hashtags,
+            ),
+            preview_url=_select_preview_url(tracks[0].links, context)
+            or tracks[0].thumbnail_url,
+            reply_markup=collection_keyboard,
+        )
+        _record_matches_safely(tracks, message, context=context)
+        return
+
+    track = tracks[0]
+    if is_private:
+        await _send_track_draft(
+            message,
+            context,
+            track,
+            user_prefix=user_prefix,
+            lang=lang,
+        )
+    else:
+        await _send_track_result(
+            context.bot,
+            message,
+            user_prefix
+            + format_track_message(
+                track,
+                include_hashtags=include_hashtags,
+            ),
+            preview_url=_select_preview_url(track.links, context)
+            or track.thumbnail_url,
+            reply_markup=add_share_button(
+                _build_link_keyboard(
+                    track.links,
+                    context=context,
+                    include_channel_button=include_channel_button,
+                    release_page_url=track.page_url,
+                    release_kind=track.kind,
+                    release_format=track.release_format,
+                ),
+                share_query=build_share_query(
+                    [url] if (url := track_share_url(track)) else []
+                ),
+                label=get_text(lang, "share_post"),
+            ),
+        )
+    _record_matches_safely([track], message, context=context)
 
 
 async def _track_lookup_message_impl(
@@ -1581,7 +1893,6 @@ async def _track_lookup_message_impl(
         action_kind = detect_action(message_text or "", source_urls, is_private=True)
         if action_kind == "help":
             await _reply_with_menu(message, context, MENU_HELP, lang=lang)
-            runtime.finish_request(user_id)
             return
         await runtime.remember_action(
             user_id,
@@ -1598,73 +1909,16 @@ async def _track_lookup_message_impl(
         if not is_private:
             return
 
-        search_query = normalize_search_query(
-            _strip_bot_mention(message_text or "", context.bot.username)
+        search_result = await _resolve_search_sources(
+            message,
+            context,
+            message_text,
+            user_id=user_id,
+            lang=lang,
         )
-        if search_query is None:
-            await _reply_with_error(
-                message,
-                context,
-                _format_no_url_message(message_text, message.chat_id, lang=lang),
-                lang=lang,
-            )
+        if search_result is None:
             return
-
-        await _send_loading_placeholder(message, lang)
-        search_client: SearchClient = context.application.bot_data["search_client"]
-        try:
-            if hasattr(search_client, "search_release_candidates"):
-                candidates = await search_client.search_release_candidates(search_query)
-            else:
-                source_url = await search_client.search_release_url(search_query)
-                candidates = [
-                    type(
-                        "SearchChoice",
-                        (),
-                        {"url": source_url, "artist": "", "title": search_query},
-                    )()
-                ]
-            if len(candidates) > 1:
-                selection_id = await _store_search_selection(
-                    context,
-                    user_id=user_id,
-                    query=search_query,
-                    urls=[candidate.url for candidate in candidates[:6]],
-                )
-                placeholder = _take_placeholder(message.chat_id)
-                target = placeholder or message
-                text = get_text(lang, "search_choose").replace("{query}", search_query)
-                keyboard = InlineKeyboardMarkup(
-                    [
-                        [
-                            InlineKeyboardButton(
-                                f"{index + 1}. {candidate.artist} — {candidate.title}"[:64],
-                                callback_data=encode_callback(
-                                    "select", "pick", f"{selection_id}:{index}"
-                                ),
-                            )
-                        ]
-                        for index, candidate in enumerate(candidates[:6])
-                    ]
-                    + [[InlineKeyboardButton(get_text(lang, "retry"), callback_data=encode_callback("retry", "last"))]]
-                )
-                if placeholder is not None:
-                    await placeholder.edit_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
-                else:
-                    await target.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
-                runtime.finish_request(user_id)
-                return
-            source_urls = [candidates[0].url]
-            found_via_search = True
-        except (SearchLookupError, IndexError):
-            await _reply_with_flow_error(
-                message,
-                context,
-                BotFlowError(BotErrorCode.SEARCH_NOT_FOUND, retryable=True),
-                lang=lang,
-            )
-            runtime.finish_request(user_id)
-            return
+        source_urls, found_via_search = search_result
 
     # The whole message was the search query, so quoting it back is noise.
     user_prefix = "" if found_via_search else _build_user_prefix(message)
@@ -1680,156 +1934,33 @@ async def _track_lookup_message_impl(
     if is_private:
         await _update_loading_placeholder(lang, "progress_card")
     tracks = bundle.tracks
-    unavailable_urls = bundle.unavailable_urls
     videos = bundle.videos
     radios = bundle.radios
     playlists = bundle.playlists
     artists = bundle.artists
 
-    if unavailable_urls:
-        await _notify_admin(
-            context,
-            "Song.link недоступен при обработке: " + ", ".join(unavailable_urls),
-            only_for_channel_message=message,
-        )
-
-    if bundle.item_count == 0:
-        if not unavailable_urls:
-            await _notify_admin(
-                context,
-                f"Не нашел платформы для ссылок в чате {message.chat_id}: "
-                + ", ".join(source_urls),
-                only_for_channel_message=message,
-            )
-
-        if message.chat.type == "channel":
-            return
-
-        if unavailable_urls:
-            await _reply_with_flow_error(
-                message,
-                context,
-                BotFlowError(
-                    BotErrorCode.PROVIDER_UNAVAILABLE,
-                    retryable=True,
-                    provider="songlink",
-                ),
-                lang=lang,
-            )
-        else:
-            await _reply_with_error(
-                message,
-                context,
-                _format_not_found_message(source_urls),
-                lang=lang,
-            )
-        runtime.finish_request(user_id)
+    if await _handle_empty_lookup(
+        message,
+        context,
+        bundle,
+        source_urls,
+        lang=lang,
+    ):
         return
 
     content_type_count = bundle.content_type_count
     if content_type_count == 1 and tracks:
-        if len(tracks) > 1:
-            collection_keyboard = _build_collection_keyboard(
-                tracks,
-                include_channel_button=include_channel_button,
-            )
-            collection_keyboard = add_share_button(
-                collection_keyboard,
-                share_query=build_share_query(
-                    [
-                        track_share_url(track) or ""
-                        for track in tracks
-                    ]
-                ),
-                label=get_text(lang, "share_post"),
-            )
-            if is_private:
-                crate_items = await load_crate(context.application.bot_data, user_id)
-                for track in tracks:
-                    draft_id = secrets.token_hex(8)
-                    item = asdict(track)
-                    draft = {
-                        "v": 2,
-                        "type": "track",
-                        "item": item,
-                        "prefix": "",
-                        "hashtags": False,
-                        "quote": False,
-                        "large_preview": True,
-                        "chat_id": message.chat_id,
-                        "lang": lang,
-                        "can_publish": False,
-                    }
-                    await _store_draft(context, draft_id, draft)
-                    crate_items, _ = await add_to_crate(
-                        context.application.bot_data,
-                        user_id,
-                        draft_id=draft_id,
-                        item=item,
-                    )
-                collection_keyboard = InlineKeyboardMarkup(
-                    [
-                        *collection_keyboard.inline_keyboard,
-                        [
-                            InlineKeyboardButton(
-                                f"Подборка · {len(crate_items)}/10",
-                                callback_data=encode_callback("crate", "open"),
-                                api_kwargs={"style": "success"},
-                            )
-                        ],
-                    ]
-                )
-            await _send_track_result(
-                context.bot,
-                message,
-                user_prefix
-                + format_collection_message(
-                    tracks,
-                    include_hashtags=include_hashtags,
-                ),
-                preview_url=_select_preview_url(tracks[0].links, context)
-                or tracks[0].thumbnail_url,
-                reply_markup=collection_keyboard,
-                )
-            _record_matches_safely(tracks, message, context=context)
-            return
-
-        track = tracks[0]
-        if is_private:
-            await _send_track_draft(
-                message,
-                context,
-                track,
-                user_prefix=user_prefix,
-                lang=lang,
-            )
-        else:
-            await _send_track_result(
-                context.bot,
-                message,
-                user_prefix
-                + format_track_message(
-                    track,
-                    include_hashtags=include_hashtags,
-                ),
-                preview_url=_select_preview_url(track.links, context)
-                or track.thumbnail_url,
-                reply_markup=add_share_button(
-                    _build_link_keyboard(
-                        track.links,
-                        context=context,
-                        include_channel_button=include_channel_button,
-                        release_page_url=track.page_url,
-                        release_kind=track.kind,
-                        release_format=track.release_format,
-                    ),
-                    share_query=build_share_query(
-                        [url] if (url := track_share_url(track)) else []
-                    ),
-                    label=get_text(lang, "share_post"),
-                ),
-                )
-        _record_matches_safely([track], message, context=context)
+        await _send_track_matches(
+            message,
+            context,
+            tracks,
+            is_private=is_private,
+            user_id=user_id,
+            user_prefix=user_prefix,
+            lang=lang,
+            include_channel_button=include_channel_button,
+            include_hashtags=include_hashtags,
+        )
         return
 
     if content_type_count == 1 and videos:

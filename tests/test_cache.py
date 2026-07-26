@@ -31,6 +31,16 @@ class TTLCacheTests(unittest.TestCase):
         self.assertIsNone(cache.get("first"))
         self.assertEqual(cache.get("second"), "2")
 
+    def test_refreshing_existing_value_does_not_evict_another_key(self) -> None:
+        cache: TTLCache[str] = TTLCache(ttl_seconds=10, max_size=2)
+
+        cache.set("first", "1")
+        cache.set("second", "2")
+        cache.set("second", "updated")
+
+        self.assertEqual(cache.get("first"), "1")
+        self.assertEqual(cache.get("second"), "updated")
+
 
 if __name__ == "__main__":
     unittest.main()
