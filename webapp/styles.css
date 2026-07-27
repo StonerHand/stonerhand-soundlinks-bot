@@ -159,8 +159,7 @@
   .post-title { font-family: "Unbounded", "Golos Text", sans-serif; font-size: 19px; font-weight: 600; line-height: 1.15; }
   .post-artist { font-size: 13px; color: var(--muted); margin-top: 2px; }
   .genre-badge { font-family: "JetBrains Mono"; font-size: 10px; text-transform: uppercase; padding: 4px 8px; border-radius: 8px; flex-shrink: 0; white-space: nowrap; }
-  .post-cta { font-size: 13px; font-style: italic; color: var(--accent); margin-bottom: 12px; line-height: 1.5; }
-  .post-cta .pencil, .post-tags .pencil { font-style: normal; opacity: .4; margin-left: 5px; font-size: 11px; }
+  .post-tags .pencil { font-style: normal; opacity: .4; margin-left: 5px; font-size: 11px; }
   .post-tags { display: flex; flex-wrap: wrap; gap: 6px 10px; margin-bottom: 14px; }
   .post-tags span { font-family: "JetBrains Mono"; font-size: 11px; color: var(--muted); }
   .plats { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -455,7 +454,6 @@ body::after { content:"";position:fixed;inset:0;pointer-events:none;z-index:0;ba
 .post-title { font-size:23px;letter-spacing:-.045em; }
 .post-artist { font-family:"JetBrains Mono";font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-top:6px; }
 .genre-badge { border-radius:999px!important; }
-.post-cta { border-left:2px solid var(--primary);padding-left:11px;font-style:normal; }
 .post-tags span { padding:4px 8px;border-radius:999px;background:var(--surface); }
 .plat { flex:1;justify-content:center;border-radius:14px;min-width:115px; }
 .plat .pb,.picker-badge,.pm-badge { border-radius:50%; }
@@ -583,7 +581,6 @@ button,a,.row,.cand,.post-card,.sheet { transition-timing-function:var(--ease-ou
 .post-card { --release-accent:var(--primary);border-color:color-mix(in srgb,var(--release-accent) 24%,var(--border)); }
 .cover img { aspect-ratio:4/3; }
 .post-title { display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;line-height:1.12; }
-.post-cta { border-left-color:var(--release-accent); }
 .row { align-items:flex-start; }
 .row-title { white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.25;overflow-wrap:anywhere; }
 .row-note { margin-top:5px;color:var(--muted);font-size:11px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; }

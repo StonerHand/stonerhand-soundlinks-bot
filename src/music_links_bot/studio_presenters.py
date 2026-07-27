@@ -3,7 +3,6 @@ from __future__ import annotations
 from music_links_bot.constants import PLATFORM_BUTTON_STYLES, PLATFORM_LABELS
 from music_links_bot.formatter import build_auto_hashtags, pick_track_emoji
 from music_links_bot.models import TrackMatch
-from music_links_bot.phrases import pick_phrase
 from music_links_bot.rich_publications import longread_view
 
 
@@ -16,11 +15,6 @@ def build_draft_response(
 ) -> dict:
     """Convert an internal draft into the stable public Studio contract."""
     track = TrackMatch(**draft["item"])
-    cta_key = {
-        "album": "album_cta",
-        "podcast": "podcast_cta",
-    }.get(track.kind, "track_cta")
-    custom_cta = draft.get("custom_cta")
     custom_tags = draft.get("custom_tags")
 
     available = [key for key in PLATFORM_LABELS if track.links.get(key)]
@@ -52,9 +46,6 @@ def build_draft_response(
         if isinstance(custom_tags, list)
         else auto_hashtags
     )
-    resolved_cta = custom_cta or pick_phrase(
-        cta_key, f"{track.artist}:{track.title}:{track.kind}"
-    )
     return {
         "ok": True,
         "draft_id": draft_id,
@@ -78,12 +69,10 @@ def build_draft_response(
             "page_url": track.page_url,
             "preview": draft.get("preview"),
             "preview_pending": bool(draft.get("preview_pending")),
-            "cta": resolved_cta,
-            "cta_custom": bool(custom_cta),
             "hashtags": hashtags,
             "auto_hashtags": auto_hashtags,
             "tags_custom": isinstance(custom_tags, list),
             "platforms": platforms,
         },
-        "publication": longread_view(draft, track, cta=resolved_cta),
+        "publication": longread_view(draft, track),
     }

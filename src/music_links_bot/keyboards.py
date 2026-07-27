@@ -11,6 +11,7 @@ CHANNEL_URL = f"https://t.me/{CHANNEL_USERNAME}"
 CHANNEL_BUTTON_TEXT = "🪨 Открыть канал"
 DEFAULT_UI_MODE = "stonerhand"
 MAX_BUTTON_TEXT_LENGTH = 64
+MAX_VISIBLE_PLATFORM_BUTTONS = 2
 SPOTIFY_SEARCH_URL = "https://open.spotify.com/search/"
 DEFAULT_PLATFORM_ORDER = (
     "spotify", "appleMusic", "applePodcasts", "youtubeMusic",
@@ -64,7 +65,7 @@ def _build_link_keyboard(
     *,
     prefix: str = "",
     context: ContextTypes.DEFAULT_TYPE | None = None,
-    include_channel_button: bool = True,
+    include_channel_button: bool = False,
     release_page_url: str | None = None,
     release_kind: str = "song",
     release_format: str | None = None,
@@ -94,6 +95,12 @@ def _build_link_keyboard(
             if platform_key not in ordered_platforms and links.get(platform_key)
         ]
         final_platforms = [*ordered_platforms, *remaining_platforms]
+
+    # Song.link remains the complete hub. Showing only the first two preferred
+    # services keeps the Telegram card thumb-friendly instead of producing a
+    # wall of near-identical buttons.
+    if release_page_url:
+        final_platforms = final_platforms[:MAX_VISIBLE_PLATFORM_BUTTONS]
 
     buttons = [
         _url_button(
@@ -133,7 +140,7 @@ def _platform_button_label(
 def _build_collection_keyboard(
     tracks: list[TrackMatch],
     *,
-    include_channel_button: bool = True,
+    include_channel_button: bool = False,
 ) -> InlineKeyboardMarkup:
     is_track_video_pair = (
         len(tracks) == 2 and {track.kind for track in tracks} == {"song", "video"}
@@ -163,7 +170,7 @@ def _build_collection_keyboard(
 def _build_youtube_keyboard(
     url: str,
     *,
-    include_channel_button: bool = True,
+    include_channel_button: bool = False,
 ) -> InlineKeyboardMarkup:
     return _single_url_keyboard(
         "📺 Смотреть на YouTube",
@@ -176,7 +183,7 @@ def _build_youtube_keyboard(
 def _build_nts_keyboard(
     url: str,
     *,
-    include_channel_button: bool = True,
+    include_channel_button: bool = False,
 ) -> InlineKeyboardMarkup:
     return _single_url_keyboard(
         "📡 Открыть на NTS",
@@ -189,7 +196,7 @@ def _build_nts_keyboard(
 def _build_playlist_keyboard(
     url: str,
     *,
-    include_channel_button: bool = True,
+    include_channel_button: bool = False,
 ) -> InlineKeyboardMarkup:
     return _single_url_keyboard(
         "🎛 Открыть плейлист",
@@ -202,7 +209,7 @@ def _build_playlist_keyboard(
 def _build_artist_keyboard(
     url: str,
     *,
-    include_channel_button: bool = True,
+    include_channel_button: bool = False,
 ) -> InlineKeyboardMarkup:
     return _single_url_keyboard(
         "🧬 Открыть артиста",
@@ -215,7 +222,7 @@ def _build_artist_keyboard(
 def _build_youtube_collection_keyboard(
     videos: list[VideoMatch],
     *,
-    include_channel_button: bool = True,
+    include_channel_button: bool = False,
 ) -> InlineKeyboardMarkup:
     buttons: list[InlineKeyboardButton] = []
     for index, video in enumerate(videos, start=1):
@@ -233,7 +240,7 @@ def _build_youtube_collection_keyboard(
 def _build_nts_collection_keyboard(
     radios: list[RadioMatch],
     *,
-    include_channel_button: bool = True,
+    include_channel_button: bool = False,
 ) -> InlineKeyboardMarkup:
     buttons: list[InlineKeyboardButton] = []
     for index, radio in enumerate(radios, start=1):
@@ -251,7 +258,7 @@ def _build_nts_collection_keyboard(
 def _build_playlist_collection_keyboard(
     playlists: list[PlaylistMatch],
     *,
-    include_channel_button: bool = True,
+    include_channel_button: bool = False,
 ) -> InlineKeyboardMarkup:
     buttons: list[InlineKeyboardButton] = []
     for index, playlist in enumerate(playlists, start=1):
@@ -269,7 +276,7 @@ def _build_playlist_collection_keyboard(
 def _build_artist_collection_keyboard(
     artists: list[ArtistMatch],
     *,
-    include_channel_button: bool = True,
+    include_channel_button: bool = False,
 ) -> InlineKeyboardMarkup:
     buttons: list[InlineKeyboardButton] = []
     for index, artist in enumerate(artists, start=1):
@@ -291,7 +298,7 @@ def _build_mixed_collection_keyboard(
     artists: list[ArtistMatch] | None = None,
     radios: list[RadioMatch] | None = None,
     *,
-    include_channel_button: bool = True,
+    include_channel_button: bool = False,
 ) -> InlineKeyboardMarkup:
     playlists = playlists or []
     artists = artists or []
@@ -374,12 +381,8 @@ def _build_mixed_collection_keyboard(
 
 
 def _should_include_channel_button(message: Message) -> bool:
-    username = message.chat.username
-    return not (
-        message.chat.type == "channel"
-        and username is not None
-        and username.casefold() == CHANNEL_USERNAME
-    )
+    del message
+    return False
 
 
 def _should_include_hashtags(message: Message) -> bool:

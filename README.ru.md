@@ -2,9 +2,7 @@
 
 # 🎧 StonerHand Soundlinks Bot
 
-### Ссылка, название или несколько релизов → карточка, лонгрид или подборка
-
-Обложка, аккуратный текст, все площадки, подборки и публикация — в 🎛 Студии.
+### Музыкальная ссылка → готовая Telegram-публикация
 
 [Открыть бота](https://t.me/StonerHandBot) · [Канал](https://t.me/stonerhand) · [English](README.md) · [Архитектура](ARCHITECTURE.ru.md)
 
@@ -13,72 +11,72 @@
 ![Vercel](https://img.shields.io/badge/Vercel-Production-000?style=flat-square&logo=vercel)
 ![CI](https://img.shields.io/github/actions/workflow/status/StonerHand/stonerhand-soundlinks-bot/ci.yml?style=flat-square&label=CI)
 
-<img src="assets/studio-demo.svg" alt="Анимация: поиск релиза, готовая карточка и публикация в StonerHand Studio" width="100%">
+<img src="assets/studio-demo.svg" alt="Анимация поиска, лонгрида и публикации в StonerHand Studio" width="100%">
 
 </div>
 
-## Что умеет
+## Возможности
 
 | Telegram-бот | Mini App «Студия» |
 | --- | --- |
-| Ссылка или название → выбор точного релиза → готовая карточка | Поиск, кандидаты, live-предпросмотр и 30-секундная прослушка |
-| 2–12 ссылок → один пост-подборка без потери треков | Импорт нескольких ссылок и подборка до 10 релизов |
-| Песня + YouTube-клип → нативное двухкадровое превью | Парная обложка песни и клипа, типы материалов и сортировка |
-| Обложка, CTA, хэштеги и компактные кнопки площадок | Переключатель Карточка / Лонгрид и точный Telegram-превью |
-| Нативные Telegram Rich Messages с безопасным fallback | Блочный редактор и сворачиваемые вступления: заголовки, текст, цитаты, списки, секции и линии |
-| Inline-поиск через `@StonerHandBot` в любом чате | Восстановление черновика, пресеты и проверка перед отправкой |
-| Автозамена ссылок в группах и каналах | Сортировка, разделы, заметки и оформление подборки |
-| RU/EN-меню, понятные ошибки и повтор действия | История, очередь, перенос, отмена и аналитика владельца |
+| Ссылка или название → точный релиз | Поиск, кандидаты и аудиопревью |
+| Кликабельный заголовок, обложка и компактные кнопки | Карточка или блочный Rich-лонгрид |
+| Несколько ссылок → одна подборка | Подборка до 10 релизов, сортировка и заметки |
+| Песня + YouTube-клип → двухкадровое медиапревью | Обложка песни и превью клипа |
+| Inline-поиск в любом чате | История, очередь, отмена и аналитика |
+| Автозамена ссылок в группах и каналах | Нативная отправка поста с кнопками |
 
-```text
-Spotify / Apple Music / YouTube / SoundCloud / Bandcamp / Deezer / Tidal
-Яндекс Музыка / Spotify playlists & artists / podcasts / NTS Radio
-```
+Поддерживаются Spotify, Apple Music, YouTube, SoundCloud, Bandcamp, Deezer,
+Tidal, Яндекс Музыка, подкасты, Spotify-плейлисты и артисты, NTS Radio.
 
-Метаданные и универсальные ссылки собираются через Song.link/Odesli, iTunes Search и oEmbed. Лонгрид отправляется как нативный Telegram Rich Message: до 32K текста, обложка и структурированные блоки. Если формат недоступен в конкретном клиенте или чате, бот автоматически отправит ограниченную HTML-версию с той же клавиатурой площадок. Действие «Поделиться» передаёт пост и кнопки одним подготовленным сообщением; обычная пересылка Telegram сама удаляет inline-клавиатуру.
+В карточках нет случайных рекламных подписей: только данные релиза, теги и
+действия. По умолчанию видны две приоритетные площадки и универсальная ссылка
+«Все платформы». Поэтому пост остаётся компактным, а после обычной пересылки
+кликабельный заголовок всё равно открывает релиз. Для отправки вместе с кнопками
+используется действие «Поделиться» в Студии.
 
-Если в сообщении одна песня и один YouTube-клип, Telegram получает нативное
-двухкадровое превью: обложку релиза и превью видео. Под ним остаётся компактная
-строка «Слушать песню / Смотреть клип». Бот не скачивает и не перезаливает
-чужое видео — кнопка открывает оригинал на YouTube.
+Лонгрид отправляется как Telegram Rich Message со структурированными блоками.
+Если формат недоступен, бот автоматически создаёт безопасную HTML-версию.
+Песня и YouTube-клип публикуются как нативный двухкадровый альбом; видео не
+скачивается и открывается в оригинале.
 
-## Как это работает
+## Сценарий
 
 ```mermaid
 flowchart LR
-    A["Ссылка / название"] --> B["Выбор релиза"]
-    A2["2–12 ссылок"] --> C["Подборка / музыкальный микс"]
+    A["Ссылка / название"] --> B["Точный релиз"]
+    A2["Несколько ссылок"] --> C["Подборка / медиамикс"]
     B --> D["Карточка / Лонгрид"]
     C --> D
-    D --> E["Поделиться · себе · канал · очередь"]
+    D --> E["Чат · канал · очередь"]
 ```
 
-Обычный пользователь может искать, редактировать, собирать подборки и отправлять готовые посты себе или в выбранный чат. Публикация в основной канал, очередь, отмена и статистика доступны владельцу из `ADMIN_CHAT_ID`. Клавиатуры автоматически адаптируются для каналов: Telegram-несовместимые inline-действия убираются, а ссылки на музыкальные площадки остаются.
+В меню бота оставлены только основные действия: Студия, поиск, подборка и
+помощь. Публикация, расписание, статистика и расширенное оформление находятся
+в Студии. Сетевые клиенты провайдеров создаются лениво — только когда реально
+нужны конкретному запросу.
 
-## Быстрый запуск на Vercel
-
-1. Создай бота у [@BotFather](https://t.me/BotFather) и включи `/setinline`.
-2. Импортируй репозиторий в Vercel с корнем `./`.
-3. Добавь минимальное окружение:
+## Запуск на Vercel
 
 ```dotenv
 BOT_TOKEN=123456:telegram-token
 SET_WEBHOOK_SECRET=long-random-secret
 CRON_SECRET=another-long-random-secret
+ADMIN_CHAT_ID=123456789
+PUBLISH_CHAT_ID=@channel
 ```
 
-4. После deploy зарегистрируй Telegram:
+1. Создай бота у [@BotFather](https://t.me/BotFather) и включи `/setinline`.
+2. Импортируй репозиторий в Vercel с корнем `./`.
+3. Подключи Upstash Redis из Vercel Marketplace для черновиков, очереди,
+   истории, статистики и межинстансовой дедупликации.
+4. Открой `https://<domain>/api/set_webhook?secret=<SET_WEBHOOK_SECRET>`.
+5. Проверь `https://<domain>/api/health`: ожидаются HTTP 200 и `"ok": true`.
 
-```text
-https://<production-domain>/api/set_webhook?secret=<SET_WEBHOOK_SECRET>
-```
-
-5. Проверь `https://<production-domain>/api/health` — здоровый production отвечает HTTP 200 и `"ok": true`.
-
-Для публикации укажи `ADMIN_CHAT_ID` и `PUBLISH_CHAT_ID`. Для долговечной очереди, истории, статистики и межинстансового дедупа подключи Upstash Redis. Все настройки перечислены в [.env.example](.env.example).
+Все переменные перечислены в [.env.example](.env.example).
 
 <details>
-<summary><b>Локальная разработка</b></summary>
+<summary><b>Локальная разработка и проверки</b></summary>
 
 ```bash
 python3 -m venv .venv
@@ -86,48 +84,26 @@ source .venv/bin/activate
 pip install -r requirements.txt pyflakes playwright
 python -m playwright install chromium
 cp .env.example .env
-PYTHONPATH=src python -m music_links_bot
+
+python -m pyflakes src api tests
+PYTHONPATH=src python -m unittest discover -s tests
+python tests/e2e/smoke.py
 ```
 
 Не запускай polling одновременно с production webhook на том же токене.
 
-```bash
-python -m pyflakes src api tests
-PYTHONPATH=src python -m unittest discover -s tests -v
-python tests/e2e/smoke.py
-```
-
 </details>
 
-<details>
-<summary><b>Production и надёжность</b></summary>
-
-- `POST /api/telegram` — подписанный Telegram webhook с дедупликацией updates;
-- `POST /api/webapp` — Studio API с HMAC-проверкой `initData`, rate limit и idempotency;
-- `GET /api/health` — Telegram, webhook, Redis, очередь и доставка созревших jobs;
-- при сбое Redis входящие updates переходят на ограниченный memory-дедуп и не теряются;
-- черновик подтверждённо записывается в Redis до завершения запроса, поэтому открывается после cold start и на другом serverless-инстансе;
-- несколько ссылок дедуплицируются и попадают в подборку одной пакетной записью вместо последовательного сохранения каждого трека;
-- временные кэши и активные пользовательские задачи ограничены по размеру и гарантированно очищаются;
-- очередь использует distributed lock, job lease, три попытки и backoff;
-- Vercel Cron ежедневно восстанавливает webhook без удаления ожидающих updates, а также команды, профиль и кнопку Студии;
-- критические ошибки приходят владельцу в Telegram с часовым дедупом.
-
-Для точности отложенных публикаций поставь внешний монитор на `/api/health` каждые пять минут.
-
-</details>
-
-## Код
+## Структура
 
 ```text
-api/                    Vercel webhook, Studio API, health, setup
-src/music_links_bot/    bot UI, lookup, Rich Messages, delivery, queue, storage
-webapp/                 Mini App без build-step: блочный редактор, preview, design system
-tests/                  offline unit/integration suite + adaptive Playwright smoke
+api/                    Vercel webhook, Studio API, health, cron
+src/music_links_bot/    поиск, форматирование, доставка, очередь, Redis
+webapp/                 Mini App без build-step
+tests/                  unit/integration + адаптивный Playwright smoke
 ```
 
-CI проверяет Python-модули, JSON-конфигурацию, JavaScript, весь offline-suite и мобильный сценарий Студии в Chromium на нескольких ширинах, в светлой и тёмной теме. Подробные потоки, API actions, Redis keyspace, безопасность и правила расширения: [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
-
-## Лицензия
+Подробные потоки, API, Redis keyspace и правила расширения описаны в
+[ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
 
 [MIT](LICENSE)

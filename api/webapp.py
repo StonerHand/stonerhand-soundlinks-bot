@@ -545,7 +545,6 @@ async def _action_prepare_share(
         rich_html = build_rich_html(
             draft,
             track,
-            cta=draft.get("custom_cta"),
             hashtags=hashtags,
         )
         result_id = hashlib.sha256(
@@ -578,7 +577,6 @@ async def _action_prepare_share(
                     message_text=build_fallback_html(
                         draft,
                         track,
-                        cta=draft.get("custom_cta"),
                         hashtags=hashtags,
                     ),
                     parse_mode=ParseMode.HTML,

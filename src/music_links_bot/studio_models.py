@@ -9,7 +9,6 @@ from music_links_bot.publication_state import release_fingerprint
 from music_links_bot.rich_publications import apply_publication_patch
 from music_links_bot.text_utils import normalize_hashtag
 
-MAX_CUSTOM_CTA_LENGTH = 200
 MAX_CUSTOM_TAGS = 8
 MAX_CRATE_ITEMS = 10
 
@@ -98,12 +97,6 @@ def apply_draft_patch(draft: dict, body: dict) -> None:
     for flag in ("hashtags", "quote", "large_preview", "as_photo"):
         if isinstance(body.get(flag), bool):
             draft[flag] = body[flag]
-    if "cta" in body:
-        cta = body.get("cta")
-        if isinstance(cta, str) and cta.strip():
-            draft["custom_cta"] = " ".join(cta.split())[:MAX_CUSTOM_CTA_LENGTH]
-        else:
-            draft.pop("custom_cta", None)
     if "tags" in body:
         tags = body.get("tags")
         if isinstance(tags, list):

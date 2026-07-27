@@ -28,7 +28,6 @@ RELEASE = {
     "artist": "Sleep", "title": "Dopesmoker", "kind": "song", "emoji": "📻",
     "year": "1999", "genre": "Stoner Metal", "artwork": COVER,
     "page_url": "https://song.link/x", "preview": None, "preview_pending": False,
-    "cta": "слушать обязательно", "cta_custom": False,
     "hashtags": "#stonerhand #doom", "auto_hashtags": "#stonerhand", "tags_custom": False,
     "platforms": [
         {"key": "spotify", "label": "Spotify", "url": "https://open.spotify.com/x", "enabled": True},
@@ -371,30 +370,29 @@ def main() -> int:
 
         # Formatting auto-saves and never allows a post without platforms.
         page.eval_on_selector("#open-format", "el => el.click()")
-        if page.locator("#format-nav button").count() != 4:
+        if page.locator("#format-nav button").count() != 3:
             failures.append("format editor navigation is incomplete")
-        page.eval_on_selector('#format-nav [data-target="format-copy"]', "el => el.click()")
-        if not page.eval_on_selector('#format-nav [data-target="format-copy"]', "el => el.classList.contains('active')"):
+        page.eval_on_selector('#format-nav [data-target="tags-sec"]', "el => el.click()")
+        if not page.eval_on_selector('#format-nav [data-target="tags-sec"]', "el => el.classList.contains('active')"):
             failures.append("format editor navigation does not expose its active section")
         page.wait_for_timeout(350)
-        nav_bottom, input_top = page.evaluate(
+        nav_bottom, section_top = page.evaluate(
             """() => [
               document.getElementById('format-nav').getBoundingClientRect().bottom,
-              document.getElementById('cta-input').getBoundingClientRect().top,
+              document.getElementById('tags-sec').getBoundingClientRect().top,
             ]"""
         )
-        if input_top < nav_bottom - 2:
+        if section_top < nav_bottom - 2:
             failures.append("format navigation scrolls the field under its sticky header")
         small_targets = _small_touch_targets(page)
         if small_targets:
             failures.append("format editor has undersized touch targets: " + ", ".join(small_targets))
         _capture(page, "03-format-dark")
-        page.eval_on_selector("#cta-input", "el => {el.value='новый текст';el.dispatchEvent(new Event('input'))}")
+        checks = page.locator("#pm-list .pm-check")
+        checks.nth(0).click()
         page.wait_for_timeout(650)
         if page.eval_on_selector("#fmt-sync", "el => el.textContent") != "Сохранено":
             failures.append("formatting changes do not reach the saved state")
-        checks = page.locator("#pm-list .pm-check")
-        checks.nth(0).click()
         checks.nth(1).click()
         if page.locator("#pm-list .pm-check.on").count() < 1:
             failures.append("formatting allowed all platforms to be disabled")

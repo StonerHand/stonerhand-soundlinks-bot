@@ -8,14 +8,18 @@ from music_links_bot.phrases import PHRASES, pick_phrase
 
 
 class PhrasesTests(unittest.TestCase):
-    def test_each_phrase_group_has_thirty_variants(self) -> None:
+    def test_only_concise_recovery_phrase_groups_remain(self) -> None:
+        self.assertEqual(
+            set(PHRASES),
+            {"no_url", "service_unavailable", "not_found"},
+        )
         for phrases in PHRASES.values():
-            self.assertEqual(len(phrases), 30)
+            self.assertEqual(len(phrases), 3)
 
     def test_pick_phrase_is_stable_for_seed(self) -> None:
         self.assertEqual(
-            pick_phrase("track_cta", "Artist:Song:song"),
-            pick_phrase("track_cta", "Artist:Song:song"),
+            pick_phrase("not_found", "Artist:Song:song"),
+            pick_phrase("not_found", "Artist:Song:song"),
         )
 
 

@@ -67,30 +67,24 @@ STRINGS: dict[str, dict[str, str]] = {
     "home_body": {
         RU: (
             "{greeting}\n\n"
-            "<i>Из музыкальной ссылки — в карточку или лонгрид с кнопками.</i>\n\n"
-            "<blockquote>◉ <b>Рабочее состояние</b>\n"
-            "Подборка · {crate_count}/10\n{mode}</blockquote>\n"
-            "<b>Быстрый старт</b>\n"
-            "Пришли ссылку, напиши <code>артист — трек</code> или вставь "
-            "несколько ссылок — получится подборка."
+            "Пришли ссылку или <code>артист — трек</code>.\n"
+            "Несколько ссылок автоматически станут подборкой.\n\n"
+            "<blockquote>Подборка · {crate_count}/10\n{mode}</blockquote>"
         ),
         EN: (
             "{greeting}\n\n"
-            "<i>Turn a music link into a card or longread with artwork and buttons.</i>\n\n"
-            "<blockquote>◉ <b>Workspace status</b>\n"
-            "Crate · {crate_count}/10\n{mode}</blockquote>\n"
-            "<b>Quick start</b>\n"
-            "Send a link, type <code>artist — track</code>, or paste several "
-            "links to build a crate."
+            "Send a link or type <code>artist — track</code>.\n"
+            "Several links automatically become a crate.\n\n"
+            "<blockquote>Crate · {crate_count}/10\n{mode}</blockquote>"
         ),
     },
     "home_mode_admin": {
-        RU: "📡 Канал, очередь и статистика доступны",
-        EN: "📡 Channel, queue and stats are available",
+        RU: "Канал и очередь — в Студии",
+        EN: "Channel and queue are in Studio",
     },
     "home_mode_user": {
-        RU: "✉️ Готовые посты можно отправлять себе",
-        EN: "✉️ Finished posts can be sent to your chat",
+        RU: "Карточки и лонгриды — в Студии",
+        EN: "Cards and longreads are in Studio",
     },
     "start_returning": {
         RU: "🎧 <b>Что собираем сегодня?</b>\n\nПришли ссылку, название релиза или открой Студию.",
@@ -139,7 +133,7 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
     },
     "quick_tour": {RU: "▶ Как всё работает", EN: "▶ How it works"},
-    "quick_search": {RU: "🔎 Создать новый пост", EN: "🔎 Create a new post"},
+    "quick_search": {RU: "🔎 Найти релиз", EN: "🔎 Find a release"},
     "open_studio": {RU: "🎛 Открыть Студию", EN: "🎛 Open Studio"},
     "home_crate": {RU: "🧺 Подборка · {count}", EN: "🧺 Crate · {count}"},
     "home_stats": {RU: "📊 Статистика канала", EN: "📊 Channel stats"},
@@ -292,12 +286,10 @@ STRINGS: dict[str, dict[str, str]] = {
             "<i>Ты присылаешь ссылку — бот собирает остальное.</i>\n\n"
             "<blockquote>📻 · <b>The Soft Moon</b>\n"
             "<i>Criminal</i>\n\n"
-            "громкость выше — мир тише\n\n"
             "<code>#stonerhand #track</code>\n\n"
             "[🟢 Spotify] [⚪ Apple]\n"
-            "[🟦 Deezer] [⚫ Tidal]\n"
             "[🪩 Все платформы]</blockquote>\n\n"
-            "<b>Внутри карточки:</b> обложка, подводка, хэштеги и живые кнопки площадок.\n\n"
+            "<b>Внутри карточки:</b> обложка, кликабельный заголовок, хэштеги и компактные кнопки.\n\n"
             "Попробуй прямо сейчас: пришли ссылку или <code>название трека</code>."
         ),
         EN: (
@@ -305,12 +297,10 @@ STRINGS: dict[str, dict[str, str]] = {
             "<i>You send a link — the bot builds the rest.</i>\n\n"
             "<blockquote>📻 · <b>The Soft Moon</b>\n"
             "<i>Criminal</i>\n\n"
-            "volume up — world down\n\n"
             "<code>#stonerhand #track</code>\n\n"
             "[🟢 Spotify] [⚪ Apple]\n"
-            "[🟦 Deezer] [⚫ Tidal]\n"
             "[🪩 All platforms]</blockquote>\n\n"
-            "<b>Inside the card:</b> artwork, intro, hashtags and live platform buttons.\n\n"
+            "<b>Inside the card:</b> artwork, a tappable title, hashtags and compact buttons.\n\n"
             "Try it now: send a link or a <code>track title</code>."
         ),
     },

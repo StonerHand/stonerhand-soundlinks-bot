@@ -84,7 +84,7 @@ class RichPublicationModelTests(unittest.TestCase):
             },
         )
 
-        view = longread_view(draft, _track(), cta="Слушать")
+        view = longread_view(draft, _track())
 
         self.assertEqual(view["mode"], "longread")
         self.assertEqual(view["longread"]["blocks"][0]["type"], "quote")
@@ -114,7 +114,6 @@ class RichPublicationModelTests(unittest.TestCase):
         result = build_rich_html(
             draft,
             _track(),
-            cta=None,
             hashtags="#stonerhand #doom",
         )
 
@@ -142,7 +141,6 @@ class RichPublicationModelTests(unittest.TestCase):
         result = build_fallback_html(
             draft,
             _track(),
-            cta=None,
             hashtags="#stonerhand",
         )
 
@@ -164,7 +162,6 @@ class RichPublicationModelTests(unittest.TestCase):
         result = build_rich_html(
             draft,
             _track(),
-            cta=None,
             hashtags="#stonerhand",
         )
 

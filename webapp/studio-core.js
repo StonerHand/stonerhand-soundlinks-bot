@@ -57,9 +57,9 @@ export function assessDraft(state, copy) {
   const longread = publication.mode === "longread"
     ? normalizeLongread(publication.longread, release)
     : null;
-  const hasEditorialText = longread
-    ? Boolean(longread.title && longread.blocks.length)
-    : Boolean(String(release.cta || "").trim());
+  const hasEditorialText = Boolean(
+    release.title || (longread && longread.title),
+  );
   const checks = [
     {
       key: "platforms",
@@ -159,11 +159,7 @@ export function normalizeLongread(value, release = {}) {
   return {
     title,
     lead,
-    blocks: blocks.length ? blocks : [{
-      id: "opening",
-      type: "paragraph",
-      text: cleanText(release.cta || "Новый релиз уже собран — осталось включить звук."),
-    }],
+    blocks,
   };
 }
 

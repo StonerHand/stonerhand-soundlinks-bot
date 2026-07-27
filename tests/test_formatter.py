@@ -5,15 +5,6 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from music_links_bot.formatter import (
-    ARTIST_COLLECTION_SIGNATURES,
-    ARTIST_SIGNATURES,
-    PLAYLIST_COLLECTION_SIGNATURES,
-    PLAYLIST_SIGNATURES,
-    RADIO_COLLECTION_SIGNATURES,
-    RADIO_SIGNATURES,
-    VIDEO_COLLECTION_SIGNATURES,
-    VIDEO_SIGNATURES,
-    _pick_signature,
     format_collection_message,
     format_artist_collection_message,
     format_artist_message,
@@ -37,9 +28,6 @@ from music_links_bot.models import (
     TrackMatch,
     VideoMatch,
 )
-from music_links_bot.phrases import pick_phrase
-
-
 class FormatterTests(unittest.TestCase):
     def test_genre_hashtags_normalize_itunes_genres(self) -> None:
         self.assertEqual(genre_hashtags("Heavy Metal"), ["#heavymetal"])
@@ -60,7 +48,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(build_auto_hashtags(track), "#stonerhand #track #heavymetal")
 
-    def test_track_cta_links_to_release_hub(self) -> None:
+    def test_track_heading_links_to_release_hub(self) -> None:
         track = TrackMatch(
             title="Paranoid",
             artist="Black Sabbath",
@@ -84,7 +72,6 @@ class FormatterTests(unittest.TestCase):
             format_track_message(track),
             f"{pick_track_emoji(track)} · <b>Artist</b>\n"
             "Song\n\n"
-            f"<i>{pick_phrase('track_cta', 'Artist:Song:song')}</i>\n\n"
             "#stonerhand #track",
         )
 
@@ -99,7 +86,6 @@ class FormatterTests(unittest.TestCase):
             format_track_message(track),
             f"{pick_track_emoji(track)} · <b>Artist</b>\n"
             "Song\n\n"
-            f"<i>{pick_phrase('track_cta', 'Artist:Song:song')}</i>\n\n"
             "#stonerhand #track",
         )
 
@@ -126,8 +112,7 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_track_message(track, include_hashtags=False),
             f"{pick_track_emoji(track)} · <b>Artist</b>\n"
-            "Song\n\n"
-            f"<i>{pick_phrase('track_cta', 'Artist:Song:song')}</i>",
+            "Song",
         )
 
     def test_format_track_message_marks_album(self) -> None:
@@ -142,7 +127,6 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_track_message(track),
             "💿 · <b>Artist</b>\nAlbum\n\n"
-            f"<i>{pick_phrase('album_cta', 'Artist:Album:album')}</i>\n\n"
             "#stonerhand #album",
         )
 
@@ -158,7 +142,6 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_track_message(track),
             "💿 · <b>Artist</b>\nEP\n\n"
-            f"<i>{pick_phrase('album_cta', 'Artist:EP:album')}</i>\n\n"
             "#stonerhand #album #ep",
         )
 
@@ -173,7 +156,6 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_track_message(track),
             "🎙️ · <b>Podcast Show</b>\nвыпуск: Episode\n\n"
-            f"<i>{pick_phrase('podcast_cta', 'Podcast Show:Episode:podcast')}</i>\n\n"
             "#stonerhand #podcast",
         )
 
@@ -189,7 +171,6 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_track_message(track),
             "🎙️ · <b>Spotify</b>\nшоу: Podcast show\n\n"
-            f"<i>{pick_phrase('podcast_cta', 'Spotify:Podcast show:podcast')}</i>\n\n"
             "#stonerhand #podcast #show",
         )
 
@@ -202,10 +183,9 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_collection_message(tracks),
             (
-                f"{pick_phrase('collection_intro', 'Artist:Song:song|Band:Album:album')}\n\n"
+                "<b>Подборка</b>\n\n"
                 f"1. {pick_track_emoji(tracks[0])} · <b>Artist</b> - Song\n"
                 "2. 💿 · <b>Band</b> - Album\n\n"
-                f"<i>{pick_phrase('collection_cta', 'Artist:Song:song|Band:Album:album')}</i>\n\n"
                 "#stonerhand #collection #track #album"
             ),
         )
@@ -298,16 +278,10 @@ class FormatterTests(unittest.TestCase):
             author="SANSAE",
             url="https://www.youtube.com/watch?v=abc",
         )
-        signature = _pick_signature(
-            VIDEO_SIGNATURES,
-            "SANSAE:SANSAE Live Session Vol.3 - Melon:https://www.youtube.com/watch?v=abc",
-        )
-
         self.assertEqual(
             format_video_message(video),
-            "📺 · <b>SANSAE Live Session Vol.3 - Melon</b>\n"
+            '📺 · <a href="https://www.youtube.com/watch?v=abc"><b>SANSAE Live Session Vol.3 - Melon</b></a>\n'
             "канал: SANSAE\n\n"
-            f"<i>{signature}</i>\n\n"
             "#stonerhand #video",
         )
 
@@ -317,16 +291,10 @@ class FormatterTests(unittest.TestCase):
             station="NTS Radio",
             url="https://www.nts.live/shows/example",
         )
-        signature = _pick_signature(
-            RADIO_SIGNATURES,
-            "NTS Radio:Dark Energy w/ Guest:https://www.nts.live/shows/example",
-        )
-
         self.assertEqual(
             format_radio_message(radio),
-            "📡 · <b>Dark Energy w/ Guest</b>\n"
+            '📡 · <a href="https://www.nts.live/shows/example"><b>Dark Energy w/ Guest</b></a>\n'
             "станция: NTS Radio\n\n"
-            f"<i>{signature}</i>\n\n"
             "#stonerhand #radio",
         )
 
@@ -336,16 +304,10 @@ class FormatterTests(unittest.TestCase):
             platform="Spotify",
             url="https://open.spotify.com/playlist/abc",
         )
-        signature = _pick_signature(
-            PLAYLIST_SIGNATURES,
-            "Spotify:Women of Punk:https://open.spotify.com/playlist/abc",
-        )
-
         self.assertEqual(
             format_playlist_message(playlist),
-            "🎛 · <b>Women of Punk</b>\n"
+            '🎛 · <a href="https://open.spotify.com/playlist/abc"><b>Women of Punk</b></a>\n'
             "платформа: Spotify\n\n"
-            f"<i>{signature}</i>\n\n"
             "#stonerhand #playlist",
         )
 
@@ -355,16 +317,10 @@ class FormatterTests(unittest.TestCase):
             platform="Spotify",
             url="https://open.spotify.com/artist/abc",
         )
-        signature = _pick_signature(
-            ARTIST_SIGNATURES,
-            "Spotify:1.Kla$:https://open.spotify.com/artist/abc",
-        )
-
         self.assertEqual(
             format_artist_message(artist),
-            "🧬 · <b>1.Kla$</b>\n"
+            '🧬 · <a href="https://open.spotify.com/artist/abc"><b>1.Kla$</b></a>\n'
             "профиль: Spotify\n\n"
-            f"<i>{signature}</i>\n\n"
             "#stonerhand #artist",
         )
 
@@ -373,17 +329,11 @@ class FormatterTests(unittest.TestCase):
             PlaylistMatch(title="Women of Punk", platform="Spotify", url="https://open.spotify.com/playlist/1"),
             PlaylistMatch(title="Dark Wave", platform="Spotify", url="https://open.spotify.com/playlist/2"),
         ]
-        signature = _pick_signature(
-            PLAYLIST_COLLECTION_SIGNATURES,
-            "https://open.spotify.com/playlist/1|https://open.spotify.com/playlist/2",
-        )
-
         self.assertEqual(
             format_playlist_collection_message(playlists),
-            "сегодня в плейлистах:\n\n"
+            "<b>Плейлисты</b>\n\n"
             '1. 🎛 · <a href="https://open.spotify.com/playlist/1"><b>Women of Punk</b></a>\n'
             '2. 🎛 · <a href="https://open.spotify.com/playlist/2"><b>Dark Wave</b></a>\n\n'
-            f"<i>{signature}</i>\n\n"
             "#stonerhand #collection #playlist",
         )
 
@@ -392,17 +342,11 @@ class FormatterTests(unittest.TestCase):
             ArtistMatch(title="1.Kla$", platform="Spotify", url="https://open.spotify.com/artist/1"),
             ArtistMatch(title="Hotbox", platform="Spotify", url="https://open.spotify.com/artist/2"),
         ]
-        signature = _pick_signature(
-            ARTIST_COLLECTION_SIGNATURES,
-            "https://open.spotify.com/artist/1|https://open.spotify.com/artist/2",
-        )
-
         self.assertEqual(
             format_artist_collection_message(artists),
-            "сегодня по артистам:\n\n"
+            "<b>Артисты</b>\n\n"
             '1. 🧬 · <a href="https://open.spotify.com/artist/1"><b>1.Kla$</b></a>\n'
             '2. 🧬 · <a href="https://open.spotify.com/artist/2"><b>Hotbox</b></a>\n\n'
-            f"<i>{signature}</i>\n\n"
             "#stonerhand #collection #artist",
         )
 
@@ -411,17 +355,11 @@ class FormatterTests(unittest.TestCase):
             VideoMatch(title="First", author="One", url="https://youtu.be/1"),
             VideoMatch(title="Second", author="Two", url="https://youtu.be/2"),
         ]
-        signature = _pick_signature(
-            VIDEO_COLLECTION_SIGNATURES,
-            "https://youtu.be/1|https://youtu.be/2",
-        )
-
         self.assertEqual(
             format_video_collection_message(videos),
-            "сегодня на экране:\n\n"
+            "<b>Видео</b>\n\n"
             '1. 📺 · <a href="https://youtu.be/1"><b>First</b></a>\n'
             '2. 📺 · <a href="https://youtu.be/2"><b>Second</b></a>\n\n'
-            f"<i>{signature}</i>\n\n"
             "#stonerhand #collection #video",
         )
 
@@ -430,17 +368,11 @@ class FormatterTests(unittest.TestCase):
             RadioMatch(title="First", station="NTS Radio", url="https://nts.live/1"),
             RadioMatch(title="Second", station="NTS Radio", url="https://nts.live/2"),
         ]
-        signature = _pick_signature(
-            RADIO_COLLECTION_SIGNATURES,
-            "https://nts.live/1|https://nts.live/2",
-        )
-
         self.assertEqual(
             format_radio_collection_message(radios),
-            "сегодня на NTS:\n\n"
+            "<b>Радио</b>\n\n"
             '1. 📡 · <a href="https://nts.live/1"><b>First</b></a>\n'
             '2. 📡 · <a href="https://nts.live/2"><b>Second</b></a>\n\n'
-            f"<i>{signature}</i>\n\n"
             "#stonerhand #collection #radio",
         )
 
