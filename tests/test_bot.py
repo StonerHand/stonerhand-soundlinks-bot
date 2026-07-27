@@ -1819,7 +1819,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         caption = media[0].caption
         self.assertTrue(
             caption.startswith(
-                "<blockquote expandable>вечерний набор</blockquote>\n\n"
+                "<blockquote>вечерний набор</blockquote>\n\n"
             )
         )
         self.assertIn("<b>Песня + клип</b>", caption)
@@ -1847,7 +1847,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 1)
         self.assertTrue(
             message.replies[0].startswith(
-                "<blockquote expandable>пачка ссылок</blockquote>\n\n"
+                "<blockquote>пачка ссылок</blockquote>\n\n"
             )
         )
         self.assertIn(
@@ -1876,7 +1876,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 1)
         self.assertTrue(
             message.replies[0].startswith(
-                "<blockquote expandable>радио и видео</blockquote>\n\n"
+                "<blockquote>радио и видео</blockquote>\n\n"
             )
         )
         self.assertIn(
