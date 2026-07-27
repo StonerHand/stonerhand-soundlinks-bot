@@ -202,12 +202,17 @@ class _CrateBotStub:
     def __init__(self) -> None:
         self.sent: list[dict] = []
         self.photos: list[dict] = []
+        self.media_groups: list[dict] = []
 
     async def send_message(self, **kwargs):
         self.sent.append(kwargs)
 
     async def send_photo(self, **kwargs):
         self.photos.append(kwargs)
+
+    async def send_media_group(self, **kwargs):
+        self.media_groups.append(kwargs)
+        return [object(), object()]
 
 
 class _PreparedShareBotStub(_CrateBotStub):
@@ -558,6 +563,36 @@ class CrateApiTests(unittest.TestCase):
         self.assertIn("1.", context.bot.sent[0]["text"])
         self.assertIn("2.", context.bot.sent[0]["text"])
 
+    def test_crate_deliver_song_and_video_uses_native_pair_preview(self) -> None:
+        import asyncio
+        from api.webapp import _action_crate_deliver
+
+        context = _crate_context()
+        body = {
+            "items": [
+                _crate_track("Dopesmoker"),
+                {
+                    "artist": "Sleep",
+                    "title": "Dopesmoker (Official Video)",
+                    "links": {},
+                    "page_url": "https://youtu.be/video123",
+                    "kind": "video",
+                    "thumbnail_url": "https://img.example/video.jpg",
+                },
+            ]
+        }
+
+        sent = asyncio.run(
+            _action_crate_deliver(context, "crate_send", 7, False, body)
+        )
+
+        self.assertTrue(sent["ok"])
+        self.assertEqual(len(context.bot.media_groups), 1)
+        self.assertEqual(len(context.bot.sent), 1)
+        keyboard = context.bot.sent[0]["reply_markup"].inline_keyboard
+        self.assertEqual(keyboard[0][0].text, "🎧 Слушать песню")
+        self.assertEqual(keyboard[0][1].text, "📺 Смотреть клип")
+
     def test_crate_publish_is_admin_only_and_clears_crate(self) -> None:
         import asyncio
         from api.webapp import _action_crate_deliver, _load_crate
@@ -740,6 +775,56 @@ class PreviewAndRateLimitTests(unittest.TestCase):
         self.assertEqual(res["requested_count"], 3)
         self.assertEqual(res["resolved_count"], 1)
         self.assertEqual(res["failed_count"], 2)
+
+    def test_resolve_batch_builds_song_and_video_mix(self) -> None:
+        import asyncio
+        from api.webapp import _action_resolve_batch
+        from music_links_bot.models import TrackMatch, VideoMatch
+
+        class _Songlink:
+            async def lookup_track(self, url):
+                return TrackMatch(
+                    title="Dopesmoker",
+                    artist="Sleep",
+                    links={"spotify": url},
+                    page_url="https://song.link/dopesmoker",
+                    thumbnail_url="https://img.example/song.jpg",
+                )
+
+        class _YouTube:
+            async def lookup_video(self, url):
+                return VideoMatch(
+                    title="Dopesmoker (Official Video)",
+                    author="Sleep",
+                    url=url,
+                    thumbnail_url="https://img.example/video.jpg",
+                )
+
+        context = _crate_context()
+        context.application.bot_data.update(
+            {
+                "songlink_client": _Songlink(),
+                "soundcloud_client": None,
+                "youtube_client": _YouTube(),
+            }
+        )
+        res = asyncio.run(
+            _action_resolve_batch(
+                context,
+                {
+                    "query": (
+                        "https://open.spotify.com/track/aaa "
+                        "https://youtu.be/video123"
+                    )
+                },
+                7,
+            )
+        )
+
+        self.assertTrue(res["ok"])
+        self.assertEqual(res["resolved_count"], 2)
+        self.assertEqual([item["data"]["kind"] for item in res["items"]], ["song", "video"])
+        self.assertEqual(res["items"][1]["artwork"], "https://img.example/video.jpg")
 
     def test_resolve_batch_needs_two_urls(self) -> None:
         import asyncio

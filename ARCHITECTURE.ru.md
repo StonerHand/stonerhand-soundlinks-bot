@@ -61,6 +61,7 @@ src/music_links_bot/
   nts.py               Open Graph страниц NTS
   models.py            нормализованные модели контента
   formatter.py         HTML-текст постов, CTA и хэштеги
+  mixed_post.py        пара песня+клип, media preview и Studio-нормализация
   rich_publications.py валидация блоков, Rich HTML, fallback и raw Bot API transport
   keyboards.py         кнопки платформ и Telegram actions
   i18n.py              RU/EN интерфейсные строки
@@ -205,6 +206,11 @@ flowchart LR
 - неизвестный SoundCloud URL деградирует к oEmbed-карточке;
 - fallback сохраняет исходный источник и универсальный переход через Song.link;
 - ошибки провайдера типизированы и превращаются в сообщение с дальнейшим действием.
+- одна песня и один YouTube-клип переходят в отдельный компактный сценарий:
+  Telegram показывает обложку и oEmbed-thumbnail двумя плитками, а под ними
+  оставляет одну строку переходов к Song.link и оригинальному видео;
+- видео не скачивается и не перезаливается; если один из thumbnail недоступен,
+  отправка автоматически возвращается к обычному безопасному link-preview.
 
 ## 6. Telegram UX и состояние
 
@@ -266,7 +272,7 @@ Studio не требует Node build:
 - `app.js` управляет state/view transitions, Telegram WebApp API, player, Card/Longread, блочным редактором, preview, crate, queue и stats;
 - `api-client.js` создаёт `request_id`, ставит timeout, поддерживает abort и нормализует ошибки;
 - `cloud-storage.js` хранит тему, onboarding, presets, active draft и client-authoritative crate;
-- `studio-core.js` независимо от транспорта распознаёт single/batch query, оценивает готовность поста/подборки, нормализует лонгрид, импортирует Markdown и сериализует active draft snapshot.
+- `studio-core.js` независимо от транспорта распознаёт single/batch query, оценивает готовность поста/подборки, нормализует лонгрид, импортирует Markdown и сериализует active draft snapshot. Batch resolve разделяет музыкальные и YouTube-ссылки: видео хранится в crate как типизированный материал с оригинальным URL и thumbnail. Пара песня+клип получает отдельное двухплиточное превью, но остаётся совместима с общей сортировкой, оформлением и отправкой crate.
 
 Home загружается одним action `dashboard`: history, зеркало crate и очередь читаются
 параллельно на сервере. Это убирает прежний waterfall из трёх запросов. Последний
@@ -331,7 +337,7 @@ draft, поэтому одинаково работает для отправк�
 | stats | Redis merge | локальный JSON/memory |
 | queue | Redis `queue:v1` | memory текущего инстанса |
 
-Client-authoritative crate позволяет собирать подборку без Redis и отправляет полный список с mutation. Сервер валидирует каждую запись, ограничивает crate десятью треками и сохраняет зеркало. Telegram-бот при импорте нескольких ссылок сначала дедуплицирует все релизы, затем сохраняет bot-crate одной записью вместо последовательного цикла load/modify/save.
+Client-authoritative crate позволяет собирать подборку без Redis и отправляет полный список с mutation. Сервер валидирует каждую запись, ограничивает crate десятью материалами и сохраняет зеркало. Дедупликация учитывает и тип материала, поэтому песня и одноимённый клип не схлопываются. Telegram-бот при импорте нескольких ссылок сначала дедуплицирует все релизы, затем сохраняет bot-crate одной записью вместо последовательного цикла load/modify/save.
 
 ## 8. Очередь публикаций
 

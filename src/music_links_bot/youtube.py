@@ -54,6 +54,7 @@ class YouTubeClient:
 
         title = str(payload.get("title") or "").strip()
         author = str(payload.get("author_name") or "").strip()
+        thumbnail_url = str(payload.get("thumbnail_url") or "").strip()
         if not title:
             raise YouTubeLookupError("YouTube video title is missing.")
 
@@ -61,6 +62,7 @@ class YouTubeClient:
             title=title,
             author=author or "YouTube",
             url=source_url,
+            thumbnail_url=thumbnail_url or None,
         )
         self._cache.set(cache_key, video)
         return video

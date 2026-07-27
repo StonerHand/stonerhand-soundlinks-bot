@@ -23,6 +23,7 @@ Artwork, polished copy, every platform, collections and publishing — in 🎛 S
 | --- | --- |
 | Link or title → exact release picker → finished card | Search, candidates, live preview and optional 30-second audio |
 | 2–12 links → one complete numbered collection | Multi-link import and a crate of up to 10 releases |
+| Song + YouTube video → a two-tile native mix preview | Paired song/video artwork, media labels and drag ordering |
 | Artwork, CTA, hashtags and compact platform buttons | Card / Longread mode with an exact Telegram preview |
 | Native Telegram Rich Messages with safe HTML fallback | Block editor: headings, text, quotes, lists, sections and dividers |
 | Inline search with `@StonerHandBot` in any chat | Draft recovery, presets and a delivery preflight |
@@ -36,12 +37,17 @@ Yandex Music / Spotify playlists & artists / podcasts / NTS Radio
 
 Metadata and universal links come from Song.link/Odesli, iTunes Search and oEmbed. Longreads use Telegram Rich Messages (up to 32K, artwork and structured blocks); if Rich Messages are unavailable in a target client or chat, the bot sends a bounded HTML version with the same platform keyboard. Use Studio's Share action to send the full post and buttons as one prepared Telegram message. Telegram's ordinary forward action removes inline keyboards.
 
+For a one-song/one-video mix, Telegram receives the song cover and YouTube
+thumbnail as one native two-tile media preview. A compact action row opens the
+universal music page or the original YouTube video; the bot does not download or
+re-upload copyrighted video.
+
 ## Flow
 
 ```mermaid
 flowchart LR
     A["Link / title"] --> B["Choose release"]
-    A2["2–12 links"] --> C["Build crate"]
+    A2["2–12 links"] --> C["Build crate / media mix"]
     B --> D["Card / Longread editor"]
     C --> D
     D --> E["Share · self · channel · queue"]

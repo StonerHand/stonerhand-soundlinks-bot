@@ -451,8 +451,9 @@ class FormatterTests(unittest.TestCase):
 
         message = format_mixed_collection_message(tracks, videos)
 
-        self.assertIn(f"1. {pick_track_emoji(tracks[0])} · <b>Artist</b> - Song", message)
-        self.assertIn('2. 📺 · <a href="https://youtu.be/1"><b>Live</b></a>', message)
+        self.assertIn("<b>Песня + клип</b>", message)
+        self.assertIn("🎧 · <b>Artist</b> - Song", message)
+        self.assertIn('📺 · <a href="https://youtu.be/1"><b>Live</b></a>', message)
         self.assertIn("#stonerhand #collection #track #video", message)
 
     def test_format_mixed_collection_message_lists_playlists(self) -> None:

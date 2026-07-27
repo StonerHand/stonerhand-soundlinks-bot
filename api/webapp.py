@@ -26,6 +26,7 @@ from music_links_bot.bot import (
     _deliver_draft,
     _load_draft,
     _lookup_tracks,
+    _lookup_youtube_videos,
     _publish_draft,
     _render_track_draft,
     _select_preview_url,
@@ -50,6 +51,11 @@ from music_links_bot.loop_runner import (
     stop_background_loop,
 )
 from music_links_bot.models import TrackMatch
+from music_links_bot.mixed_post import (
+    as_video_track,
+    send_track_video_album,
+    split_track_video_pair,
+)
 from music_links_bot.publish_queue import (
     MAX_DELAY_SECONDS,
     QueueBusyError,
@@ -91,7 +97,7 @@ _save_crate = _studio_storage._save_crate
 _crate_base_items = _studio_storage._crate_base_items
 _crate_response = _studio_storage._crate_response
 
-from music_links_bot.url_utils import extract_supported_urls
+from music_links_bot.url_utils import extract_supported_urls, is_youtube_video_url
 from music_links_bot.webapp_auth import validate_init_data
 from telegram import InlineQueryResultArticle, InputTextMessageContent
 from telegram.constants import ParseMode
@@ -406,21 +412,35 @@ async def _action_resolve_batch(context, body: dict, user_id: int) -> dict:
         return {"ok": False, "error": "need urls"}
 
     bot_data = context.application.bot_data
-    tracks, _unavailable = await _lookup_tracks(
-        bot_data["songlink_client"],
-        source_urls,
-        soundcloud_client=bot_data["soundcloud_client"],
-        search_client=bot_data.get("search_client"),
+    video_urls = [url for url in source_urls if is_youtube_video_url(url)]
+    music_urls = [url for url in source_urls if not is_youtube_video_url(url)]
+    track_result, videos = await asyncio.gather(
+        _lookup_tracks(
+            bot_data["songlink_client"],
+            music_urls,
+            soundcloud_client=bot_data["soundcloud_client"],
+            search_client=bot_data.get("search_client"),
+        )
+        if music_urls
+        else asyncio.sleep(0, result=([], [])),
+        _lookup_youtube_videos(bot_data["youtube_client"], video_urls)
+        if video_urls
+        else asyncio.sleep(0, result=[]),
     )
+    tracks, _unavailable = track_result
     tracks = [track for track in tracks if track.links]
-    if not tracks:
+    resolved_items = [*tracks, *(as_video_track(video) for video in videos)]
+    if not resolved_items:
         return {"ok": False, "error": "not found"}
 
     items: list[dict] = []
     seen: set[str] = set()
-    for track in tracks:
+    for track in resolved_items:
         compact = _compact_track_data(asdict(track))
-        fingerprint = _release_fingerprint(compact["artist"], compact["title"])
+        fingerprint = (
+            f"{compact['kind']}:"
+            f"{_release_fingerprint(compact['artist'], compact['title'])}"
+        )
         if fingerprint in seen:
             continue
         seen.add(fingerprint)
@@ -610,10 +630,15 @@ async def _action_prepare_crate_share(context, body: dict, user_id: int) -> dict
         tracks, include_hashtags=True, **_collection_format_options(body, len(tracks))
     )
     keyboard = _build_collection_keyboard(tracks, include_channel_button=True)
+    pair = split_track_video_pair(tracks)
     result = InlineQueryResultArticle(
         id=hashlib.sha256(f"{user_id}:{text}".encode("utf-8")).hexdigest()[:32],
-        title=f"Подборка · {len(tracks)}",
-        description="Готовая подборка с кнопками всех релизов",
+        title="Песня + клип" if pair else f"Подборка · {len(tracks)}",
+        description=(
+            "Музыкальный микс с компактными кнопками"
+            if pair
+            else "Готовая подборка с кнопками всех релизов"
+        ),
         thumbnail_url=tracks[0].thumbnail_url,
         input_message_content=InputTextMessageContent(
             message_text=text,
@@ -933,9 +958,16 @@ async def _action_crate_add(context, body: dict, user_id: int) -> dict:
         return {"ok": False, "error": "draft not found"}
 
     items = await _crate_base_items(context, body, user_id)
-    fingerprint = _release_fingerprint(new_item["artist"], new_item["title"])
+    fingerprint = (
+        f"{new_item['kind']}:"
+        f"{_release_fingerprint(new_item['artist'], new_item['title'])}"
+    )
     if any(
-        _release_fingerprint(item["artist"], item["title"]) == fingerprint
+        (
+            f"{item['kind']}:"
+            f"{_release_fingerprint(item['artist'], item['title'])}"
+        )
+        == fingerprint
         for item in items
     ):
         await _save_crate(context, user_id, items)
@@ -1010,16 +1042,32 @@ async def _action_crate_deliver(
         tracks, include_channel_button=include_channel_button
     )
     try:
-        await context.bot.send_message(
-            chat_id=target,
-            text=text,
-            parse_mode=ParseMode.HTML,
-            link_preview_options=_build_link_preview_options(
-                _select_preview_url(tracks[0].links, context) or tracks[0].thumbnail_url,
-                prefer_large_media=True,
-            ),
-            reply_markup=keyboard,
-        )
+        pair = split_track_video_pair(tracks)
+        sent_pair = None
+        if pair is not None:
+            track, video = pair
+            sent_pair = await send_track_video_album(
+                context.bot,
+                chat_id=target,
+                track=track,
+                video_title=video.title,
+                video_url=video.page_url or "",
+                video_thumbnail_url=video.thumbnail_url,
+                caption=text,
+                reply_markup=keyboard,
+            )
+        if sent_pair is None:
+            await context.bot.send_message(
+                chat_id=target,
+                text=text,
+                parse_mode=ParseMode.HTML,
+                link_preview_options=_build_link_preview_options(
+                    _select_preview_url(tracks[0].links, context)
+                    or tracks[0].thumbnail_url,
+                    prefer_large_media=True,
+                ),
+                reply_markup=keyboard,
+            )
     except Exception:
         LOGGER.exception("Crate deliver failed")
         return {"ok": False, "error": "send failed"}

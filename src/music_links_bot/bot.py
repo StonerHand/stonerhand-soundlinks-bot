@@ -155,7 +155,9 @@ from music_links_bot.formatter import (
 )
 from music_links_bot.models import (
     TrackMatch,
+    VideoMatch,
 )
+from music_links_bot.mixed_post import send_track_video_album
 from music_links_bot.nts import NTSClient
 from music_links_bot.publication_state import (
     find_posted_date as _find_posted_date,
@@ -2097,6 +2099,65 @@ async def _send_track_result(
     )
 
 
+async def _send_track_video_pair_result(
+    bot: Bot,
+    message: Message,
+    text: str,
+    *,
+    track: TrackMatch,
+    video: VideoMatch,
+    reply_markup: InlineKeyboardMarkup | None,
+) -> bool:
+    if (
+        message.chat.type in {"group", "supergroup"}
+        and ephemeral_group_replies_enabled()
+        and getattr(message, "from_user", None) is not None
+    ):
+        await _send_track_result(
+            bot,
+            message,
+            text,
+            preview_url=_select_preview_url(track.links) or track.thumbnail_url,
+            reply_markup=reply_markup,
+        )
+        return True
+
+    placeholder = _take_placeholder(message.chat_id)
+    if placeholder is not None:
+        try:
+            await placeholder.delete()
+        except TelegramError:
+            LOGGER.debug("Could not remove mixed-post placeholder", exc_info=True)
+
+    sent = await send_track_video_album(
+        bot,
+        chat_id=message.chat_id,
+        track=track,
+        video_title=video.title,
+        video_url=video.url,
+        video_thumbnail_url=video.thumbnail_url,
+        caption=text,
+        reply_markup=(
+            make_channel_safe_keyboard(reply_markup)
+            if message.chat.type == "channel"
+            else reply_markup
+        ),
+    )
+    if sent is None:
+        await _send_track_result(
+            bot,
+            message,
+            text,
+            preview_url=_select_preview_url(track.links) or track.thumbnail_url,
+            reply_markup=reply_markup,
+        )
+        return True
+
+    if message.chat.type in {"group", "supergroup", "channel"}:
+        await _try_delete_message(message)
+    return True
+
+
 async def _reply_with_track(
     message: Message,
     text: str,
@@ -2130,6 +2191,7 @@ async def _reply_with_track(
 
 
 _bot_lookup.configure_track_result_sender(_send_track_result)
+_bot_lookup.configure_track_video_pair_sender(_send_track_video_pair_result)
 
 
 def _build_intro_keyboard(
