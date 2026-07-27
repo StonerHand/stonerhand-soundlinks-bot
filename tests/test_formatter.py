@@ -184,8 +184,8 @@ class FormatterTests(unittest.TestCase):
             format_collection_message(tracks),
             (
                 "<b>Подборка</b>\n\n"
-                f"1. {pick_track_emoji(tracks[0])} · <b>Artist</b> - Song\n"
-                "2. 💿 · <b>Band</b> - Album\n\n"
+                f"1. {pick_track_emoji(tracks[0])} · <b>Artist</b>\nSong\n"
+                "2. 💿 · <b>Band</b>\nAlbum\n\n"
                 "#stonerhand #collection #track #album"
             ),
         )
@@ -387,7 +387,7 @@ class FormatterTests(unittest.TestCase):
         message = format_mixed_collection_message(tracks, videos)
 
         self.assertIn("<b>Песня + клип</b>", message)
-        self.assertIn("🎧 · <b>Artist</b> - Song", message)
+        self.assertIn("🎧 · <b>Artist</b>\nSong", message)
         self.assertIn('📺 · <a href="https://youtu.be/1"><b>Live</b></a>', message)
         self.assertIn("#stonerhand #collection #track #video", message)
 
