@@ -43,13 +43,6 @@ def format_track_heading(track: TrackMatch) -> str:
     )
 
 
-def _linked_heading(url: str | None, heading: str) -> str:
-    """Keep collection entries useful after Telegram strips their keyboard."""
-    if not url:
-        return heading
-    return f'<a href="{escape(url, quote=True)}">{heading}</a>'
-
-
 def format_release_heading(track: TrackMatch) -> str:
     if track.kind == "album":
         return f"💿 · <b>{_display_text(track.artist)}</b>\n{_display_text(track.title)}"
@@ -73,12 +66,7 @@ def format_track_message(
     include_hashtags: bool = True,
     hashtags: str | None = None,
 ) -> str:
-    heading = format_release_heading(track)
-    # Telegram strips inline keyboards from ordinary forwards. Keep the
-    # release heading itself tappable without adding promotional filler copy.
-    if track.page_url:
-        heading = f'<a href="{escape(track.page_url, quote=True)}">{heading}</a>'
-    lines = [heading]
+    lines = [format_release_heading(track)]
     return _with_hashtags(
         lines,
         hashtags if hashtags is not None else build_auto_hashtags(track),
@@ -88,7 +76,7 @@ def format_track_message(
 
 def format_video_message(video: VideoMatch, *, include_hashtags: bool = True) -> str:
     lines = [
-        f'📺 · <a href="{escape(video.url, quote=True)}"><b>{_display_text(video.title)}</b></a>',
+        f"📺 · <b>{_display_text(video.title)}</b>",
         f"канал: {_display_text(video.author)}",
     ]
     return _with_hashtags(lines, "#stonerhand #video", include_hashtags=include_hashtags)
@@ -96,7 +84,7 @@ def format_video_message(video: VideoMatch, *, include_hashtags: bool = True) ->
 
 def format_radio_message(radio: RadioMatch, *, include_hashtags: bool = True) -> str:
     lines = [
-        f'📡 · <a href="{escape(radio.url, quote=True)}"><b>{_display_text(radio.title)}</b></a>',
+        f"📡 · <b>{_display_text(radio.title)}</b>",
         f"станция: {_display_text(radio.station)}",
     ]
     return _with_hashtags(lines, "#stonerhand #radio", include_hashtags=include_hashtags)
@@ -108,7 +96,7 @@ def format_playlist_message(
     include_hashtags: bool = True,
 ) -> str:
     lines = [
-        f'🎛 · <a href="{escape(playlist.url, quote=True)}"><b>{_display_text(playlist.title)}</b></a>',
+        f"🎛 · <b>{_display_text(playlist.title)}</b>",
         f"платформа: {_display_text(playlist.platform)}",
     ]
     return _with_hashtags(lines, "#stonerhand #playlist", include_hashtags=include_hashtags)
@@ -120,7 +108,7 @@ def format_artist_message(
     include_hashtags: bool = True,
 ) -> str:
     lines = [
-        f'🧬 · <a href="{escape(artist.url, quote=True)}"><b>{_display_text(artist.title)}</b></a>',
+        f"🧬 · <b>{_display_text(artist.title)}</b>",
         f"профиль: {_display_text(artist.platform)}",
     ]
     return _with_hashtags(lines, "#stonerhand #artist", include_hashtags=include_hashtags)
@@ -134,10 +122,7 @@ def format_artist_collection_message(
     lines = ["<b>Артисты</b>", ""]
     for index, artist in enumerate(artists, start=1):
         heading = f"<b>{_display_text(artist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(
-            f"{index}. 🧬 · "
-            f"{_linked_heading(artist.url, heading)}"
-        )
+        lines.append(f"{index}. 🧬 · {heading}")
 
     return _with_hashtags(lines, "#stonerhand #collection #artist", include_hashtags=include_hashtags)
 
@@ -150,10 +135,7 @@ def format_playlist_collection_message(
     lines = ["<b>Плейлисты</b>", ""]
     for index, playlist in enumerate(playlists, start=1):
         heading = f"<b>{_display_text(playlist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(
-            f"{index}. 🎛 · "
-            f"{_linked_heading(playlist.url, heading)}"
-        )
+        lines.append(f"{index}. 🎛 · {heading}")
 
     return _with_hashtags(lines, "#stonerhand #collection #playlist", include_hashtags=include_hashtags)
 
@@ -166,10 +148,7 @@ def format_video_collection_message(
     lines = ["<b>Видео</b>", ""]
     for index, video in enumerate(videos, start=1):
         heading = f"<b>{_display_text(video.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(
-            f"{index}. 📺 · "
-            f"{_linked_heading(video.url, heading)}"
-        )
+        lines.append(f"{index}. 📺 · {heading}")
 
     return _with_hashtags(lines, "#stonerhand #collection #video", include_hashtags=include_hashtags)
 
@@ -182,10 +161,7 @@ def format_radio_collection_message(
     lines = ["<b>Радио</b>", ""]
     for index, radio in enumerate(radios, start=1):
         heading = f"<b>{_display_text(radio.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(
-            f"{index}. 📡 · "
-            f"{_linked_heading(radio.url, heading)}"
-        )
+        lines.append(f"{index}. 📡 · {heading}")
 
     return _with_hashtags(lines, "#stonerhand #collection #radio", include_hashtags=include_hashtags)
 
@@ -221,41 +197,28 @@ def format_mixed_collection_message(
     for track in tracks:
         emoji = pick_track_emoji(track)
         lines.append(
-            f"{index}. {emoji} · "
-            f"{_linked_heading(track.page_url, format_track_heading(track))}"
+            f"{index}. {emoji} · {format_track_heading(track)}"
         )
         index += 1
 
     for playlist in playlists:
         heading = f"<b>{_display_text(playlist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(
-            f"{index}. 🎛 · "
-            f"{_linked_heading(playlist.url, heading)}"
-        )
+        lines.append(f"{index}. 🎛 · {heading}")
         index += 1
 
     for artist in artists:
         heading = f"<b>{_display_text(artist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(
-            f"{index}. 🧬 · "
-            f"{_linked_heading(artist.url, heading)}"
-        )
+        lines.append(f"{index}. 🧬 · {heading}")
         index += 1
 
     for radio in radios:
         heading = f"<b>{_display_text(radio.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(
-            f"{index}. 📡 · "
-            f"{_linked_heading(radio.url, heading)}"
-        )
+        lines.append(f"{index}. 📡 · {heading}")
         index += 1
 
     for video in videos:
         heading = f"<b>{_display_text(video.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(
-            f"{index}. 📺 · "
-            f"{_linked_heading(video.url, heading)}"
-        )
+        lines.append(f"{index}. 📺 · {heading}")
         index += 1
 
     return _with_hashtags(
@@ -278,11 +241,8 @@ def format_track_video_pair_message(
     include_hashtags: bool = True,
 ) -> str:
     """A compact editorial layout for the most common mixed post."""
-    track_heading = _linked_heading(track.page_url, format_track_heading(track))
-    video_heading = _linked_heading(
-        video.url,
-        f"<b>{_display_text(video.title, MAX_COLLECTION_TEXT_LENGTH)}</b>",
-    )
+    track_heading = format_track_heading(track)
+    video_heading = f"<b>{_display_text(video.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
     lines = [
         "<b>Песня + клип</b>",
         "",
@@ -349,8 +309,7 @@ def format_collection_message(
             active_section = section
         emoji = pick_track_emoji(track)
         lines.append(
-            f"{index}. {emoji} · "
-            f"{_linked_heading(track.page_url, format_track_heading(track))}"
+            f"{index}. {emoji} · {format_track_heading(track)}"
         )
         note = (
             item_notes[index - 1].strip()

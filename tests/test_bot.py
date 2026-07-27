@@ -1824,11 +1824,8 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("<b>Песня + клип</b>", caption)
         self.assertIn("<b>Youth Code</b>\nTransitions", caption)
-        self.assertIn(
-            '<a href="https://www.youtube.com/watch?v=abc123">'
-            "<b>SANSAE Live Session Vol.3 - Melon</b></a>",
-            caption,
-        )
+        self.assertIn("<b>SANSAE Live Session Vol.3 - Melon</b>", caption)
+        self.assertNotIn("<a href=", caption)
         self.assertNotIn("#stonerhand", caption)
         self.assertEqual(media[0].media, "https://img.example/a.jpg")
         self.assertEqual(media[1].media, "https://img.youtube.example/abc123.jpg")
@@ -1850,16 +1847,12 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
                 "<blockquote>пачка ссылок</blockquote>\n\n"
             )
         )
+        self.assertIn("<b>Women of Punk</b>", message.replies[0])
         self.assertIn(
-            '<a href="https://open.spotify.com/playlist/'
-            '37i9dQZF1DX51TD2wakW3K"><b>Women of Punk</b></a>',
+            "<b>SANSAE Live Session Vol.3 - Melon</b>",
             message.replies[0],
         )
-        self.assertIn(
-            '<a href="https://www.youtube.com/watch?v=abc123">'
-            "<b>SANSAE Live Session Vol.3 - Melon</b></a>",
-            message.replies[0],
-        )
+        self.assertNotIn("<a href=", message.replies[0])
         self.assertNotIn("#playlist #video", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "🎛 1. Women of Punk")
@@ -1879,16 +1872,12 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
                 "<blockquote>радио и видео</blockquote>\n\n"
             )
         )
+        self.assertIn("<b>Dark Energy w/ Guest</b>", message.replies[0])
         self.assertIn(
-            '<a href="https://www.nts.live/shows/example">'
-            "<b>Dark Energy w/ Guest</b></a>",
+            "<b>SANSAE Live Session Vol.3 - Melon</b>",
             message.replies[0],
         )
-        self.assertIn(
-            '<a href="https://www.youtube.com/watch?v=abc123">'
-            "<b>SANSAE Live Session Vol.3 - Melon</b></a>",
-            message.replies[0],
-        )
+        self.assertNotIn("<a href=", message.replies[0])
         self.assertNotIn("#radio #video", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "📡 1. Dark Energy w/ Guest")
@@ -2089,13 +2078,13 @@ class StudioOverrideTests(unittest.TestCase):
         draft.update(overrides)
         return draft
 
-    def test_legacy_custom_cta_is_not_rendered(self) -> None:
+    def test_legacy_custom_cta_is_not_rendered_and_heading_stays_plain(self) -> None:
         text, _ = _render_track_draft(
             self._draft(custom_cta="жми и слушай громко"), None
         )
 
         self.assertNotIn("жми и слушай громко", text)
-        self.assertIn('href="https://song.link/dopesmoker"', text)
+        self.assertNotIn("<a href=", text)
 
     def test_custom_tags_replace_auto_hashtags(self) -> None:
         text, _ = _render_track_draft(

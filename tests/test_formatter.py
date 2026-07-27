@@ -48,7 +48,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(build_auto_hashtags(track), "#stonerhand #track #heavymetal")
 
-    def test_track_heading_links_to_release_hub(self) -> None:
+    def test_track_heading_stays_plain_when_release_hub_exists(self) -> None:
         track = TrackMatch(
             title="Paranoid",
             artist="Black Sabbath",
@@ -58,7 +58,8 @@ class FormatterTests(unittest.TestCase):
 
         message = format_track_message(track, include_hashtags=False)
 
-        self.assertIn('<a href="https://song.link/paranoid">', message)
+        self.assertNotIn("<a href=", message)
+        self.assertIn("<b>Black Sabbath</b>\nParanoid", message)
 
     def test_format_track_message_includes_heading_and_hashtag(self) -> None:
         track = TrackMatch(
@@ -280,7 +281,7 @@ class FormatterTests(unittest.TestCase):
         )
         self.assertEqual(
             format_video_message(video),
-            '📺 · <a href="https://www.youtube.com/watch?v=abc"><b>SANSAE Live Session Vol.3 - Melon</b></a>\n'
+            "📺 · <b>SANSAE Live Session Vol.3 - Melon</b>\n"
             "канал: SANSAE\n\n"
             "#stonerhand #video",
         )
@@ -293,7 +294,7 @@ class FormatterTests(unittest.TestCase):
         )
         self.assertEqual(
             format_radio_message(radio),
-            '📡 · <a href="https://www.nts.live/shows/example"><b>Dark Energy w/ Guest</b></a>\n'
+            "📡 · <b>Dark Energy w/ Guest</b>\n"
             "станция: NTS Radio\n\n"
             "#stonerhand #radio",
         )
@@ -306,7 +307,7 @@ class FormatterTests(unittest.TestCase):
         )
         self.assertEqual(
             format_playlist_message(playlist),
-            '🎛 · <a href="https://open.spotify.com/playlist/abc"><b>Women of Punk</b></a>\n'
+            "🎛 · <b>Women of Punk</b>\n"
             "платформа: Spotify\n\n"
             "#stonerhand #playlist",
         )
@@ -319,7 +320,7 @@ class FormatterTests(unittest.TestCase):
         )
         self.assertEqual(
             format_artist_message(artist),
-            '🧬 · <a href="https://open.spotify.com/artist/abc"><b>1.Kla$</b></a>\n'
+            "🧬 · <b>1.Kla$</b>\n"
             "профиль: Spotify\n\n"
             "#stonerhand #artist",
         )
@@ -332,8 +333,8 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_playlist_collection_message(playlists),
             "<b>Плейлисты</b>\n\n"
-            '1. 🎛 · <a href="https://open.spotify.com/playlist/1"><b>Women of Punk</b></a>\n'
-            '2. 🎛 · <a href="https://open.spotify.com/playlist/2"><b>Dark Wave</b></a>\n\n'
+            "1. 🎛 · <b>Women of Punk</b>\n"
+            "2. 🎛 · <b>Dark Wave</b>\n\n"
             "#stonerhand #collection #playlist",
         )
 
@@ -345,8 +346,8 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_artist_collection_message(artists),
             "<b>Артисты</b>\n\n"
-            '1. 🧬 · <a href="https://open.spotify.com/artist/1"><b>1.Kla$</b></a>\n'
-            '2. 🧬 · <a href="https://open.spotify.com/artist/2"><b>Hotbox</b></a>\n\n'
+            "1. 🧬 · <b>1.Kla$</b>\n"
+            "2. 🧬 · <b>Hotbox</b>\n\n"
             "#stonerhand #collection #artist",
         )
 
@@ -358,8 +359,8 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_video_collection_message(videos),
             "<b>Видео</b>\n\n"
-            '1. 📺 · <a href="https://youtu.be/1"><b>First</b></a>\n'
-            '2. 📺 · <a href="https://youtu.be/2"><b>Second</b></a>\n\n'
+            "1. 📺 · <b>First</b>\n"
+            "2. 📺 · <b>Second</b>\n\n"
             "#stonerhand #collection #video",
         )
 
@@ -371,8 +372,8 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_radio_collection_message(radios),
             "<b>Радио</b>\n\n"
-            '1. 📡 · <a href="https://nts.live/1"><b>First</b></a>\n'
-            '2. 📡 · <a href="https://nts.live/2"><b>Second</b></a>\n\n'
+            "1. 📡 · <b>First</b>\n"
+            "2. 📡 · <b>Second</b>\n\n"
             "#stonerhand #collection #radio",
         )
 
@@ -388,7 +389,8 @@ class FormatterTests(unittest.TestCase):
 
         self.assertIn("<b>Песня + клип</b>", message)
         self.assertIn("🎧 · <b>Artist</b>\nSong", message)
-        self.assertIn('📺 · <a href="https://youtu.be/1"><b>Live</b></a>', message)
+        self.assertIn("📺 · <b>Live</b>", message)
+        self.assertNotIn("<a href=", message)
         self.assertIn("#stonerhand #collection #track #video", message)
 
     def test_format_mixed_collection_message_lists_playlists(self) -> None:
@@ -405,8 +407,9 @@ class FormatterTests(unittest.TestCase):
 
         message = format_mixed_collection_message([], videos, playlists)
 
-        self.assertIn('<a href="https://open.spotify.com/playlist/1"><b>Women of Punk</b></a>', message)
-        self.assertIn('<a href="https://youtu.be/1"><b>Live</b></a>', message)
+        self.assertIn("🎛 · <b>Women of Punk</b>", message)
+        self.assertIn("📺 · <b>Live</b>", message)
+        self.assertNotIn("<a href=", message)
         self.assertIn("#stonerhand #collection #playlist #video", message)
 
     def test_format_mixed_collection_message_lists_artists(self) -> None:
@@ -423,8 +426,9 @@ class FormatterTests(unittest.TestCase):
 
         message = format_mixed_collection_message([], videos, artists=artists)
 
-        self.assertIn('<a href="https://open.spotify.com/artist/1"><b>1.Kla$</b></a>', message)
-        self.assertIn('<a href="https://youtu.be/1"><b>Live</b></a>', message)
+        self.assertIn("🧬 · <b>1.Kla$</b>", message)
+        self.assertIn("📺 · <b>Live</b>", message)
+        self.assertNotIn("<a href=", message)
         self.assertIn("#stonerhand #collection #artist #video", message)
 
     def test_format_mixed_collection_message_lists_radios(self) -> None:
@@ -441,8 +445,9 @@ class FormatterTests(unittest.TestCase):
 
         message = format_mixed_collection_message([], videos, radios=radios)
 
-        self.assertIn('<a href="https://nts.live/1"><b>Dark Energy</b></a>', message)
-        self.assertIn('<a href="https://youtu.be/1"><b>Live</b></a>', message)
+        self.assertIn("📡 · <b>Dark Energy</b>", message)
+        self.assertIn("📺 · <b>Live</b>", message)
+        self.assertNotIn("<a href=", message)
         self.assertIn("#stonerhand #collection #radio #video", message)
 
 
