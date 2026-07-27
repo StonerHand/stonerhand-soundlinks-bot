@@ -1823,7 +1823,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             )
         )
         self.assertIn("<b>Песня + клип</b>", caption)
-        self.assertIn("<b>Youth Code</b> - Transitions", caption)
+        self.assertIn("<b>Youth Code</b>\nTransitions", caption)
         self.assertIn(
             '<a href="https://www.youtube.com/watch?v=abc123">'
             "<b>SANSAE Live Session Vol.3 - Melon</b></a>",

@@ -38,7 +38,7 @@ def format_track_label(track: TrackMatch) -> str:
 
 def format_track_heading(track: TrackMatch) -> str:
     return (
-        f"<b>{_display_text(track.artist, MAX_COLLECTION_TEXT_LENGTH)}</b> - "
+        f"<b>{_display_text(track.artist, MAX_COLLECTION_TEXT_LENGTH)}</b>\n"
         f"{_display_text(track.title, MAX_COLLECTION_TEXT_LENGTH)}"
     )
 
