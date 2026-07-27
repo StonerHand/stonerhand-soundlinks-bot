@@ -377,11 +377,11 @@ def prepend_user_text(message_text: str, *, author_label: str | None = None) -> 
 
     if author_label:
         return (
-            f"<blockquote expandable>{escape(author_label)}:\n"
+            f"<blockquote>{escape(author_label)}:\n"
             f"{escape(header)}</blockquote>\n\n"
         )
 
-    return f"<blockquote expandable>{escape(header)}</blockquote>\n\n"
+    return f"<blockquote>{escape(header)}</blockquote>\n\n"
 
 
 def prepend_user_html(message_html: str, *, author_label: str | None = None) -> str:
@@ -391,11 +391,11 @@ def prepend_user_html(message_html: str, *, author_label: str | None = None) -> 
 
     if author_label:
         return (
-            f"<blockquote expandable>{escape(author_label)}:\n"
+            f"<blockquote>{escape(author_label)}:\n"
             f"{header}</blockquote>\n\n"
         )
 
-    return f"<blockquote expandable>{header}</blockquote>\n\n"
+    return f"<blockquote>{header}</blockquote>\n\n"
 
 
 def _display_text(value: str, max_length: int = MAX_METADATA_TEXT_LENGTH) -> str:

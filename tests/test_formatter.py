@@ -236,14 +236,14 @@ class FormatterTests(unittest.TestCase):
     def test_prepend_user_text_formats_username_prefix(self) -> None:
         self.assertEqual(
             prepend_user_text("Твой текст", author_label="@username"),
-            "<blockquote expandable>@username:\nТвой текст</blockquote>\n\n",
+            "<blockquote>@username:\nТвой текст</blockquote>\n\n",
         )
 
     def test_prepend_user_text_escapes_html(self) -> None:
         self.assertEqual(
             prepend_user_text("<b>text</b>", author_label="@username"),
             (
-                "<blockquote expandable>@username:\n"
+                "<blockquote>@username:\n"
                 "&lt;b&gt;text&lt;/b&gt;</blockquote>\n\n"
             ),
         )
@@ -255,7 +255,7 @@ class FormatterTests(unittest.TestCase):
                 author_label="@username",
             ),
             (
-                "<blockquote expandable>@username:\nПервый абзац\n\n"
+                "<blockquote>@username:\nПервый абзац\n\n"
                 "  - пункт один\n  - пункт два</blockquote>\n\n"
             ),
         )
@@ -267,7 +267,7 @@ class FormatterTests(unittest.TestCase):
                 author_label="@username",
             ),
             (
-                "<blockquote expandable>@username:\n"
+                "<blockquote>@username:\n"
                 "<b>Жирный</b> и <i>курсив</i></blockquote>\n\n"
             ),
         )
