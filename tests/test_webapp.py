@@ -149,6 +149,46 @@ class StudioApiHelperTests(unittest.TestCase):
         self.assertEqual(draft["custom_tags"], ["#doom", "#stonerrock"])
         self.assertEqual(draft["platforms"], ["tidal", "spotify"])
 
+    def test_resolved_drafts_enable_hashtags_by_default(self) -> None:
+        import asyncio
+        from api.webapp import _action_resolve
+        from music_links_bot.models import TrackMatch
+
+        context = _crate_context()
+        context.application.bot_data.update(
+            {
+                "songlink_client": object(),
+                "soundcloud_client": None,
+                "search_client": None,
+            }
+        )
+        track = TrackMatch(
+            title="Dopesmoker",
+            artist="Sleep",
+            links={"spotify": "https://open.spotify.com/track/aaa"},
+        )
+        store = AsyncMock()
+        with (
+            patch(
+                "api.webapp._lookup_tracks",
+                new=AsyncMock(return_value=([track], [])),
+            ),
+            patch("api.webapp._store_draft", new=store),
+            patch("api.webapp._record_history", new=AsyncMock()),
+        ):
+            result = asyncio.run(
+                _action_resolve(
+                    context,
+                    {"query": "https://open.spotify.com/track/aaa"},
+                    7,
+                    False,
+                    "ru",
+                )
+            )
+
+        self.assertTrue(result["flags"]["hashtags"])
+        self.assertTrue(store.await_args.args[2]["hashtags"])
+
     def test_apply_draft_patch_resets_customization(self) -> None:
         from api.webapp import _apply_draft_patch
 

@@ -1033,7 +1033,6 @@ import {
     state = res; saveActiveDraft(); show("result"); renderCard(); hap.ok(); maybeCoach();
     if (applyDefaults) loadPrefs((prefs) => {
       if (!prefs) return; const patch = {};
-      if (typeof prefs.hashtags==="boolean" && prefs.hashtags!==state.flags.hashtags) patch.hashtags=prefs.hashtags;
       if (typeof prefs.large_preview==="boolean" && prefs.large_preview!==state.flags.large_preview) patch.large_preview=prefs.large_preview;
       if (Array.isArray(prefs.platforms) && prefs.platforms.length) patch.platforms=prefs.platforms;
       if (Object.keys(patch).length) syncDraft(patch, true);
@@ -1347,7 +1346,7 @@ import {
     if (pending && pending.value.trim()) editTags.push(pending.value.trim());
     const patch = { tags: editTags };
     if (editTags.length && !state.flags.hashtags) patch.hashtags = true;
-    savePrefs({ platforms: pmSelection(), hashtags: state.flags.hashtags, large_preview: state.flags.large_preview });
+    savePrefs({ platforms: pmSelection(), large_preview: state.flags.large_preview });
     syncDraft(patch, true);
     goBack();
   });

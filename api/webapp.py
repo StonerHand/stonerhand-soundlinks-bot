@@ -384,7 +384,7 @@ async def _action_resolve(context, body: dict, user_id: int, is_admin: bool, lan
         "type": "track",
         "item": asdict(track),
         "prefix": "",
-        "hashtags": False,
+        "hashtags": True,
         "quote": False,
         "large_preview": True,
         "chat_id": user_id,

@@ -770,8 +770,8 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertFalse(_should_include_channel_button(ChannelMessageStub()))
         self.assertFalse(_should_include_channel_button(GroupMessageStub()))
 
-    def test_hashtags_are_hidden_only_in_private_chats(self) -> None:
-        self.assertFalse(_should_include_hashtags(PrivateMessageStub()))
+    def test_hashtags_are_visible_in_private_and_public_chats(self) -> None:
+        self.assertTrue(_should_include_hashtags(PrivateMessageStub()))
         self.assertTrue(_should_include_hashtags(GroupMessageStub()))
 
     def test_section_keyboard_keeps_creation_actions_close(self) -> None:
@@ -1682,7 +1682,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 1)
         self.assertIn("<b>SANSAE Live Session Vol.3 - Melon</b>", message.replies[0])
         self.assertIn("канал: SANSAE", message.replies[0])
-        self.assertNotIn("#stonerhand", message.replies[0])
+        self.assertIn("#stonerhand #video", message.replies[0])
         # Private chats show an editable loading placeholder instead of a
         # typing action, so no chat action is expected here.
         self.assertEqual(context.bot.chat_actions, [])
@@ -1705,7 +1705,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 1)
         self.assertIn("<b>Dark Energy w/ Guest</b>", message.replies[0])
         self.assertIn("станция: NTS Radio", message.replies[0])
-        self.assertNotIn("#stonerhand", message.replies[0])
+        self.assertIn("#stonerhand #radio", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         preview_options = message.reply_kwargs[0]["link_preview_options"]
         self.assertEqual(keyboard[0][0].text, "📡 Открыть на NTS")
@@ -1724,6 +1724,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(message.replies), 1)
         self.assertIn("<b>Youth Code</b>\nTransitions", message.replies[0])
+        self.assertIn("#stonerhand #track", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "🟢 Spotify")
         self.assertEqual(keyboard[1][0].text, "🪩 Все платформы")
@@ -1770,7 +1771,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(message.replies), 1)
         self.assertIn("<b>Women of Punk</b>", message.replies[0])
-        self.assertNotIn("#stonerhand #playlist", message.replies[0])
+        self.assertIn("#stonerhand #playlist", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "🎛 Открыть плейлист")
         self.assertEqual(
@@ -1793,7 +1794,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 1)
         self.assertIn("<b>1.Kla$</b>", message.replies[0])
         self.assertIn("профиль: Spotify", message.replies[0])
-        self.assertNotIn("#stonerhand #artist", message.replies[0])
+        self.assertIn("#stonerhand #artist", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "🧬 Открыть артиста")
         self.assertEqual(
@@ -1826,7 +1827,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("<b>Youth Code</b>\nTransitions", caption)
         self.assertIn("<b>SANSAE Live Session Vol.3 - Melon</b>", caption)
         self.assertNotIn("<a href=", caption)
-        self.assertNotIn("#stonerhand", caption)
+        self.assertIn("#stonerhand #collection #track #video", caption)
         self.assertEqual(media[0].media, "https://img.example/a.jpg")
         self.assertEqual(media[1].media, "https://img.youtube.example/abc123.jpg")
         keyboard = context.bot.sent_messages[0]["reply_markup"].inline_keyboard
@@ -1853,7 +1854,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             message.replies[0],
         )
         self.assertNotIn("<a href=", message.replies[0])
-        self.assertNotIn("#playlist #video", message.replies[0])
+        self.assertIn("#stonerhand #collection #playlist #video", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "🎛 1. Women of Punk")
         self.assertEqual(keyboard[0][1].text, "📺 2. SANSAE Live Session Vol.3 - Melon")
@@ -1878,7 +1879,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             message.replies[0],
         )
         self.assertNotIn("<a href=", message.replies[0])
-        self.assertNotIn("#radio #video", message.replies[0])
+        self.assertIn("#stonerhand #collection #radio #video", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "📡 1. Dark Energy w/ Guest")
         self.assertEqual(keyboard[0][1].text, "📺 2. SANSAE Live Session Vol.3 - Melon")

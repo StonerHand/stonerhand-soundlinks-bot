@@ -386,7 +386,8 @@ def _should_include_channel_button(message: Message) -> bool:
 
 
 def _should_include_hashtags(message: Message) -> bool:
-    return message.chat.type != "private"
+    del message
+    return True
 
 
 def _build_platform_order(primary_platform: str | None) -> tuple[str, ...]:
