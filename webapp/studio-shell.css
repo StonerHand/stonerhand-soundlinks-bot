@@ -266,7 +266,7 @@ body::before { opacity: .014; }
   top: 88px;
   z-index: 3;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0,1fr));
+  grid-template-columns: repeat(3, minmax(0,1fr));
   gap: 6px;
   margin: 0 0 13px;
   padding: 7px;
@@ -709,7 +709,6 @@ body::before { opacity: .014; }
   .post-inner { padding: 22px; }
   .post-title { font-size: clamp(23px,6.5vw,28px); line-height: 1.15; }
   .post-artist { margin-top: 7px; font-size: 13px; line-height: 1.4; }
-  .post-cta { font-size: 15px; line-height: 1.5; }
   .post-tags span { min-height: 32px; padding: 7px 10px; font-size: 12px; }
   .plats { gap: 10px; }
   .plat {

@@ -2,9 +2,7 @@
 
 # 🎧 StonerHand Soundlinks Bot
 
-### A link, title or several releases → a card, longread or collection
-
-Artwork, polished copy, every platform, collections and publishing — in 🎛 Studio.
+### A music link → a finished Telegram publication
 
 [Open the bot](https://t.me/StonerHandBot) · [Channel](https://t.me/stonerhand) · [Русская версия](README.ru.md) · [Architecture (RU)](ARCHITECTURE.ru.md)
 
@@ -13,72 +11,70 @@ Artwork, polished copy, every platform, collections and publishing — in 🎛 S
 ![Vercel](https://img.shields.io/badge/Vercel-Production-000?style=flat-square&logo=vercel)
 ![CI](https://img.shields.io/github/actions/workflow/status/StonerHand/stonerhand-soundlinks-bot/ci.yml?style=flat-square&label=CI)
 
-<img src="assets/studio-demo.svg" alt="Animation: release search, finished card and publishing in StonerHand Studio" width="100%">
+<img src="assets/studio-demo.svg" alt="Animated StonerHand Studio search, longread and publishing flow" width="100%">
 
 </div>
 
-## What it does
+## Features
 
 | Telegram bot | Studio Mini App |
 | --- | --- |
-| Link or title → exact release picker → finished card | Search, candidates, live preview and optional 30-second audio |
-| 2–12 links → one complete numbered collection | Multi-link import and a crate of up to 10 releases |
-| Song + YouTube video → a two-tile native mix preview | Paired song/video artwork, media labels and drag ordering |
-| Artwork, CTA, hashtags and compact platform buttons | Card / Longread mode with an exact Telegram preview |
-| Native Telegram Rich Messages with safe HTML fallback | Block editor and expandable intros: headings, text, quotes, lists, sections and dividers |
-| Inline search with `@StonerHandBot` in any chat | Draft recovery, presets and a delivery preflight |
-| Automatic link replacement in groups and channels | Reordering, sections, notes and collection styling |
-| RU/EN workspace, actionable errors and retry | History, queue, reschedule, undo and owner analytics |
+| Link or title → exact release | Search, candidates and audio preview |
+| Tappable title, artwork and compact buttons | Card or block-based Rich longread |
+| Several links → one collection | Up to 10 releases with ordering and notes |
+| Song + YouTube clip → two-tile media preview | Song artwork and video thumbnail |
+| Inline search in any conversation | History, queue, undo and owner analytics |
+| Automatic link replacement in chats and channels | Native sharing that preserves buttons |
 
-```text
-Spotify / Apple Music / YouTube / SoundCloud / Bandcamp / Deezer / Tidal
-Yandex Music / Spotify playlists & artists / podcasts / NTS Radio
-```
+Spotify, Apple Music, YouTube, SoundCloud, Bandcamp, Deezer, Tidal,
+Yandex Music, podcasts, Spotify playlists and artists, and NTS Radio are
+supported.
 
-Metadata and universal links come from Song.link/Odesli, iTunes Search and oEmbed. Longreads use Telegram Rich Messages (up to 32K, artwork and structured blocks); if Rich Messages are unavailable in a target client or chat, the bot sends a bounded HTML version with the same platform keyboard. Use Studio's Share action to send the full post and buttons as one prepared Telegram message. Telegram's ordinary forward action removes inline keyboards.
+Cards contain release data and actions without generated promotional filler.
+The default keyboard shows two preferred services plus a universal hub, while
+the tappable heading survives Telegram's ordinary forwarding. Use Studio's
+Share action when the complete keyboard must travel with the post.
 
-For a one-song/one-video mix, Telegram receives the song cover and YouTube
-thumbnail as one native two-tile media preview. A compact action row opens the
-universal music page or the original YouTube video; the bot does not download or
-re-upload copyrighted video.
+Longreads use Telegram Rich Messages with a safe HTML fallback. A song and a
+YouTube clip become a native two-tile media album; the bot never downloads or
+re-uploads the copyrighted video.
 
 ## Flow
 
 ```mermaid
 flowchart LR
-    A["Link / title"] --> B["Choose release"]
-    A2["2–12 links"] --> C["Build crate / media mix"]
-    B --> D["Card / Longread editor"]
+    A["Link / title"] --> B["Exact release"]
+    A2["Several links"] --> C["Collection / media mix"]
+    B --> D["Card / Longread"]
     C --> D
-    D --> E["Share · self · channel · queue"]
+    D --> E["Chat · channel · queue"]
 ```
 
-Every user can search, edit, build crates and send finished posts to themselves or another chat. Channel publishing, scheduling, undo and stats are restricted to `ADMIN_CHAT_ID`. Keyboards are channel-safe: unsupported inline actions are removed while music-platform URL buttons remain.
+The bot menu exposes only Studio, search, crate and help. Publishing,
+scheduling, analytics and advanced formatting live in Studio. Provider clients
+are created lazily, only when a request actually needs them.
 
-## Quick start on Vercel
-
-1. Create a bot with [@BotFather](https://t.me/BotFather) and enable `/setinline`.
-2. Import the repository into Vercel with `./` as the root.
-3. Add the minimum environment:
+## Vercel setup
 
 ```dotenv
 BOT_TOKEN=123456:telegram-token
 SET_WEBHOOK_SECRET=long-random-secret
 CRON_SECRET=another-long-random-secret
+ADMIN_CHAT_ID=123456789
+PUBLISH_CHAT_ID=@channel
 ```
 
-4. Register Telegram after deployment:
+1. Create a bot with [@BotFather](https://t.me/BotFather) and enable `/setinline`.
+2. Import the repository into Vercel with `./` as the project root.
+3. Connect Upstash Redis from Vercel Marketplace for drafts, queue, history,
+   analytics and cross-instance deduplication.
+4. Open `https://<domain>/api/set_webhook?secret=<SET_WEBHOOK_SECRET>`.
+5. Verify `https://<domain>/api/health` returns HTTP 200 and `"ok": true`.
 
-```text
-https://<production-domain>/api/set_webhook?secret=<SET_WEBHOOK_SECRET>
-```
-
-5. Check `https://<production-domain>/api/health`; healthy production returns HTTP 200 and `"ok": true`.
-
-Set `ADMIN_CHAT_ID` and `PUBLISH_CHAT_ID` for channel publishing. Add Upstash Redis for durable scheduling, history, full stats and cross-instance deduplication. See [.env.example](.env.example) for every option.
+See [.env.example](.env.example) for every setting.
 
 <details>
-<summary><b>Local development</b></summary>
+<summary><b>Local development and verification</b></summary>
 
 ```bash
 python3 -m venv .venv
@@ -86,48 +82,26 @@ source .venv/bin/activate
 pip install -r requirements.txt pyflakes playwright
 python -m playwright install chromium
 cp .env.example .env
-PYTHONPATH=src python -m music_links_bot
-```
 
-Do not run polling and the production webhook against the same token.
-
-```bash
 python -m pyflakes src api tests
-PYTHONPATH=src python -m unittest discover -s tests -v
+PYTHONPATH=src python -m unittest discover -s tests
 python tests/e2e/smoke.py
 ```
 
-</details>
-
-<details>
-<summary><b>Production and reliability</b></summary>
-
-- `POST /api/telegram`: signed Telegram webhook with update deduplication;
-- `POST /api/webapp`: Studio API with HMAC `initData`, rate limiting and idempotency;
-- `GET /api/health`: Telegram, webhook, Redis, queue state and due-job delivery;
-- a Redis outage falls back to bounded in-memory deduplication instead of dropping updates;
-- a draft is durably written to Redis before the request completes, so it survives cold starts and opens from another serverless instance;
-- multi-link input is deduplicated and added to the crate with one batch write instead of one persistence round trip per track;
-- transient caches and active user tasks are bounded and deterministically cleaned up;
-- the queue uses a distributed lock, per-job lease, three attempts and backoff;
-- Vercel Cron restores the webhook without dropping pending updates, plus commands, profile and the Studio button;
-- critical failures are sent to the owner with hourly alert deduplication.
-
-Ping `/api/health` every five minutes for timely scheduled posts.
+Do not run polling and the production webhook against the same token.
 
 </details>
 
 ## Code map
 
 ```text
-api/                    Vercel webhook, Studio API, health and setup
-src/music_links_bot/    bot UI, lookup, Rich Messages, delivery, queue and storage
-webapp/                 build-free Mini App: block editor, preview, design system
-tests/                  offline unit/integration suite + adaptive Playwright smoke
+api/                    Vercel webhook, Studio API, health and cron
+src/music_links_bot/    lookup, formatting, delivery, queue and Redis
+webapp/                 build-free Telegram Mini App
+tests/                  unit/integration + adaptive Playwright smoke
 ```
 
-CI verifies Python modules, deployment JSON, JavaScript, the complete offline suite and the mobile Studio flow in Chromium at multiple widths and in both themes. For request flows, API actions, Redis keys, security and extension rules, see [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
-
-## License
+See [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md) for request flows, API actions,
+Redis keyspace, security and extension rules.
 
 [MIT](LICENSE)

@@ -11,59 +11,10 @@ from music_links_bot.models import (
     TrackMatch,
     VideoMatch,
 )
-from music_links_bot.phrases import pick_phrase
 
 TRACK_EMOJIS = ("🎵", "🎧", "🎶", "🔊", "📻")
 MAX_METADATA_TEXT_LENGTH = 180
 MAX_COLLECTION_TEXT_LENGTH = 96
-VIDEO_SIGNATURES = (
-    "видео на месте, можно смотреть",
-    "экран готов, жми смотреть",
-    "включай, пока не остыло",
-    "картинка поймана, звук рядом",
-    "смотреть можно отсюда",
-)
-PLAYLIST_SIGNATURES = (
-    "плейлист на месте, можно нырять",
-    "пачка собрана, вход открыт",
-    "выбирай трек и проваливайся",
-    "готово, можно запускать по кругу",
-    "сохранил маршрут, осталось открыть",
-)
-PLAYLIST_COLLECTION_SIGNATURES = (
-    "выбирай, с какой пачки начать",
-    "несколько маршрутов, один пост",
-    "плейлисты рядом, дальше твой ход",
-)
-VIDEO_COLLECTION_SIGNATURES = (
-    "выбирай, что включить первым",
-    "экранная пачка готова",
-    "можно смотреть по порядку, можно наугад",
-)
-RADIO_SIGNATURES = (
-    "эфир на месте, можно включать",
-    "радио поймано, дальше NTS",
-    "здесь уже можно нырять",
-    "передача готова к запуску",
-    "включай, если хочется провалиться",
-)
-RADIO_COLLECTION_SIGNATURES = (
-    "эфиры рядом, выбирай первый",
-    "радио-пачка готова",
-    "можно включать по порядку, можно наугад",
-)
-ARTIST_SIGNATURES = (
-    "точка входа в артиста",
-    "дальше уже дискография",
-    "если зацепило - ныряй в каталог",
-    "профиль открыт, можно копать глубже",
-    "сначала артист, потом все остальное",
-)
-ARTIST_COLLECTION_SIGNATURES = (
-    "артисты рядом, выбирай с кого начать",
-    "несколько входов в разные каталоги",
-    "витрина артистов готова",
-)
 
 
 def pick_track_emoji(track: TrackMatch) -> str:
@@ -120,29 +71,14 @@ def format_track_message(
     track: TrackMatch,
     *,
     include_hashtags: bool = True,
-    cta_text: str | None = None,
     hashtags: str | None = None,
 ) -> str:
-    seed = f"{track.artist}:{track.title}:{track.kind}"
-    cta_key = {
-        "album": "album_cta",
-        "podcast": "podcast_cta",
-    }.get(track.kind, "track_cta")
-
-    escaped_cta = escape(cta_text if cta_text else pick_phrase(cta_key, seed))
-    # The CTA doubles as a hub link: forwarded messages lose inline keyboards
-    # (a Telegram limitation), so the text itself keeps a tappable path to
-    # every platform.
+    heading = format_release_heading(track)
+    # Telegram strips inline keyboards from ordinary forwards. Keep the
+    # release heading itself tappable without adding promotional filler copy.
     if track.page_url:
-        cta_line = f'<i><a href="{escape(track.page_url, quote=True)}">{escaped_cta}</a></i>'
-    else:
-        cta_line = f"<i>{escaped_cta}</i>"
-
-    lines = [
-        format_release_heading(track),
-        "",
-        cta_line,
-    ]
+        heading = f'<a href="{escape(track.page_url, quote=True)}">{heading}</a>'
+    lines = [heading]
     return _with_hashtags(
         lines,
         hashtags if hashtags is not None else build_auto_hashtags(track),
@@ -151,29 +87,17 @@ def format_track_message(
 
 
 def format_video_message(video: VideoMatch, *, include_hashtags: bool = True) -> str:
-    signature = _pick_signature(
-        VIDEO_SIGNATURES,
-        f"{video.author}:{video.title}:{video.url}",
-    )
     lines = [
-        f"📺 · <b>{_display_text(video.title)}</b>",
+        f'📺 · <a href="{escape(video.url, quote=True)}"><b>{_display_text(video.title)}</b></a>',
         f"канал: {_display_text(video.author)}",
-        "",
-        f"<i>{escape(signature)}</i>",
     ]
     return _with_hashtags(lines, "#stonerhand #video", include_hashtags=include_hashtags)
 
 
 def format_radio_message(radio: RadioMatch, *, include_hashtags: bool = True) -> str:
-    signature = _pick_signature(
-        RADIO_SIGNATURES,
-        f"{radio.station}:{radio.title}:{radio.url}",
-    )
     lines = [
-        f"📡 · <b>{_display_text(radio.title)}</b>",
+        f'📡 · <a href="{escape(radio.url, quote=True)}"><b>{_display_text(radio.title)}</b></a>',
         f"станция: {_display_text(radio.station)}",
-        "",
-        f"<i>{escape(signature)}</i>",
     ]
     return _with_hashtags(lines, "#stonerhand #radio", include_hashtags=include_hashtags)
 
@@ -183,15 +107,9 @@ def format_playlist_message(
     *,
     include_hashtags: bool = True,
 ) -> str:
-    signature = _pick_signature(
-        PLAYLIST_SIGNATURES,
-        f"{playlist.platform}:{playlist.title}:{playlist.url}",
-    )
     lines = [
-        f"🎛 · <b>{_display_text(playlist.title)}</b>",
+        f'🎛 · <a href="{escape(playlist.url, quote=True)}"><b>{_display_text(playlist.title)}</b></a>',
         f"платформа: {_display_text(playlist.platform)}",
-        "",
-        f"<i>{escape(signature)}</i>",
     ]
     return _with_hashtags(lines, "#stonerhand #playlist", include_hashtags=include_hashtags)
 
@@ -201,15 +119,9 @@ def format_artist_message(
     *,
     include_hashtags: bool = True,
 ) -> str:
-    signature = _pick_signature(
-        ARTIST_SIGNATURES,
-        f"{artist.platform}:{artist.title}:{artist.url}",
-    )
     lines = [
-        f"🧬 · <b>{_display_text(artist.title)}</b>",
+        f'🧬 · <a href="{escape(artist.url, quote=True)}"><b>{_display_text(artist.title)}</b></a>',
         f"профиль: {_display_text(artist.platform)}",
-        "",
-        f"<i>{escape(signature)}</i>",
     ]
     return _with_hashtags(lines, "#stonerhand #artist", include_hashtags=include_hashtags)
 
@@ -219,11 +131,7 @@ def format_artist_collection_message(
     *,
     include_hashtags: bool = True,
 ) -> str:
-    signature = _pick_signature(
-        ARTIST_COLLECTION_SIGNATURES,
-        "|".join(artist.url for artist in artists),
-    )
-    lines = ["сегодня по артистам:", ""]
+    lines = ["<b>Артисты</b>", ""]
     for index, artist in enumerate(artists, start=1):
         heading = f"<b>{_display_text(artist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
         lines.append(
@@ -231,7 +139,6 @@ def format_artist_collection_message(
             f"{_linked_heading(artist.url, heading)}"
         )
 
-    lines.extend(["", f"<i>{escape(signature)}</i>"])
     return _with_hashtags(lines, "#stonerhand #collection #artist", include_hashtags=include_hashtags)
 
 
@@ -240,11 +147,7 @@ def format_playlist_collection_message(
     *,
     include_hashtags: bool = True,
 ) -> str:
-    signature = _pick_signature(
-        PLAYLIST_COLLECTION_SIGNATURES,
-        "|".join(playlist.url for playlist in playlists),
-    )
-    lines = ["сегодня в плейлистах:", ""]
+    lines = ["<b>Плейлисты</b>", ""]
     for index, playlist in enumerate(playlists, start=1):
         heading = f"<b>{_display_text(playlist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
         lines.append(
@@ -252,12 +155,6 @@ def format_playlist_collection_message(
             f"{_linked_heading(playlist.url, heading)}"
         )
 
-    lines.extend(
-        [
-            "",
-            f"<i>{escape(signature)}</i>",
-        ]
-    )
     return _with_hashtags(lines, "#stonerhand #collection #playlist", include_hashtags=include_hashtags)
 
 
@@ -266,11 +163,7 @@ def format_video_collection_message(
     *,
     include_hashtags: bool = True,
 ) -> str:
-    signature = _pick_signature(
-        VIDEO_COLLECTION_SIGNATURES,
-        "|".join(video.url for video in videos),
-    )
-    lines = ["сегодня на экране:", ""]
+    lines = ["<b>Видео</b>", ""]
     for index, video in enumerate(videos, start=1):
         heading = f"<b>{_display_text(video.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
         lines.append(
@@ -278,12 +171,6 @@ def format_video_collection_message(
             f"{_linked_heading(video.url, heading)}"
         )
 
-    lines.extend(
-        [
-            "",
-            f"<i>{escape(signature)}</i>",
-        ]
-    )
     return _with_hashtags(lines, "#stonerhand #collection #video", include_hashtags=include_hashtags)
 
 
@@ -292,11 +179,7 @@ def format_radio_collection_message(
     *,
     include_hashtags: bool = True,
 ) -> str:
-    signature = _pick_signature(
-        RADIO_COLLECTION_SIGNATURES,
-        "|".join(radio.url for radio in radios),
-    )
-    lines = ["сегодня на NTS:", ""]
+    lines = ["<b>Радио</b>", ""]
     for index, radio in enumerate(radios, start=1):
         heading = f"<b>{_display_text(radio.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
         lines.append(
@@ -304,12 +187,6 @@ def format_radio_collection_message(
             f"{_linked_heading(radio.url, heading)}"
         )
 
-    lines.extend(
-        [
-            "",
-            f"<i>{escape(signature)}</i>",
-        ]
-    )
     return _with_hashtags(lines, "#stonerhand #collection #radio", include_hashtags=include_hashtags)
 
 
@@ -338,19 +215,7 @@ def format_mixed_collection_message(
             include_hashtags=include_hashtags,
         )
 
-    seed = "|".join(
-        [
-            *(f"{track.artist}:{track.title}:{track.kind}" for track in tracks),
-            *(f"{playlist.platform}:{playlist.title}:playlist" for playlist in playlists),
-            *(f"{artist.platform}:{artist.title}:artist" for artist in artists),
-            *(f"{radio.station}:{radio.title}:radio" for radio in radios),
-            *(f"{video.author}:{video.title}:video" for video in videos),
-        ]
-    )
-    lines = [
-        pick_phrase("collection_intro", seed),
-        "",
-    ]
+    lines = ["<b>Подборка</b>", ""]
 
     index = 1
     for track in tracks:
@@ -393,13 +258,6 @@ def format_mixed_collection_message(
         )
         index += 1
 
-    lines.extend(
-        [
-            "",
-            f"<i>{escape(pick_phrase('collection_cta', seed))}</i>",
-        ]
-    )
-
     return _with_hashtags(
         lines,
         build_mixed_collection_hashtags(
@@ -433,7 +291,6 @@ def format_track_video_pair_message(
     ]
     if video.author:
         lines.append(f"   <i>{_display_text(video.author, MAX_COLLECTION_TEXT_LENGTH)}</i>")
-    lines.extend(["", "<i>один релиз, два способа включить</i>"])
     return _with_hashtags(
         lines,
         build_mixed_collection_hashtags([track], has_videos=True),
@@ -470,11 +327,13 @@ def format_collection_message(
             include_hashtags=include_hashtags,
         )
 
-    seed = "|".join(f"{track.artist}:{track.title}:{track.kind}" for track in tracks)
     lines: list[str] = []
     if title:
         lines.extend([f"<b>{escape(title)}</b>", ""])
-    lines.extend([escape(intro) if intro else pick_phrase("collection_intro", seed), ""])
+    elif not intro:
+        lines.extend(["<b>Подборка</b>", ""])
+    if intro:
+        lines.extend([escape(intro), ""])
 
     active_section = ""
     for index, track in enumerate(tracks, start=1):
@@ -501,12 +360,8 @@ def format_collection_message(
         if note:
             lines.append(f"   <i>↳ {escape(note)}</i>")
 
-    lines.extend(
-        [
-            "",
-            f"<i>{escape(outro) if outro else escape(pick_phrase('collection_cta', seed))}</i>",
-        ]
-    )
+    if outro:
+        lines.extend(["", f"<i>{escape(outro)}</i>"])
 
     return _with_hashtags(
         lines,
@@ -603,11 +458,6 @@ def _with_hashtags(lines: list[str], hashtags: str, *, include_hashtags: bool) -
         lines.extend(["", hashtags])
 
     return "\n".join(lines)
-
-
-def _pick_signature(options: tuple[str, ...], seed: str) -> str:
-    index = int(hashlib.sha256(seed.encode("utf-8")).hexdigest(), 16) % len(options)
-    return options[index]
 
 
 def build_mixed_collection_hashtags(

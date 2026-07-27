@@ -51,7 +51,6 @@ def _clean_text(value: object, limit: int, *, multiline: bool = False) -> str:
 def default_longread(
     track: TrackMatch,
     *,
-    cta: str | None = None,
     lang: str = "ru",
 ) -> dict:
     title = f"{track.artist} — {track.title}".strip(" —")
@@ -65,23 +64,11 @@ def default_longread(
         if value
     ]
     lead = " · ".join(details)
-    opening = _clean_text(cta, MAX_BLOCK_TEXT) if cta else ""
-    if not opening:
-        opening = (
-            "Новый релиз уже собран — осталось включить звук."
-            if lang != "en"
-            else "The release is ready — all that remains is to press play."
-        )
+    del lang
     return {
         "title": title[:MAX_LONGREAD_TITLE],
         "lead": lead[:MAX_LONGREAD_LEAD],
-        "blocks": [
-            {
-                "id": "opening",
-                "type": "paragraph",
-                "text": opening,
-            }
-        ],
+        "blocks": [],
     }
 
 
@@ -89,10 +76,9 @@ def sanitize_longread(
     value: object,
     track: TrackMatch,
     *,
-    cta: str | None = None,
     lang: str = "ru",
 ) -> dict:
-    fallback = default_longread(track, cta=cta, lang=lang)
+    fallback = default_longread(track, lang=lang)
     if not isinstance(value, dict):
         return fallback
 
@@ -186,8 +172,6 @@ def sanitize_longread(
                     }
                 )
 
-    if not blocks:
-        blocks = fallback["blocks"]
     return {"title": title, "lead": lead, "blocks": blocks}
 
 
@@ -205,7 +189,6 @@ def apply_publication_patch(draft: dict, body: dict) -> None:
     draft["longread"] = sanitize_longread(
         body.get("longread"),
         track,
-        cta=draft.get("custom_cta"),
         lang=draft.get("lang") or "ru",
     )
 
@@ -213,13 +196,10 @@ def apply_publication_patch(draft: dict, body: dict) -> None:
 def longread_view(
     draft: dict,
     track: TrackMatch,
-    *,
-    cta: str | None,
 ) -> dict:
     longread = sanitize_longread(
         draft.get("longread"),
         track,
-        cta=cta,
         lang=draft.get("lang") or "ru",
     )
     return {
@@ -237,13 +217,11 @@ def build_rich_html(
     draft: dict,
     track: TrackMatch,
     *,
-    cta: str | None,
     hashtags: str | None,
 ) -> str:
     data = sanitize_longread(
         draft.get("longread"),
         track,
-        cta=cta,
         lang=draft.get("lang") or "ru",
     )
     pieces = [f"<h1>{html.escape(data['title'])}</h1>"]
@@ -298,7 +276,6 @@ def build_fallback_html(
     draft: dict,
     track: TrackMatch,
     *,
-    cta: str | None,
     hashtags: str | None,
 ) -> str:
     """Render the longread with the formatting supported by older clients.
@@ -308,7 +285,6 @@ def build_fallback_html(
     data = sanitize_longread(
         draft.get("longread"),
         track,
-        cta=cta,
         lang=draft.get("lang") or "ru",
     )
     pieces = [f"<b>{html.escape(data['title'])}</b>"]

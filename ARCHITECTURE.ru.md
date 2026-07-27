@@ -60,7 +60,7 @@ src/music_links_bot/
   artist.py            Spotify artist oEmbed
   nts.py               Open Graph страниц NTS
   models.py            нормализованные модели контента
-  formatter.py         HTML-текст постов, CTA и хэштеги
+  formatter.py         компактный HTML постов, кликабельные заголовки и хэштеги
   mixed_post.py        пара песня+клип, media preview и Studio-нормализация
   rich_publications.py валидация блоков, Rich HTML, fallback и raw Bot API transport
   keyboards.py         кнопки платформ и Telegram actions
@@ -74,6 +74,7 @@ src/music_links_bot/
   request_guard.py     rate limit и idempotency Studio mutations
   kvstore.py           Upstash/Vercel KV REST adapter
   cache.py             локальный TTL cache
+  lazy_client.py       отложенная инициализация HTTP-клиентов провайдеров
   stats.py             локальные счётчики и merge
   bot_stats.py         запись статистики из Telegram handlers
   alerts.py            дедуплицированные DM владельцу
@@ -218,7 +219,15 @@ flowchart LR
 
 В личке текстовый запрос сохраняется в пользовательской сессии. Бот показывает до шести кандидатов. После выбора или прямой ссылки одно сообщение обновляется по этапам, поэтому чат не засоряется временными статусами.
 
-`/start` рендерит персональный home-state из сессии, размера bot-crate и роли пользователя. Студия — главное полноширинное действие; поиск и подборка остаются доступны одним тапом. Для админа появляется статистика. Справочные экраны используют единый action footer (новый пост, подборка, Студия, возврат домой), а Web App-кнопка исключается в группах, где Telegram её не поддерживает.
+`/start` рендерит короткий home-state из размера bot-crate и роли пользователя.
+В первом уровне остаются Студия, поиск, подборка и помощь. Очередь, публикация,
+аналитика и расширенное оформление перенесены в Студию. Web App-кнопка
+исключается в группах, где Telegram её не поддерживает.
+
+Готовая карточка не содержит сгенерированных рекламных подписей. Заголовок
+релиза кликабелен, поэтому обычная пересылка остаётся полезной даже после
+удаления inline-клавиатуры самим Telegram. При наличии universal page клавиатура
+показывает две приоритетные площадки и кнопку «Все платформы».
 
 ### Черновик
 
@@ -230,7 +239,6 @@ draft:<id> → {
   item,
   source_url,
   flags,
-  custom_cta,
   custom_hashtags,
   platform_order,
   publication_mode: card | longread,
@@ -311,7 +319,7 @@ draft, поэтому одинаково работает для отправк�
 | `resolve_batch` | пользователь | 2+ URL → дедуплицированные элементы crate |
 | `draft` | владелец draft | открыть draft из Telegram |
 | `preview` | владелец draft | лениво получить audio preview |
-| `update` | владелец draft | применить flags, CTA, tags, platform order и Card/Longread blocks |
+| `update` | владелец draft | применить flags, tags, platform order и Card/Longread blocks |
 | `dashboard` | пользователь | history + crate + краткое состояние очереди одним запросом |
 | `history` | пользователь | последние 10 релизов и published state |
 | `send` | пользователь | отправить карточку или Rich Message себе |
@@ -511,6 +519,8 @@ Vercel Git Integration создаёт Preview для feature branch и Productio
 - Vercel Functions не дают постоянного процесса: очередь тикает оппортунистически, а не отдельным worker;
 - без Redis состояние является best-effort и привязано к тёплому инстансу;
 - `bot.py` и `api/webapp.py` остаются orchestration-модулями; inline уже вынесен в `bot_inline.py`, новые provider/storage/UI обязанности также нужно добавлять отдельными файлами;
+- HTTP-клиенты провайдеров создаются лениво при первом обращении; неиспользованный
+  провайдер не увеличивает холодный старт и не открывает соединения;
 - Studio — vanilla JS state machine без статической типизации, поэтому API contract защищают runtime validation и E2E;
 - Telegram удаляет inline keyboard при обычной пересылке; Студия использует prepared message для отправки текста вместе с URL-кнопками, а каналам не отдаёт запрещённые `switch_inline_query`-действия;
 - публичный iTunes Search не гарантирует одинаковый каталог во всех регионах;

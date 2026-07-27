@@ -527,10 +527,6 @@ class BotKeyboardTests(unittest.TestCase):
             [
                 ("start", "меню и быстрый старт"),
                 ("help", "как пользоваться"),
-                ("guide", "для групп и каналов"),
-                ("platforms", "сервисы и типы ссылок"),
-                ("channel", "канал StonerHand"),
-                ("stats", "статистика бота"),
                 ("crate", "моя подборка"),
             ],
         )
@@ -558,7 +554,7 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[0][0].url, "https://song.link/track-1")
         self.assertEqual(rows[0][1].text, "🎧 2. Show Me The Body - Camp Orchestra")
         self.assertEqual(rows[0][1].url, "https://song.link/track-2")
-        self.assertEqual(rows[1][0].text, "🪨 Открыть канал")
+        self.assertEqual(len(rows), 1)
 
     def test_release_keyboard_can_hide_channel_button(self) -> None:
         keyboard = _build_link_keyboard(
@@ -662,16 +658,14 @@ class BotKeyboardTests(unittest.TestCase):
     def test_error_keyboard_points_to_supported_services(self) -> None:
         keyboard = _build_error_keyboard("StonerHandBot")
 
-        self.assertEqual(keyboard.inline_keyboard[0][0].text, "🔎 Создать новый пост")
+        self.assertEqual(keyboard.inline_keyboard[0][0].text, "🔎 Найти релиз")
         self.assertEqual(
             keyboard.inline_keyboard[0][0].switch_inline_query_current_chat,
             "",
         )
-        self.assertEqual(keyboard.inline_keyboard[1][0].text, "Что поддерживается")
-        self.assertEqual(keyboard.inline_keyboard[1][0].callback_data, "menu:platforms")
-        self.assertEqual(keyboard.inline_keyboard[1][1].callback_data, "menu:start")
-        self.assertEqual(keyboard.inline_keyboard[2][0].text, "🪨 Открыть канал")
-        self.assertEqual(keyboard.inline_keyboard[2][1].text, "↗ Поделиться ботом")
+        self.assertEqual(keyboard.inline_keyboard[1][0].text, "← Главное меню")
+        self.assertEqual(keyboard.inline_keyboard[1][0].callback_data, "menu:start")
+        self.assertEqual(len(keyboard.inline_keyboard), 2)
 
     def test_collection_keyboard_can_hide_channel_button(self) -> None:
         keyboard = _build_collection_keyboard(
@@ -772,9 +766,9 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[0][1].text, "📺 2. Live Session")
         self.assertEqual(rows[0][1].api_kwargs, {"style": "danger"})
 
-    def test_channel_button_is_hidden_only_in_stonerhand_channel(self) -> None:
+    def test_publication_cards_do_not_repeat_channel_navigation(self) -> None:
         self.assertFalse(_should_include_channel_button(ChannelMessageStub()))
-        self.assertTrue(_should_include_channel_button(GroupMessageStub()))
+        self.assertFalse(_should_include_channel_button(GroupMessageStub()))
 
     def test_hashtags_are_hidden_only_in_private_chats(self) -> None:
         self.assertFalse(_should_include_hashtags(PrivateMessageStub()))
@@ -785,7 +779,7 @@ class BotKeyboardTests(unittest.TestCase):
 
         rows = keyboard.inline_keyboard
         self.assertEqual(len(rows), 3)
-        self.assertEqual(rows[0][0].text, "🔎 Создать новый пост")
+        self.assertEqual(rows[0][0].text, "🔎 Найти релиз")
         self.assertEqual(rows[0][1].text, "🧺 Подборка · 0")
         self.assertEqual([button.text for button in rows[1]], ["❓ Помощь", "🎛 Сервисы"])
         self.assertEqual(rows[2][0].text, "← Главное меню")
@@ -845,16 +839,12 @@ class BotKeyboardTests(unittest.TestCase):
         rows = keyboard.inline_keyboard
         self.assertEqual(rows[0][0].text, "🎛 Открыть Студию")
         self.assertEqual(rows[0][0].api_kwargs, {"style": "success"})
-        self.assertEqual(rows[1][0].text, "🔎 Создать новый пост")
+        self.assertEqual(rows[1][0].text, "🔎 Найти релиз")
         self.assertEqual(len(rows[1]), 1)
         self.assertEqual(rows[2][0].text, "🧺 Подборка · 3")
         self.assertEqual(rows[2][0].api_kwargs, {"style": "success"})
-        self.assertEqual(rows[2][1].text, "▶ Как всё работает")
-        self.assertEqual(rows[3][0].text, "📊 Статистика канала")
-        self.assertEqual(rows[3][1].text, "🗓 Очередь")
-        self.assertEqual(rows[3][1].web_app.url, "https://studio.example/app?view=queue")
-        self.assertEqual(rows[-1][0].text, "❓ Помощь")
-        self.assertEqual(rows[-1][1].text, "🪨 Открыть канал")
+        self.assertEqual(rows[2][1].text, "❓ Помощь")
+        self.assertEqual(len(rows), 3)
 
     def test_home_text_is_personal_and_escapes_telegram_html(self) -> None:
         text = _build_home_text(
@@ -866,8 +856,7 @@ class BotKeyboardTests(unittest.TestCase):
 
         self.assertIn("Твоя Студия, &lt;Артём&gt;", text)
         self.assertIn("Подборка · 4/10", text)
-        self.assertIn("Канал, очередь и статистика доступны", text)
-        self.assertIn("<i>", text)
+        self.assertIn("Канал и очередь — в Студии", text)
         self.assertIn("<code>артист — трек</code>", text)
 
     def test_home_keyboard_omits_webapp_button_outside_private_chat(self) -> None:
@@ -918,7 +907,7 @@ class BotKeyboardTests(unittest.TestCase):
                     for tag in ("b", "i", "code", "blockquote"):
                         self.assertEqual(text.count(f"<{tag}>"), text.count(f"</{tag}>"))
 
-    def test_demo_menu_shows_example_post_and_cta(self) -> None:
+    def test_demo_menu_shows_compact_example_post(self) -> None:
         demo_text = _menu_text("menu:demo")
 
         self.assertTrue(demo_text.startswith("✨ <b>Так выглядит готовый пост</b>"))
@@ -1305,19 +1294,17 @@ class PostEditorTests(unittest.TestCase):
     def test_editor_rows_show_toggle_states_and_actions(self) -> None:
         rows = _editor_rows("abc123", self._draft(hashtags=True))
 
-        self.assertEqual(rows[0][0].text, "✉️ Отправить себе")
-        self.assertEqual(rows[0][0].callback_data, "v2|editor|s|abc123")
-        self.assertEqual(rows[1][0].text, "🧺 В подборку")
-        self.assertEqual(rows[2][0].text, "⚙️ Настроить")
+        self.assertEqual(rows[0][0].text, "🧺 В подборку")
+        self.assertEqual(rows[0][0].callback_data, "v2|editor|c|abc123")
         more = _editor_more_rows("abc123", self._draft(hashtags=True))
         self.assertEqual(more[0][0].text, "# Хэштеги ✓")
         self.assertEqual(more[0][0].callback_data, "v2|editor|h|abc123")
 
-    def test_editor_rows_add_publish_button_for_admin(self) -> None:
+    def test_editor_rows_keep_admin_actions_in_studio(self) -> None:
         rows = _editor_rows("abc123", self._draft(can_publish=True))
 
-        self.assertEqual(rows[0][1].text, "📤 В канал")
-        self.assertEqual(rows[0][1].callback_data, "v2|editor|p|abc123")
+        labels = [button.text for row in rows for button in row]
+        self.assertNotIn("📤 В канал", labels)
 
     def test_editor_rows_show_quote_toggle_only_with_prefix(self) -> None:
         rows_without_quote = _editor_more_rows("abc123", self._draft())
@@ -1343,9 +1330,10 @@ class PostEditorTests(unittest.TestCase):
         ):
             rows = _editor_rows("abc123", self._draft())
 
-        studio = rows[1][0]
+        studio = rows[0][0]
         self.assertEqual(studio.text, "🎛 Студия")
         self.assertEqual(studio.web_app.url, "https://studio.example/app?draft=abc123")
+        self.assertEqual(studio.api_kwargs, {"style": "success"})
 
     def test_render_track_draft_respects_toggles(self) -> None:
         draft = self._draft(
@@ -1364,7 +1352,7 @@ class PostEditorTests(unittest.TestCase):
             for button in row
             if button.callback_data
         ]
-        self.assertIn("v2|editor|m|abc123", editor_buttons)
+        self.assertIn("v2|editor|c|abc123", editor_buttons)
 
         draft["quote"] = False
         draft["hashtags"] = False
@@ -1514,8 +1502,8 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("<code>артист — название</code>", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "Повторить")
-        self.assertEqual(keyboard[1][0].text, "🔎 Создать новый пост")
-        self.assertEqual(keyboard[2][0].text, "Что поддерживается")
+        self.assertEqual(keyboard[1][0].text, "🔎 Найти релиз")
+        self.assertEqual(keyboard[2][0].text, "← Главное меню")
         self.assertEqual(context.bot.sent_messages, [])
         self.assertEqual(context.bot.chat_actions, [])
         self.assertEqual(context.application.bot_data["runtime"].active_tasks, {})
@@ -1653,10 +1641,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             for button in row
             if button.callback_data
         ]
-        self.assertIn(
-            True,
-            [data.startswith("v2|editor|m|") for data in callback_data],
-        )
+        self.assertTrue(any(data.startswith("v2|editor|c|") for data in callback_data))
         self.assertEqual(len(context.application.bot_data["drafts"]), 1)
 
     async def test_multiple_spotify_links_use_one_collection_post(self) -> None:
@@ -1695,7 +1680,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertIn("📺 · <b>SANSAE Live Session Vol.3 - Melon</b>", message.replies[0])
+        self.assertIn("<b>SANSAE Live Session Vol.3 - Melon</b>", message.replies[0])
         self.assertIn("канал: SANSAE", message.replies[0])
         self.assertNotIn("#stonerhand", message.replies[0])
         # Private chats show an editable loading placeholder instead of a
@@ -1718,7 +1703,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertIn("📡 · <b>Dark Energy w/ Guest</b>", message.replies[0])
+        self.assertIn("<b>Dark Energy w/ Guest</b>", message.replies[0])
         self.assertIn("станция: NTS Radio", message.replies[0])
         self.assertNotIn("#stonerhand", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
@@ -1784,7 +1769,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertIn("🎛 · <b>Women of Punk</b>", message.replies[0])
+        self.assertIn("<b>Women of Punk</b>", message.replies[0])
         self.assertNotIn("#stonerhand #playlist", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "🎛 Открыть плейлист")
@@ -1806,7 +1791,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertIn("🧬 · <b>1.Kla$</b>", message.replies[0])
+        self.assertIn("<b>1.Kla$</b>", message.replies[0])
         self.assertIn("профиль: Spotify", message.replies[0])
         self.assertNotIn("#stonerhand #artist", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
@@ -2104,12 +2089,12 @@ class StudioOverrideTests(unittest.TestCase):
         draft.update(overrides)
         return draft
 
-    def test_custom_cta_replaces_generated_phrase(self) -> None:
+    def test_legacy_custom_cta_is_not_rendered(self) -> None:
         text, _ = _render_track_draft(
             self._draft(custom_cta="жми и слушай громко"), None
         )
 
-        self.assertIn("жми и слушай громко", text)
+        self.assertNotIn("жми и слушай громко", text)
         self.assertIn('href="https://song.link/dopesmoker"', text)
 
     def test_custom_tags_replace_auto_hashtags(self) -> None:
@@ -2165,4 +2150,4 @@ class StudioOverrideTests(unittest.TestCase):
             for button in row
             if button.url and "song.link" not in button.url and "t.me" not in button.url
         ]
-        self.assertEqual(len(urls), 3)
+        self.assertEqual(len(urls), 2)

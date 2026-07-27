@@ -38,8 +38,8 @@ import {
     dupA: "⚠️ Already published on ", dupB: ". Publish again?", confirm: "Publish", cancel: "Cancel",
     err: "The signal got noisy. Try again.", network: "No connection. Check your internet and retry.", timeout: "The server needs more time. Try again.", busy: "Still working on it. Try again in a moment.", allPlatforms: "All",
     toCrate: "In crate", crateFull: "CRATE IS FULL",
-    secContent: "Content", secText: "Your text", secTags: "Hashtags", secPm: "Platforms & order",
-    rHashtags: "Hashtags", rQuote: "Quote / CTA", rPhoto: "Photo mode (no player)", rBig: "Large preview",
+    secContent: "Content", secTags: "Hashtags", secPm: "Platforms & order",
+    rHashtags: "Hashtags", rQuote: "Quote", rPhoto: "Photo mode (no player)", rBig: "Large preview",
     addTrack: "Add track", crateEmpty: "ADD TRACKS FROM ANY CARD", needMore: "ADD AT LEAST 2 TRACKS",
     crateSend: "Send to me", cratePublish: "Publish collection", crateClear: "Clear crate", crateShare: "Share collection",
     crateTitle: "tracks", queueTitle: "posts", queueEmpty: "QUEUE IS EMPTY",
@@ -47,7 +47,7 @@ import {
     sheetTitle: "When to publish?", in1h: "In 1 hour", in3h: "In 3 hours", tonight: "Tonight 19:00", tomorrow: "Tomorrow 10:00",
     clipQ: "Paste from clipboard?", preview30: "0:30 preview", addTag: "add",
     stat: { posts: "posts", song: "tracks", album: "albums", podcast: "podcasts", videos: "videos", collections: "sets" },
-    coach: [["🔎","Find the release","Paste a link or search by artist and title."],["🎧","Check the sound","Preview the track before you build the post."],["🎛","Shape the card","Tune the text, cover and platforms in Style."],["📡","Choose a destination","Send to yourself, a channel or the publishing queue."]],
+    coach: [["🔎","Find the release","Paste a link or search by artist and title."],["🎧","Check the sound","Preview the track before you build the post."],["🎛","Shape the card","Tune the cover, tags and platforms in Style."],["📡","Choose a destination","Send to yourself, a channel or the publishing queue."]],
     gotIt: "Start creating", next: "Next", skip: "Skip", step: "STEP",
     flow: ["Find","Style","Send"], support: "All music platforms", batch: "Several links → crate",
     quick: { create:["Create","Smart release search"], crate:["Crate","Build a set"], inline:["Inline search","In any chat"], queue:["Queue","Publishing plan"], stats:["Analytics","Channel pulse"] },
@@ -56,8 +56,8 @@ import {
       heroKicker:"MUSIC POST WORKSHOP", heroTitle:"Build a post,<br><em>that sounds.</em>",
       homeError:"Could not refresh", homeErrorCopy:"Check your connection and retry", loadError:"Could not load data", retry:"Retry",
       cancelSearch:"Cancel search", notFoundHead:"Nothing found", notFoundTitle:"Release not found", notFoundCopy:"Refine the artist and title or paste a direct link", editQuery:"Edit query",
-      resultKicker:"READY TO AIR", resultCopy:"This is what your audience will see", format:"Style", livePreview:"LIVE PREVIEW", ctaPlaceholder:"Add your own caption…", publishedStamp:"PUBLISHED", sentStamp:"SENT",
-      saved:"Saved", saving:"Saving…", saveError:"Not saved", onePlatform:"Keep at least one platform", done:"Done", content:"Content", ownText:"Your text", hashtags:"Hashtags", platforms:"Platforms & order",
+      resultKicker:"READY TO AIR", resultCopy:"This is what your audience will see", format:"Style", livePreview:"LIVE PREVIEW", publishedStamp:"PUBLISHED", sentStamp:"SENT",
+      saved:"Saved", saving:"Saving…", saveError:"Not saved", onePlatform:"Keep at least one platform", done:"Done", content:"Content", hashtags:"Hashtags", platforms:"Platforms & order",
       crate:"Crate", crateKicker:"CURATED BY STONERHAND", crateHero:"Your next set", queue:"Queue", stats:"Analytics", period:"All time", breakdown:"Breakdown", create:"Create",
       close:"Close", publishKicker:"FINAL STEP", publishTitle:"Where should the post go?",
       destinations:[["To channel","Publish for everyone"],["Send to me","Check in your private chat"],["Add to queue","Choose a date and time"],["Send to another chat","Ready post with every button"]],
@@ -100,8 +100,8 @@ import {
     dupA: "⚠️ Уже публиковалось ", dupB: ". Опубликовать снова?", confirm: "Опубликовать", cancel: "Отмена",
     err: "Связь зашумела. Попробуем ещё раз.", network: "Нет соединения. Проверь интернет и повтори.", timeout: "Серверу нужно больше времени. Попробуй ещё раз.", busy: "Ещё работаем над запросом. Повтори через секунду.", allPlatforms: "Все",
     toCrate: "В подборке", crateFull: "ПОДБОРКА ЗАПОЛНЕНА",
-    secContent: "Содержимое", secText: "Свой текст", secTags: "Хэштеги", secPm: "Платформы и порядок",
-    rHashtags: "Хэштеги", rQuote: "Цитата / CTA", rPhoto: "Фото-режим (без плеера)", rBig: "Большое превью",
+    secContent: "Содержимое", secTags: "Хэштеги", secPm: "Платформы и порядок",
+    rHashtags: "Хэштеги", rQuote: "Цитата", rPhoto: "Фото-режим (без плеера)", rBig: "Большое превью",
     addTrack: "Добавить трек", crateEmpty: "ДОБАВЛЯЙ ТРЕКИ С ЛЮБОЙ КАРТОЧКИ", needMore: "НУЖНО МИНИМУМ 2 ТРЕКА",
     crateSend: "Отправить себе", cratePublish: "Опубликовать подборку", crateClear: "Очистить подборку", crateShare: "Поделиться подборкой",
     crateTitle: "треков", queueTitle: "постов", queueEmpty: "ОЧЕРЕДЬ ПУСТА",
@@ -109,7 +109,7 @@ import {
     sheetTitle: "Когда опубликовать?", in1h: "Через час", in3h: "Через 3 часа", tonight: "Сегодня 19:00", tomorrow: "Завтра 10:00",
     clipQ: "Вставить из буфера?", preview30: "0:30 превью", addTag: "тег",
     stat: { posts: "постов", song: "треков", album: "альбомов", podcast: "подкастов", videos: "видео", collections: "подборок" },
-    coach: [["🔎","Найди точный релиз","Вставь ссылку или найди музыку по артисту и названию."],["🎧","Проверь звучание","Прослушай отрывок до того, как собирать пост."],["🎛","Настрой карточку","Измени текст, обложку и площадки в «Оформлении»."],["📡","Выбери назначение","Отправь себе, опубликуй в канал или поставь в очередь."]],
+    coach: [["🔎","Найди точный релиз","Вставь ссылку или найди музыку по артисту и названию."],["🎧","Проверь звучание","Прослушай отрывок до того, как собирать пост."],["🎛","Настрой карточку","Выбери обложку, теги и площадки в «Оформлении»."],["📡","Выбери назначение","Отправь себе, опубликуй в канал или поставь в очередь."]],
     gotIt: "Начать", next: "Дальше", skip: "Пропустить", step: "ШАГ",
     flow: ["Найти","Оформить","Отправить"], support: "Все музыкальные сервисы", batch: "Несколько ссылок → подборка",
     quick: { create:["Создать","Умный поиск релиза"], crate:["Подборка","Собрать сет"], inline:["Inline-поиск","В любом чате"], queue:["Очередь","Планы на эфир"], stats:["Статистика","Ритм канала"] },
@@ -118,8 +118,8 @@ import {
       heroKicker:"МУЗЫКАЛЬНАЯ МАСТЕРСКАЯ", heroTitle:"Собери пост,<br><em>который звучит.</em>",
       homeError:"Не удалось обновить", homeErrorCopy:"Проверь соединение и повтори", loadError:"Не удалось загрузить данные", retry:"Ещё раз",
       cancelSearch:"Отменить поиск", notFoundHead:"Ничего не найдено", notFoundTitle:"Релиз не найден", notFoundCopy:"Уточни исполнителя и название или вставь прямую ссылку", editQuery:"Изменить запрос",
-      resultKicker:"ГОТОВО К ЭФИРУ", resultCopy:"Так пост увидит аудитория", format:"Оформление", livePreview:"ЖИВОЕ ПРЕВЬЮ", ctaPlaceholder:"Добавь свой комментарий…", publishedStamp:"ОПУБЛИКОВАНО", sentStamp:"ОТПРАВЛЕНО",
-      saved:"Сохранено", saving:"Сохраняю…", saveError:"Не сохранено", onePlatform:"Оставь хотя бы одну площадку", done:"Готово", content:"Содержимое", ownText:"Свой текст", hashtags:"Хэштеги", platforms:"Площадки и порядок",
+      resultKicker:"ГОТОВО К ЭФИРУ", resultCopy:"Так пост увидит аудитория", format:"Оформление", livePreview:"ЖИВОЕ ПРЕВЬЮ", publishedStamp:"ОПУБЛИКОВАНО", sentStamp:"ОТПРАВЛЕНО",
+      saved:"Сохранено", saving:"Сохраняю…", saveError:"Не сохранено", onePlatform:"Оставь хотя бы одну площадку", done:"Готово", content:"Содержимое", hashtags:"Хэштеги", platforms:"Площадки и порядок",
       crate:"Подборка", crateKicker:"СОБРАНО STONERHAND", crateHero:"Следующий сет", queue:"Очередь", stats:"Статистика", period:"За всё время", breakdown:"Разбивка", create:"Создать",
       close:"Закрыть", publishKicker:"ФИНАЛЬНЫЙ ШАГ", publishTitle:"Куда отправить пост?",
       destinations:[["В канал","Опубликовать для всех"],["Отправить себе","Проверить в личном чате"],["Добавить в очередь","Выбрать дату и время"],["Отправить в другой чат","Готовый пост со всеми кнопками"]],
@@ -257,7 +257,7 @@ import {
   try { tg.onEvent?.("safeAreaChanged", syncSafeArea); tg.onEvent?.("contentSafeAreaChanged", syncSafeArea); tg.onEvent?.("viewportChanged", syncSafeArea); } catch(e) {}
 
   /* Prefer Telegram's native primary action where it exists. Browsers and
-     older clients keep the custom dock, so the flow never loses its CTA. */
+     older clients keep the custom dock, so the primary action stays visible. */
   const nativeMain = tg.MainButton && typeof tg.MainButton.show === "function" ? tg.MainButton : null;
   let nativeMainHandler = null;
   function hideNativeMain() {
@@ -315,8 +315,7 @@ import {
   $("nf-head").textContent = T.ui.notFoundHead; $("nf-title").textContent = T.ui.notFoundTitle; $("nf-copy").textContent = T.ui.notFoundCopy; $("nf-retry").textContent = T.ui.editQuery;
   $("result-kicker").textContent = T.ui.resultKicker; $("result-copy").textContent = T.ui.resultCopy;
   $("format-title").textContent = T.ui.format; $("format-kicker").textContent = T.ui.livePreview; $("fmt-sync").textContent = T.ui.saved;
-  $("cta-input").placeholder = T.ui.ctaPlaceholder;
-  $("format-content").textContent = T.ui.content; $("format-text").textContent = T.ui.ownText; $("format-tags").textContent = T.ui.hashtags; $("format-platforms").textContent = T.ui.platforms;
+  $("format-content").textContent = T.ui.content; $("format-tags").textContent = T.ui.hashtags; $("format-platforms").textContent = T.ui.platforms;
   $("crate-label").textContent = T.ui.crate; $("crate-kicker").textContent = T.ui.crateKicker; $("crate-hero-title").textContent = T.ui.crateHero;
   $("crate-edit-label").textContent = T.crateEdit;
   $("crate-editor-title").textContent = T.crateEditor; $("crate-editor-save").textContent = T.crateSave;
@@ -325,7 +324,6 @@ import {
   $("queue-label").textContent = T.ui.queue; $("stats-title").textContent = T.ui.stats; $("stats-period").textContent = T.ui.period; $("stats-breakdown-label").textContent = T.ui.breakdown;
   $("create-label").textContent = T.ui.create; $("fmt-apply").textContent = T.ui.done;
   $("format-nav-presets").textContent = EN ? "Style" : "Стиль";
-  $("format-nav-copy").textContent = EN ? "Copy" : "Текст";
   $("format-nav-tags").textContent = EN ? "Tags" : "Теги";
   $("format-nav-services").textContent = EN ? "Services" : "Сервисы";
   $("result-score-label").textContent = EN ? "ready" : "готово";
@@ -671,7 +669,6 @@ import {
       '<div class="post-title">'+esc(r.title)+"</div>"+
       '<div class="post-artist">'+esc(r.emoji)+" · "+esc(r.artist)+(r.year?" · "+esc(r.year):"")+"</div></div>"+genre+"</div>";
 
-    const ctaBlock = '<div class="post-cta" id="cta-line">'+esc(r.cta)+'<span class="pencil">✏️</span></div>';
     const tagsBlock = (f.hashtags && r.hashtags)
       ? '<div class="post-tags" id="tags-line">'+r.hashtags.split(/\s+/).filter(Boolean).map((t)=>"<span>"+esc(t)+"</span>").join("")+'<span class="pencil">✏️</span></div>'
       : "";
@@ -711,9 +708,9 @@ import {
           ? '<img class="compact-art" data-card-art="1" data-emoji="'+artEmoji+'" crossorigin="anonymous" alt="'+artAlt+'" decoding="async" src="'+artSrc+'">'
           : '<div class="compact-art cover-fallback" aria-label="'+artAlt+'">'+artEmoji+"</div>")+"</div>"+
         '<div style="flex:1;min-width:0">'+headBlock+"</div></div>";
-      card.innerHTML = coverBlock + innerTop + '<div class="post-inner" style="padding-top:12px">'+ctaBlock+tagsBlock+'<div class="plats">'+plats+"</div></div>";
+      card.innerHTML = coverBlock + innerTop + '<div class="post-inner" style="padding-top:12px">'+tagsBlock+'<div class="plats">'+plats+"</div></div>";
     } else {
-      card.innerHTML = coverBlock + '<div class="post-inner">'+headBlock+ctaBlock+tagsBlock+'<div class="plats">'+plats+"</div></div>";
+      card.innerHTML = coverBlock + '<div class="post-inner">'+headBlock+tagsBlock+'<div class="plats">'+plats+"</div></div>";
     }
     card.style.boxShadow = "0 8px 32px "+acc+"22";
     card.style.borderColor = "var(--border)";
@@ -736,7 +733,6 @@ import {
         }
       }).catch(() => { previewFetching = false; });
     }
-    const ctaLine = $("cta-line"); if (ctaLine) ctaLine.addEventListener("click", () => openFormat());
     const tagsLine = $("tags-line"); if (tagsLine) tagsLine.addEventListener("click", () => openFormat());
 
     const img = card.querySelector("img");
@@ -1222,7 +1218,6 @@ import {
     previewArt.textContent = release.emoji || "♪";
     previewArt.style.backgroundImage = safeUrl(release.artwork) ? 'url("'+release.artwork.replace(/"/g, "%22")+'")' : "";
     drawToggles();
-    $("cta-input").value = state.release.cta; $("cta-count").textContent = state.release.cta.length;
     editTags = (state.release.hashtags||"").split(/\s+/).filter(Boolean); drawTags();
     $("tags-sec").style.display = state.flags.hashtags ? "" : "none";
     pmOrder = state.release.platforms.map((p)=>p.key); pmEnabled = {};
@@ -1345,18 +1340,12 @@ import {
   }
   function pmSelection(){ return pmOrder.filter((k)=>pmEnabled[k]); }
   function applyPm(){ const s=pmSelection(); if (s.length) syncDraft({platforms:s}); }
-  $("cta-input").addEventListener("input", () => {
-    $("cta-count").textContent = $("cta-input").value.length;
-    syncDraft({cta:$("cta-input").value.trim() || null});
-  });
   $("open-format").addEventListener("click", openFormat);
   $("fmt-apply").addEventListener("click", () => {
     hap.ok();
     const pending = $("tag-cloud").querySelector(".chip-input");
     if (pending && pending.value.trim()) editTags.push(pending.value.trim());
     const patch = { tags: editTags };
-    const cta = $("cta-input").value.trim();
-    patch.cta = cta && cta !== state.release.cta ? cta : (state.release.cta_custom ? cta : null);
     if (editTags.length && !state.flags.hashtags) patch.hashtags = true;
     savePrefs({ platforms: pmSelection(), hashtags: state.flags.hashtags, large_preview: state.flags.large_preview });
     syncDraft(patch, true);
@@ -2118,8 +2107,8 @@ import {
     openDraftResult({
       ok:true, draft_id:"demo", can_publish:true,
       flags:{hashtags:true,quote:false,large_preview:true,as_photo:false,has_prefix:false},
-      release:{artist:"Electric Wizard",title:"Funeralopolis",kind:"song",emoji:"⚡",year:"2000",genre:"Doom Metal",artwork:location.origin+"/assets/studio-demo.svg",page_url:"https://song.link/demo",preview:null,preview_pending:false,cta:"громкость выше — мир тише",hashtags:"#stonerhand #doom #electricwizard",platforms:[{key:"spotify",label:"Spotify",url:"https://open.spotify.com",enabled:true},{key:"appleMusic",label:"Apple Music",url:"https://music.apple.com",enabled:true},{key:"youtubeMusic",label:"YouTube",url:"https://music.youtube.com",enabled:true}]},
-      publication:{mode:"card",rich_supported:true,longread:{title:"Electric Wizard — Funeralopolis",lead:"Doom Metal · 2000",blocks:[{id:"opening",type:"paragraph",text:"громкость выше — мир тише"}]}}
+      release:{artist:"Electric Wizard",title:"Funeralopolis",kind:"song",emoji:"⚡",year:"2000",genre:"Doom Metal",artwork:location.origin+"/assets/studio-demo.svg",page_url:"https://song.link/demo",preview:null,preview_pending:false,hashtags:"#stonerhand #doom #electricwizard",platforms:[{key:"spotify",label:"Spotify",url:"https://open.spotify.com",enabled:true},{key:"appleMusic",label:"Apple Music",url:"https://music.apple.com",enabled:true},{key:"youtubeMusic",label:"YouTube",url:"https://music.youtube.com",enabled:true}]},
+      publication:{mode:"card",rich_supported:true,longread:{title:"Electric Wizard — Funeralopolis",lead:"Doom Metal · 2000",blocks:[]}}
     }, false);
   } else if (localDemo === "crate") {
     isAdmin = true;

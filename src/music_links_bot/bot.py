@@ -115,6 +115,7 @@ _channel_button = _keyboards._channel_button
 _get_platform_order = _keyboards._get_platform_order
 
 from music_links_bot.kvstore import KVStore
+from music_links_bot.lazy_client import LazyAsyncClient
 from music_links_bot.bot_crate import (
     add_many_to_crate,
     add_to_crate,
@@ -238,10 +239,6 @@ DEFAULT_PLATFORM_ORDER = (
 PUBLIC_BOT_COMMANDS = (
     BotCommand("start", "меню и быстрый старт"),
     BotCommand("help", "как пользоваться"),
-    BotCommand("guide", "для групп и каналов"),
-    BotCommand("platforms", "сервисы и типы ссылок"),
-    BotCommand("channel", "канал StonerHand"),
-    BotCommand("stats", "статистика бота"),
     BotCommand("crate", "моя подборка"),
 )
 PRIMARY_PLATFORM_ALIASES = {
@@ -270,17 +267,19 @@ NOT_FOUND_DETAIL = (
 
 def build_application(settings: Settings) -> Application:
     kv_store = KVStore.from_env()
-    songlink_client = SonglinkClient(
-        user_countries=settings.songlink_user_countries,
-        api_key=settings.songlink_api_key,
-        kv=kv_store,
+    songlink_client = LazyAsyncClient(
+        lambda: SonglinkClient(
+            user_countries=settings.songlink_user_countries,
+            api_key=settings.songlink_api_key,
+            kv=kv_store,
+        )
     )
-    youtube_client = YouTubeClient()
-    nts_client = NTSClient()
-    soundcloud_client = SoundCloudClient()
-    playlist_client = PlaylistClient()
-    artist_client = ArtistClient()
-    search_client = SearchClient()
+    youtube_client = LazyAsyncClient(YouTubeClient)
+    nts_client = LazyAsyncClient(NTSClient)
+    soundcloud_client = LazyAsyncClient(SoundCloudClient)
+    playlist_client = LazyAsyncClient(PlaylistClient)
+    artist_client = LazyAsyncClient(ArtistClient)
+    search_client = LazyAsyncClient(SearchClient)
     application = (
         Application.builder()
         .token(settings.bot_token)
@@ -331,10 +330,10 @@ BOT_DESCRIPTIONS = {
         "Музыкальный редактор для Telegram.\n\n"
         "• Ссылка или название → точный релиз и готовая карточка\n"
         "• Несколько ссылок → одна редактируемая подборка\n"
-        "• Обложка, хэштеги, цитата и кнопки всех площадок\n"
+        "• Обложка, кликабельный заголовок и компактные кнопки\n"
         "• Нативная отправка поста с кнопками в любой чат\n"
         "• Inline: @StonerHandBot + запрос прямо в переписке\n"
-        "• Студия: карточка или Rich-лонгрид, preview, очередь и канал\n\n"
+        "• Студия: карточка или Rich-лонгрид, превью, очередь и канал\n\n"
         "Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
         "Yandex Music, NTS Radio."
     ),
@@ -342,7 +341,7 @@ BOT_DESCRIPTIONS = {
         "A music post editor for Telegram.\n\n"
         "• A link or title → the exact release and a finished card\n"
         "• Several links → one editable crate\n"
-        "• Artwork, hashtags, quote and every platform button\n"
+        "• Artwork, a tappable heading and compact platform actions\n"
         "• Native sharing that preserves buttons in any chat\n"
         "• Inline: @StonerHandBot + a query inside any conversation\n"
         "• Studio: card or Rich longread, preview, queue and publishing\n\n"
@@ -830,7 +829,7 @@ def _render_track_draft(
     keyboard = _build_link_keyboard(
         track.links,
         context=context,
-        include_channel_button=True,
+        include_channel_button=False,
         release_page_url=track.page_url,
         release_kind=track.kind,
         release_format=track.release_format,
@@ -855,13 +854,8 @@ def _draft_message_overrides(
     *,
     include_hashtags: bool,
 ) -> tuple[bool, dict]:
-    """Custom CTA text and hashtags set in the Studio replace the generated
-    ones; an explicitly emptied hashtag list wins over the house style."""
+    """Custom hashtags set in Studio replace the generated house tags."""
     overrides: dict = {}
-    custom_cta = draft.get("custom_cta")
-    if isinstance(custom_cta, str) and custom_cta.strip():
-        overrides["cta_text"] = custom_cta.strip()
-
     custom_tags = draft.get("custom_tags")
     if isinstance(custom_tags, list):
         tags = [tag for tag in (normalize_hashtag(value) for value in custom_tags) if tag]
@@ -1258,14 +1252,12 @@ async def _deliver_draft(
     )
     try:
         if is_longread(draft):
-            cta = overrides.get("cta_text")
             hashtags = overrides.get("hashtags")
             if include_hashtags and not hashtags:
                 hashtags = build_auto_hashtags(track)
             rich_html = build_rich_html(
                 draft,
                 track,
-                cta=cta,
                 hashtags=hashtags if include_hashtags else None,
             )
             try:
@@ -1286,7 +1278,6 @@ async def _deliver_draft(
                     text=build_fallback_html(
                         draft,
                         track,
-                        cta=cta,
                         hashtags=hashtags if include_hashtags else None,
                     ),
                     parse_mode=ParseMode.HTML,

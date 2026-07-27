@@ -140,14 +140,12 @@ class StudioApiHelperTests(unittest.TestCase):
             draft,
             {
                 "hashtags": True,
-                "cta": "  жми   сюда  ",
                 "tags": ["#Doom", "stoner rock", "!!!"],
                 "platforms": ["tidal", "bogus", "spotify"],
             },
         )
 
         self.assertTrue(draft["hashtags"])
-        self.assertEqual(draft["custom_cta"], "жми сюда")
         self.assertEqual(draft["custom_tags"], ["#doom", "#stonerrock"])
         self.assertEqual(draft["platforms"], ["tidal", "spotify"])
 
@@ -155,13 +153,11 @@ class StudioApiHelperTests(unittest.TestCase):
         from api.webapp import _apply_draft_patch
 
         draft = {
-            "custom_cta": "x",
             "custom_tags": ["#x"],
             "platforms": ["spotify"],
         }
-        _apply_draft_patch(draft, {"cta": None, "tags": None, "platforms": []})
+        _apply_draft_patch(draft, {"tags": None, "platforms": []})
 
-        self.assertNotIn("custom_cta", draft)
         self.assertNotIn("custom_tags", draft)
         self.assertNotIn("platforms", draft)
 
