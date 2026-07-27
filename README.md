@@ -25,7 +25,7 @@ Artwork, polished copy, every platform, collections and publishing — in 🎛 S
 | 2–12 links → one complete numbered collection | Multi-link import and a crate of up to 10 releases |
 | Song + YouTube video → a two-tile native mix preview | Paired song/video artwork, media labels and drag ordering |
 | Artwork, CTA, hashtags and compact platform buttons | Card / Longread mode with an exact Telegram preview |
-| Native Telegram Rich Messages with safe HTML fallback | Block editor: headings, text, quotes, lists, sections and dividers |
+| Native Telegram Rich Messages with safe HTML fallback | Block editor and expandable intros: headings, text, quotes, lists, sections and dividers |
 | Inline search with `@StonerHandBot` in any chat | Draft recovery, presets and a delivery preflight |
 | Automatic link replacement in groups and channels | Reordering, sections, notes and collection styling |
 | RU/EN workspace, actionable errors and retry | History, queue, reschedule, undo and owner analytics |

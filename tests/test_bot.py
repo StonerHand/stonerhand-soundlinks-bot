@@ -1832,7 +1832,11 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(context.bot.sent_media_groups), 1)
         media = context.bot.sent_media_groups[0]["media"]
         caption = media[0].caption
-        self.assertTrue(caption.startswith("<blockquote>вечерний набор</blockquote>\n\n"))
+        self.assertTrue(
+            caption.startswith(
+                "<blockquote expandable>вечерний набор</blockquote>\n\n"
+            )
+        )
         self.assertIn("<b>Песня + клип</b>", caption)
         self.assertIn("<b>Youth Code</b> - Transitions", caption)
         self.assertIn(
@@ -1856,7 +1860,11 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertTrue(message.replies[0].startswith("<blockquote>пачка ссылок</blockquote>\n\n"))
+        self.assertTrue(
+            message.replies[0].startswith(
+                "<blockquote expandable>пачка ссылок</blockquote>\n\n"
+            )
+        )
         self.assertIn(
             '<a href="https://open.spotify.com/playlist/'
             '37i9dQZF1DX51TD2wakW3K"><b>Women of Punk</b></a>',
@@ -1881,7 +1889,11 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertTrue(message.replies[0].startswith("<blockquote>радио и видео</blockquote>\n\n"))
+        self.assertTrue(
+            message.replies[0].startswith(
+                "<blockquote expandable>радио и видео</blockquote>\n\n"
+            )
+        )
         self.assertIn(
             '<a href="https://www.nts.live/shows/example">'
             "<b>Dark Energy w/ Guest</b></a>",
