@@ -1005,11 +1005,14 @@ import {
       }
       const found = (res.items || []);
       if (!res.ok || !found.length) { $("nf-query").textContent = q; show("notfound"); hap.err(); return; }
-      // merge into the crate, dedupe by artist+title, respect the cap
-      const have = new Set(crateItems.map((x)=>((x.data.artist||"")+"|"+(x.data.title||"")).toLowerCase()));
+      // Merge into the crate, keeping a song and its clip as distinct media.
+      const itemKey = (x) => (
+        (x.data?.kind||"song")+"|"+(x.data?.artist||"")+"|"+(x.data?.title||"")
+      ).toLowerCase();
+      const have = new Set(crateItems.map(itemKey));
       let added = 0;
       found.forEach((it) => {
-        const key = ((it.data.artist||"")+"|"+(it.data.title||"")).toLowerCase();
+        const key = itemKey(it);
         if (!have.has(key) && crateItems.length < 10) { have.add(key); crateItems.push(normalizeCrateItem(it)); added++; }
       });
       persistCrate(); refreshCrateBadge(); hap.ok();
@@ -1022,7 +1025,11 @@ import {
           ? (EN
             ? `${added} added · ${failed} not recognized`
             : `Добавлено: ${added} · не распознано: ${failed}`)
-          : (EN ? `Added ${added} to the crate` : `Добавлено в подборку: ${added}`),
+          : (
+            found.some((item)=>item.data?.kind==="video")
+              ? (EN ? "Music mix is ready" : "Музыкальный микс готов")
+              : (EN ? `Added ${added} to the crate` : `Добавлено в подборку: ${added}`)
+          ),
       );
     } catch(e) { if (seq !== loadSeq) return; $("nf-query").textContent = q; show("notfound"); hap.err(); }
   }
@@ -1669,10 +1676,10 @@ import {
     return { ...item, meta: item?.meta && typeof item.meta==="object" ? {section:String(item.meta.section||""),note:String(item.meta.note||"")} : {section:"",note:""} };
   }
   function adoptCrateItems(items) {
-    const previous=new Map(crateItems.map((item)=>[((item.data?.artist||"")+"|"+(item.data?.title||"")).toLowerCase(),item.meta||{}]));
+    const previous=new Map(crateItems.map((item)=>[((item.data?.kind||"song")+"|"+(item.data?.artist||"")+"|"+(item.data?.title||"")).toLowerCase(),item.meta||{}]));
     return (items||[]).map((item)=>{
       const normalized=normalizeCrateItem(item);
-      const key=((normalized.data?.artist||"")+"|"+(normalized.data?.title||"")).toLowerCase();
+      const key=((normalized.data?.kind||"song")+"|"+(normalized.data?.artist||"")+"|"+(normalized.data?.title||"")).toLowerCase();
       normalized.meta=previous.get(key)||normalized.meta;
       return normalized;
     });
@@ -1722,10 +1729,17 @@ import {
   }
   function drawCrate() {
     const list = $("crate-list"); list.innerHTML = "";
-    const crateWord = plural(crateItems.length,"track","tracks","трек","трека","треков");
+    const hasVideo = crateItems.some((item)=>item.data?.kind==="video");
+    const hasMusic = crateItems.some((item)=>item.data?.kind!=="video");
+    const isPair = crateItems.length===2 && hasVideo && hasMusic;
+    const crateWord = hasVideo
+      ? (EN ? (crateItems.length===1?"item":"items") : plural(crateItems.length,"material","materials","материал","материала","материалов"))
+      : plural(crateItems.length,"track","tracks","трек","трека","треков");
     $("crate-count").textContent = crateItems.length + " " + crateWord;
     $("crate-cover-count").textContent = crateItems.length + " " + crateWord;
-    $("crate-hero-title").textContent=collectionMeta.title||T.ui.crateHero;
+    $("crate-hero-title").textContent=collectionMeta.title||(isPair?(EN?"Song + video":"Песня + клип"):T.ui.crateHero);
+    $("crate-kicker").textContent=isPair?(EN?"MUSIC MIX":"МУЗЫКАЛЬНЫЙ МИКС"):T.ui.crateKicker;
+    $("crate-cover").classList.toggle("is-pair",isPair);
     const crateHealth = assessCollection(crateItems, collectionMeta, PREFLIGHT.collection);
     $("crate-health").textContent = crateHealth.score + "%";
     $("crate-health").style.setProperty("--health", String(crateHealth.score));
@@ -1734,10 +1748,14 @@ import {
       "aria-label",
       (EN ? "Collection readiness: " : "Готовность подборки: ") + crateHealth.score + "%",
     );
+    $("crate-stack").classList.toggle("pair",isPair);
     const stack = $("crate-stack").querySelectorAll("i");
     stack.forEach((tile, index) => {
       const item = crateItems[index];
       tile.style.backgroundImage = item && safeUrl(item.artwork) ? 'url("'+String(item.artwork).replace(/"/g,"%22")+'")' : "";
+      tile.dataset.kind = item?.data?.kind==="video" ? "video" : (item ? "song" : "");
+      tile.dataset.label = item?.data?.kind==="video" ? (EN?"VIDEO":"КЛИП") : (EN?"SONG":"ПЕСНЯ");
+      tile.setAttribute("aria-label",item?.data?.kind==="video"?(EN?"Video":"Клип"):(EN?"Song cover":"Обложка песни"));
     });
     if (crateItems.length === 0) { list.innerHTML = emptyBox("layers", EN?"Build your next set":"Собери свой следующий сет", EN?"Add releases from any card":"Добавляй релизы из любой карточки"); }
     $("crate-empty").textContent = crateItems.length===1 ? T.needMore : "";
@@ -1745,10 +1763,13 @@ import {
       const row = document.createElement("div"); row.className = "row"; row.style.opacity = "1"; row.dataset.i = i;
       const group=it.meta?.section?'<span class="crate-group">'+esc(it.meta.section)+"</span>":"";
       const note=it.meta?.note?'<div class="row-note">'+esc(it.meta.note)+"</div>":"";
+      const kind=it.data?.kind==="video"
+        ? '<span class="row-kind video">'+(EN?"VIDEO":"КЛИП")+"</span>"
+        : (hasVideo?'<span class="row-kind">'+(EN?"SONG":"ПЕСНЯ")+"</span>":"");
       row.innerHTML =
         '<div class="grip">'+ico("grip","s18")+"</div>"+
         '<span class="crate-idx">'+(i+1)+"</span>"+ artHtml(it.artwork, it.emoji, "row-art sm")+
-        '<div class="row-meta">'+group+'<div class="row-title">'+esc(it.title)+'</div><div class="row-sub">'+esc(it.artist)+"</div>"+note+"</div>"+
+        '<div class="row-meta">'+kind+group+'<div class="row-title">'+esc(it.title)+'</div><div class="row-sub">'+esc(it.artist)+"</div>"+note+"</div>"+
         '<button class="rowbtn edit" aria-label="'+(EN?"Edit track":"Настроить трек")+'">'+ico("sliders","s14")+"</button>"+
         '<button class="rowbtn danger del" aria-label="'+(EN?"Remove track":"Удалить трек")+'">'+ico("trash","s14")+"</button>";
       row.querySelector(".edit").addEventListener("click",()=>openCrateItemEditor(i));

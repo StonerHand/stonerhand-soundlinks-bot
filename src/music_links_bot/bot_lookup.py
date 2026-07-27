@@ -52,6 +52,7 @@ NOT_FOUND_DETAIL = (
     "подкаст, YouTube-видео или NTS Radio"
 )
 _track_result_sender: Callable[..., Awaitable[Any]] | None = None
+_track_video_pair_sender: Callable[..., Awaitable[bool]] | None = None
 _BACKGROUND_TASKS: set[asyncio.Task[Any]] = set()
 _BATCH_LOOKUP_CONCURRENCY = 2
 _BATCH_RETRY_DELAY_SECONDS = 0.2
@@ -62,10 +63,23 @@ def configure_track_result_sender(sender: Callable[..., Awaitable[Any]]) -> None
     _track_result_sender = sender
 
 
+def configure_track_video_pair_sender(
+    sender: Callable[..., Awaitable[bool]],
+) -> None:
+    global _track_video_pair_sender
+    _track_video_pair_sender = sender
+
+
 async def _send_track_result(*args, **kwargs):
     if _track_result_sender is None:
         raise RuntimeError("track result sender is not configured")
     return await _track_result_sender(*args, **kwargs)
+
+
+async def _send_track_video_pair_result(*args, **kwargs) -> bool:
+    if _track_video_pair_sender is None:
+        return False
+    return await _track_video_pair_sender(*args, **kwargs)
 
 
 @dataclass(slots=True)
@@ -613,42 +627,57 @@ async def _send_mixed_result(
         videos,
         context,
     )
-    await _send_track_result(
-        bot,
-        message,
-        user_prefix
-        + format_mixed_collection_message(
+    text = user_prefix + format_mixed_collection_message(
+        tracks,
+        videos,
+        playlists,
+        artists,
+        radios,
+        include_hashtags=include_hashtags,
+    )
+    keyboard = add_share_button(
+        _build_mixed_collection_keyboard(
             tracks,
             videos,
             playlists,
             artists,
             radios,
-            include_hashtags=include_hashtags,
+            include_channel_button=include_channel_button,
         ),
+        share_query=build_share_query(
+            [
+                *[track_share_url(track) or "" for track in tracks],
+                *[playlist.url for playlist in playlists],
+                *[artist.url for artist in artists],
+                *[radio.url for radio in radios],
+                *[video.url for video in videos],
+            ]
+        ),
+        label=get_text(lang, "share_post"),
+    )
+    if (
+        len(tracks) == 1
+        and len(videos) == 1
+        and not playlists
+        and not artists
+        and not radios
+        and await _send_track_video_pair_result(
+            bot,
+            message,
+            text,
+            track=tracks[0],
+            video=videos[0],
+            reply_markup=keyboard,
+        )
+    ):
+        return
+
+    await _send_track_result(
+        bot,
+        message,
+        text,
         preview_url=preview_url,
-        reply_markup=add_share_button(
-            _build_mixed_collection_keyboard(
-                tracks,
-                videos,
-                playlists,
-                artists,
-                radios,
-                include_channel_button=include_channel_button,
-            ),
-            share_query=build_share_query(
-                [
-                    *[
-                        track_share_url(track) or ""
-                        for track in tracks
-                    ],
-                    *[playlist.url for playlist in playlists],
-                    *[artist.url for artist in artists],
-                    *[radio.url for radio in radios],
-                    *[video.url for video in videos],
-                ]
-            ),
-            label=get_text(lang, "share_post"),
-        ),
+        reply_markup=keyboard,
     )
 
 

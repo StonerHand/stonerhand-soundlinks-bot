@@ -65,7 +65,10 @@ def coerce_crate_items(raw: object) -> list[dict]:
         compact = compact_track_data(entry)
         if not (compact["artist"] or compact["title"]):
             continue
-        fingerprint = release_fingerprint(compact["artist"], compact["title"])
+        fingerprint = (
+            f"{compact['kind']}:"
+            f"{release_fingerprint(compact['artist'], compact['title'])}"
+        )
         if fingerprint in seen:
             continue
         seen.add(fingerprint)

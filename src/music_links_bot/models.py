@@ -21,6 +21,7 @@ class VideoMatch:
     title: str
     author: str
     url: str
+    thumbnail_url: str | None = None
 
 
 @dataclass(slots=True)

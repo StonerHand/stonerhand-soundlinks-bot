@@ -67,6 +67,9 @@ ARTIST_COLLECTION_SIGNATURES = (
 
 
 def pick_track_emoji(track: TrackMatch) -> str:
+    if track.kind == "video":
+        return "📺"
+
     if track.kind == "podcast":
         return "🎙️"
 
@@ -322,6 +325,19 @@ def format_mixed_collection_message(
     playlists = playlists or []
     artists = artists or []
     radios = radios or []
+    if (
+        len(tracks) == 1
+        and len(videos) == 1
+        and not playlists
+        and not artists
+        and not radios
+    ):
+        return format_track_video_pair_message(
+            tracks[0],
+            videos[0],
+            include_hashtags=include_hashtags,
+        )
+
     seed = "|".join(
         [
             *(f"{track.artist}:{track.title}:{track.kind}" for track in tracks),
@@ -397,6 +413,34 @@ def format_mixed_collection_message(
     )
 
 
+def format_track_video_pair_message(
+    track: TrackMatch,
+    video: VideoMatch,
+    *,
+    include_hashtags: bool = True,
+) -> str:
+    """A compact editorial layout for the most common mixed post."""
+    track_heading = _linked_heading(track.page_url, format_track_heading(track))
+    video_heading = _linked_heading(
+        video.url,
+        f"<b>{_display_text(video.title, MAX_COLLECTION_TEXT_LENGTH)}</b>",
+    )
+    lines = [
+        "<b>Песня + клип</b>",
+        "",
+        f"🎧 · {track_heading}",
+        f"📺 · {video_heading}",
+    ]
+    if video.author:
+        lines.append(f"   <i>{_display_text(video.author, MAX_COLLECTION_TEXT_LENGTH)}</i>")
+    lines.extend(["", "<i>один релиз, два способа включить</i>"])
+    return _with_hashtags(
+        lines,
+        build_mixed_collection_hashtags([track], has_videos=True),
+        include_hashtags=include_hashtags,
+    )
+
+
 def format_collection_message(
     tracks: list[TrackMatch],
     *,
@@ -408,6 +452,24 @@ def format_collection_message(
     item_notes: list[str] | None = None,
     item_sections: list[str] | None = None,
 ) -> str:
+    if (
+        len(tracks) == 2
+        and not any((title, intro, outro, item_notes, item_sections))
+        and {track.kind for track in tracks} == {"song", "video"}
+    ):
+        song = next(track for track in tracks if track.kind == "song")
+        video_track = next(track for track in tracks if track.kind == "video")
+        return format_track_video_pair_message(
+            song,
+            VideoMatch(
+                title=video_track.title,
+                author=video_track.artist,
+                url=video_track.page_url or "",
+                thumbnail_url=video_track.thumbnail_url,
+            ),
+            include_hashtags=include_hashtags,
+        )
+
     seed = "|".join(f"{track.artist}:{track.title}:{track.kind}" for track in tracks)
     lines: list[str] = []
     if title:
@@ -485,6 +547,10 @@ def _display_text(value: str, max_length: int = MAX_METADATA_TEXT_LENGTH) -> str
 
 def build_auto_hashtags(track: TrackMatch) -> str:
     hashtags = ["#stonerhand"]
+
+    if track.kind == "video":
+        hashtags.append("#video")
+        return " ".join(hashtags)
 
     if track.kind == "podcast":
         hashtags.append("#podcast")
@@ -575,6 +641,9 @@ def build_collection_hashtags(tracks: list[TrackMatch]) -> str:
 
     if "podcast" in kinds:
         hashtags.append("#podcast")
+
+    if "video" in kinds:
+        hashtags.append("#video")
 
     if "show" in formats:
         hashtags.append("#show")

@@ -68,9 +68,9 @@ RESPONSES = {
         {"artist": "Sleep", "title": "Dopesmoker", "emoji": "📻", "artwork": None,
          "data": {"artist": "Sleep", "title": "Dopesmoker", "kind": "song",
                   "page_url": "https://song.link/a", "thumbnail_url": None}},
-        {"artist": "Om", "title": "Advaitic Songs", "emoji": "📻", "artwork": None,
-         "data": {"artist": "Om", "title": "Advaitic Songs", "kind": "song",
-                  "page_url": "https://song.link/b", "thumbnail_url": None}},
+        {"artist": "Sleep", "title": "Dopesmoker (Official Video)", "emoji": "📺", "artwork": None,
+         "data": {"artist": "Sleep", "title": "Dopesmoker (Official Video)", "kind": "video",
+                  "page_url": "https://youtu.be/video123", "thumbnail_url": None}},
     ]},
 }
 REQUEST_BODIES: list[dict] = []
@@ -90,7 +90,11 @@ def _launch(p):
     try:
         return p.chromium.launch()
     except Exception:
-        candidates = glob.glob("/opt/pw-browsers/chromium-*/chrome-linux/chrome")
+        candidates = [
+            *glob.glob("/opt/pw-browsers/chromium-*/chrome-linux/chrome"),
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        ]
+        candidates = [candidate for candidate in candidates if pathlib.Path(candidate).exists()]
         if not candidates:
             raise
         return p.chromium.launch(executable_path=candidates[0])
@@ -527,7 +531,7 @@ def main() -> int:
         page.eval_on_selector(
             "#query",
             """el => {
-              el.value='https://open.spotify.com/track/a https://open.spotify.com/track/b';
+              el.value='https://open.spotify.com/track/a https://youtu.be/video123';
               el.dispatchEvent(new Event('input'));
             }""",
         )
@@ -541,6 +545,12 @@ def main() -> int:
             failures.append("batch paste did not open the crate")
         elif "Dopesmoker" not in page.eval_on_selector("#v-crate", "el => el.innerText"):
             failures.append("batch paste crate is missing items")
+        if not page.eval_on_selector("#crate-cover", "el => el.classList.contains('is-pair')"):
+            failures.append("song + video did not activate the dedicated mix preview")
+        if "Песня + клип" not in page.eval_on_selector("#crate-cover", "el => el.innerText"):
+            failures.append("mix preview does not explain the song/video pair")
+        if page.locator("#crate-list .row-kind.video").count() != 1:
+            failures.append("video item has no visible media-type label")
         if page.evaluate("document.documentElement.scrollWidth > window.innerWidth"):
             failures.append("crate view has horizontal overflow")
         crate_health_state = page.evaluate(
@@ -578,6 +588,25 @@ def main() -> int:
         if small_targets:
             failures.append("crate has undersized touch targets: " + ", ".join(small_targets))
         _capture(page, "03d-crate-mobile")
+        page.evaluate("document.body.classList.remove('dark');document.body.classList.add('light')")
+        page.wait_for_timeout(200)
+        if _theme_contrast(page) < 4.5:
+            failures.append("light mix view foreground contrast is below WCAG AA")
+        if page.evaluate("document.documentElement.scrollWidth > window.innerWidth"):
+            failures.append("light mix view has horizontal overflow")
+        _capture(page, "03e-mix-light")
+        page.evaluate("document.body.classList.remove('light');document.body.classList.add('dark')")
+        page.set_viewport_size({"width": 880, "height": 900})
+        page.wait_for_timeout(150)
+        pair_columns = page.eval_on_selector(
+            "#crate-stack",
+            "el => getComputedStyle(el).gridTemplateColumns",
+        )
+        if pair_columns == "none" or len(pair_columns.split()) != 2:
+            failures.append("wide mix preview did not preserve its two media tiles")
+        if page.evaluate("document.documentElement.scrollWidth > window.innerWidth"):
+            failures.append("wide mix view has horizontal overflow")
+        page.set_viewport_size({"width": 390, "height": 800})
         page.eval_on_selector("#crate-edit", "el => el.click()")
         page.eval_on_selector("#crate-title-input", "el => el.value='Тяжёлый вечер'")
         page.eval_on_selector("#crate-intro-input", "el => el.value='Два релиза рядом'")

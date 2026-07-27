@@ -302,6 +302,7 @@ body::before { opacity: .014; }
   border-radius: 27px;
   box-shadow: 0 18px 50px rgba(0,0,0,.2);
 }
+.crate-cover.is-pair > div:nth-child(2) { flex-basis:calc(100% - 66px); }
 .crate-cover > div:nth-child(2) {
   position: relative;
   z-index: 1;
@@ -777,6 +778,9 @@ body::before { opacity: .014; }
   .screen-intro strong { margin-top: 7px; font-size: 21px; line-height: 1.25; }
   .screen-intro small { margin-top: 6px; font-size: 14px; line-height: 1.45; }
   .crate-cover { margin: 0 12px 16px; min-height: 166px; padding: 20px; }
+  .crate-cover.is-pair { min-height:270px; }
+  .crate-stack.pair { height:124px; }
+  .crate-stack.pair i { height:124px; }
   .crate-cover > div:nth-child(2) { min-width: 0; flex: 1; }
   .crate-cover > div:nth-child(2) > span {
     font-size: 9px;
@@ -810,7 +814,13 @@ body::before { opacity: .014; }
   }
   #crate-list .row-art { width: 58px; height: 58px; }
   #crate-list .row-meta { min-width: 0; }
-  #crate-list .row-title { white-space: nowrap; -webkit-line-clamp: initial; }
+  #crate-list .row-title {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    -webkit-line-clamp: initial;
+  }
   #crate-list .rowbtn {
     width: 48px;
     height: 48px;

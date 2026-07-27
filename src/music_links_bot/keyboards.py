@@ -135,6 +135,9 @@ def _build_collection_keyboard(
     *,
     include_channel_button: bool = True,
 ) -> InlineKeyboardMarkup:
+    is_track_video_pair = (
+        len(tracks) == 2 and {track.kind for track in tracks} == {"song", "video"}
+    )
     buttons: list[InlineKeyboardButton] = []
 
     for index, track in enumerate(tracks, start=1):
@@ -142,13 +145,15 @@ def _build_collection_keyboard(
         if not destination:
             continue
 
+        if is_track_video_pair:
+            text = "📺 Смотреть клип" if track.kind == "video" else "🎧 Слушать песню"
+        else:
+            text = f"{_track_button_icon(track)} {index}. {track.artist} - {track.title}"
         buttons.append(
             _url_button(
-                text=_shorten_button_text(
-                    f"{_track_button_icon(track)} {index}. {track.artist} - {track.title}"
-                ),
+                text=_shorten_button_text(text),
                 url=destination,
-                style="primary",
+                style="danger" if track.kind == "video" else "primary",
             )
         )
 
@@ -291,6 +296,13 @@ def _build_mixed_collection_keyboard(
     playlists = playlists or []
     artists = artists or []
     radios = radios or []
+    is_track_video_pair = (
+        len(tracks) == 1
+        and len(videos) == 1
+        and not playlists
+        and not artists
+        and not radios
+    )
     buttons: list[InlineKeyboardButton] = []
     index = 1
 
@@ -301,8 +313,12 @@ def _build_mixed_collection_keyboard(
 
         buttons.append(
             _url_button(
-                text=_shorten_button_text(
-                    f"{_track_button_icon(track)} {index}. {track.artist} - {track.title}"
+                text=(
+                    "🎧 Слушать песню"
+                    if is_track_video_pair
+                    else _shorten_button_text(
+                        f"{_track_button_icon(track)} {index}. {track.artist} - {track.title}"
+                    )
                 ),
                 url=destination,
                 style="primary",
@@ -343,7 +359,11 @@ def _build_mixed_collection_keyboard(
     for video in videos:
         buttons.append(
             _url_button(
-                text=_shorten_button_text(f"📺 {index}. {video.title}"),
+                text=(
+                    "📺 Смотреть клип"
+                    if is_track_video_pair
+                    else _shorten_button_text(f"📺 {index}. {video.title}")
+                ),
                 url=video.url,
                 style="danger",
             )
@@ -399,6 +419,9 @@ def _shorten_button_text(text: str) -> str:
 
 
 def _track_button_icon(track: TrackMatch) -> str:
+    if track.kind == "video":
+        return "📺"
+
     if track.kind == "album":
         return "💿"
 

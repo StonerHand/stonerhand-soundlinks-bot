@@ -107,6 +107,7 @@ class SuccessfulLookupClient:
             artist="Youth Code",
             links={"spotify": "https://open.spotify.com/track/1"},
             page_url="https://song.link/transitions",
+            thumbnail_url="https://img.example/a.jpg",
         )
 
 
@@ -116,6 +117,7 @@ class YouTubeClientStub:
             title="SANSAE Live Session Vol.3 - Melon",
             author="SANSAE",
             url=source_url,
+            thumbnail_url="https://img.youtube.example/abc123.jpg",
         )
 
 
@@ -214,12 +216,17 @@ class BotStub:
         self.sent_messages: list[dict[str, object]] = []
         self.chat_actions: list[dict[str, object]] = []
         self.edited_messages: list[dict[str, object]] = []
+        self.sent_media_groups: list[dict[str, object]] = []
         self.edit_error: Exception | None = None
         self.username = "StonerHandBot"
         self.id = 424242
 
     async def send_message(self, **kwargs: object) -> None:
         self.sent_messages.append(kwargs)
+
+    async def send_media_group(self, **kwargs: object) -> list[object]:
+        self.sent_media_groups.append(kwargs)
+        return [object(), object()]
 
     async def send_chat_action(self, **kwargs: object) -> None:
         self.chat_actions.append(kwargs)
@@ -278,6 +285,9 @@ class EditableReplyStub:
         self._owner.replies[self._index] = text
         self._owner.reply_kwargs[self._index] = kwargs
         return self
+
+    async def delete(self) -> None:
+        self._owner.replies[self._index] = "<deleted>"
 
 
 class ChannelMessageStub:
@@ -734,10 +744,10 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(rows[0][0].text, "🎧 1. Youth Code - Transitions")
+        self.assertEqual(rows[0][0].text, "🎧 Слушать песню")
         self.assertEqual(rows[0][0].url, "https://song.link/transitions")
         self.assertEqual(rows[0][0].api_kwargs, {"style": "primary"})
-        self.assertEqual(rows[0][1].text, "📺 2. Live Session")
+        self.assertEqual(rows[0][1].text, "📺 Смотреть клип")
         self.assertEqual(rows[0][1].url, "https://youtu.be/1")
         self.assertEqual(rows[0][1].api_kwargs, {"style": "danger"})
 
@@ -1818,22 +1828,24 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         with patch("music_links_bot.bot_stats.record_mixed") as record_mixed:
             await track_lookup_message(UpdateStub(message), context)
 
-        self.assertEqual(len(message.replies), 1)
-        self.assertTrue(message.replies[0].startswith("<blockquote>вечерний набор</blockquote>\n\n"))
-        self.assertIn("<b>Youth Code</b> - Transitions", message.replies[0])
+        self.assertEqual(message.replies, ["<deleted>"])
+        self.assertEqual(len(context.bot.sent_media_groups), 1)
+        media = context.bot.sent_media_groups[0]["media"]
+        caption = media[0].caption
+        self.assertTrue(caption.startswith("<blockquote>вечерний набор</blockquote>\n\n"))
+        self.assertIn("<b>Песня + клип</b>", caption)
+        self.assertIn("<b>Youth Code</b> - Transitions", caption)
         self.assertIn(
             '<a href="https://www.youtube.com/watch?v=abc123">'
             "<b>SANSAE Live Session Vol.3 - Melon</b></a>",
-            message.replies[0],
+            caption,
         )
-        self.assertNotIn("#stonerhand", message.replies[0])
-        keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
-        preview_options = message.reply_kwargs[0]["link_preview_options"]
-        self.assertEqual(keyboard[0][0].text, "🎧 1. Youth Code - Transitions")
-        self.assertEqual(keyboard[0][1].text, "📺 2. SANSAE Live Session Vol.3 - Melon")
-        self.assertTrue(preview_options.prefer_large_media)
-        self.assertFalse(bool(preview_options.prefer_small_media))
-        self.assertTrue(preview_options.show_above_text)
+        self.assertNotIn("#stonerhand", caption)
+        self.assertEqual(media[0].media, "https://img.example/a.jpg")
+        self.assertEqual(media[1].media, "https://img.youtube.example/abc123.jpg")
+        keyboard = context.bot.sent_messages[0]["reply_markup"].inline_keyboard
+        self.assertEqual(keyboard[0][0].text, "🎧 Слушать песню")
+        self.assertEqual(keyboard[0][1].text, "📺 Смотреть клип")
         record_mixed.assert_called_once()
 
     async def test_mixed_playlist_and_youtube_links_keep_both_items(self) -> None:
