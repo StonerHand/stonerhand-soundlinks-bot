@@ -53,26 +53,22 @@ def build_start_keyboard(
     del bot_username, is_admin, show_tour
     rows: list[list[InlineKeyboardButton]] = []
     studio_url = webapp_url()
-    if studio_url and include_studio:
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    get_text(lang, "open_studio"),
-                    web_app=WebAppInfo(url=studio_url),
-                    api_kwargs={"style": "success"},
-                )
-            ]
+    primary_actions = [
+        InlineKeyboardButton(
+            get_text(lang, "quick_mode"),
+            switch_inline_query_current_chat="",
+            api_kwargs={"style": "primary"},
         )
-
-    rows.append(
-        [
+    ]
+    if studio_url and include_studio:
+        primary_actions.append(
             InlineKeyboardButton(
-                get_text(lang, "quick_search"),
-                switch_inline_query_current_chat="",
-                api_kwargs={"style": "primary"},
+                get_text(lang, "studio_mode"),
+                web_app=WebAppInfo(url=studio_url),
+                api_kwargs={"style": "success"},
             )
-        ]
-    )
+        )
+    rows.append(primary_actions)
     rows.append(
         [
             _crate_button(lang, crate_count),
@@ -225,27 +221,23 @@ def build_onboarding_keyboard(step: int, lang: str) -> InlineKeyboardMarkup:
 
 def editor_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
     lang = draft.get("lang") or "ru"
-    rows: list[list[InlineKeyboardButton]] = []
+    actions: list[InlineKeyboardButton] = []
     studio_url = webapp_url()
     if studio_url:
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    get_text(lang, "ed_studio"),
-                    web_app=WebAppInfo(url=f"{studio_url}?draft={draft_id}"),
-                    api_kwargs={"style": "success"},
-                )
-            ]
-        )
-    rows.append(
-        [
+        actions.append(
             InlineKeyboardButton(
-                get_text(lang, "ed_add_crate"),
-                callback_data=encode_callback("editor", "c", draft_id),
+                get_text(lang, "ed_studio"),
+                web_app=WebAppInfo(url=f"{studio_url}?draft={draft_id}"),
+                api_kwargs={"style": "success"},
             )
-        ]
+        )
+    actions.append(
+        InlineKeyboardButton(
+            get_text(lang, "ed_add_crate"),
+            callback_data=encode_callback("editor", "c", draft_id),
+        )
     )
-    return rows
+    return [actions]
 
 
 def editor_more_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:

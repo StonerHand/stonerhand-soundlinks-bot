@@ -5,7 +5,7 @@ import logging
 from time import monotonic
 from urllib.parse import quote
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from telegram import Bot, Message
@@ -45,6 +45,12 @@ from music_links_bot.url_utils import (
     is_spotify_playlist_url, is_youtube_video_url, spotify_url_type,
 )
 from music_links_bot.youtube import YouTubeClient, YouTubeLookupError
+from music_links_bot.provider_runtime import (
+    ProviderTask,
+    get_cached_lookup,
+    run_provider_tasks,
+    set_cached_lookup,
+)
 
 LOGGER = logging.getLogger(__name__)
 NOT_FOUND_DETAIL = (
@@ -119,31 +125,67 @@ class LookupBundle:
 
 
 async def resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBundle:
+    cached = await get_cached_lookup(bot_data, source_urls)
+    if cached is not None:
+        restored = _bundle_from_cache(cached)
+        if restored is not None:
+            return restored
+
     artist_urls, playlist_urls, youtube_urls, nts_urls, music_urls = (
         _split_source_urls(source_urls)
     )
-    lookup_result, videos, radios, playlists, artists = await asyncio.gather(
-        _measured_lookup(bot_data, "songlink", _lookup_tracks(
-            bot_data["songlink_client"],
-            music_urls,
-            soundcloud_client=bot_data["soundcloud_client"],
-            search_client=bot_data.get("search_client"),
-        ))
-        if music_urls
-        else _empty_track_lookup(),
-        _measured_lookup(bot_data, "youtube", _lookup_youtube_videos(bot_data["youtube_client"], youtube_urls))
-        if youtube_urls
-        else _empty_video_lookup(),
-        _measured_lookup(bot_data, "nts", _lookup_nts_radios(bot_data["nts_client"], nts_urls))
-        if nts_urls
-        else _empty_radio_lookup(),
-        _measured_lookup(bot_data, "spotify", _lookup_playlists(bot_data["playlist_client"], playlist_urls))
-        if playlist_urls
-        else _empty_playlist_lookup(),
-        _measured_lookup(bot_data, "spotify", _lookup_artists(bot_data["artist_client"], artist_urls))
-        if artist_urls
-        else _empty_artist_lookup(),
-    )
+    tasks: list[ProviderTask] = []
+    if music_urls:
+        tasks.append(
+            ProviderTask(
+                "songlink",
+                _lookup_tracks(
+                    bot_data["songlink_client"],
+                    music_urls,
+                    soundcloud_client=bot_data["soundcloud_client"],
+                    search_client=bot_data.get("search_client"),
+                ),
+                ([], list(music_urls)),
+            )
+        )
+    if youtube_urls:
+        tasks.append(
+            ProviderTask(
+                "youtube",
+                _lookup_youtube_videos(bot_data["youtube_client"], youtube_urls),
+                [],
+            )
+        )
+    if nts_urls:
+        tasks.append(
+            ProviderTask(
+                "nts",
+                _lookup_nts_radios(bot_data["nts_client"], nts_urls),
+                [],
+            )
+        )
+    if playlist_urls:
+        tasks.append(
+            ProviderTask(
+                "playlists",
+                _lookup_playlists(bot_data["playlist_client"], playlist_urls),
+                [],
+            )
+        )
+    if artist_urls:
+        tasks.append(
+            ProviderTask(
+                "artists",
+                _lookup_artists(bot_data["artist_client"], artist_urls),
+                [],
+            )
+        )
+    results = await run_provider_tasks(bot_data, tasks)
+    lookup_result = results.get("songlink", ([], []))
+    videos = results.get("youtube", [])
+    radios = results.get("nts", [])
+    playlists = results.get("playlists", [])
+    artists = results.get("artists", [])
     tracks, unavailable_urls = lookup_result
     if unavailable_urls:
         runtime = bot_data.get("runtime")
@@ -151,7 +193,7 @@ async def resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBundl
             runtime.record_provider(
                 "songlink", ok=False, latency_ms=0, error=SonglinkError("lookup failed")
             )
-    return LookupBundle(
+    bundle = LookupBundle(
         tracks=[track for track in tracks if track.links],
         unavailable_urls=unavailable_urls,
         videos=videos,
@@ -159,6 +201,38 @@ async def resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBundl
         playlists=playlists,
         artists=artists,
     )
+    if bundle.item_count and not bundle.unavailable_urls:
+        await set_cached_lookup(bot_data, source_urls, _bundle_to_cache(bundle))
+    return bundle
+
+
+def _bundle_to_cache(bundle: LookupBundle) -> dict[str, Any]:
+    return {
+        "tracks": [asdict(item) for item in bundle.tracks],
+        "unavailable_urls": list(bundle.unavailable_urls),
+        "videos": [asdict(item) for item in bundle.videos],
+        "radios": [asdict(item) for item in bundle.radios],
+        "playlists": [asdict(item) for item in bundle.playlists],
+        "artists": [asdict(item) for item in bundle.artists],
+    }
+
+
+def _bundle_from_cache(payload: dict) -> LookupBundle | None:
+    try:
+        return LookupBundle(
+            tracks=[TrackMatch(**item) for item in payload.get("tracks", [])],
+            unavailable_urls=[
+                str(url) for url in payload.get("unavailable_urls", [])
+            ],
+            videos=[VideoMatch(**item) for item in payload.get("videos", [])],
+            radios=[RadioMatch(**item) for item in payload.get("radios", [])],
+            playlists=[
+                PlaylistMatch(**item) for item in payload.get("playlists", [])
+            ],
+            artists=[ArtistMatch(**item) for item in payload.get("artists", [])],
+        )
+    except (TypeError, ValueError):
+        return None
 
 
 async def _measured_lookup(bot_data: dict, provider: str, awaitable):

@@ -20,7 +20,7 @@
 | Telegram bot | Studio Mini App |
 | --- | --- |
 | Link or title → exact release | Search, candidates and audio preview |
-| Tappable title, artwork and compact buttons | Card or block-based Rich longread |
+| Clean title, artwork, hashtags and compact buttons | Card or block-based Rich longread |
 | Several links → one collection | Up to 10 releases with ordering and notes |
 | Song + YouTube clip → two-tile media preview | Song artwork and video thumbnail |
 | Inline search in any conversation | History, queue, undo and owner analytics |
@@ -30,10 +30,10 @@ Spotify, Apple Music, YouTube, SoundCloud, Bandcamp, Deezer, Tidal,
 Yandex Music, podcasts, Spotify playlists and artists, and NTS Radio are
 supported.
 
-Cards contain release data and actions without generated promotional filler.
-The default keyboard shows two preferred services plus a universal hub, while
-the tappable heading survives Telegram's ordinary forwarding. Use Studio's
-Share action when the complete keyboard must travel with the post.
+Cards contain release data and actions without generated promotional filler or
+hidden heading links. The default keyboard shows two preferred services plus a
+universal hub. Use Studio's Share action when the complete keyboard must travel
+with the post.
 
 Longreads use Telegram Rich Messages with a safe HTML fallback. A song and a
 YouTube clip become a native two-tile media album; the bot never downloads or
@@ -50,9 +50,11 @@ flowchart LR
     D --> E["Chat · channel · queue"]
 ```
 
-The bot menu exposes only Studio, search, crate and help. Publishing,
-scheduling, analytics and advanced formatting live in Studio. Provider clients
-are created lazily, only when a request actually needs them.
+The bot exposes two clear modes: **Quick** for a finished chat card and
+**Studio** for longreads, crates, scheduling and publishing. A chat draft keeps
+only Studio and Add to crate actions. Provider clients are lazy, independent
+lookups run in parallel, and successful bundles are cached in memory and Redis.
+A slow optional provider no longer discards already resolved content.
 
 ## Vercel setup
 
@@ -95,10 +97,10 @@ Do not run polling and the production webhook against the same token.
 ## Code map
 
 ```text
-api/                    Vercel webhook, Studio API, health and cron
-src/music_links_bot/    lookup, formatting, delivery, queue and Redis
-webapp/                 build-free Telegram Mini App
-tests/                  unit/integration + adaptive Playwright smoke
+api/                    webhook, Studio API, health and queue worker
+src/music_links_bot/    providers, bot UI, delivery, queue and Redis
+webapp/                 build-free modular Telegram Mini App
+tests/                  unit/integration, mobile smoke and production canary
 ```
 
 See [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md) for request flows, API actions,

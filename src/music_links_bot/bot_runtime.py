@@ -2,12 +2,19 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import asdict, dataclass, field
-from enum import Enum
 import secrets
 from time import monotonic, time
 from typing import Any
 
 from music_links_bot.kvstore import KVStore
+from music_links_bot.errors import (
+    BotErrorCode as _BotErrorCode,
+    BotFlowError as _BotFlowError,
+)
+
+# Backwards-compatible exports for existing imports and callbacks.
+BotErrorCode = _BotErrorCode
+BotFlowError = _BotFlowError
 
 CALLBACK_VERSION = "v2"
 CALLBACK_TTL_SECONDS = 15 * 60
@@ -15,34 +22,6 @@ ACTION_LOCK_SECONDS = 45
 SESSION_TTL_SECONDS = 30 * 24 * 3600
 MAX_MEMORY_SESSIONS = 500
 MAX_MEMORY_KEYS = 2_000
-
-
-class BotErrorCode(str, Enum):
-    INVALID_INPUT = "invalid_input"
-    SEARCH_NOT_FOUND = "search_not_found"
-    RELEASE_NOT_FOUND = "release_not_found"
-    PROVIDER_UNAVAILABLE = "provider_unavailable"
-    DRAFT_EXPIRED = "draft_expired"
-    ACTION_BUSY = "action_busy"
-    ACTION_DUPLICATE = "action_duplicate"
-    PERMISSION_DENIED = "permission_denied"
-    DELIVERY_FAILED = "delivery_failed"
-
-
-class BotFlowError(RuntimeError):
-    def __init__(
-        self,
-        code: BotErrorCode,
-        *,
-        detail: str = "",
-        retryable: bool = False,
-        provider: str | None = None,
-    ) -> None:
-        super().__init__(detail or code.value)
-        self.code = code
-        self.detail = detail
-        self.retryable = retryable
-        self.provider = provider
 
 
 def detect_action(text: str, source_urls: list[str], *, is_private: bool) -> str:

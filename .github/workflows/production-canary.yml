@@ -1,0 +1,21 @@
+name: Production canary
+
+on:
+  schedule:
+    # 30 minutes stays within the free GitHub Actions allowance while still
+    # providing an independent production heartbeat.
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: production-canary
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify bot, Redis and Mini App
+        run: python tests/e2e/production_canary.py

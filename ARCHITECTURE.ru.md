@@ -17,6 +17,7 @@ flowchart TB
     REDIS[("Upstash Redis REST")]
     CHANNEL["Канал публикации"]
     HEALTH["api/health.py\nмониторинг + queue tick"]
+    WORKER["api/queue_worker.py\nзащищённый queue worker"]
 
     USER --> TELEGRAM
     ADMIN --> TELEGRAM
@@ -32,6 +33,7 @@ flowchart TB
     HEALTH --> TELEGRAM
     HEALTH --> REDIS
     HEALTH --> WEBAPP
+    WORKER --> CORE
 ```
 
 Production работает на Vercel Functions. Telegram присылает updates через webhook, а Studio обращается к отдельному JSON API. Оба транспорта собирают одно и то же PTB-приложение через `build_application()` и переиспользуют доменные сервисы.
@@ -43,6 +45,7 @@ api/
   telegram.py          HTTP webhook Telegram, dedup updates, warm runtime
   webapp.py            авторизованный JSON API Студии
   health.py            Telegram/webhook/Redis health + состояние очереди
+  queue_worker.py      CRON_SECRET endpoint обработки очереди
   set_webhook.py       регистрация webhook, команд, профиля и menu button
 
 src/music_links_bot/
@@ -50,6 +53,9 @@ src/music_links_bot/
   bot_inline.py        inline query, карточки и коллекции для любого чата
   bot_lookup.py        параллельный lookup и fallback разных типов URL
   bot_runtime.py       сессии, callback v2, action leases, диагностика
+  bot_storage.py       durable drafts/selections и bounded memory
+  bot_progress.py      одно редактируемое progress-сообщение
+  errors.py            единые коды ошибок бота и Studio API
   bot_crate.py         подборка внутри Telegram-чата
   bot_ui.py            экраны и клавиатуры conversational UX
   songlink.py          Song.link/Odesli, кеш и single-flight
@@ -60,7 +66,7 @@ src/music_links_bot/
   artist.py            Spotify artist oEmbed
   nts.py               Open Graph страниц NTS
   models.py            нормализованные модели контента
-  formatter.py         компактный HTML постов, кликабельные заголовки и хэштеги
+  formatter.py         компактный HTML постов, чистые заголовки и хэштеги
   mixed_post.py        пара песня+клип, media preview и Studio-нормализация
   rich_publications.py валидация блоков, Rich HTML, fallback и raw Bot API transport
   keyboards.py         кнопки платформ и Telegram actions
@@ -74,6 +80,7 @@ src/music_links_bot/
   request_guard.py     rate limit и idempotency Studio mutations
   kvstore.py           Upstash/Vercel KV REST adapter
   cache.py             локальный TTL cache
+  provider_runtime.py  provider timeout, partial results и Redis cache
   lazy_client.py       отложенная инициализация HTTP-клиентов провайдеров
   stats.py             локальные счётчики и merge
   bot_stats.py         запись статистики из Telegram handlers
@@ -91,6 +98,7 @@ webapp/
   app.js               state machine, UI, Telegram WebApp integration
   api-client.js        JSON transport, timeout/cancel, request_id
   cloud-storage.js     Promise/callback adapter Telegram CloudStorage
+  error-ui.js          перевод error_code в понятное восстановление
   studio-core.js       query mode, preflight, нормализация лонгрида и Markdown import
 
 tests/
@@ -194,11 +202,19 @@ flowchart LR
     MODEL4 --> VIEW
 ```
 
-`bot_lookup.resolve_sources()` запускает независимые provider lookup параллельно. Результат — `LookupBundle` с треками, видео, радио, плейлистами, артистами и ошибками.
+`bot_lookup.resolve_sources()` передаёт независимые операции в
+`provider_runtime.run_provider_tasks()`. У каждого провайдера есть собственный
+timeout и безопасный fallback, поэтому недоступное видео не отменяет уже
+найденную песню. Результат — `LookupBundle` с треками, видео, радио,
+плейлистами, артистами и ошибками.
 
 Ключевые свойства:
 
 - Song.link использует локальный TTL cache и Redis cache на 7 дней;
+- готовый межпровайдерный `LookupBundle` кешируется на 15 минут в bounded memory
+  и Redis; временные и пустые результаты не фиксируются;
+- успешные partial results отправляются пользователю, а состояние каждого
+  провайдера попадает в runtime diagnostics;
 - одинаковые одновременные запросы объединяются single-flight; завершившаяся задача удаляется даже после timeout/cancel вызывающего запроса;
 - основной регион запрашивается первым, дополнительные — только если результат неполный;
 - Search имеет positive cache на 6 часов и negative cache на 10 минут;
@@ -220,14 +236,15 @@ flowchart LR
 В личке текстовый запрос сохраняется в пользовательской сессии. Бот показывает до шести кандидатов. После выбора или прямой ссылки одно сообщение обновляется по этапам, поэтому чат не засоряется временными статусами.
 
 `/start` рендерит короткий home-state из размера bot-crate и роли пользователя.
-В первом уровне остаются Студия, поиск, подборка и помощь. Очередь, публикация,
-аналитика и расширенное оформление перенесены в Студию. Web App-кнопка
+В первом уровне явно показаны два режима — «Быстро» и «Студия», рядом остаются
+подборка и помощь. Очередь, публикация, аналитика и расширенное оформление
+перенесены в Студию. Web App-кнопка
 исключается в группах, где Telegram её не поддерживает.
 
-Готовая карточка не содержит сгенерированных рекламных подписей. Заголовок
-релиза кликабелен, поэтому обычная пересылка остаётся полезной даже после
-удаления inline-клавиатуры самим Telegram. При наличии universal page клавиатура
-показывает две приоритетные площадки и кнопку «Все платформы».
+Готовая карточка не содержит сгенерированных рекламных подписей или скрытой
+ссылки в заголовке. Навигация остаётся в явных кнопках: две приоритетные
+площадки и «Все платформы». Для пересылки с кнопками Студия создаёт prepared
+message вместо обычного Telegram forward.
 
 ### Черновик
 
@@ -280,6 +297,7 @@ Studio не требует Node build:
 - `app.js` управляет state/view transitions, Telegram WebApp API, player, Card/Longread, блочным редактором, preview, crate, queue и stats;
 - `api-client.js` создаёт `request_id`, ставит timeout, поддерживает abort и нормализует ошибки;
 - `cloud-storage.js` хранит тему, onboarding, presets, active draft и client-authoritative crate;
+- `error-ui.js` переводит стабильный `error_code` API в единообразное сообщение и следующий шаг;
 - `studio-core.js` независимо от транспорта распознаёт single/batch query, оценивает готовность поста/подборки, нормализует лонгрид, импортирует Markdown и сериализует active draft snapshot. Batch resolve разделяет музыкальные и YouTube-ссылки: видео хранится в crate как типизированный материал с оригинальным URL и thumbnail. Пара песня+клип получает отдельное двухплиточное превью, но остаётся совместима с общей сортировкой, оформлением и отправкой crate.
 
 Home загружается одним action `dashboard`: history, зеркало crate и очередь читаются
@@ -483,7 +501,7 @@ Endpoint:
 - `node --check` для всех четырёх ES modules;
 - отдельный Playwright/Chromium smoke: boot → search → candidate/result → crate и batch flow.
 
-Vercel Git Integration создаёт Preview для feature branch и Production deployment после merge в `main`. `vercel.json` отдельно объявляет Python functions, Web App assets и README-анимацию, routes, security headers и daily cron. Повторная регистрация webhook не удаляет ожидающие updates.
+Vercel Git Integration создаёт Preview для feature branch и Production deployment после merge в `main`. `vercel.json` отдельно объявляет Python functions, Web App assets, routes, security headers и два допустимых для Hobby daily cron: синхронизацию webhook и аварийный queue worker. GitHub production canary каждые 30 минут проверяет Telegram, webhook, Redis и оболочку Mini App, оставаясь в бесплатном лимите Actions; вызов health также безопасно запускает lease-защищённый queue tick.
 
 ## 14. Правила изменения системы
 
@@ -516,7 +534,7 @@ Vercel Git Integration создаёт Preview для feature branch и Productio
 
 ## 15. Известные архитектурные ограничения
 
-- Vercel Functions не дают постоянного процесса: очередь тикает оппортунистически, а не отдельным worker;
+- Vercel Hobby не даёт минутный Cron: очередь тикает из webhook/health, а защищённый worker выполняет ежедневное восстановление; lease не позволяет двум тикам опубликовать один job дважды;
 - без Redis состояние является best-effort и привязано к тёплому инстансу;
 - `bot.py` и `api/webapp.py` остаются orchestration-модулями; inline уже вынесен в `bot_inline.py`, новые provider/storage/UI обязанности также нужно добавлять отдельными файлами;
 - HTTP-клиенты провайдеров создаются лениво при первом обращении; неиспользованный
@@ -524,7 +542,8 @@ Vercel Git Integration создаёт Preview для feature branch и Productio
 - Studio — vanilla JS state machine без статической типизации, поэтому API contract защищают runtime validation и E2E;
 - Telegram удаляет inline keyboard при обычной пересылке; Студия использует prepared message для отправки текста вместе с URL-кнопками, а каналам не отдаёт запрещённые `switch_inline_query`-действия;
 - публичный iTunes Search не гарантирует одинаковый каталог во всех регионах;
-- точность отложенной публикации зависит от частоты внешних health pings.
+- без пользовательского трафика точность отложенной публикации ограничена
+  30-минутным интервалом бесплатного production canary.
 
 ## 16. Инварианты
 

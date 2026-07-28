@@ -18,6 +18,10 @@
       "use": "@vercel/python"
     },
     {
+      "src": "api/queue_worker.py",
+      "use": "@vercel/python"
+    },
+    {
       "src": "webapp/index.html",
       "use": "@vercel/static"
     },
@@ -35,6 +39,10 @@
     },
     {
       "src": "webapp/cloud-storage.js",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "webapp/error-ui.js",
       "use": "@vercel/static"
     },
     {
@@ -66,6 +74,10 @@
     {
       "src": "/api/health",
       "dest": "api/health.py"
+    },
+    {
+      "src": "/api/queue_worker",
+      "dest": "api/queue_worker.py"
     },
     {
       "src": "/app",
@@ -102,6 +114,10 @@
       "dest": "webapp/cloud-storage.js"
     },
     {
+      "src": "/webapp/error-ui.js",
+      "dest": "webapp/error-ui.js"
+    },
+    {
       "src": "/webapp/studio-core.js",
       "dest": "webapp/studio-core.js"
     },
@@ -121,6 +137,10 @@
     {
       "path": "/api/set_webhook",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/queue_worker",
+      "schedule": "5 3 * * *"
     }
   ]
 }

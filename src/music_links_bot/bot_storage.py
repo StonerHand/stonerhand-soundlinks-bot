@@ -1,0 +1,113 @@
+from __future__ import annotations
+
+import secrets
+
+from music_links_bot.kvstore import KVStore
+
+DRAFT_TTL_SECONDS = 48 * 3600
+MAX_MEMORY_DRAFTS = 300
+SELECTION_TTL_SECONDS = 15 * 60
+MAX_MEMORY_SELECTIONS = 300
+
+
+def remember_bounded(
+    items: dict,
+    key: str,
+    value: dict,
+    *,
+    max_size: int,
+) -> None:
+    """Refresh a warm-instance value without allowing unbounded growth."""
+    items.pop(key, None)
+    while len(items) >= max_size:
+        items.pop(next(iter(items)))
+    items[key] = value
+
+
+async def store_draft(context, draft_id: str, draft: dict) -> None:
+    drafts: dict = context.application.bot_data.setdefault("drafts", {})
+    remember_bounded(
+        drafts,
+        draft_id,
+        draft,
+        max_size=MAX_MEMORY_DRAFTS,
+    )
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    if kv is not None:
+        # Await the durable write: a serverless instance may freeze immediately
+        # after the handler returns and the next request can hit another region.
+        await kv.set_json(
+            f"draft:{draft_id}",
+            draft,
+            ttl_seconds=DRAFT_TTL_SECONDS,
+        )
+
+
+async def load_draft(context, draft_id: str) -> dict | None:
+    drafts: dict = context.application.bot_data.setdefault("drafts", {})
+    draft = drafts.get(draft_id)
+    if isinstance(draft, dict):
+        return draft
+
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    if kv is None:
+        return None
+    draft = await kv.get_json(f"draft:{draft_id}")
+    if isinstance(draft, dict) and draft.get("type") == "track":
+        remember_bounded(
+            drafts,
+            draft_id,
+            draft,
+            max_size=MAX_MEMORY_DRAFTS,
+        )
+        return draft
+    return None
+
+
+async def store_search_selection(
+    context,
+    *,
+    user_id: int,
+    query: str,
+    urls: list[str],
+) -> str:
+    selection_id = secrets.token_hex(5)
+    payload = {"user_id": user_id, "query": query, "urls": urls}
+    selections: dict = context.application.bot_data.setdefault(
+        "search_selections", {}
+    )
+    remember_bounded(
+        selections,
+        selection_id,
+        payload,
+        max_size=MAX_MEMORY_SELECTIONS,
+    )
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    if kv is not None:
+        await kv.set_json(
+            f"selection:v1:{selection_id}",
+            payload,
+            ttl_seconds=SELECTION_TTL_SECONDS,
+        )
+    return selection_id
+
+
+async def load_search_selection(context, selection_id: str) -> dict | None:
+    selections: dict = context.application.bot_data.setdefault(
+        "search_selections", {}
+    )
+    payload = selections.get(selection_id)
+    if isinstance(payload, dict):
+        return payload
+
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    payload = await kv.get_json(f"selection:v1:{selection_id}") if kv else None
+    if isinstance(payload, dict):
+        remember_bounded(
+            selections,
+            selection_id,
+            payload,
+            max_size=MAX_MEMORY_SELECTIONS,
+        )
+        return payload
+    return None

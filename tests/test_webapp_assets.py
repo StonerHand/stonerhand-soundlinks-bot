@@ -23,11 +23,13 @@ class WebAppAssetTests(unittest.TestCase):
         route_sources = {item["src"] for item in config["routes"]}
         self.assertIn("webapp/api-client.js", build_sources)
         self.assertIn("webapp/cloud-storage.js", build_sources)
+        self.assertIn("webapp/error-ui.js", build_sources)
         self.assertIn("webapp/studio-core.js", build_sources)
         self.assertIn("webapp/studio-shell.css", build_sources)
         self.assertIn("assets/studio-demo.svg", build_sources)
         self.assertIn("/webapp/api-client.js", route_sources)
         self.assertIn("/webapp/studio-core.js", route_sources)
+        self.assertIn("/webapp/error-ui.js", route_sources)
         self.assertIn("/webapp/studio-shell.css", route_sources)
         self.assertIn("/assets/studio-demo.svg", route_sources)
         app_route = next(item for item in config["routes"] if item["src"] == "/app")

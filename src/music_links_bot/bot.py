@@ -133,6 +133,20 @@ from music_links_bot.bot_runtime import (
     detect_action,
     encode_callback,
 )
+from music_links_bot.bot_storage import (
+    DRAFT_TTL_SECONDS as _DRAFT_TTL_SECONDS,
+    MAX_MEMORY_DRAFTS as _MAX_MEMORY_DRAFTS,
+    load_draft as _load_draft,
+    load_search_selection as _load_search_selection,
+    store_draft as _store_draft,
+    store_search_selection as _store_search_selection,
+)
+from music_links_bot.bot_progress import (
+    adopt_progress_message as _adopt_progress_message,
+    start_progress as _send_loading_placeholder,
+    take_progress as _take_placeholder,
+    update_progress as _update_loading_placeholder,
+)
 from music_links_bot.bot_ui import (
     build_error_keyboard as _build_error_keyboard_view,
     build_home_text as _build_home_text,
@@ -212,17 +226,11 @@ MENU_DEMO = "menu:demo"
 MENU_KEYS = frozenset((MENU_START, MENU_HELP, MENU_GUIDE, MENU_PLATFORMS, MENU_DEMO))
 DEFAULT_UI_MODE = "stonerhand"
 MAX_BUTTON_TEXT_LENGTH = 64
-DRAFT_TTL_SECONDS = 48 * 3600
-MAX_MEMORY_DRAFTS = 300
 STATS_KV_KEY = "stats:v1"
+# Public compatibility constants used by the Studio API and tests.
+DRAFT_TTL_SECONDS = _DRAFT_TTL_SECONDS
+MAX_MEMORY_DRAFTS = _MAX_MEMORY_DRAFTS
 
-# The "collecting the post" placeholder for the current update. ContextVars are
-# task-local in asyncio, and PTB processes each update in its own task, so this
-# never leaks between concurrent updates.
-_PLACEHOLDER_MESSAGE: contextvars.ContextVar[Message | None] = contextvars.ContextVar(
-    "placeholder_message",
-    default=None,
-)
 _INPUT_OVERRIDE: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "input_override", default=None
 )
@@ -330,7 +338,7 @@ BOT_DESCRIPTIONS = {
         "Музыкальный редактор для Telegram.\n\n"
         "• Ссылка или название → точный релиз и готовая карточка\n"
         "• Несколько ссылок → одна редактируемая подборка\n"
-        "• Обложка, кликабельный заголовок и компактные кнопки\n"
+        "• Обложка, чистый заголовок и компактные кнопки площадок\n"
         "• Нативная отправка поста с кнопками в любой чат\n"
         "• Inline: @StonerHandBot + запрос прямо в переписке\n"
         "• Студия: карточка или Rich-лонгрид, превью, очередь и канал\n\n"
@@ -341,7 +349,7 @@ BOT_DESCRIPTIONS = {
         "A music post editor for Telegram.\n\n"
         "• A link or title → the exact release and a finished card\n"
         "• Several links → one editable crate\n"
-        "• Artwork, a tappable heading and compact platform actions\n"
+        "• Artwork, a clean heading and compact platform actions\n"
         "• Native sharing that preserves buttons in any chat\n"
         "• Inline: @StonerHandBot + a query inside any conversation\n"
         "• Studio: card or Rich longread, preview, queue and publishing\n\n"
@@ -876,102 +884,6 @@ def _draft_platform_selection(draft: dict) -> list[str] | None:
     return selection or None
 
 
-def _remember_bounded(
-    items: dict,
-    key: str,
-    value: dict,
-    *,
-    max_size: int,
-) -> None:
-    """Insert or refresh a value without growing a warm-instance cache forever."""
-    items.pop(key, None)
-    while len(items) >= max_size:
-        items.pop(next(iter(items)))
-    items[key] = value
-
-
-async def _store_draft(
-    context: ContextTypes.DEFAULT_TYPE,
-    draft_id: str,
-    draft: dict,
-) -> None:
-    drafts: dict = context.application.bot_data.setdefault("drafts", {})
-    _remember_bounded(
-        drafts,
-        draft_id,
-        draft,
-        max_size=MAX_MEMORY_DRAFTS,
-    )
-    kv: KVStore | None = context.application.bot_data.get("kv_store")
-    if kv is not None:
-        # A serverless instance may be frozen immediately after the handler
-        # returns. Await the durable write so Studio can open this draft from a
-        # different instance and it survives a cold start.
-        await kv.set_json(
-            f"draft:{draft_id}", draft, ttl_seconds=DRAFT_TTL_SECONDS
-        )
-
-
-async def _load_draft(
-    context: ContextTypes.DEFAULT_TYPE,
-    draft_id: str,
-) -> dict | None:
-    drafts: dict = context.application.bot_data.setdefault("drafts", {})
-    draft = drafts.get(draft_id)
-    if draft is not None:
-        return draft
-
-    kv: KVStore | None = context.application.bot_data.get("kv_store")
-    if kv is None:
-        return None
-
-    draft = await kv.get_json(f"draft:{draft_id}")
-    if isinstance(draft, dict) and draft.get("type") == "track":
-        _remember_bounded(
-            drafts,
-            draft_id,
-            draft,
-            max_size=MAX_MEMORY_DRAFTS,
-        )
-        return draft
-
-    return None
-
-
-async def _store_search_selection(
-    context: ContextTypes.DEFAULT_TYPE,
-    *,
-    user_id: int,
-    query: str,
-    urls: list[str],
-) -> str:
-    selection_id = secrets.token_hex(5)
-    payload = {"user_id": user_id, "query": query, "urls": urls}
-    selections: dict = context.application.bot_data.setdefault("search_selections", {})
-    _remember_bounded(selections, selection_id, payload, max_size=300)
-    kv: KVStore | None = context.application.bot_data.get("kv_store")
-    if kv is not None:
-        await kv.set_json(
-            f"selection:v1:{selection_id}", payload, ttl_seconds=15 * 60
-        )
-    return selection_id
-
-
-async def _load_search_selection(
-    context: ContextTypes.DEFAULT_TYPE, selection_id: str
-) -> dict | None:
-    selections: dict = context.application.bot_data.setdefault("search_selections", {})
-    payload = selections.get(selection_id)
-    if isinstance(payload, dict):
-        return payload
-    kv: KVStore | None = context.application.bot_data.get("kv_store")
-    payload = await kv.get_json(f"selection:v1:{selection_id}") if kv else None
-    if isinstance(payload, dict):
-        _remember_bounded(selections, selection_id, payload, max_size=300)
-        return payload
-    return None
-
-
 async def _dispatch_selection_action(query, context, action: CallbackAction) -> None:
     lang = resolve_lang(query.from_user.language_code if query.from_user else None)
     if action.action != "pick" or ":" not in action.payload:
@@ -993,7 +905,7 @@ async def _dispatch_selection_action(query, context, action: CallbackAction) -> 
     await query.answer(get_text(lang, "progress_links"))
     if query.message is None:
         return
-    _PLACEHOLDER_MESSAGE.set(query.message)
+    _adopt_progress_message(query.message)
     token = _INPUT_OVERRIDE.set(source_url)
     try:
         synthetic = Update(update_id=0, callback_query=query)
@@ -1014,7 +926,7 @@ async def _dispatch_retry_action(query, context, action: CallbackAction) -> None
         await query.answer(get_text(lang, "ed_expired"), show_alert=True)
         return
     await query.answer(get_text(lang, "progress_search"))
-    _PLACEHOLDER_MESSAGE.set(query.message)
+    _adopt_progress_message(query.message)
     token = _INPUT_OVERRIDE.set(value)
     try:
         await track_lookup_message(Update(update_id=0, callback_query=query), context)
@@ -1525,39 +1437,6 @@ async def _send_typing_action(bot: Bot, message: Message) -> None:
         await bot.send_chat_action(chat_id=message.chat_id, action=ChatAction.TYPING)
     except TelegramError:
         LOGGER.debug("Could not send typing action", exc_info=True)
-
-
-async def _send_loading_placeholder(message: Message, lang: str = "ru") -> None:
-    if _PLACEHOLDER_MESSAGE.get() is not None:
-        return
-
-    loading_text = get_text(lang, "progress_search")
-    try:
-        placeholder = await message.reply_text(loading_text)
-    except TelegramError:
-        LOGGER.debug("Could not send loading placeholder", exc_info=True)
-        return
-
-    _PLACEHOLDER_MESSAGE.set(placeholder)
-
-
-async def _update_loading_placeholder(lang: str, key: str) -> None:
-    placeholder = _PLACEHOLDER_MESSAGE.get()
-    if placeholder is None:
-        return
-    try:
-        await placeholder.edit_text(get_text(lang, key))
-    except TelegramError:
-        LOGGER.debug("Could not update loading placeholder", exc_info=True)
-
-
-def _take_placeholder(chat_id: int) -> Message | None:
-    placeholder = _PLACEHOLDER_MESSAGE.get()
-    if placeholder is None or placeholder.chat_id != chat_id:
-        return None
-
-    _PLACEHOLDER_MESSAGE.set(None)
-    return placeholder
 
 
 async def _resolve_search_sources(

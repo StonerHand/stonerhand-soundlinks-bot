@@ -67,14 +67,14 @@ STRINGS: dict[str, dict[str, str]] = {
     "home_body": {
         RU: (
             "{greeting}\n\n"
-            "Пришли ссылку или <code>артист — трек</code>.\n"
-            "Несколько ссылок автоматически станут подборкой.\n\n"
+            "<b>Быстро</b> — пришли ссылку или <code>артист — трек</code>.\n"
+            "<b>Студия</b> — лонгрид, подборка, очередь и публикация.\n\n"
             "<blockquote>Подборка · {crate_count}/10\n{mode}</blockquote>"
         ),
         EN: (
             "{greeting}\n\n"
-            "Send a link or type <code>artist — track</code>.\n"
-            "Several links automatically become a crate.\n\n"
+            "<b>Quick</b> — send a link or type <code>artist — track</code>.\n"
+            "<b>Studio</b> — longreads, crates, queue and publishing.\n\n"
             "<blockquote>Crate · {crate_count}/10\n{mode}</blockquote>"
         ),
     },
@@ -134,6 +134,8 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "quick_tour": {RU: "▶ Как всё работает", EN: "▶ How it works"},
     "quick_search": {RU: "🔎 Найти релиз", EN: "🔎 Find a release"},
+    "quick_mode": {RU: "⚡ Быстро", EN: "⚡ Quick"},
+    "studio_mode": {RU: "🎛 Студия", EN: "🎛 Studio"},
     "open_studio": {RU: "🎛 Открыть Студию", EN: "🎛 Open Studio"},
     "home_crate": {RU: "🧺 Подборка · {count}", EN: "🧺 Crate · {count}"},
     "home_stats": {RU: "📊 Статистика канала", EN: "📊 Channel stats"},
@@ -289,7 +291,7 @@ STRINGS: dict[str, dict[str, str]] = {
             "<code>#stonerhand #track</code>\n\n"
             "[🟢 Spotify] [⚪ Apple]\n"
             "[🪩 Все платформы]</blockquote>\n\n"
-            "<b>Внутри карточки:</b> обложка, кликабельный заголовок, хэштеги и компактные кнопки.\n\n"
+            "<b>Внутри карточки:</b> обложка, чистый заголовок, хэштеги и компактные кнопки.\n\n"
             "Попробуй прямо сейчас: пришли ссылку или <code>название трека</code>."
         ),
         EN: (

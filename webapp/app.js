@@ -1,5 +1,6 @@
 import { createApiClient } from "/webapp/api-client.js";
 import { createCloudStorage } from "/webapp/cloud-storage.js";
+import { createErrorText } from "/webapp/error-ui.js";
 import {
   analyzeQuery,
   assessCollection,
@@ -465,16 +466,7 @@ import {
     el.textContent = msg; el.style.opacity = "1";
     clearTimeout(el._t); el._t = setTimeout(() => { el.style.opacity = "0"; }, 2400);
   }
-  function errorText(error) {
-    if (error === "network") return T.network;
-    if (error === "timeout") return T.timeout;
-    if (error === "request_in_progress" || error === "queue_busy") return T.busy;
-    if (error === "draft not found") return EN?"This draft expired. Find the release again.":"Черновик устарел. Найди релиз ещё раз.";
-    if (error === "need more tracks") return T.needMore;
-    if (error === "unauthorized") return EN?"Reopen Studio from the bot.":"Закрой и снова открой Студию из бота.";
-    if (error === "save_failed") return EN?"Changes were not saved. Check the connection and retry.":"Изменения не сохранены. Проверь соединение и повтори.";
-    return T.err;
-  }
+  const errorText = createErrorText({ strings: T, english: EN });
   function confirmAction(message) {
     return new Promise((resolve) => {
       try {

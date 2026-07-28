@@ -837,14 +837,14 @@ class BotKeyboardTests(unittest.TestCase):
             )
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(rows[0][0].text, "🎛 Открыть Студию")
-        self.assertEqual(rows[0][0].api_kwargs, {"style": "success"})
-        self.assertEqual(rows[1][0].text, "🔎 Найти релиз")
-        self.assertEqual(len(rows[1]), 1)
-        self.assertEqual(rows[2][0].text, "🧺 Подборка · 3")
-        self.assertEqual(rows[2][0].api_kwargs, {"style": "success"})
-        self.assertEqual(rows[2][1].text, "❓ Помощь")
-        self.assertEqual(len(rows), 3)
+        self.assertEqual(rows[0][0].text, "⚡ Быстро")
+        self.assertEqual(rows[0][0].api_kwargs, {"style": "primary"})
+        self.assertEqual(rows[0][1].text, "🎛 Студия")
+        self.assertEqual(rows[0][1].api_kwargs, {"style": "success"})
+        self.assertEqual(rows[1][0].text, "🧺 Подборка · 3")
+        self.assertEqual(rows[1][0].api_kwargs, {"style": "success"})
+        self.assertEqual(rows[1][1].text, "❓ Помощь")
+        self.assertEqual(len(rows), 2)
 
     def test_home_text_is_personal_and_escapes_telegram_html(self) -> None:
         text = _build_home_text(

@@ -2,13 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import json
 import logging
 import threading
 import time
 from dataclasses import asdict
-from http import HTTPStatus
-from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 import secrets
 import sys
@@ -61,10 +58,10 @@ from music_links_bot.publish_queue import (
     QueueBusyError,
     add_job,
     load_jobs,
-    process_due_jobs,
     remove_job,
     reschedule_job,
 )
+from music_links_bot.provider_runtime import ProviderTask, run_provider_tasks
 from music_links_bot.request_guard import rate_limited, run_idempotent
 from music_links_bot.rich_publications import (
     build_fallback_html,
@@ -98,7 +95,7 @@ _crate_base_items = _studio_storage._crate_base_items
 _crate_response = _studio_storage._crate_response
 
 from music_links_bot.url_utils import extract_supported_urls, is_youtube_video_url
-from music_links_bot.webapp_auth import validate_init_data
+from api.webapp_transport import StudioRequestHandler
 from telegram import InlineQueryResultArticle, InputTextMessageContent
 from telegram.constants import ParseMode
 from telegram.error import TelegramError
@@ -141,102 +138,6 @@ _LOOP: asyncio.AbstractEventLoop | None = None
 _LOOP_THREAD: threading.Thread | None = None
 _APPLICATION = None
 _SETTINGS: Settings | None = None
-
-
-class handler(BaseHTTPRequestHandler):
-    def do_GET(self) -> None:
-        # A GET doubles as a queue tick: any uptime ping (or a curious
-        # browser) delivers scheduled posts whose time has come.
-        published = 0
-        try:
-            loop, application, _settings = _ensure_application()
-            context = SimpleNamespace(application=application, bot=application.bot)
-            published = run_on_loop(
-                loop,
-                process_due_jobs(context),
-                timeout=QUEUE_TICK_TIMEOUT_SECONDS,
-            )
-        except Exception:
-            LOGGER.exception("Queue tick failed")
-
-        self._send_json(
-            {"ok": True, "service": "StonerHand studio API", "queue_published": published}
-        )
-
-    def do_POST(self) -> None:
-        try:
-            content_length = int(self.headers.get("content-length") or "0")
-        except ValueError:
-            content_length = 0
-
-        if content_length <= 0 or content_length > MAX_BODY_BYTES:
-            self._send_json({"ok": False, "error": "bad request"}, HTTPStatus.BAD_REQUEST)
-            return
-
-        try:
-            payload = json.loads(self.rfile.read(content_length))
-            if not isinstance(payload, dict):
-                raise ValueError
-        except ValueError:
-            self._send_json({"ok": False, "error": "invalid json"}, HTTPStatus.BAD_REQUEST)
-            return
-
-        req_id = secrets.token_hex(4)
-        # Sanitize before logging so a crafted action string can't forge log
-        # lines (control chars) or flood them (length).
-        action = str(payload.get("action") or "?").replace("\n", " ").replace("\r", " ")[:48]
-        started = time.monotonic()
-        try:
-            loop, application, settings = _ensure_application()
-            user = validate_init_data(
-                str(payload.get("init_data") or ""),
-                settings.bot_token,
-            )
-            if user is None:
-                LOGGER.info("req=%s action=%s unauthorized", req_id, action)
-                self._send_json(
-                    {"ok": False, "error": "unauthorized", "request_id": req_id},
-                    HTTPStatus.UNAUTHORIZED,
-                )
-                return
-
-            result = run_on_loop(
-                loop,
-                _handle_action(application, settings, user, payload),
-                timeout=ACTION_TIMEOUT_SECONDS,
-            )
-            result.setdefault("request_id", req_id)
-        except asyncio.TimeoutError:
-            LOGGER.warning(
-                "req=%s action=%s timed out after %.1fs",
-                req_id, action, time.monotonic() - started,
-            )
-            self._send_json(
-                {"ok": False, "error": "timeout", "retryable": True, "request_id": req_id}, HTTPStatus.GATEWAY_TIMEOUT
-            )
-            return
-        except Exception:
-            LOGGER.exception("req=%s action=%s failed", req_id, action)
-            self._send_json(
-                {"ok": False, "error": "internal", "retryable": True, "request_id": req_id},
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-            )
-            return
-
-        LOGGER.info(
-            "req=%s action=%s ok=%s %.0fms",
-            req_id, action, bool(result.get("ok")), (time.monotonic() - started) * 1000,
-        )
-        status = HTTPStatus.OK if result.get("ok") else HTTPStatus.UNPROCESSABLE_ENTITY
-        self._send_json(result, status)
-
-    def _send_json(self, payload: dict, status: HTTPStatus = HTTPStatus.OK) -> None:
-        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        self.send_response(status)
-        self.send_header("content-type", "application/json; charset=utf-8")
-        self.send_header("content-length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
 
 
 def _ensure_application():
@@ -414,19 +315,31 @@ async def _action_resolve_batch(context, body: dict, user_id: int) -> dict:
     bot_data = context.application.bot_data
     video_urls = [url for url in source_urls if is_youtube_video_url(url)]
     music_urls = [url for url in source_urls if not is_youtube_video_url(url)]
-    track_result, videos = await asyncio.gather(
-        _lookup_tracks(
-            bot_data["songlink_client"],
-            music_urls,
-            soundcloud_client=bot_data["soundcloud_client"],
-            search_client=bot_data.get("search_client"),
+    tasks: list[ProviderTask] = []
+    if music_urls:
+        tasks.append(
+            ProviderTask(
+                "songlink",
+                _lookup_tracks(
+                    bot_data["songlink_client"],
+                    music_urls,
+                    soundcloud_client=bot_data["soundcloud_client"],
+                    search_client=bot_data.get("search_client"),
+                ),
+                ([], list(music_urls)),
+            )
         )
-        if music_urls
-        else asyncio.sleep(0, result=([], [])),
-        _lookup_youtube_videos(bot_data["youtube_client"], video_urls)
-        if video_urls
-        else asyncio.sleep(0, result=[]),
-    )
+    if video_urls:
+        tasks.append(
+            ProviderTask(
+                "youtube",
+                _lookup_youtube_videos(bot_data["youtube_client"], video_urls),
+                [],
+            )
+        )
+    results = await run_provider_tasks(bot_data, tasks)
+    track_result = results.get("songlink", ([], []))
+    videos = results.get("youtube", [])
     tracks, _unavailable = track_result
     tracks = [track for track in tracks if track.links]
     resolved_items = [*tracks, *(as_video_track(video) for video in videos)]
@@ -1108,3 +1021,15 @@ async def _draft_response(context, draft_id: str, draft: dict, is_admin: bool) -
         is_admin=is_admin,
         ttl_seconds=DRAFT_TTL_SECONDS,
     )
+
+
+class handler(StudioRequestHandler):
+    max_body_bytes = MAX_BODY_BYTES
+    action_timeout_seconds = ACTION_TIMEOUT_SECONDS
+    queue_timeout_seconds = QUEUE_TICK_TIMEOUT_SECONDS
+
+    def ensure_application(self):
+        return _ensure_application()
+
+    async def handle_action(self, application, settings, user, payload):
+        return await _handle_action(application, settings, user, payload)

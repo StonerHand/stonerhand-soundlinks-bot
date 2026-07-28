@@ -21,6 +21,7 @@ STUDIO_SHELL_CSS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "st
 JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "app.js").read_text()
 API_JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "api-client.js").read_text()
 CLOUD_JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "cloud-storage.js").read_text()
+ERROR_JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "error-ui.js").read_text()
 CORE_JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "studio-core.js").read_text()
 COVER = "https://cover.local/a.jpg"
 
@@ -183,6 +184,7 @@ def main() -> int:
         page.route("https://studio.local/webapp/app.js", lambda r: r.fulfill(body=JS, content_type="application/javascript"))
         page.route("https://studio.local/webapp/api-client.js", lambda r: r.fulfill(body=API_JS, content_type="application/javascript"))
         page.route("https://studio.local/webapp/cloud-storage.js", lambda r: r.fulfill(body=CLOUD_JS, content_type="application/javascript"))
+        page.route("https://studio.local/webapp/error-ui.js", lambda r: r.fulfill(body=ERROR_JS, content_type="application/javascript"))
         page.route("https://studio.local/webapp/studio-core.js", lambda r: r.fulfill(body=CORE_JS, content_type="application/javascript"))
 
         errors: list[str] = []
