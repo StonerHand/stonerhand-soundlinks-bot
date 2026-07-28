@@ -6,6 +6,7 @@ import sys
 from unittest.mock import patch
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import BadRequest
+from telegram.ext import CommandHandler
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -52,10 +53,19 @@ from music_links_bot.bot import (
     _editor_more_rows,
     _render_bot_crate,
     _render_track_draft,
+    build_application,
+    channel_command,
+    crate_command,
+    guide_command,
+    id_command,
+    platforms_command,
+    stats_command,
+    status_command,
     track_lookup_message,
     help_command,
     start_command,
 )
+from music_links_bot.config import Settings
 from music_links_bot.artist import ArtistLookupError
 from music_links_bot.i18n import get_text
 from music_links_bot.models import (
@@ -217,7 +227,9 @@ class BotStub:
         self.chat_actions: list[dict[str, object]] = []
         self.edited_messages: list[dict[str, object]] = []
         self.sent_media_groups: list[dict[str, object]] = []
+        self.deleted_messages: list[dict[str, object]] = []
         self.edit_error: Exception | None = None
+        self.delete_error: Exception | None = None
         self.username = "StonerHandBot"
         self.id = 424242
 
@@ -235,6 +247,11 @@ class BotStub:
         self.edited_messages.append(kwargs)
         if self.edit_error is not None:
             raise self.edit_error
+
+    async def delete_message(self, **kwargs: object) -> None:
+        self.deleted_messages.append(kwargs)
+        if self.delete_error is not None:
+            raise self.delete_error
 
 
 class ContextStub:
@@ -439,7 +456,7 @@ class StartUpdateStub:
 
 
 class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
-    async def test_repeated_start_refreshes_one_home_message(self) -> None:
+    async def test_repeated_start_sends_visible_home_and_retires_old_one(self) -> None:
         message = PrivateMessageStub()
         update = StartUpdateStub(message)
         context = ContextStub()
@@ -447,12 +464,15 @@ class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
         await start_command(update, context)
         await start_command(update, context)
 
-        self.assertEqual(len(message.replies), 1)
-        self.assertEqual(len(context.bot.edited_messages), 1)
-        self.assertEqual(context.bot.edited_messages[0]["message_id"], 1000)
-        self.assertIn("StonerHand Studio", message.replies[0])
+        self.assertEqual(len(message.replies), 2)
+        self.assertEqual(context.bot.edited_messages, [])
+        self.assertEqual(
+            context.bot.deleted_messages,
+            [{"chat_id": message.chat_id, "message_id": 1000}],
+        )
+        self.assertIn("StonerHand Studio", message.replies[-1])
 
-    async def test_help_reuses_the_live_home_message(self) -> None:
+    async def test_help_sends_visible_reply_and_retires_home(self) -> None:
         message = PrivateMessageStub()
         update = StartUpdateStub(message)
         context = ContextStub()
@@ -460,30 +480,52 @@ class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
         await start_command(update, context)
         await help_command(update, context)
 
-        self.assertEqual(len(message.replies), 1)
-        self.assertEqual(len(context.bot.edited_messages), 1)
-        self.assertEqual(context.bot.edited_messages[0]["message_id"], 1000)
-        self.assertIn("Как собрать пост", context.bot.edited_messages[0]["text"])
+        self.assertEqual(len(message.replies), 2)
+        self.assertEqual(context.bot.edited_messages, [])
+        self.assertEqual(context.bot.deleted_messages[0]["message_id"], 1000)
+        self.assertIn("Как собрать пост", message.replies[-1])
 
-    async def test_unchanged_home_is_not_sent_again(self) -> None:
+    async def test_stale_home_delete_failure_does_not_hide_new_reply(self) -> None:
         message = PrivateMessageStub()
         update = StartUpdateStub(message)
         context = ContextStub()
 
         await start_command(update, context)
-        context.bot.edit_error = BadRequest("Message is not modified")
+        context.bot.delete_error = BadRequest("Message to delete not found")
         await start_command(update, context)
 
-        self.assertEqual(len(message.replies), 1)
-        self.assertEqual(len(context.bot.edited_messages), 1)
+        self.assertEqual(len(message.replies), 2)
+        runtime = context.application.bot_data["runtime"]
+        session = await runtime.get_session(message.chat_id)
+        self.assertEqual(session.home_message_id, 1001)
 
-    async def test_missing_old_home_is_replaced_and_pointer_is_updated(self) -> None:
+    async def test_every_registered_user_command_produces_a_reply(self) -> None:
+        commands = (
+            start_command,
+            help_command,
+            guide_command,
+            platforms_command,
+            channel_command,
+            id_command,
+            stats_command,
+            crate_command,
+            status_command,
+        )
+        for command in commands:
+            with self.subTest(command=command.__name__):
+                message = PrivateMessageStub()
+                update = StartUpdateStub(message)
+                context = ContextStub()
+                await command(update, context)
+                self.assertGreaterEqual(len(message.replies), 1)
+
+    async def test_new_home_pointer_survives_old_message_cleanup_failure(self) -> None:
         message = PrivateMessageStub()
         update = StartUpdateStub(message)
         context = ContextStub()
 
         await start_command(update, context)
-        context.bot.edit_error = BadRequest("Message to edit not found")
+        context.bot.delete_error = BadRequest("Message to delete not found")
         await start_command(update, context)
 
         runtime = context.application.bot_data["runtime"]
@@ -493,6 +535,40 @@ class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
 
 
 class BotKeyboardTests(unittest.TestCase):
+    def test_every_supported_command_is_registered(self) -> None:
+        application = build_application(
+            Settings(
+                bot_token="123:test",
+                songlink_api_key=None,
+                songlink_user_countries=("US",),
+                log_level="INFO",
+                admin_chat_id=123,
+                primary_platform=None,
+                ui_mode="stonerhand",
+            )
+        )
+        registered = {
+            command
+            for handlers in application.handlers.values()
+            for handler in handlers
+            if isinstance(handler, CommandHandler)
+            for command in handler.commands
+        }
+        self.assertEqual(
+            registered,
+            {
+                "start",
+                "help",
+                "guide",
+                "platforms",
+                "channel",
+                "id",
+                "stats",
+                "crate",
+                "status",
+            },
+        )
+
     def test_profile_descriptions_are_current_and_fit_telegram_limits(self) -> None:
         self.assertIn("Несколько ссылок", BOT_DESCRIPTIONS[""])
         self.assertIn("точный релиз", BOT_DESCRIPTIONS[""])

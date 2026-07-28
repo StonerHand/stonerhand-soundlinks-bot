@@ -26,6 +26,7 @@ from music_links_bot.loop_runner import (
     start_background_loop,
     stop_background_loop,
 )
+from music_links_bot.logging_config import quiet_transport_logs
 from music_links_bot.publish_queue import process_due_jobs
 
 LOGGER = logging.getLogger(__name__)
@@ -280,6 +281,7 @@ def _ensure_application():
                 level=getattr(logging, settings.log_level, logging.INFO),
                 format="%(asctime)s %(levelname)s %(name)s: %(message)s",
             )
+            quiet_transport_logs()
             loop, thread = start_background_loop("telegram-runtime")
             try:
                 application = build_application(settings)

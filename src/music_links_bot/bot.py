@@ -311,84 +311,77 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     lang = _update_lang(update)
     user_id = update.effective_user.id if update.effective_user else update.message.chat_id
     runtime = _runtime(context)
-    action_key = f"home:{update.message.chat_id}:{user_id}"
-    action_token = await runtime.acquire_action(action_key)
-    if action_token is None:
-        return
-
-    try:
-        session = await runtime.get_session(user_id, lang=lang)
-        crate_count, is_admin = await _home_state(context, user_id)
-        text = _build_home_text(
-            lang=lang,
-            first_name=update.effective_user.first_name if update.effective_user else "",
-            crate_count=crate_count,
-            is_admin=is_admin,
-            first_visit=not session.onboarding_seen,
+    session = await runtime.get_session(user_id, lang=lang)
+    crate_count, is_admin = await _home_state(context, user_id)
+    text = _build_home_text(
+        lang=lang,
+        first_name=update.effective_user.first_name if update.effective_user else "",
+        crate_count=crate_count,
+        is_admin=is_admin,
+        first_visit=not session.onboarding_seen,
+    )
+    keyboard = _build_start_keyboard(
+        context.bot.username,
+        lang=lang,
+        crate_count=crate_count,
+        is_admin=is_admin,
+        show_tour=not session.onboarding_seen,
+        include_studio=update.message.chat.type == "private",
+    )
+    sent = await update.message.reply_text(
+        text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=keyboard,
+    )
+    if update.message.chat.type == "private":
+        await _remember_fresh_home_message(
+            context,
+            runtime,
+            session,
+            chat_id=update.message.chat_id,
+            sent=sent,
         )
-        keyboard = _build_start_keyboard(
-            context.bot.username,
-            lang=lang,
-            crate_count=crate_count,
-            is_admin=is_admin,
-            show_tour=not session.onboarding_seen,
-            include_studio=update.message.chat.type == "private",
-        )
-
-        is_private = update.message.chat.type == "private"
-        if is_private:
-            had_home_pointer = bool(session.home_message_id)
-            if await _refresh_home_message(
-                context,
-                session,
-                chat_id=update.message.chat_id,
-                text=text,
-                keyboard=keyboard,
-            ):
-                return
-            if had_home_pointer:
-                await runtime.save_session(session)
-
-        sent = await update.message.reply_text(
-            text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=keyboard,
-        )
-        message_id = getattr(sent, "message_id", None)
-        if is_private and isinstance(message_id, int) and message_id > 0:
-            session.home_chat_id = update.message.chat_id
-            session.home_message_id = message_id
-            await runtime.save_session(session)
-    finally:
-        await runtime.release_action(action_key, action_token)
 
 
-async def _refresh_home_message(
+async def _remember_fresh_home_message(
     context: ContextTypes.DEFAULT_TYPE,
+    runtime: BotRuntime,
     session: UserSession,
     *,
     chat_id: int,
-    text: str,
-    keyboard: InlineKeyboardMarkup,
-) -> bool:
-    if session.home_chat_id != chat_id or not session.home_message_id:
-        return False
+    sent: Message,
+) -> None:
+    """Point navigation at a visible reply, then retire the previous menu.
+
+    A slash command is an explicit request for feedback at the bottom of the
+    chat. Editing an old home message can succeed off-screen — or return
+    ``Message is not modified`` — while looking like the command was ignored.
+    """
+    message_id = getattr(sent, "message_id", None)
+    if not isinstance(message_id, int) or message_id <= 0:
+        return
+
+    previous_chat_id = session.home_chat_id
+    previous_message_id = session.home_message_id
+    session.home_chat_id = chat_id
+    session.home_message_id = message_id
+    await runtime.save_session(session)
+
+    if (
+        previous_chat_id != chat_id
+        or not previous_message_id
+        or previous_message_id == message_id
+    ):
+        return
     try:
-        await context.bot.edit_message_text(
-            chat_id=chat_id,
-            message_id=session.home_message_id,
-            text=text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=keyboard,
+        await context.bot.delete_message(
+            chat_id=previous_chat_id,
+            message_id=previous_message_id,
         )
-        return True
-    except BadRequest as exc:
-        if "Message is not modified" in str(exc):
-            return True
-        LOGGER.info("Could not refresh home menu; sending a new one: %s", exc)
-        session.home_chat_id = None
-        session.home_message_id = None
-        return False
+    except TelegramError:
+        # The new menu is already live and saved, so stale-message cleanup must
+        # never make a successfully handled command look failed.
+        LOGGER.debug("Could not retire previous home message", exc_info=True)
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1103,51 +1096,33 @@ async def _reply_with_menu(
 ) -> None:
     runtime = _runtime(context)
     subject_id = message.from_user.id if message.from_user else message.chat_id
-    action_key = f"home:{message.chat_id}:{subject_id}"
-    action_token = await runtime.acquire_action(action_key)
-    if action_token is None:
-        return
-
-    try:
-        crate_count, _is_admin = await _home_state(context, message.chat_id)
-        text = _menu_text(menu_key, lang=lang)
-        keyboard = _build_section_keyboard(
-            context.bot.username,
-            lang=lang,
-            crate_count=crate_count,
-            include_studio=message.chat.type == "private",
-            active=menu_key.removeprefix("menu:"),
+    crate_count, _is_admin = await _home_state(context, subject_id)
+    text = _menu_text(menu_key, lang=lang)
+    keyboard = _build_section_keyboard(
+        context.bot.username,
+        lang=lang,
+        crate_count=crate_count,
+        include_studio=message.chat.type == "private",
+        active=menu_key.removeprefix("menu:"),
+    )
+    session = (
+        await runtime.get_session(subject_id, lang=lang)
+        if message.chat.type == "private"
+        else None
+    )
+    sent = await message.reply_text(
+        text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=keyboard,
+    )
+    if session is not None:
+        await _remember_fresh_home_message(
+            context,
+            runtime,
+            session,
+            chat_id=message.chat_id,
+            sent=sent,
         )
-        if message.chat.type == "private":
-            session = await runtime.get_session(subject_id, lang=lang)
-            had_home_pointer = bool(session.home_message_id)
-            if await _refresh_home_message(
-                context,
-                session,
-                chat_id=message.chat_id,
-                text=text,
-                keyboard=keyboard,
-            ):
-                return
-            if had_home_pointer:
-                await runtime.save_session(session)
-
-        sent = await message.reply_text(
-            text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=keyboard,
-        )
-        message_id = getattr(sent, "message_id", None)
-        if (
-            message.chat.type == "private"
-            and isinstance(message_id, int)
-            and message_id > 0
-        ):
-            session.home_chat_id = message.chat_id
-            session.home_message_id = message_id
-            await runtime.save_session(session)
-    finally:
-        await runtime.release_action(action_key, action_token)
 
 
 async def _reply_with_error(

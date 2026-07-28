@@ -16,8 +16,10 @@ if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
 from music_links_bot.alerts import send_admin_alert
+from music_links_bot.logging_config import quiet_transport_logs
 
 LOGGER = logging.getLogger(__name__)
+quiet_transport_logs()
 TIMEOUT_SECONDS = 8
 
 

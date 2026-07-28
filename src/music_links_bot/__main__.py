@@ -5,6 +5,7 @@ import logging
 
 from music_links_bot.bot import build_application
 from music_links_bot.config import Settings
+from music_links_bot.logging_config import quiet_transport_logs
 
 
 def main() -> None:
@@ -16,6 +17,7 @@ def main() -> None:
         level=getattr(logging, settings.log_level, logging.INFO),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    quiet_transport_logs()
 
     application = build_application(settings)
     application.run_polling(

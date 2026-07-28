@@ -18,6 +18,7 @@ from music_links_bot.config import Settings
 from music_links_bot.kvstore import KVStore
 from music_links_bot.lazy_client import LazyAsyncClient
 from music_links_bot.i18n import get_text
+from music_links_bot.logging_config import quiet_transport_logs
 from music_links_bot.publication_state import webapp_url
 
 PUBLIC_BOT_COMMANDS = (
@@ -67,6 +68,8 @@ def build_application(settings: Settings) -> Application:
     Provider implementations are imported only when an application is actually
     built. Pure formatter/tests no longer pay that cold-start cost.
     """
+    quiet_transport_logs()
+
     from music_links_bot.artist import ArtistClient
     from music_links_bot import bot as handlers
     from music_links_bot.nts import NTSClient
