@@ -111,6 +111,19 @@ def _route_api(route):
     if action == "resolve" and (body.get("payload") or {}).get("query") == "missing":
         route.fulfill(json={"ok": False, "error": "not_found"}, content_type="application/json")
         return
+    if action == "resolve_batch" and "/failed" in (body.get("payload") or {}).get("query", ""):
+        route.fulfill(
+            json={
+                **RESPONSES["resolve_batch"],
+                "requested_count": 2,
+                "resolved_count": 1,
+                "failed_count": 1,
+                "items": RESPONSES["resolve_batch"]["items"][:1],
+                "retry_urls": ["https://open.spotify.com/track/failed"],
+            },
+            content_type="application/json",
+        )
+        return
     if action == "dashboard" and ACTION_ATTEMPTS[action] == 1:
         route.fulfill(
             status=503,
@@ -553,6 +566,33 @@ def main() -> int:
             failures.append("video item has no visible media-type label")
         if page.evaluate("document.documentElement.scrollWidth > window.innerWidth"):
             failures.append("crate view has horizontal overflow")
+
+        # Partial batch preserves successful items and retries only failed URLs.
+        page.eval_on_selector('#tabbar [data-tab="home"]', "el => el.click()")
+        page.wait_for_timeout(150)
+        page.eval_on_selector(
+            "#query",
+            """el => {
+              el.value='https://open.spotify.com/track/ok https://open.spotify.com/track/failed';
+              el.dispatchEvent(new Event('input'));
+              el.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter'}));
+            }""",
+        )
+        page.wait_for_timeout(600)
+        if page.get_attribute("#toast", "aria-hidden") != "false":
+            failures.append("partial batch has no failed-only recovery prompt")
+        page.eval_on_selector("#toast-confirm", "el => el.click()")
+        page.wait_for_timeout(250)
+        batch_requests = [
+            body for body in REQUEST_BODIES if body.get("action") == "resolve_batch"
+        ]
+        retry_query = (
+            (batch_requests[-1].get("payload") or {}).get("query")
+            if batch_requests
+            else ""
+        )
+        if retry_query != "https://open.spotify.com/track/failed":
+            failures.append("partial batch retried successful links too")
         crate_health_state = page.evaluate(
             """() => ({
               display: getComputedStyle(document.getElementById('crate-health')).display,

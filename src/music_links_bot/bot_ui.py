@@ -182,6 +182,51 @@ def build_error_keyboard(
     return InlineKeyboardMarkup(rows)
 
 
+def build_duplicate_post_keyboard(
+    draft_id: str,
+    record: dict,
+    *,
+    lang: str,
+) -> InlineKeyboardMarkup:
+    rows = [
+        [
+            InlineKeyboardButton(
+                get_text(lang, "duplicate_repeat"),
+                callback_data=encode_callback("editor", "r", draft_id),
+                api_kwargs={"style": "primary"},
+            )
+        ]
+    ]
+    if isinstance(record.get("message_id"), int):
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "duplicate_replace"),
+                    callback_data=encode_callback("editor", "x", draft_id),
+                    api_kwargs={"style": "danger"},
+                )
+            ]
+        )
+    if record.get("url"):
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "duplicate_open"),
+                    url=str(record["url"]),
+                )
+            ]
+        )
+    rows.append(
+        [
+            InlineKeyboardButton(
+                get_text(lang, "cancel"),
+                callback_data=encode_callback("editor", "b", draft_id),
+            )
+        ]
+    )
+    return InlineKeyboardMarkup(rows)
+
+
 def build_onboarding_keyboard(step: int, lang: str) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     if step < 3:

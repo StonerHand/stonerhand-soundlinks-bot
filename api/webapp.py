@@ -31,7 +31,7 @@ from music_links_bot.bot import (
     build_application,
 )
 from music_links_bot.publication_state import (
-    find_posted_date as _find_posted_date,
+    find_posted_record as _find_posted_record,
     mark_posted as _schedule_mark_posted,
     release_fingerprint as _release_fingerprint,
 )
@@ -163,6 +163,32 @@ def _ensure_application():
 
 
 async def _handle_action(application, settings: Settings, user: dict, payload: dict) -> dict:
+    started = time.monotonic()
+    result: dict = {"ok": False}
+    try:
+        result = await _handle_action_impl(
+            application,
+            settings,
+            user,
+            payload,
+        )
+        return result
+    finally:
+        runtime = application.bot_data.get("runtime")
+        if runtime is not None:
+            runtime.record_request(
+                latency_ms=int((time.monotonic() - started) * 1000),
+                ok=bool(result.get("ok")),
+            )
+            await runtime.persist_metrics()
+
+
+async def _handle_action_impl(
+    application,
+    settings: Settings,
+    user: dict,
+    payload: dict,
+) -> dict:
     context = SimpleNamespace(application=application, bot=application.bot)
     action = str(payload.get("action") or "")
     body = payload.get("payload") if isinstance(payload.get("payload"), dict) else {}
@@ -340,7 +366,7 @@ async def _action_resolve_batch(context, body: dict, user_id: int) -> dict:
     results = await run_provider_tasks(bot_data, tasks)
     track_result = results.get("songlink", ([], []))
     videos = results.get("youtube", [])
-    tracks, _unavailable = track_result
+    tracks, unavailable = track_result
     tracks = [track for track in tracks if track.links]
     resolved_items = [*tracks, *(as_video_track(video) for video in videos)]
     if not resolved_items:
@@ -365,9 +391,68 @@ async def _action_resolve_batch(context, body: dict, user_id: int) -> dict:
             "requested_count": len(source_urls),
             "resolved_count": len(items),
             "failed_count": max(0, len(source_urls) - len(items)),
+            "statuses": _batch_source_statuses(
+                source_urls,
+                tracks=tracks,
+                videos=videos,
+                unavailable_urls=unavailable,
+            ),
+            "retry_urls": list(unavailable),
         }
     )
     return result
+
+
+def _batch_source_statuses(
+    source_urls: list[str],
+    *,
+    tracks: list[TrackMatch],
+    videos: list,
+    unavailable_urls: list[str],
+) -> list[dict]:
+    unavailable = set(unavailable_urls)
+    successful_urls = {
+        url
+        for track in tracks
+        for url in track.links.values()
+        if isinstance(url, str)
+    }
+    successful_urls.update(
+        str(video.url)
+        for video in videos
+        if getattr(video, "url", None)
+    )
+    music_candidates = [
+        url
+        for url in source_urls
+        if url not in unavailable and not is_youtube_video_url(url)
+    ]
+    successful_urls.update(music_candidates[: len(tracks)])
+    video_candidates = [
+        url
+        for url in source_urls
+        if url not in unavailable and is_youtube_video_url(url)
+    ]
+    successful_urls.update(video_candidates[: len(videos)])
+    statuses = []
+    for source_url in source_urls:
+        if source_url in unavailable:
+            state = "unavailable"
+            retryable = True
+        elif source_url in successful_urls:
+            state = "success"
+            retryable = False
+        else:
+            state = "not_found"
+            retryable = False
+        statuses.append(
+            {
+                "source_url": source_url,
+                "state": state,
+                "retryable": retryable,
+            }
+        )
+    return statuses
 
 
 async def _action_draft(context, body: dict, user_id: int, is_admin: bool) -> dict:
@@ -604,13 +689,28 @@ async def _action_deliver(context, action: str, body: dict, user_id: int, is_adm
             return {"ok": False, "error": "admin only"}
 
         if not body.get("force"):
-            posted_date = await _find_posted_date(context, track)
-            if posted_date:
-                return {"ok": False, "error": "duplicate", "posted_date": posted_date}
+            posted = await _find_posted_record(context, track)
+            if posted:
+                return {
+                    "ok": False,
+                    "error": "duplicate",
+                    "posted_date": posted.get("date"),
+                    "posted_url": posted.get("url"),
+                    "posted_message_id": posted.get("message_id"),
+                }
 
         published = await _publish_draft(context, draft)
         if published:
-            await _schedule_mark_posted(context, track)
+            target = (
+                context.application.bot_data.get("publish_chat_id")
+                or "@stonerhand"
+            )
+            await _schedule_mark_posted(
+                context,
+                track,
+                message=published,
+                target=target,
+            )
 
         return {
             "ok": bool(published),
@@ -685,9 +785,15 @@ async def _action_schedule(context, body: dict, user_id: int, is_admin: bool) ->
     await _store_draft(context, draft_id, draft)
     track = TrackMatch(**draft["item"])
     if not body.get("force"):
-        posted_date = await _find_posted_date(context, track)
-        if posted_date:
-            return {"ok": False, "error": "duplicate", "posted_date": posted_date}
+        posted = await _find_posted_record(context, track)
+        if posted:
+            return {
+                "ok": False,
+                "error": "duplicate",
+                "posted_date": posted.get("date"),
+                "posted_url": posted.get("url"),
+                "posted_message_id": posted.get("message_id"),
+            }
 
     try:
         job = await add_job(context, draft, publish_at)
@@ -777,6 +883,7 @@ async def _action_stats(context, is_admin: bool) -> dict:
     if kv is not None:
         stats_data = merge_stats(stats_data, await kv.get_json(STATS_KV_KEY))
 
+    runtime = context.application.bot_data.get("runtime")
     return {
         "ok": True,
         "stats": {
@@ -792,6 +899,8 @@ async def _action_stats(context, is_admin: bool) -> dict:
             "top_users": _top_entries(stats_data.get("users")),
             "top_chats": _top_entries(stats_data.get("chats")),
         },
+        "runtime": runtime.metrics_snapshot() if runtime is not None else {},
+        "providers": runtime.provider_snapshot() if runtime is not None else [],
     }
 
 
@@ -945,6 +1054,15 @@ async def _action_crate_deliver(
     if action == "crate_publish":
         target = context.application.bot_data.get("publish_chat_id") or f"@{CHANNEL_USERNAME}"
         include_channel_button = str(target).lstrip("@").casefold() != CHANNEL_USERNAME
+        from music_links_bot.chat_access import check_publish_access
+
+        access = await check_publish_access(context, target)
+        if not access.allowed:
+            return {
+                "ok": False,
+                "error": "publish failed",
+                "detail": access.detail,
+            }
     else:
         target = user_id
         include_channel_button = True
@@ -952,6 +1070,7 @@ async def _action_crate_deliver(
     keyboard = _build_collection_keyboard(
         tracks, include_channel_button=include_channel_button
     )
+    delivered_message = None
     try:
         pair = split_track_video_pair(tracks)
         sent_pair = None
@@ -967,8 +1086,10 @@ async def _action_crate_deliver(
                 caption=text,
                 reply_markup=keyboard,
             )
+            if isinstance(sent_pair, list) and sent_pair:
+                delivered_message = sent_pair[-1]
         if sent_pair is None:
-            await context.bot.send_message(
+            delivered_message = await context.bot.send_message(
                 chat_id=target,
                 text=text,
                 parse_mode=ParseMode.HTML,
@@ -985,7 +1106,12 @@ async def _action_crate_deliver(
 
     if action == "crate_publish":
         for track in tracks:
-            await _schedule_mark_posted(context, track)
+            await _schedule_mark_posted(
+                context,
+                track,
+                message=delivered_message,
+                target=target,
+            )
         await _save_crate(context, user_id, [])
     else:
         # keep the server mirror in step with what was just sent

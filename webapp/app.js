@@ -36,7 +36,7 @@ import {
     previewTitle: "Post preview", format: "Style", apply: "Apply",
     send: "Send to me", publish: "Publish", sent: "Sent", published: "Published!",
     undo: "Undo", undone: "POST DELETED", scheduled: "SCHEDULED: ",
-    dupA: "⚠️ Already published on ", dupB: ". Publish again?", confirm: "Publish", cancel: "Cancel",
+    dupA: "⚠️ Already published on ", dupB: ". Publish again?", oldPost: "Open previous post", retryFailed: "Retry failed", confirm: "Publish", cancel: "Cancel",
     err: "The signal got noisy. Try again.", network: "No connection. Check your internet and retry.", timeout: "The server needs more time. Try again.", busy: "Still working on it. Try again in a moment.", allPlatforms: "All",
     toCrate: "In crate", crateFull: "CRATE IS FULL",
     secContent: "Content", secTags: "Hashtags", secPm: "Platforms & order",
@@ -98,7 +98,7 @@ import {
     previewTitle: "Превью поста", format: "Оформление", apply: "Применить",
     send: "Отправить себе", publish: "Опубликовать", sent: "Отправлено", published: "Опубликовано!",
     undo: "Отмена", undone: "ПОСТ УДАЛЁН", scheduled: "В ОЧЕРЕДИ: ",
-    dupA: "⚠️ Уже публиковалось ", dupB: ". Опубликовать снова?", confirm: "Опубликовать", cancel: "Отмена",
+    dupA: "⚠️ Уже публиковалось ", dupB: ". Опубликовать снова?", oldPost: "Открыть старый пост", retryFailed: "Повторить ошибки", confirm: "Опубликовать", cancel: "Отмена",
     err: "Связь зашумела. Попробуем ещё раз.", network: "Нет соединения. Проверь интернет и повтори.", timeout: "Серверу нужно больше времени. Попробуй ещё раз.", busy: "Ещё работаем над запросом. Повтори через секунду.", allPlatforms: "Все",
     toCrate: "В подборке", crateFull: "ПОДБОРКА ЗАПОЛНЕНА",
     secContent: "Содержимое", secTags: "Хэштеги", secPm: "Платформы и порядок",
@@ -1019,6 +1019,17 @@ import {
               : (EN ? `Added ${added} to the crate` : `Добавлено в подборку: ${added}`)
           ),
       );
+      if (Array.isArray(res.retry_urls) && res.retry_urls.length) {
+        $("toast-msg").textContent = EN
+          ? `${failed} links are temporarily unavailable. Retry only those links?`
+          : `${failed} ссылок временно недоступно. Повторить только их?`;
+        $("toast-confirm").textContent = T.retryFailed;
+        $("toast-confirm").onclick = () => {
+          setToastOpen(false);
+          searchBatch(res.retry_urls.join("\n"));
+        };
+        setToastOpen(true);
+      }
     } catch(e) { if (seq !== loadSeq) return; $("nf-query").textContent = q; show("notfound"); hap.err(); }
   }
   function openDraftResult(res, applyDefaults) {
@@ -1366,6 +1377,13 @@ import {
 
   /* ── deliver + undo ── */
   function clearUndo(){ if (undoTimer) { clearInterval(undoTimer); undoTimer=null; } }
+  function duplicateMessage(res) {
+    let html = T.dupA+"<b>"+esc(res.posted_date||"—")+"</b>"+T.dupB;
+    if (typeof res.posted_url === "string" && /^https:\/\/t\.me\//.test(res.posted_url)) {
+      html += '<br><a href="'+esc(res.posted_url)+'">'+esc(T.oldPost)+"</a>";
+    }
+    return html;
+  }
   function startUndo(messageId) {
     let left = 5;
     $("dock-default").classList.add("hidden"); $("dock-done").classList.remove("hidden");
@@ -1392,7 +1410,7 @@ import {
         setTimeout(() => { renderCard(); }, 2400);
       } else if (res.error==="duplicate") {
         hap.err();
-        $("toast-msg").innerHTML = T.dupA+"<b>"+esc(res.posted_date)+"</b>"+T.dupB;
+        $("toast-msg").innerHTML = duplicateMessage(res);
         setToastOpen(true); $("toast-confirm").textContent = T.confirm;
         $("toast-confirm").onclick = () => { setToastOpen(false); deliver("publish", {force:true}); };
       } else { hap.err(); $("status").textContent = errorText(res.error); }
@@ -1606,7 +1624,7 @@ import {
     try {
       const res = await api("schedule", { draft_id: state.draft_id, at, force: Boolean(force), hashtags: state.flags.hashtags, quote: state.flags.quote, large_preview: state.flags.large_preview, as_photo: Boolean(state.flags.as_photo), ...publicationPayload() });
       if (res.ok) { hap.ok(); $("status").textContent = T.scheduled + fmtWhen(res.publish_at); refreshQueueBadge(); }
-      else if (res.error==="duplicate") { hap.err(); $("toast-msg").innerHTML=T.dupA+"<b>"+esc(res.posted_date)+"</b>"+T.dupB; setToastOpen(true); $("toast-confirm").textContent=T.confirm; $("toast-confirm").onclick=()=>{setToastOpen(false);schedule(at,true);}; }
+      else if (res.error==="duplicate") { hap.err(); $("toast-msg").innerHTML=duplicateMessage(res); setToastOpen(true); $("toast-confirm").textContent=T.confirm; $("toast-confirm").onclick=()=>{setToastOpen(false);schedule(at,true);}; }
       else { hap.err(); $("status").textContent = errorText(res.error); }
     } catch(e) { hap.err(); $("status").textContent = errorText("network"); }
     finally { schedulePending = false; }

@@ -43,6 +43,7 @@ class handler(BaseHTTPRequestHandler):
         # Read the queue AFTER the tick: anything still overdue means it isn't
         # draining (a repeatedly failing publish or a queue nobody is ticking).
         queue = _queue_status()
+        metrics = _runtime_metrics_status()
 
         if not healthy:
             failing = ", ".join(sorted(describe_failures(checks)))
@@ -62,6 +63,7 @@ class handler(BaseHTTPRequestHandler):
                 "ok": healthy,
                 "checks": checks,
                 "queue": queue,
+                "metrics": metrics,
                 "queue_published": queue_published,
                 "ts": int(time.time()),
             },
@@ -211,6 +213,32 @@ def _queue_status(*, now: float | None = None) -> dict:
         jobs = []
 
     return _summarize_queue_jobs(jobs, now=now)
+
+
+def _runtime_metrics_status() -> dict:
+    """Expose the most recent warm bot process metrics through Redis."""
+    import asyncio
+
+    from music_links_bot.bot_runtime import METRICS_KV_KEY
+    from music_links_bot.kvstore import KVStore
+
+    kv = KVStore.from_env()
+    if kv is None:
+        return {"configured": False}
+
+    async def read():
+        try:
+            return await kv.get_json(METRICS_KV_KEY)
+        finally:
+            await kv.aclose()
+
+    try:
+        payload = asyncio.run(read())
+    except Exception:
+        return {"configured": True, "available": False}
+    if not isinstance(payload, dict):
+        return {"configured": True, "available": False}
+    return {"configured": True, "available": True, **payload}
 
 
 def _summarize_queue_jobs(jobs: list, *, now: float | None = None) -> dict:

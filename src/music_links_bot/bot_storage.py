@@ -8,6 +8,7 @@ DRAFT_TTL_SECONDS = 48 * 3600
 MAX_MEMORY_DRAFTS = 300
 SELECTION_TTL_SECONDS = 15 * 60
 MAX_MEMORY_SELECTIONS = 300
+RETRY_TTL_SECONDS = 30 * 60
 
 
 def remember_bounded(
@@ -106,6 +107,53 @@ async def load_search_selection(context, selection_id: str) -> dict | None:
         remember_bounded(
             selections,
             selection_id,
+            payload,
+            max_size=MAX_MEMORY_SELECTIONS,
+        )
+        return payload
+    return None
+
+
+async def store_retry_sources(
+    context,
+    *,
+    user_id: int,
+    urls: list[str],
+) -> str:
+    retry_id = secrets.token_hex(5)
+    payload = {
+        "user_id": int(user_id),
+        "urls": [str(url) for url in urls if url][:10],
+    }
+    retries: dict = context.application.bot_data.setdefault("retry_sources", {})
+    remember_bounded(
+        retries,
+        retry_id,
+        payload,
+        max_size=MAX_MEMORY_SELECTIONS,
+    )
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    if kv is not None:
+        await kv.set_json(
+            f"retry:v1:{retry_id}",
+            payload,
+            ttl_seconds=RETRY_TTL_SECONDS,
+        )
+    return retry_id
+
+
+async def load_retry_sources(context, retry_id: str) -> dict | None:
+    retries: dict = context.application.bot_data.setdefault("retry_sources", {})
+    payload = retries.get(retry_id)
+    if isinstance(payload, dict):
+        return payload
+
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    payload = await kv.get_json(f"retry:v1:{retry_id}") if kv else None
+    if isinstance(payload, dict):
+        remember_bounded(
+            retries,
+            retry_id,
             payload,
             max_size=MAX_MEMORY_SELECTIONS,
         )

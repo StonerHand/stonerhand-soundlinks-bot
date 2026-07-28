@@ -22,6 +22,9 @@ ACTION_LOCK_SECONDS = 45
 SESSION_TTL_SECONDS = 30 * 24 * 3600
 MAX_MEMORY_SESSIONS = 500
 MAX_MEMORY_KEYS = 2_000
+CIRCUIT_FAILURE_THRESHOLD = 3
+CIRCUIT_COOLDOWN_SECONDS = 45
+METRICS_KV_KEY = "runtime:metrics:v1"
 
 
 def detect_action(text: str, source_urls: list[str], *, is_private: bool) -> str:
@@ -117,6 +120,9 @@ class ProviderDiagnostic:
     ok: bool = True
     latency_ms: int = 0
     failures: int = 0
+    successes: int = 0
+    consecutive_failures: int = 0
+    circuit_open_until: int = 0
     last_error: str = ""
     checked_at: int = 0
 
@@ -131,6 +137,17 @@ class BotRuntime:
         self.action_locks: dict[str, float] = {}
         self.active_tasks: dict[int, asyncio.Task[Any]] = {}
         self.diagnostics: dict[str, ProviderDiagnostic] = {}
+        self.metrics: dict[str, int] = {
+            "requests": 0,
+            "request_errors": 0,
+            "request_ms_total": 0,
+            "request_ms_max": 0,
+            "cache_hits": 0,
+            "cache_misses": 0,
+            "publications": 0,
+            "publication_errors": 0,
+        }
+        self._metrics_persisted_at = 0.0
 
     async def get_session(self, user_id: int, *, lang: str = "ru") -> UserSession:
         cached = self.sessions.get(user_id)
@@ -240,13 +257,80 @@ class BotRuntime:
         diagnostic.latency_ms = max(0, latency_ms)
         diagnostic.checked_at = int(time())
         if ok:
+            diagnostic.successes += 1
+            diagnostic.consecutive_failures = 0
+            diagnostic.circuit_open_until = 0
             diagnostic.last_error = ""
         else:
             diagnostic.failures += 1
+            diagnostic.consecutive_failures += 1
             diagnostic.last_error = type(error).__name__ if error else "unknown"
+            if diagnostic.consecutive_failures >= CIRCUIT_FAILURE_THRESHOLD:
+                diagnostic.circuit_open_until = (
+                    diagnostic.checked_at + CIRCUIT_COOLDOWN_SECONDS
+                )
+
+    def provider_available(self, provider: str, *, now: int | None = None) -> bool:
+        diagnostic = self.diagnostics.get(provider)
+        if diagnostic is None:
+            return True
+        current = int(time()) if now is None else now
+        return diagnostic.circuit_open_until <= current
 
     def provider_snapshot(self) -> list[dict[str, Any]]:
-        return [asdict(item) for item in sorted(self.diagnostics.values(), key=lambda x: x.provider)]
+        current = int(time())
+        snapshot: list[dict[str, Any]] = []
+        for item in sorted(self.diagnostics.values(), key=lambda value: value.provider):
+            payload = asdict(item)
+            payload["circuit_open"] = item.circuit_open_until > current
+            snapshot.append(payload)
+        return snapshot
+
+    def record_cache(self, *, hit: bool) -> None:
+        self.metrics["cache_hits" if hit else "cache_misses"] += 1
+
+    def record_request(self, *, latency_ms: int, ok: bool) -> None:
+        latency = max(0, int(latency_ms))
+        self.metrics["requests"] += 1
+        self.metrics["request_ms_total"] += latency
+        self.metrics["request_ms_max"] = max(
+            self.metrics["request_ms_max"],
+            latency,
+        )
+        if not ok:
+            self.metrics["request_errors"] += 1
+
+    def record_publication(self, *, ok: bool) -> None:
+        self.metrics["publications"] += 1
+        if not ok:
+            self.metrics["publication_errors"] += 1
+
+    def metrics_snapshot(self) -> dict[str, int]:
+        snapshot = dict(self.metrics)
+        requests = snapshot["requests"]
+        snapshot["request_ms_avg"] = (
+            snapshot["request_ms_total"] // requests if requests else 0
+        )
+        snapshot["updated_at"] = int(time())
+        return snapshot
+
+    async def persist_metrics(self) -> None:
+        now = monotonic()
+        if self.kv is None or now - self._metrics_persisted_at < 30:
+            return
+        self._metrics_persisted_at = now
+        try:
+            await asyncio.wait_for(
+                self.kv.set_json(
+                    METRICS_KV_KEY,
+                    self.metrics_snapshot(),
+                    ttl_seconds=7 * 24 * 3600,
+                ),
+                timeout=0.35,
+            )
+        except Exception:
+            # Metrics must never add visible latency to a user request.
+            pass
 
     @staticmethod
     def _drop_expired(items: dict[str, float], now: float) -> None:

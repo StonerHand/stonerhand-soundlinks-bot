@@ -2,10 +2,14 @@ name: Production canary
 
 on:
   schedule:
-    # 30 minutes stays within the free GitHub Actions allowance while still
-    # providing an independent production heartbeat.
-    - cron: "*/30 * * * *"
+    # The public repository uses standard GitHub-hosted runners, so a compact
+    # 10-minute heartbeat can also drain the durable publishing queue.
+    - cron: "*/10 * * * *"
   workflow_dispatch:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
 
 concurrency:
   group: production-canary
@@ -13,9 +17,17 @@ concurrency:
 
 jobs:
   verify:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
       - uses: actions/checkout@v4
       - name: Verify bot, Redis and Mini App
-        run: python tests/e2e/production_canary.py
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            python tests/e2e/production_canary.py && exit 0
+            sleep 20
+          done
+          exit 1

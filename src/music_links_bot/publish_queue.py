@@ -262,8 +262,9 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
     A process crash leaves the job in ``processing`` instead of deleting it;
     another worker can safely reclaim it when ``lease_until`` expires.
     """
-    from music_links_bot.bot import _publish_draft, _schedule_mark_posted
     from music_links_bot.models import TrackMatch
+    from music_links_bot.publication_service import PublicationService
+    from music_links_bot.publication_state import mark_posted
 
     now_ts = int(now if now is not None else time.time())
     owner = secrets.token_hex(12)
@@ -276,10 +277,13 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
     for job in claimed:
         draft = job.get("draft")
         valid = isinstance(draft, dict) and isinstance(draft.get("item"), dict)
-        delivered = False
+        delivered = None
         if valid:
             try:
-                delivered = await _publish_draft(context, draft)
+                delivered = await PublicationService(
+                    context,
+                    channel_username="stonerhand",
+                ).publish(draft, notify_failure=False)
             except Exception:
                 LOGGER.exception("Scheduled publish crashed for job %s", job.get("id"))
 
@@ -297,7 +301,16 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
 
         if outcome == "published" and valid:
             published += 1
-            await _schedule_mark_posted(context, TrackMatch(**draft["item"]))
+            target = (
+                context.application.bot_data.get("publish_chat_id")
+                or "@stonerhand"
+            )
+            await mark_posted(
+                context,
+                TrackMatch(**draft["item"]),
+                message=delivered,
+                target=target,
+            )
         elif outcome == "exhausted" and failed_draft is not None:
             await _alert_job_failure(context, failed_draft)
 

@@ -49,11 +49,14 @@ api/
   set_webhook.py       регистрация webhook, команд, профиля и menu button
 
 src/music_links_bot/
-  bot.py               composition root, handlers, chat editor, delivery
+  bot.py               совместимый facade и Telegram handlers
+  bot_app.py           composition root, lazy clients и lifecycle
+  bot_admin.py         owner-only status и runtime-диагностика
+  bot_batch.py         статусы нескольких ссылок и retry failed-only
   bot_inline.py        inline query, карточки и коллекции для любого чата
   bot_lookup.py        параллельный lookup и fallback разных типов URL
   bot_runtime.py       сессии, callback v2, action leases, диагностика
-  bot_storage.py       durable drafts/selections и bounded memory
+  bot_storage.py       durable drafts/selections/retry и bounded memory
   bot_progress.py      одно редактируемое progress-сообщение
   errors.py            единые коды ошибок бота и Studio API
   bot_crate.py         подборка внутри Telegram-чата
@@ -76,11 +79,15 @@ src/music_links_bot/
   studio_presenters.py стабильный публичный Studio response для draft
   studio_storage.py    история и серверное зеркало crate
   publish_queue.py     durable-очередь отложенных публикаций
-  publication_state.py антидубль опубликованных релизов
+  publication_service.py единый delivery для бота, Studio и очереди
+  publication_state.py антидубль с ID и ссылкой старого поста
+  chat_access.py       кешируемая проверка прав канала
   request_guard.py     rate limit и idempotency Studio mutations
   kvstore.py           Upstash/Vercel KV REST adapter
   cache.py             локальный TTL cache
-  provider_runtime.py  provider timeout, partial results и Redis cache
+  provider_registry.py декларативная маршрутизация URL по адаптерам
+  provider_runtime.py  общий deadline, circuit breaker, partial results и cache
+  inline_storage.py    кеш inline-поиска и персональная история
   lazy_client.py       отложенная инициализация HTTP-клиентов провайдеров
   stats.py             локальные счётчики и merge
   bot_stats.py         запись статистики из Telegram handlers
@@ -108,13 +115,13 @@ tests/
 
 ## 3. Composition root и жизненный цикл
 
-`build_application(settings)` в `bot.py` создаёт:
+`build_application(settings)` делегирует сборку в `bot_app.py`, который создаёт:
 
 - `python-telegram-bot` Application;
 - HTTP-клиенты Song.link, Search, YouTube, SoundCloud, Spotify oEmbed и NTS;
 - опциональный `KVStore`;
 - `BotRuntime`;
-- memory fallback для drafts, search selections и другого transient state;
+- memory fallback для drafts, search selections, failed retries и inline state;
 - Telegram handlers и общий error handler.
 
 Один набор handlers используется в двух режимах:
@@ -405,6 +412,10 @@ stateDiagram-v2
 
 Queue tick запускается после Telegram update, при `GET /api/webapp` и из `/api/health`. Vercel Cron не является поминутным scheduler: для точности около пяти минут нужен внешний uptime monitor.
 
+В production независимый GitHub canary вызывает health каждые 10 минут.
+Поэтому без пользовательского трафика бесплатный контур даёт точность примерно
+до 10 минут; при обычном трафике webhook запускает queue tick чаще.
+
 ## 9. Redis keyspace
 
 | Ключ / префикс | Назначение | TTL |
@@ -412,6 +423,10 @@ Queue tick запускается после Telegram update, при `GET /api/w
 | Song.link cache keys | нормализованные provider responses | 7 дней |
 | `draft:<id>` | Telegram/Studio draft | 48 часов |
 | `session:v1:<user>` | onboarding, язык, last/retry action, указатель на живое меню | 30 дней |
+| `retry:v1:<id>` | только временно не обработанные URL batch-запроса | 30 минут |
+| `inline:search:v1:<hash>` | кандидаты inline-поиска | 30 минут |
+| `inline:history:v1:<user>` | персональная история inline | 30 дней |
+| `lookup:v2:<hash>` | полный успешный LookupBundle | 15 минут |
 | `callback:v2:<id>` | дедуп callback query | 15 минут |
 | `action:v1:<key>` | lease долгого Telegram action | 45 секунд |
 | `seen_update:<id>` | дедуп webhook update | 10 минут |
@@ -422,7 +437,8 @@ Queue tick запускается после Telegram update, при `GET /api/w
 | `queue:v1` | durable очередь | без TTL |
 | `queue:lock` | межинстансовая запись очереди | 30 секунд |
 | `stats:v1` | объединённая статистика | без TTL |
-| release fingerprint | антидубль публикаций | зависит от publication state |
+| `runtime:metrics:v1` | latency, cache hits и delivery counters тёплого процесса | 7 дней |
+| release fingerprint | дата, target, message ID и URL прежнего поста | без TTL |
 | alert dedup keys | ограничение повторных DM | 1 час |
 
 Если Redis не настроен или временно недоступен, `KVStore` мягко возвращает fallback. Это сохраняет основной lookup и отправку, но memory state не разделяется между serverless-инстансами и может исчезнуть после cold start.
@@ -437,7 +453,8 @@ Queue tick запускается после Telegram update, при `GET /api/w
 2. `getWebhookInfo` — webhook зарегистрирован на `/api/telegram` и нет свежей ошибки доставки;
 3. Redis ping, если Redis настроен;
 4. размер и число просроченных queue jobs;
-5. запускает queue tick через `/api/webapp`.
+5. последний runtime metrics snapshot;
+6. запускает queue tick через `/api/webapp`.
 
 Telegram и webhook критичны всегда; Redis критичен только когда настроен. HTTP 503 позволяет внешнему монитору заметить отказ. Health и queue-stuck alerts дедуплицируются примерно на час.
 
@@ -498,10 +515,10 @@ Endpoint:
 - Python 3.12;
 - `pyflakes` для `src`, `api`, `tests`;
 - полный `unittest` suite;
-- `node --check` для всех четырёх ES modules;
+- `node --check` для всех ES modules;
 - отдельный Playwright/Chromium smoke: boot → search → candidate/result → crate и batch flow.
 
-Vercel Git Integration создаёт Preview для feature branch и Production deployment после merge в `main`. `vercel.json` отдельно объявляет Python functions, Web App assets, routes, security headers и два допустимых для Hobby daily cron: синхронизацию webhook и аварийный queue worker. GitHub production canary каждые 30 минут проверяет Telegram, webhook, Redis и оболочку Mini App, оставаясь в бесплатном лимите Actions; вызов health также безопасно запускает lease-защищённый queue tick.
+Vercel Git Integration создаёт Preview для feature branch и Production deployment после merge в `main`. `vercel.json` отдельно объявляет Python functions, Web App assets, routes, security headers и два допустимых для Hobby daily cron: синхронизацию webhook и аварийный queue worker. GitHub production canary каждые 10 минут и после успешного CI проверяет Telegram, webhook, Redis и оболочку Mini App; вызов health также безопасно запускает lease-защищённый queue tick.
 
 ## 14. Правила изменения системы
 
@@ -536,14 +553,14 @@ Vercel Git Integration создаёт Preview для feature branch и Productio
 
 - Vercel Hobby не даёт минутный Cron: очередь тикает из webhook/health, а защищённый worker выполняет ежедневное восстановление; lease не позволяет двум тикам опубликовать один job дважды;
 - без Redis состояние является best-effort и привязано к тёплому инстансу;
-- `bot.py` и `api/webapp.py` остаются orchestration-модулями; inline уже вынесен в `bot_inline.py`, новые provider/storage/UI обязанности также нужно добавлять отдельными файлами;
+- `bot.py` и `api/webapp.py` остаются совместимыми orchestration-фасадами; lifecycle, публикация, owner status, batch recovery, inline storage и provider registry вынесены в отдельные модули;
 - HTTP-клиенты провайдеров создаются лениво при первом обращении; неиспользованный
   провайдер не увеличивает холодный старт и не открывает соединения;
 - Studio — vanilla JS state machine без статической типизации, поэтому API contract защищают runtime validation и E2E;
 - Telegram удаляет inline keyboard при обычной пересылке; Студия использует prepared message для отправки текста вместе с URL-кнопками, а каналам не отдаёт запрещённые `switch_inline_query`-действия;
 - публичный iTunes Search не гарантирует одинаковый каталог во всех регионах;
 - без пользовательского трафика точность отложенной публикации ограничена
-  30-минутным интервалом бесплатного production canary.
+  примерно 10-минутным интервалом production canary;
 
 ## 16. Инварианты
 
@@ -551,6 +568,7 @@ Vercel Git Integration создаёт Preview для feature branch и Productio
 - временная ошибка не кешируется как окончательный idempotent result;
 - draft нельзя открыть или изменить другому пользователю;
 - privileged действие всегда повторно проверяет admin на сервере;
+- публикация в канал предварительно проверяет `can_post_messages`;
 - queue job не удаляется до подтверждённой доставки;
 - stale lease можно безопасно подобрать после crash;
 - необязательный провайдер или Redis не должен ломать базовый сценарий «ссылка → пост»;

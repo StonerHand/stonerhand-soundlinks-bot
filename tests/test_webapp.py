@@ -811,6 +811,11 @@ class PreviewAndRateLimitTests(unittest.TestCase):
         self.assertEqual(res["requested_count"], 3)
         self.assertEqual(res["resolved_count"], 1)
         self.assertEqual(res["failed_count"], 2)
+        self.assertEqual(
+            [item["state"] for item in res["statuses"]],
+            ["success", "unavailable", "unavailable"],
+        )
+        self.assertEqual(res["retry_urls"], body["query"].split()[1:])
 
     def test_resolve_batch_builds_song_and_video_mix(self) -> None:
         import asyncio

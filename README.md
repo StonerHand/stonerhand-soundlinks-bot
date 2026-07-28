@@ -21,9 +21,9 @@
 | --- | --- |
 | Link or title → exact release | Search, candidates and audio preview |
 | Clean title, artwork, hashtags and compact buttons | Card or block-based Rich longread |
-| Several links → one collection | Up to 10 releases with ordering and notes |
+| Several links → one collection with per-link status | Up to 10 releases, ordering and failed-link retry |
 | Song + YouTube clip → two-tile media preview | Song artwork and video thumbnail |
-| Inline search in any conversation | History, queue, undo and owner analytics |
+| Inline search with history, cache and pagination | History, queue, undo and owner analytics |
 | Automatic link replacement in chats and channels | Native sharing that preserves buttons |
 
 Spotify, Apple Music, YouTube, SoundCloud, Bandcamp, Deezer, Tidal,
@@ -54,7 +54,14 @@ The bot exposes two clear modes: **Quick** for a finished chat card and
 **Studio** for longreads, crates, scheduling and publishing. A chat draft keeps
 only Studio and Add to crate actions. Provider clients are lazy, independent
 lookups run in parallel, and successful bundles are cached in memory and Redis.
-A slow optional provider no longer discards already resolved content.
+One request deadline bounds the entire lookup, while a repeatedly failing
+provider is temporarily isolated. Partial batches keep their successful cards
+and retry only failed links.
+
+Before channel delivery, the bot checks its posting rights. Duplicate records
+retain the previous post link and offer open, repeat or replace actions. The
+owner-only `/status` command summarizes Telegram, Redis, queue, permissions,
+latency, cache and provider circuits.
 
 ## Vercel setup
 
@@ -98,7 +105,7 @@ Do not run polling and the production webhook against the same token.
 
 ```text
 api/                    webhook, Studio API, health and queue worker
-src/music_links_bot/    providers, bot UI, delivery, queue and Redis
+src/music_links_bot/    handlers, provider registry, publication, queue and Redis
 webapp/                 build-free modular Telegram Mini App
 tests/                  unit/integration, mobile smoke and production canary
 ```

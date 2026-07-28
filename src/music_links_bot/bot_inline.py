@@ -25,6 +25,12 @@ from music_links_bot.formatter import (
     format_video_message,
 )
 from music_links_bot.i18n import get_text, resolve_lang
+from music_links_bot.inline_storage import (
+    load_cached_search,
+    load_inline_history,
+    remember_inline_urls,
+    store_cached_search,
+)
 from music_links_bot.keyboards import (
     _build_artist_keyboard,
     _build_link_keyboard,
@@ -66,6 +72,7 @@ async def inline_query_handler(
         inline_query.from_user.language_code if inline_query.from_user else None
     )
     query_text = inline_query.query or ""
+    user_id = inline_query.from_user.id if inline_query.from_user else 0
     channel_safe = getattr(inline_query, "chat_type", None) == "channel"
     shared_urls = parse_share_query(query_text)
     source_urls = extract_supported_urls(query_text)[:MAX_LINKS_PER_MESSAGE]
@@ -86,36 +93,57 @@ async def inline_query_handler(
         )
         return
 
-    source_urls = source_urls[:1]
+    personal_results = channel_safe
     if not source_urls:
         search_query = normalize_search_query(query_text)
         if search_query is None:
-            await _answer_inline_hint(
-                inline_query,
-                get_text(lang, "inline_hint_empty"),
+            source_urls = await load_inline_history(
+                context.application.bot_data,
+                user_id,
             )
-            return
-
-        source_urls = await _search_source_urls(
-            context,
-            inline_query,
-            search_query,
-            lang=lang,
-        )
+            personal_results = True
+            if not source_urls:
+                await _answer_inline_hint(
+                    inline_query,
+                    get_text(lang, "inline_hint_empty"),
+                )
+                return
+        else:
+            source_urls = await _search_source_urls(
+                context,
+                inline_query,
+                search_query,
+                lang=lang,
+            )
+            personal_results = True
         if not source_urls:
             return
+    else:
+        source_urls = source_urls[:1]
+
+    await remember_inline_urls(
+        context.application.bot_data,
+        user_id,
+        source_urls,
+    )
+    try:
+        offset = max(0, int(getattr(inline_query, "offset", "") or 0))
+    except (TypeError, ValueError):
+        offset = 0
+    page_urls = source_urls[offset : offset + 6]
+    next_offset = str(offset + 6) if offset + 6 < len(source_urls) else ""
 
     outcomes = await asyncio.gather(
         *(
             _build_inline_result(
                 source_url, context, lang=lang, channel_safe=channel_safe
             )
-            for source_url in source_urls
+            for source_url in page_urls
         ),
         return_exceptions=True,
     )
     results: list[InlineQueryResultArticle] = []
-    for source_url, outcome in zip(source_urls, outcomes, strict=False):
+    for source_url, outcome in zip(page_urls, outcomes, strict=False):
         if isinstance(outcome, InlineQueryResultArticle):
             results.append(outcome)
         elif isinstance(outcome, Exception):
@@ -134,9 +162,10 @@ async def inline_query_handler(
 
     try:
         await inline_query.answer(
-            results[:6],
+            results,
             cache_time=0 if channel_safe else INLINE_CACHE_SECONDS,
-            is_personal=channel_safe,
+            is_personal=personal_results,
+            next_offset=next_offset,
             button=_studio_button(lang),
         )
     except TelegramError:
@@ -198,6 +227,11 @@ async def _search_source_urls(
     *,
     lang: str,
 ) -> list[str]:
+    bot_data = context.application.bot_data
+    cached = await load_cached_search(bot_data, search_query)
+    if cached is not None:
+        return cached
+
     search_client: SearchClient = context.application.bot_data["search_client"]
     try:
         if hasattr(search_client, "search_release_candidates"):
@@ -218,7 +252,9 @@ async def _search_source_urls(
         )
         return []
 
-    return [candidate.url for candidate in candidates]
+    urls = [candidate.url for candidate in candidates]
+    await store_cached_search(bot_data, search_query, urls)
+    return urls
 
 
 def _studio_button(lang: str) -> InlineQueryResultsButton:

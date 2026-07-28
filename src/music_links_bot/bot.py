@@ -11,20 +11,14 @@ import secrets
 
 from telegram import (
     Bot,
-    BotCommand,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
-    MenuButtonWebApp,
     Message,
     Update,
-    WebAppInfo,
 )
 from telegram.constants import ChatAction, ParseMode
 from telegram.error import BadRequest, Forbidden, TelegramError
-from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
-from telegram.ext import CallbackQueryHandler, InlineQueryHandler
-
-from music_links_bot.artist import ArtistClient
+from telegram.ext import Application, ContextTypes
 from music_links_bot.branding import (
     brand_label,
     brand_logo_url,
@@ -40,6 +34,22 @@ from music_links_bot.bot_stats import (
     record_radio_items as _record_radios_safely,
     record_tracks as _record_matches_safely,
     record_video_items as _record_videos_safely,
+)
+from music_links_bot.bot_batch import (
+    send_partial_lookup_status as _send_partial_lookup_status_impl,
+)
+from music_links_bot.bot_admin import (
+    id_command,
+    stats_command,
+    stats_text as _stats_text,
+    status_command,
+)
+from music_links_bot.bot_app import (
+    BOT_DESCRIPTIONS,
+    BOT_SHORT_DESCRIPTIONS,
+    PUBLIC_BOT_COMMANDS,
+    close_application_resources,
+    sync_application_commands,
 )
 from music_links_bot.bot_inline import (
     _build_inline_collection_result,
@@ -78,6 +88,7 @@ _songlink_page_url = _bot_lookup._songlink_page_url
 _build_podcast_fallback = _bot_lookup._build_podcast_fallback
 
 from music_links_bot.config import Settings
+from music_links_bot.chat_access import check_publish_access
 from music_links_bot.ephemeral import (
     ephemeral_group_replies_enabled,
     send_ephemeral_message,
@@ -114,8 +125,6 @@ _single_url_keyboard = _keyboards._single_url_keyboard
 _channel_button = _keyboards._channel_button
 _get_platform_order = _keyboards._get_platform_order
 
-from music_links_bot.kvstore import KVStore
-from music_links_bot.lazy_client import LazyAsyncClient
 from music_links_bot.bot_crate import (
     add_many_to_crate,
     add_to_crate,
@@ -137,6 +146,7 @@ from music_links_bot.bot_storage import (
     DRAFT_TTL_SECONDS as _DRAFT_TTL_SECONDS,
     MAX_MEMORY_DRAFTS as _MAX_MEMORY_DRAFTS,
     load_draft as _load_draft,
+    load_retry_sources as _load_retry_sources,
     load_search_selection as _load_search_selection,
     store_draft as _store_draft,
     store_search_selection as _store_search_selection,
@@ -148,6 +158,7 @@ from music_links_bot.bot_progress import (
     update_progress as _update_loading_placeholder,
 )
 from music_links_bot.bot_ui import (
+    build_duplicate_post_keyboard as _duplicate_post_keyboard,
     build_error_keyboard as _build_error_keyboard_view,
     build_home_text as _build_home_text,
     build_onboarding_keyboard as _build_onboarding_keyboard,
@@ -162,9 +173,8 @@ from music_links_bot.search import (
     SearchLookupError,
     normalize_search_query,
 )
-from music_links_bot.constants import MAX_LINKS_PER_MESSAGE, PLATFORM_LABELS
+from music_links_bot.constants import MAX_LINKS_PER_MESSAGE
 from music_links_bot.formatter import (
-    build_auto_hashtags,
     format_collection_message,
     format_track_message,
 )
@@ -173,29 +183,16 @@ from music_links_bot.models import (
     VideoMatch,
 )
 from music_links_bot.mixed_post import send_track_video_album
-from music_links_bot.nts import NTSClient
 from music_links_bot.publication_state import (
-    find_posted_date as _find_posted_date,
+    find_posted_record as _find_posted_record,
     mark_posted as _schedule_mark_posted,
     release_fingerprint as _release_fingerprint,
     webapp_url as _webapp_url,
 )
-from music_links_bot.rich_publications import (
-    build_fallback_html,
-    build_rich_html,
-    is_longread,
-    rich_api_unavailable,
-    send_rich_publication,
-)
-from music_links_bot.playlist import PlaylistClient
-from music_links_bot.songlink import SonglinkClient
-from music_links_bot.soundcloud import (
-    SoundCloudClient,
-)
-from music_links_bot.stats import (
-    format_stats_message,
-    load_stats,
-    merge_stats,
+from music_links_bot.publication_service import (
+    PublicationService,
+    draft_message_overrides as _draft_message_overrides,
+    draft_platform_selection as _draft_platform_selection,
 )
 from music_links_bot.sharing import (
     add_share_button,
@@ -207,13 +204,23 @@ from music_links_bot.text_utils import normalize_hashtag
 from music_links_bot.url_utils import (
     extract_supported_urls,
 )
-from music_links_bot.youtube import YouTubeClient
 
 LOGGER = logging.getLogger(__name__)
 __all__ = [
+    "BOT_DESCRIPTIONS",
+    "BOT_SHORT_DESCRIPTIONS",
+    "PUBLIC_BOT_COMMANDS",
     "_build_inline_collection_result",
     "_build_inline_result",
     "_release_fingerprint",
+    "_webapp_url",
+    "close_application_resources",
+    "id_command",
+    "inline_query_handler",
+    "normalize_hashtag",
+    "stats_command",
+    "status_command",
+    "sync_application_commands",
 ]
 CHANNEL_USERNAME = "stonerhand"
 CHANNEL_URL = f"https://t.me/{CHANNEL_USERNAME}"
@@ -244,11 +251,6 @@ DEFAULT_PLATFORM_ORDER = (
     "tidal",
     "yandexMusic",
 )
-PUBLIC_BOT_COMMANDS = (
-    BotCommand("start", "меню и быстрый старт"),
-    BotCommand("help", "как пользоваться"),
-    BotCommand("crate", "моя подборка"),
-)
 PRIMARY_PLATFORM_ALIASES = {
     "spotify": "spotify",
     "apple": "appleMusic",
@@ -274,153 +276,9 @@ NOT_FOUND_DETAIL = (
 
 
 def build_application(settings: Settings) -> Application:
-    kv_store = KVStore.from_env()
-    songlink_client = LazyAsyncClient(
-        lambda: SonglinkClient(
-            user_countries=settings.songlink_user_countries,
-            api_key=settings.songlink_api_key,
-            kv=kv_store,
-        )
-    )
-    youtube_client = LazyAsyncClient(YouTubeClient)
-    nts_client = LazyAsyncClient(NTSClient)
-    soundcloud_client = LazyAsyncClient(SoundCloudClient)
-    playlist_client = LazyAsyncClient(PlaylistClient)
-    artist_client = LazyAsyncClient(ArtistClient)
-    search_client = LazyAsyncClient(SearchClient)
-    application = (
-        Application.builder()
-        .token(settings.bot_token)
-        .post_init(_post_init)
-        .post_shutdown(_post_shutdown)
-        .build()
-    )
-    application.bot_data["songlink_client"] = songlink_client
-    application.bot_data["youtube_client"] = youtube_client
-    application.bot_data["nts_client"] = nts_client
-    application.bot_data["soundcloud_client"] = soundcloud_client
-    application.bot_data["playlist_client"] = playlist_client
-    application.bot_data["artist_client"] = artist_client
-    application.bot_data["search_client"] = search_client
-    application.bot_data["kv_store"] = kv_store
-    application.bot_data["drafts"] = {}
-    application.bot_data["publish_chat_id"] = settings.publish_chat_id
-    application.bot_data["admin_chat_id"] = settings.admin_chat_id
-    application.bot_data["platform_order"] = _build_platform_order(settings.primary_platform)
-    application.bot_data["ui_mode"] = settings.ui_mode
-    application.bot_data["runtime"] = BotRuntime(kv_store)
-    application.bot_data["search_selections"] = {}
+    from music_links_bot.bot_app import build_application as assemble
 
-    application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("guide", guide_command))
-    application.add_handler(CommandHandler("platforms", platforms_command))
-    application.add_handler(CommandHandler("channel", channel_command))
-    application.add_handler(CommandHandler("id", id_command))
-    application.add_handler(CommandHandler("stats", stats_command))
-    application.add_handler(CommandHandler("crate", crate_command))
-    application.add_handler(CallbackQueryHandler(bot_callback, pattern=r"^v2\|"))
-    application.add_handler(CallbackQueryHandler(menu_callback, pattern=r"^menu:"))
-    application.add_handler(CallbackQueryHandler(editor_callback, pattern=r"^ed\|"))
-    application.add_handler(InlineQueryHandler(inline_query_handler))
-    application.add_handler(
-        MessageHandler(
-            (filters.TEXT | filters.CAPTION) & ~filters.COMMAND,
-            track_lookup_message,
-        )
-    )
-    application.add_error_handler(_application_error_handler)
-    return application
-
-
-BOT_DESCRIPTIONS = {
-    "": (
-        "Музыкальный редактор для Telegram.\n\n"
-        "• Ссылка или название → точный релиз и готовая карточка\n"
-        "• Несколько ссылок → одна редактируемая подборка\n"
-        "• Обложка, чистый заголовок и компактные кнопки площадок\n"
-        "• Нативная отправка поста с кнопками в любой чат\n"
-        "• Inline: @StonerHandBot + запрос прямо в переписке\n"
-        "• Студия: карточка или Rich-лонгрид, превью, очередь и канал\n\n"
-        "Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
-        "Yandex Music, NTS Radio."
-    ),
-    "en": (
-        "A music post editor for Telegram.\n\n"
-        "• A link or title → the exact release and a finished card\n"
-        "• Several links → one editable crate\n"
-        "• Artwork, a clean heading and compact platform actions\n"
-        "• Native sharing that preserves buttons in any chat\n"
-        "• Inline: @StonerHandBot + a query inside any conversation\n"
-        "• Studio: card or Rich longread, preview, queue and publishing\n\n"
-        "Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
-        "Yandex Music and NTS Radio."
-    ),
-}
-BOT_SHORT_DESCRIPTIONS = {
-    "": (
-        "Ссылка или несколько треков → карточка, лонгрид или подборка. "
-        "Обложка, площадки и публикация — в 🎛 Студии."
-    ),
-    "en": (
-        "A link or tracks → a card, longread or crate. "
-        "Artwork, platforms and publishing — in 🎛 Studio."
-    ),
-}
-
-
-async def sync_application_commands(application: Application) -> None:
-    try:
-        await application.bot.set_my_commands(PUBLIC_BOT_COMMANDS)
-        webapp_url = _webapp_url()
-        if webapp_url:
-            await application.bot.set_chat_menu_button(
-                menu_button=MenuButtonWebApp(
-                    text=get_text("ru", "menu_button_studio"),
-                    web_app=WebAppInfo(url=webapp_url),
-                )
-            )
-        for language_code, description in BOT_DESCRIPTIONS.items():
-            await application.bot.set_my_description(
-                description,
-                language_code=language_code or None,
-            )
-        for language_code, short_description in BOT_SHORT_DESCRIPTIONS.items():
-            await application.bot.set_my_short_description(
-                short_description,
-                language_code=language_code or None,
-            )
-    except TelegramError:
-        LOGGER.info("Could not sync bot command menu")
-
-
-async def close_application_resources(application: Application) -> None:
-    client_keys = (
-        "songlink_client",
-        "youtube_client",
-        "nts_client",
-        "soundcloud_client",
-        "playlist_client",
-        "artist_client",
-        "search_client",
-        "kv_store",
-    )
-    clients = [application.bot_data.get(key) for key in client_keys]
-    active_clients = [client for client in clients if client is not None]
-    if not active_clients:
-        return
-
-    results = await asyncio.gather(
-        *(client.aclose() for client in active_clients),
-        return_exceptions=True,
-    )
-    for client, result in zip(active_clients, results, strict=False):
-        if isinstance(result, Exception):
-            LOGGER.warning(
-                "Could not close %s cleanly: %s",
-                type(client).__name__,
-                type(result).__name__,
-            )
+    return assemble(settings)
 
 
 async def _application_error_handler(
@@ -430,6 +288,9 @@ async def _application_error_handler(
     del update
     error = context.error
     if isinstance(error, BaseException):
+        context.application.bot_data["last_error"] = {
+            "type": type(error).__name__,
+        }
         LOGGER.error(
             "Unhandled Telegram update error",
             exc_info=(type(error), error, error.__traceback__),
@@ -857,33 +718,6 @@ def _render_track_draft(
     return text, InlineKeyboardMarkup(rows)
 
 
-def _draft_message_overrides(
-    draft: dict,
-    *,
-    include_hashtags: bool,
-) -> tuple[bool, dict]:
-    """Custom hashtags set in Studio replace the generated house tags."""
-    overrides: dict = {}
-    custom_tags = draft.get("custom_tags")
-    if isinstance(custom_tags, list):
-        tags = [tag for tag in (normalize_hashtag(value) for value in custom_tags) if tag]
-        if tags:
-            overrides["hashtags"] = " ".join(tags)
-        else:
-            include_hashtags = False
-
-    return include_hashtags, overrides
-
-
-def _draft_platform_selection(draft: dict) -> list[str] | None:
-    platforms = draft.get("platforms")
-    if not isinstance(platforms, list):
-        return None
-
-    selection = [key for key in platforms if isinstance(key, str) and key in PLATFORM_LABELS]
-    return selection or None
-
-
 async def _dispatch_selection_action(query, context, action: CallbackAction) -> None:
     lang = resolve_lang(query.from_user.language_code if query.from_user else None)
     if action.action != "pick" or ":" not in action.payload:
@@ -915,13 +749,23 @@ async def _dispatch_selection_action(query, context, action: CallbackAction) -> 
 
 
 async def _dispatch_retry_action(query, context, action: CallbackAction) -> None:
-    del action
     if query.from_user is None or query.message is None:
         await query.answer()
         return
     lang = resolve_lang(query.from_user.language_code)
-    session = await _runtime(context).get_session(query.from_user.id, lang=lang)
-    value = str(session.last_action.get("value") or "")
+    value = ""
+    if action.action == "failed" and action.payload:
+        payload = await _load_retry_sources(context, action.payload)
+        if (
+            isinstance(payload, dict)
+            and int(payload.get("user_id") or 0) == query.from_user.id
+        ):
+            value = "\n".join(
+                str(url) for url in payload.get("urls", []) if isinstance(url, str)
+            )
+    else:
+        session = await _runtime(context).get_session(query.from_user.id, lang=lang)
+        value = str(session.last_action.get("value") or "")
     if not value:
         await query.answer(get_text(lang, "ed_expired"), show_alert=True)
         return
@@ -983,7 +827,7 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
             await _try_delete_message(query.message)
         return
 
-    if action in {"p", "s", "c"}:
+    if action in {"p", "r", "x", "s", "c"}:
         user_id = query.from_user.id if query.from_user else 0
         runtime = _runtime(context)
         lock_key = f"{user_id}:{action}:{draft_id}"
@@ -1056,22 +900,73 @@ async def _run_primary_editor_action(
         return
 
     track = TrackMatch(**draft["item"])
-    if not draft.get("dup_ok"):
-        posted_date = await _find_posted_date(context, track)
-        if posted_date:
-            draft["dup_ok"] = True
-            await _store_draft(context, draft_id, draft)
+    record = await _find_posted_record(context, track)
+    if action == "p" and record:
+        draft["duplicate_record"] = record
+        await _store_draft(context, draft_id, draft)
+        await query.answer(
+            get_text(lang, "ed_duplicate").replace(
+                "{date}", str(record.get("date") or "")
+            ),
+            show_alert=True,
+        )
+        text, _keyboard = _render_track_draft(draft, context, draft_id=None)
+        await _edit_editor_message(
+            query,
+            context,
+            draft,
+            text,
+            _duplicate_post_keyboard(draft_id, record, lang=lang),
+        )
+        return
+
+    if action == "x" and record:
+        message_id = record.get("message_id")
+        target = (
+            context.application.bot_data.get("publish_chat_id")
+            or f"@{CHANNEL_USERNAME}"
+        )
+        if isinstance(message_id, int) and message_id > 0:
+            try:
+                await context.bot.delete_message(
+                    chat_id=target,
+                    message_id=message_id,
+                )
+            except TelegramError:
+                await query.answer(
+                    get_text(lang, "ed_publish_failed"),
+                    show_alert=True,
+                )
+                text, _keyboard = _render_track_draft(
+                    draft, context, draft_id=None
+                )
+                await _edit_editor_message(
+                    query,
+                    context,
+                    draft,
+                    text,
+                    _duplicate_post_keyboard(draft_id, record, lang=lang),
+                )
+                return
+        else:
             await query.answer(
-                get_text(lang, "ed_duplicate").replace("{date}", posted_date),
+                get_text(lang, "ed_publish_failed"),
                 show_alert=True,
             )
-            text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
-            await _edit_editor_message(query, context, draft, text, keyboard)
             return
 
     published = await _publish_draft(context, draft)
     if published:
-        await _schedule_mark_posted(context, track)
+        target = (
+            context.application.bot_data.get("publish_chat_id")
+            or f"@{CHANNEL_USERNAME}"
+        )
+        await _schedule_mark_posted(
+            context,
+            track,
+            message=published,
+            target=target,
+        )
         success_keyboard = InlineKeyboardMarkup(
             [
                 [
@@ -1127,8 +1022,16 @@ async def _publish_draft(
     context: ContextTypes.DEFAULT_TYPE,
     draft: dict,
 ) -> Message | bool | None:
-    target = context.application.bot_data.get("publish_chat_id") or f"@{CHANNEL_USERNAME}"
-    return await _deliver_draft(context, draft, target=target, channel_style=True)
+    return await PublicationService(
+        context,
+        channel_username=CHANNEL_USERNAME,
+        branding_hooks=(
+            photo_branding_enabled,
+            build_branded_cover,
+            brand_label,
+            brand_logo_url,
+        ),
+    ).publish(draft)
 
 
 async def _deliver_draft(
@@ -1138,146 +1041,20 @@ async def _deliver_draft(
     target: int | str,
     channel_style: bool,
 ) -> Message | bool | None:
-    """Single delivery pipeline for self-send, channel publish and API jobs."""
-    track = TrackMatch(**draft["item"])
-    prefix = draft.get("prefix") or ""
-    include_hashtags, overrides = _draft_message_overrides(
+    return await PublicationService(
+        context,
+        channel_username=CHANNEL_USERNAME,
+        branding_hooks=(
+            photo_branding_enabled,
+            build_branded_cover,
+            brand_label,
+            brand_logo_url,
+        ),
+    ).deliver(
         draft,
-        include_hashtags=True if channel_style else bool(draft.get("hashtags")),
+        target=target,
+        channel_style=channel_style,
     )
-    text = (prefix if draft.get("quote") and prefix else "") + format_track_message(
-        track,
-        include_hashtags=include_hashtags,
-        **overrides,
-    )
-    include_channel_button = (
-        str(target).lstrip("@").casefold() != CHANNEL_USERNAME
-    )
-    keyboard = _build_link_keyboard(
-        track.links,
-        context=context,
-        include_channel_button=include_channel_button,
-        release_page_url=track.page_url,
-        release_kind=track.kind,
-        release_format=track.release_format,
-        platform_selection=_draft_platform_selection(draft),
-    )
-    try:
-        if is_longread(draft):
-            hashtags = overrides.get("hashtags")
-            if include_hashtags and not hashtags:
-                hashtags = build_auto_hashtags(track)
-            rich_html = build_rich_html(
-                draft,
-                track,
-                hashtags=hashtags if include_hashtags else None,
-            )
-            try:
-                sent = await send_rich_publication(
-                    context.bot,
-                    chat_id=target,
-                    rich_html=rich_html,
-                    reply_markup=keyboard,
-                )
-            except TelegramError as exc:
-                if not rich_api_unavailable(exc):
-                    raise
-                LOGGER.info(
-                    "Rich Messages unavailable for %s; using HTML fallback", target
-                )
-                sent = await context.bot.send_message(
-                    chat_id=target,
-                    text=build_fallback_html(
-                        draft,
-                        track,
-                        hashtags=hashtags if include_hashtags else None,
-                    ),
-                    parse_mode=ParseMode.HTML,
-                    link_preview_options=_build_link_preview_options(
-                        _select_preview_url(track.links, context)
-                        or track.thumbnail_url,
-                        prefer_large_media=True,
-                    ),
-                    reply_markup=keyboard,
-                )
-        elif draft.get("as_photo") and track.thumbnail_url:
-            # Photo posts pin the artwork on top on every Telegram client,
-            # at the cost of the preview-size toggle.
-            photo = track.thumbnail_url
-            if photo_branding_enabled():
-                branded = await build_branded_cover(
-                    track.thumbnail_url,
-                    label=brand_label(f"@{CHANNEL_USERNAME}"),
-                    logo_url=brand_logo_url(),
-                )
-                if branded is not None:
-                    photo = branded
-            sent = await context.bot.send_photo(
-                chat_id=target,
-                photo=photo,
-                caption=text,
-                parse_mode=ParseMode.HTML,
-                reply_markup=keyboard,
-            )
-        else:
-            sent = await context.bot.send_message(
-                chat_id=target,
-                text=text,
-                parse_mode=ParseMode.HTML,
-                link_preview_options=_build_link_preview_options(
-                    _select_preview_url(track.links, context) or track.thumbnail_url,
-                    prefer_large_media=bool(draft.get("large_preview")),
-                ),
-                reply_markup=keyboard,
-            )
-    except TelegramError:
-        LOGGER.warning("Could not deliver draft to %s", target, exc_info=True)
-        return None
-
-    return sent if sent is not None else True
-
-
-async def id_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    del context
-    message = update.effective_message
-    if not message:
-        return
-
-    await message.reply_text(f"Chat ID: {message.chat_id}")
-
-
-async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    message = update.effective_message
-    if not message:
-        return
-
-    admin_chat_id: int | None = context.application.bot_data.get("admin_chat_id")
-    include_private = admin_chat_id is not None and message.chat_id == admin_chat_id
-    text = await _stats_text(context, include_private=include_private)
-    await message.reply_text(text)
-
-
-async def _stats_text(
-    context: ContextTypes.DEFAULT_TYPE, *, include_private: bool
-) -> str:
-    stats_data = load_stats()
-    kv: KVStore | None = context.application.bot_data.get("kv_store")
-    if kv is not None:
-        stats_data = merge_stats(stats_data, await kv.get_json(STATS_KV_KEY))
-
-    text = format_stats_message(stats_data, include_private=include_private)
-    if include_private:
-        diagnostics = _runtime(context).provider_snapshot()
-        if diagnostics:
-            lines = ["", "Провайдеры"]
-            for item in diagnostics:
-                marker = "✅" if item["ok"] else "⚠️"
-                lines.append(
-                    f"{marker} {item['provider']} · {item['latency_ms']} ms"
-                    + (f" · {item['last_error']}" if item["last_error"] else "")
-                )
-            text += "\n".join(lines)
-    return text
 
 
 async def crate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1534,6 +1311,8 @@ async def _resolve_search_sources(
 
 
 async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    started = asyncio.get_running_loop().time()
+    completed = False
     message = update.effective_message
     private_user_id: int | None = None
     if message is not None and message.chat.type == "private":
@@ -1544,13 +1323,29 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         )
     try:
         await _track_lookup_message_impl(update, context)
+        completed = True
     except asyncio.CancelledError:
         # A newer private-chat request superseded this one. Treat cancellation
         # as an expected UX event, not a failed Telegram webhook delivery.
         LOGGER.debug("Stale lookup cancelled in favor of a newer request")
+    except TelegramError as exc:
+        if message is not None and message.chat.type == "channel":
+            await _notify_admin(
+                context,
+                "Автозамена поста в канале завершилась ошибкой: "
+                f"{type(exc).__name__}: {str(exc)[:180]}",
+                only_for_channel_message=message,
+            )
+        raise
     finally:
+        runtime = _runtime(context)
+        runtime.record_request(
+            latency_ms=int((asyncio.get_running_loop().time() - started) * 1000),
+            ok=completed,
+        )
+        await runtime.persist_metrics()
         if private_user_id is not None:
-            _runtime(context).finish_request(private_user_id)
+            runtime.finish_request(private_user_id)
 
 
 async def _handle_empty_lookup(
@@ -1603,6 +1398,24 @@ async def _handle_empty_lookup(
             lang=lang,
         )
     return True
+
+
+async def _send_partial_lookup_status(
+    message: Message,
+    context: ContextTypes.DEFAULT_TYPE,
+    bundle: _bot_lookup.LookupBundle,
+    *,
+    user_id: int,
+    lang: str,
+) -> None:
+    await _send_partial_lookup_status_impl(
+        message,
+        context,
+        bundle,
+        user_id=user_id,
+        lang=lang,
+        notify_admin=_notify_admin,
+    )
 
 
 async def _add_track_drafts_to_crate(
@@ -1792,6 +1605,22 @@ async def _track_lookup_message_impl(
             return
         source_urls, found_via_search = search_result
 
+    if message.chat.type == "channel":
+        access = await check_publish_access(context, message.chat_id)
+        if not access.allowed or not access.can_delete:
+            missing = (
+                "публиковать"
+                if not access.allowed
+                else "удалять исходные сообщения"
+            )
+            await _notify_admin(
+                context,
+                f"Автозамена в канале {message.chat_id} остановлена: "
+                f"бот не может {missing}. {access.detail}",
+                only_for_channel_message=message,
+            )
+            return
+
     # The whole message was the search query, so quoting it back is noise.
     user_prefix = "" if found_via_search else _build_user_prefix(message)
     if is_private:
@@ -1833,6 +1662,9 @@ async def _track_lookup_message_impl(
             include_channel_button=include_channel_button,
             include_hashtags=include_hashtags,
         )
+        await _send_partial_lookup_status(
+            message, context, bundle, user_id=user_id, lang=lang
+        )
         return
 
     if content_type_count == 1 and videos:
@@ -1846,6 +1678,9 @@ async def _track_lookup_message_impl(
             lang=lang,
         )
         _record_videos_safely(videos, message, context=context)
+        await _send_partial_lookup_status(
+            message, context, bundle, user_id=user_id, lang=lang
+        )
         return
 
     if content_type_count == 1 and radios:
@@ -1859,6 +1694,9 @@ async def _track_lookup_message_impl(
             lang=lang,
         )
         _record_radios_safely(radios, message, context=context)
+        await _send_partial_lookup_status(
+            message, context, bundle, user_id=user_id, lang=lang
+        )
         return
 
     if content_type_count == 1 and playlists:
@@ -1872,6 +1710,9 @@ async def _track_lookup_message_impl(
             lang=lang,
         )
         _record_playlists_safely(playlists, message, context=context)
+        await _send_partial_lookup_status(
+            message, context, bundle, user_id=user_id, lang=lang
+        )
         return
 
     if content_type_count == 1 and artists:
@@ -1885,6 +1726,9 @@ async def _track_lookup_message_impl(
             lang=lang,
         )
         _record_artists_safely(artists, message, context=context)
+        await _send_partial_lookup_status(
+            message, context, bundle, user_id=user_id, lang=lang
+        )
         return
 
     await _send_mixed_result(
@@ -1909,6 +1753,9 @@ async def _track_lookup_message_impl(
         artists,
         message,
         context=context,
+    )
+    await _send_partial_lookup_status(
+        message, context, bundle, user_id=user_id, lang=lang
     )
 
 
@@ -2128,11 +1975,3 @@ async def _try_delete_message(message: Message) -> bool:
         return False
 
     return True
-
-
-async def _post_init(application: Application) -> None:
-    await sync_application_commands(application)
-
-
-async def _post_shutdown(application: Application) -> None:
-    await close_application_resources(application)

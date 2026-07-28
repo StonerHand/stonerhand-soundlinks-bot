@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from time import monotonic
 from urllib.parse import quote
 from collections.abc import Awaitable, Callable
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from telegram import Bot, Message
@@ -40,17 +39,15 @@ from music_links_bot.soundcloud import (
     SoundCloudLookupError,
     build_soundcloud_fallback,
 )
-from music_links_bot.url_utils import (
-    apple_podcasts_url_type, is_nts_url, is_spotify_artist_url,
-    is_spotify_playlist_url, is_youtube_video_url, spotify_url_type,
-)
+from music_links_bot.url_utils import apple_podcasts_url_type, spotify_url_type
 from music_links_bot.youtube import YouTubeClient, YouTubeLookupError
 from music_links_bot.provider_runtime import (
     ProviderTask,
     get_cached_lookup,
-    run_provider_tasks,
+    run_provider_tasks_detailed,
     set_cached_lookup,
 )
+from music_links_bot.provider_registry import DEFAULT_PROVIDER_REGISTRY
 
 LOGGER = logging.getLogger(__name__)
 NOT_FOUND_DETAIL = (
@@ -96,6 +93,7 @@ class LookupBundle:
     radios: list[RadioMatch]
     playlists: list[PlaylistMatch]
     artists: list[ArtistMatch]
+    statuses: list["SourceStatus"] = field(default_factory=list)
 
     @property
     def item_count(self) -> int:
@@ -124,6 +122,15 @@ class LookupBundle:
         )
 
 
+@dataclass(slots=True)
+class SourceStatus:
+    source_url: str
+    provider: str
+    state: str
+    label: str = ""
+    retryable: bool = False
+
+
 async def resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBundle:
     cached = await get_cached_lookup(bot_data, source_urls)
     if cached is not None:
@@ -131,21 +138,36 @@ async def resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBundl
         if restored is not None:
             return restored
 
-    artist_urls, playlist_urls, youtube_urls, nts_urls, music_urls = (
-        _split_source_urls(source_urls)
-    )
+    grouped = DEFAULT_PROVIDER_REGISTRY.group(source_urls)
+    artist_urls = grouped["artists"]
+    playlist_urls = grouped["playlists"]
+    youtube_urls = grouped["youtube"]
+    nts_urls = grouped["nts"]
+    music_urls = grouped["songlink"]
     tasks: list[ProviderTask] = []
     if music_urls:
         tasks.append(
             ProviderTask(
                 "songlink",
-                _lookup_tracks(
+                _lookup_tracks_detailed(
                     bot_data["songlink_client"],
                     music_urls,
                     soundcloud_client=bot_data["soundcloud_client"],
                     search_client=bot_data.get("search_client"),
                 ),
-                ([], list(music_urls)),
+                (
+                    [],
+                    list(music_urls),
+                    [
+                        SourceStatus(
+                            source_url=url,
+                            provider="songlink",
+                            state="unavailable",
+                            retryable=True,
+                        )
+                        for url in music_urls
+                    ],
+                ),
             )
         )
     if youtube_urls:
@@ -180,13 +202,20 @@ async def resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBundl
                 [],
             )
         )
-    results = await run_provider_tasks(bot_data, tasks)
-    lookup_result = results.get("songlink", ([], []))
-    videos = results.get("youtube", [])
-    radios = results.get("nts", [])
-    playlists = results.get("playlists", [])
-    artists = results.get("artists", [])
-    tracks, unavailable_urls = lookup_result
+    outcomes = await run_provider_tasks_detailed(bot_data, tasks)
+    lookup_result = _outcome_value(outcomes, "songlink", ([], [], []))
+    videos = _outcome_value(outcomes, "youtube", [])
+    radios = _outcome_value(outcomes, "nts", [])
+    playlists = _outcome_value(outcomes, "playlists", [])
+    artists = _outcome_value(outcomes, "artists", [])
+    tracks, unavailable_urls, track_statuses = lookup_result
+    statuses = [
+        *track_statuses,
+        *_provider_statuses("youtube", youtube_urls, videos, outcomes),
+        *_provider_statuses("nts", nts_urls, radios, outcomes),
+        *_provider_statuses("playlists", playlist_urls, playlists, outcomes),
+        *_provider_statuses("artists", artist_urls, artists, outcomes),
+    ]
     if unavailable_urls:
         runtime = bot_data.get("runtime")
         if runtime is not None and hasattr(runtime, "record_provider"):
@@ -200,6 +229,7 @@ async def resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBundl
         radios=radios,
         playlists=playlists,
         artists=artists,
+        statuses=_sort_statuses(statuses, source_urls),
     )
     if bundle.item_count and not bundle.unavailable_urls:
         await set_cached_lookup(bot_data, source_urls, _bundle_to_cache(bundle))
@@ -214,6 +244,7 @@ def _bundle_to_cache(bundle: LookupBundle) -> dict[str, Any]:
         "radios": [asdict(item) for item in bundle.radios],
         "playlists": [asdict(item) for item in bundle.playlists],
         "artists": [asdict(item) for item in bundle.artists],
+        "statuses": [asdict(item) for item in bundle.statuses],
     }
 
 
@@ -230,56 +261,83 @@ def _bundle_from_cache(payload: dict) -> LookupBundle | None:
                 PlaylistMatch(**item) for item in payload.get("playlists", [])
             ],
             artists=[ArtistMatch(**item) for item in payload.get("artists", [])],
+            statuses=[
+                SourceStatus(**item) for item in payload.get("statuses", [])
+            ],
         )
     except (TypeError, ValueError):
         return None
 
 
-async def _measured_lookup(bot_data: dict, provider: str, awaitable):
-    started = monotonic()
-    try:
-        result = await awaitable
-    except BaseException as exc:
-        runtime = bot_data.get("runtime")
-        if runtime is not None and hasattr(runtime, "record_provider"):
-            runtime.record_provider(
-                provider,
-                ok=False,
-                latency_ms=int((monotonic() - started) * 1000),
-                error=exc,
+def _outcome_value(outcomes: dict, provider: str, fallback):
+    outcome = outcomes.get(provider)
+    return outcome.value if outcome is not None else fallback
+
+
+def _provider_statuses(
+    provider: str,
+    source_urls: list[str],
+    items: list,
+    outcomes: dict,
+) -> list[SourceStatus]:
+    outcome = outcomes.get(provider)
+    if outcome is not None and not outcome.ok:
+        return [
+            SourceStatus(
+                source_url=url,
+                provider=provider,
+                state="unavailable",
+                retryable=True,
             )
-        raise
-    runtime = bot_data.get("runtime")
-    if runtime is not None and hasattr(runtime, "record_provider"):
-        runtime.record_provider(
-            provider,
-            ok=True,
-            latency_ms=int((monotonic() - started) * 1000),
+            for url in source_urls
+        ]
+
+    statuses: list[SourceStatus] = []
+    for index, source_url in enumerate(source_urls):
+        item = items[index] if index < len(items) else None
+        statuses.append(
+            SourceStatus(
+                source_url=source_url,
+                provider=provider,
+                state="success" if item is not None else "not_found",
+                label=_item_label(item),
+            )
         )
-    return result
+    return statuses
+
+
+def _item_label(item: object) -> str:
+    if item is None:
+        return ""
+    title = str(getattr(item, "title", "") or "")
+    artist = str(
+        getattr(item, "artist", "")
+        or getattr(item, "author", "")
+        or getattr(item, "station", "")
+        or ""
+    )
+    return " — ".join(part for part in (artist, title) if part)[:120]
+
+
+def _sort_statuses(
+    statuses: list[SourceStatus],
+    source_urls: list[str],
+) -> list[SourceStatus]:
+    positions = {url: index for index, url in enumerate(source_urls)}
+    return sorted(statuses, key=lambda item: positions.get(item.source_url, 10_000))
+
 
 def _split_source_urls(
     source_urls: list[str],
 ) -> tuple[list[str], list[str], list[str], list[str], list[str]]:
-    artist_urls: list[str] = []
-    playlist_urls: list[str] = []
-    youtube_urls: list[str] = []
-    nts_urls: list[str] = []
-    music_urls: list[str] = []
-
-    for source_url in source_urls:
-        if is_spotify_artist_url(source_url):
-            artist_urls.append(source_url)
-        elif is_spotify_playlist_url(source_url):
-            playlist_urls.append(source_url)
-        elif is_youtube_video_url(source_url):
-            youtube_urls.append(source_url)
-        elif is_nts_url(source_url):
-            nts_urls.append(source_url)
-        else:
-            music_urls.append(source_url)
-
-    return artist_urls, playlist_urls, youtube_urls, nts_urls, music_urls
+    grouped = DEFAULT_PROVIDER_REGISTRY.group(source_urls)
+    return (
+        grouped["artists"],
+        grouped["playlists"],
+        grouped["youtube"],
+        grouped["nts"],
+        grouped["songlink"],
+    )
 
 
 def _format_not_found_message(source_urls: list[str]) -> str:
@@ -788,6 +846,22 @@ async def _lookup_tracks(
     soundcloud_client: SoundCloudClient | None = None,
     search_client: SearchClient | None = None,
 ) -> tuple[list[TrackMatch], list[str]]:
+    tracks, unavailable_urls, _statuses = await _lookup_tracks_detailed(
+        client,
+        source_urls,
+        soundcloud_client=soundcloud_client,
+        search_client=search_client,
+    )
+    return tracks, unavailable_urls
+
+
+async def _lookup_tracks_detailed(
+    client: SonglinkClient,
+    source_urls: list[str],
+    *,
+    soundcloud_client: SoundCloudClient | None = None,
+    search_client: SearchClient | None = None,
+) -> tuple[list[TrackMatch], list[str], list[SourceStatus]]:
     # Song.link can throttle a burst of otherwise valid URLs. Keep batch
     # lookups bounded and retry transient provider failures once so a
     # three-link collection cannot silently collapse into a one-track post.
@@ -819,10 +893,19 @@ async def _lookup_tracks(
 
     tracks: list[TrackMatch] = []
     unavailable_urls: list[str] = []
+    statuses: list[SourceStatus] = []
 
     for source_url, result in zip(source_urls, results, strict=False):
         if isinstance(result, TrackMatch):
             tracks.append(result)
+            statuses.append(
+                SourceStatus(
+                    source_url=source_url,
+                    provider="songlink",
+                    state="success",
+                    label=_item_label(result),
+                )
+            )
             continue
 
         if isinstance(result, SonglinkError):
@@ -832,10 +915,25 @@ async def _lookup_tracks(
             )
             if fallback_track:
                 tracks.append(fallback_track)
+                statuses.append(
+                    SourceStatus(
+                        source_url=source_url,
+                        provider="songlink",
+                        state="success",
+                        label=_item_label(fallback_track),
+                    )
+                )
                 continue
 
             if isinstance(result, SonglinkLookupError):
                 LOGGER.info("Song.link could not resolve %s", source_url)
+                statuses.append(
+                    SourceStatus(
+                        source_url=source_url,
+                        provider="songlink",
+                        state="not_found",
+                    )
+                )
                 continue
 
             LOGGER.error(
@@ -844,6 +942,14 @@ async def _lookup_tracks(
                 exc_info=(type(result), result, result.__traceback__),
             )
             unavailable_urls.append(source_url)
+            statuses.append(
+                SourceStatus(
+                    source_url=source_url,
+                    provider="songlink",
+                    state="unavailable",
+                    retryable=True,
+                )
+            )
             continue
 
         if isinstance(result, Exception):
@@ -853,6 +959,14 @@ async def _lookup_tracks(
                 exc_info=(type(result), result, result.__traceback__),
             )
             unavailable_urls.append(source_url)
+            statuses.append(
+                SourceStatus(
+                    source_url=source_url,
+                    provider="songlink",
+                    state="unavailable",
+                    retryable=True,
+                )
+            )
 
     tracks = [_ensure_spotify_link(track) for track in tracks]
     if search_client is not None and tracks:
@@ -866,7 +980,7 @@ async def _lookup_tracks(
         except TimeoutError:
             LOGGER.debug("Genre enrichment continues in background")
 
-    return tracks, unavailable_urls
+    return tracks, unavailable_urls, statuses
 
 
 async def _fill_genres(search_client: SearchClient, tracks: list[TrackMatch]) -> None:

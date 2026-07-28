@@ -373,6 +373,27 @@ STRINGS: dict[str, dict[str, str]] = {
         EN: "Already done — nothing was sent twice.",
     },
     "retry": {RU: "Повторить", EN: "Retry"},
+    "retry_failed": {
+        RU: "Повторить только ошибки",
+        EN: "Retry failed links",
+    },
+    "partial_result": {
+        RU: "<b>Готово не всё</b>\n{ok} из {total} ссылок обработано. Остальные можно повторить отдельно.",
+        EN: "<b>Some links need another try</b>\n{ok} of {total} links were processed. Retry only the failed ones.",
+    },
+    "duplicate_repeat": {
+        RU: "Опубликовать снова",
+        EN: "Publish again",
+    },
+    "duplicate_replace": {
+        RU: "Заменить старый пост",
+        EN: "Replace old post",
+    },
+    "duplicate_open": {
+        RU: "Открыть старый пост",
+        EN: "Open old post",
+    },
+    "cancel": {RU: "Отмена", EN: "Cancel"},
     "error_title": {RU: "Пост пока не собран", EN: "The post is not ready yet"},
     "error_search": {
         RU: (
