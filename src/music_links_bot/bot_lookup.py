@@ -31,7 +31,11 @@ from music_links_bot.models import ArtistMatch, PlaylistMatch, RadioMatch, Track
 from music_links_bot.sharing import add_share_button, build_share_query, track_share_url
 from music_links_bot.nts import NTSClient, NTSLookupError, build_nts_fallback
 from music_links_bot.phrases import pick_phrase
-from music_links_bot.playlist import PlaylistClient, PlaylistLookupError
+from music_links_bot.playlist import (
+    PlaylistClient,
+    PlaylistLookupError,
+    build_playlist_fallback,
+)
 from music_links_bot.search import SearchClient
 from music_links_bot.songlink import SonglinkClient, SonglinkError, SonglinkLookupError
 from music_links_bot.soundcloud import (
@@ -419,9 +423,7 @@ async def _lookup_playlists(
                 exc_info=(type(result), result, result.__traceback__),
             )
 
-        playlists.append(
-            PlaylistMatch(title="Spotify playlist", platform="Spotify", url=source_url)
-        )
+        playlists.append(build_playlist_fallback(source_url))
 
     return playlists
 

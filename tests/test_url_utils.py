@@ -5,10 +5,13 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from music_links_bot.url_utils import (
+    apple_music_url_type,
     apple_podcasts_url_type,
     cache_key_for_url,
     extract_supported_urls,
+    is_apple_music_playlist_url,
     is_nts_url,
+    is_playlist_url,
     is_spotify_artist_url,
     is_spotify_playlist_url,
     is_soundcloud_url,
@@ -165,6 +168,23 @@ class UrlUtilsTests(unittest.TestCase):
             is_spotify_playlist_url("https://open.spotify.com/playlist/abc?si=123")
         )
         self.assertFalse(is_spotify_playlist_url("https://open.spotify.com/track/abc"))
+
+    def test_apple_music_url_type_detects_regional_playlist_links(self) -> None:
+        url = (
+            "https://music.apple.com/tr/playlist/anya-taylor-joy-my-lucky-playlist/"
+            "pl.e245dcff90464785a675ec40e8c52abb"
+        )
+
+        self.assertEqual(apple_music_url_type(url), "playlist")
+        self.assertTrue(is_apple_music_playlist_url(url))
+        self.assertTrue(is_playlist_url(url))
+
+    def test_apple_music_playlist_detection_rejects_albums(self) -> None:
+        album = "https://music.apple.com/us/album/test/123?i=456"
+
+        self.assertEqual(apple_music_url_type(album), "album")
+        self.assertFalse(is_apple_music_playlist_url(album))
+        self.assertFalse(is_playlist_url(album))
 
     def test_is_spotify_artist_url_detects_artists(self) -> None:
         self.assertTrue(

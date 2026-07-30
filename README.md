@@ -27,8 +27,8 @@
 | Automatic link replacement in chats and channels | Native sharing that preserves buttons |
 
 Spotify, Apple Music, YouTube, SoundCloud, Bandcamp, Deezer, Tidal,
-Yandex Music, podcasts, Spotify playlists and artists, and NTS Radio are
-supported.
+Yandex Music, podcasts, Spotify and Apple Music playlists, Spotify artists,
+and NTS Radio are supported.
 
 Cards contain release data and actions without generated promotional filler or
 hidden heading links. A quick card is capped at four actions: the preferred

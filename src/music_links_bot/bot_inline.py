@@ -51,8 +51,8 @@ from music_links_bot.sharing import (
 from music_links_bot.url_utils import (
     extract_supported_urls,
     is_nts_url,
+    is_playlist_url,
     is_spotify_artist_url,
-    is_spotify_playlist_url,
     is_youtube_video_url,
 )
 
@@ -313,7 +313,7 @@ async def _build_inline_result(
             channel_safe=channel_safe,
         )
 
-    if is_spotify_playlist_url(source_url):
+    if is_playlist_url(source_url):
         playlists = await bot_lookup._lookup_playlists(
             bot_data["playlist_client"],
             [source_url],

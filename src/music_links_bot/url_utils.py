@@ -243,6 +243,26 @@ def is_spotify_playlist_url(url: str) -> bool:
     return spotify_url_type(url) == "playlist"
 
 
+def apple_music_url_type(url: str) -> str | None:
+    parsed = urlparse(url)
+    if normalize_host(parsed.hostname) != "music.apple.com":
+        return None
+
+    parts = [part.lower() for part in parsed.path.split("/") if part]
+    for part in parts:
+        if part in {"album", "artist", "music-video", "playlist", "song"}:
+            return part
+    return None
+
+
+def is_apple_music_playlist_url(url: str) -> bool:
+    return apple_music_url_type(url) == "playlist"
+
+
+def is_playlist_url(url: str) -> bool:
+    return is_spotify_playlist_url(url) or is_apple_music_playlist_url(url)
+
+
 def is_spotify_artist_url(url: str) -> bool:
     return spotify_url_type(url) == "artist"
 

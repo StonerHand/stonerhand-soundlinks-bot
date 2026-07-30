@@ -205,6 +205,61 @@ class StudioApiHelperTests(unittest.TestCase):
         self.assertTrue(result["flags"]["hashtags"])
         self.assertTrue(store.await_args.args[2]["hashtags"])
 
+    def test_apple_music_playlist_opens_as_studio_draft(self) -> None:
+        import asyncio
+        from api.webapp import _action_resolve
+        from music_links_bot.bot_lookup import LookupBundle, SourceStatus
+        from music_links_bot.models import PlaylistMatch
+
+        source_url = (
+            "https://music.apple.com/tr/playlist/anya-taylor-joy-my-lucky-playlist/"
+            "pl.e245dcff90464785a675ec40e8c52abb"
+        )
+        context = _crate_context()
+        bundle = LookupBundle(
+            tracks=[],
+            unavailable_urls=[],
+            videos=[],
+            radios=[],
+            playlists=[
+                PlaylistMatch(
+                    title="Anya Taylor-Joy: My Lucky Playlist",
+                    platform="Apple Music",
+                    url=source_url,
+                )
+            ],
+            artists=[],
+            statuses=[
+                SourceStatus(
+                    source_url=source_url,
+                    provider="playlists",
+                    state="success",
+                )
+            ],
+        )
+        with (
+            patch(
+                "api.webapp._bot_lookup.resolve_sources",
+                new=AsyncMock(return_value=bundle),
+            ),
+            patch("api.webapp._store_draft", new=AsyncMock()),
+            patch("api.webapp._record_history", new=AsyncMock()),
+        ):
+            result = asyncio.run(
+                _action_resolve(
+                    context,
+                    {"query": source_url},
+                    7,
+                    False,
+                    "ru",
+                )
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["release"]["title"], "Anya Taylor-Joy: My Lucky Playlist")
+        self.assertEqual(result["release"]["artist"], "Apple Music")
+        self.assertEqual(result["release"]["kind"], "playlist")
+
     def test_apply_draft_patch_resets_customization(self) -> None:
         from api.webapp import _apply_draft_patch
 

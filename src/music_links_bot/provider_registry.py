@@ -5,8 +5,8 @@ from dataclasses import dataclass
 
 from music_links_bot.url_utils import (
     is_nts_url,
+    is_playlist_url,
     is_spotify_artist_url,
-    is_spotify_playlist_url,
     is_youtube_video_url,
 )
 
@@ -21,7 +21,7 @@ class ProviderAdapter:
 
 DEFAULT_PROVIDER_ADAPTERS = (
     ProviderAdapter("artists", is_spotify_artist_url),
-    ProviderAdapter("playlists", is_spotify_playlist_url),
+    ProviderAdapter("playlists", is_playlist_url),
     ProviderAdapter("youtube", is_youtube_video_url),
     ProviderAdapter("nts", is_nts_url),
     ProviderAdapter("songlink", lambda _url: True),
@@ -51,4 +51,3 @@ class ProviderRegistry:
 
 
 DEFAULT_PROVIDER_REGISTRY = ProviderRegistry()
-
