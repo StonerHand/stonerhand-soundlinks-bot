@@ -9,7 +9,7 @@ from telegram.error import TelegramError
 
 from music_links_bot.bot_runtime import METRICS_KV_KEY
 from music_links_bot.chat_access import check_publish_access
-from music_links_bot.publish_queue import load_jobs
+from music_links_bot.publish_queue import QueueStorageError, load_jobs
 from music_links_bot.stats import format_stats_message, load_stats, merge_stats
 
 STATS_KV_KEY = "stats:v1"
@@ -127,7 +127,14 @@ async def build_status_text(context) -> str:
             redis_ok = False
 
     access = await check_publish_access(context, target)
-    jobs = await load_jobs(context)
+    try:
+        jobs = await load_jobs(context)
+        queue_ok = True
+        queue_detail = None
+    except QueueStorageError:
+        jobs = []
+        queue_ok = False
+        queue_detail = "Redis недоступен"
     overdue = sum(
         int(job.get("publish_at") or 0) < int(time()) - 120
         for job in jobs
@@ -148,8 +155,8 @@ async def build_status_text(context) -> str:
         _line("Публикация в канал", access.allowed, access.detail),
         _line(
             "Очередь",
-            overdue == 0,
-            f"{len(jobs)} задач, просрочено: {overdue}",
+            queue_ok and overdue == 0,
+            queue_detail or f"{len(jobs)} задач, просрочено: {overdue}",
         ),
     ]
 

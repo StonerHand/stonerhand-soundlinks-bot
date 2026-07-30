@@ -12,12 +12,17 @@ from music_links_bot.constants import HTTP_USER_AGENT
 LOGGER = logging.getLogger(__name__)
 
 
+class KVUnavailableError(RuntimeError):
+    """Raised when an operation explicitly requires durable Redis storage."""
+
+
 class KVStore:
     """Tiny async client for the Upstash Redis REST API.
 
     Vercel KV exposes the same protocol, so both UPSTASH_REDIS_REST_* and
-    KV_REST_API_* credentials work. Every method swallows transport errors:
-    the bot must stay fully functional when Redis is down or not configured.
+    KV_REST_API_* credentials work. Cache-style methods fail softly; the
+    ``*_required`` methods surface outages for durable workflows such as the
+    publishing queue.
     """
 
     def __init__(self, base_url: str, token: str, *, timeout: float = 3.0) -> None:
@@ -69,6 +74,22 @@ class KVStore:
 
         return await self._command(command) == "OK"
 
+    async def set_required(
+        self,
+        key: str,
+        value: str,
+        *,
+        ttl_seconds: int | None = None,
+        nx: bool = False,
+    ) -> bool:
+        command: list[str] = ["SET", key, value]
+        if nx:
+            command.append("NX")
+        if ttl_seconds is not None:
+            command += ["EX", str(ttl_seconds)]
+        result = await self._command_or_raise(command)
+        return result == "OK"
+
     async def delete(self, key: str) -> None:
         await self._command(["DEL", key])
 
@@ -118,6 +139,18 @@ class KVStore:
         except ValueError:
             return None
 
+    async def get_json_required(self, key: str) -> Any | None:
+        """Read durable state without disguising an outage as a cache miss."""
+        raw_value = await self._command_or_raise(["GET", key])
+        if raw_value is None:
+            return None
+        if not isinstance(raw_value, str):
+            raise KVUnavailableError("Redis returned an invalid value")
+        try:
+            return json.loads(raw_value)
+        except ValueError as exc:
+            raise KVUnavailableError("Redis contains invalid JSON") from exc
+
     async def set_json(
         self,
         key: str,
@@ -130,6 +163,19 @@ class KVStore:
             json.dumps(value, ensure_ascii=False),
             ttl_seconds=ttl_seconds,
         )
+
+    async def set_json_required(
+        self,
+        key: str,
+        value: Any,
+        *,
+        ttl_seconds: int | None = None,
+    ) -> None:
+        command = ["SET", key, json.dumps(value, ensure_ascii=False)]
+        if ttl_seconds is not None:
+            command += ["EX", str(ttl_seconds)]
+        if await self._command_or_raise(command) != "OK":
+            raise KVUnavailableError("Redis did not confirm the write")
 
     async def _command(self, command: list[str]) -> Any | None:
         try:
@@ -144,3 +190,16 @@ class KVStore:
             return payload.get("result")
 
         return None
+
+    async def _command_or_raise(self, command: list[str]) -> Any | None:
+        try:
+            response = await self._client.post("/", json=command)
+            response.raise_for_status()
+            payload = response.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            LOGGER.warning("Required KV command failed: %s", command[0])
+            raise KVUnavailableError("Redis is unavailable") from exc
+
+        if not isinstance(payload, dict) or "result" not in payload:
+            raise KVUnavailableError("Redis returned an invalid response")
+        return payload["result"]

@@ -152,6 +152,7 @@ class StudioApiHelperTests(unittest.TestCase):
     def test_resolved_drafts_enable_hashtags_by_default(self) -> None:
         import asyncio
         from api.webapp import _action_resolve
+        from music_links_bot.bot_lookup import LookupBundle, SourceStatus
         from music_links_bot.models import TrackMatch
 
         context = _crate_context()
@@ -167,11 +168,26 @@ class StudioApiHelperTests(unittest.TestCase):
             artist="Sleep",
             links={"spotify": "https://open.spotify.com/track/aaa"},
         )
+        bundle = LookupBundle(
+            tracks=[track],
+            unavailable_urls=[],
+            videos=[],
+            radios=[],
+            playlists=[],
+            artists=[],
+            statuses=[
+                SourceStatus(
+                    source_url="https://open.spotify.com/track/aaa",
+                    provider="songlink",
+                    state="success",
+                )
+            ],
+        )
         store = AsyncMock()
         with (
             patch(
-                "api.webapp._lookup_tracks",
-                new=AsyncMock(return_value=([track], [])),
+                "api.webapp._bot_lookup.resolve_sources",
+                new=AsyncMock(return_value=bundle),
             ),
             patch("api.webapp._store_draft", new=store),
             patch("api.webapp._record_history", new=AsyncMock()),
@@ -315,7 +331,10 @@ class DashboardApiTests(unittest.TestCase):
         self.assertFalse(result["is_admin"])
         self.assertEqual(result["history"][0]["title"], "Dopesmoker")
         self.assertEqual(result["crate"]["count"], 1)
-        self.assertEqual(result["queue"], {"count": 0, "next_at": None})
+        self.assertEqual(
+            result["queue"],
+            {"count": 0, "next_at": None, "available": True},
+        )
 
     def test_queue_screen_skips_corrupt_jobs(self) -> None:
         import asyncio
@@ -343,6 +362,39 @@ class DashboardApiTests(unittest.TestCase):
 
         self.assertTrue(result["ok"])
         self.assertEqual([item["id"] for item in result["items"]], ["valid"])
+
+    def test_schedule_never_claims_success_when_storage_is_down(self) -> None:
+        import asyncio
+        import time
+        from api.webapp import _action_schedule
+        from music_links_bot.publish_queue import QueueStorageError
+
+        context = _crate_context()
+        context.application.bot_data["drafts"]["d1"] = {
+            "type": "track",
+            "item": _crate_track("Dopesmoker"),
+            "chat_id": 7,
+        }
+        with patch(
+            "api.webapp.add_job",
+            new=AsyncMock(side_effect=QueueStorageError("offline")),
+        ):
+            result = asyncio.run(
+                _action_schedule(
+                    context,
+                    {
+                        "draft_id": "d1",
+                        "at": int(time.time()) + 600,
+                        "force": True,
+                    },
+                    7,
+                    True,
+                )
+            )
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["error"], "storage_unavailable")
+        self.assertTrue(result["retryable"])
 
 
 class CrateApiTests(unittest.TestCase):
@@ -784,6 +836,7 @@ class PreviewAndRateLimitTests(unittest.TestCase):
     def test_resolve_batch_reports_partial_results(self) -> None:
         import asyncio
         from api.webapp import _action_resolve_batch
+        from music_links_bot.bot_lookup import LookupBundle, SourceStatus
         from music_links_bot.models import TrackMatch
 
         context = _crate_context()
@@ -800,10 +853,24 @@ class PreviewAndRateLimitTests(unittest.TestCase):
             artist="Sleep",
             links={"spotify": "https://open.spotify.com/track/aaa"},
         )
+        urls = body["query"].split()
+        bundle = LookupBundle(
+            tracks=[match],
+            unavailable_urls=urls[1:],
+            videos=[],
+            radios=[],
+            playlists=[],
+            artists=[],
+            statuses=[
+                SourceStatus(urls[0], "songlink", "success"),
+                SourceStatus(urls[1], "songlink", "unavailable", retryable=True),
+                SourceStatus(urls[2], "songlink", "unavailable", retryable=True),
+            ],
+        )
 
         with patch(
-            "api.webapp._lookup_tracks",
-            new=AsyncMock(return_value=([match], body["query"].split()[1:])),
+            "api.webapp._bot_lookup.resolve_sources",
+            new=AsyncMock(return_value=bundle),
         ):
             res = asyncio.run(_action_resolve_batch(context, body, 7))
 

@@ -740,7 +740,7 @@ class BotKeyboardTests(unittest.TestCase):
             "",
         )
         self.assertEqual(keyboard.inline_keyboard[1][0].text, "← Главное меню")
-        self.assertEqual(keyboard.inline_keyboard[1][0].callback_data, "menu:start")
+        self.assertEqual(keyboard.inline_keyboard[1][0].callback_data, "v2|menu|start")
         self.assertEqual(len(keyboard.inline_keyboard), 2)
 
     def test_collection_keyboard_can_hide_channel_button(self) -> None:
@@ -913,13 +913,12 @@ class BotKeyboardTests(unittest.TestCase):
             )
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(rows[0][0].text, "⚡ Быстро")
-        self.assertEqual(rows[0][0].api_kwargs, {"style": "primary"})
-        self.assertEqual(rows[0][1].text, "🎛 Студия")
-        self.assertEqual(rows[0][1].api_kwargs, {"style": "success"})
-        self.assertEqual(rows[1][0].text, "🧺 Подборка · 3")
-        self.assertEqual(rows[1][0].api_kwargs, {"style": "success"})
-        self.assertEqual(rows[1][1].text, "❓ Помощь")
+        self.assertEqual(rows[0][0].text, "🎛 Открыть Студию")
+        self.assertEqual(rows[0][0].api_kwargs, {"style": "success"})
+        self.assertEqual(rows[1][0].text, "🔎 Найти релиз")
+        self.assertEqual(rows[1][0].api_kwargs, {"style": "primary"})
+        self.assertEqual(rows[1][1].text, "🧺 Подборка · 3")
+        self.assertEqual(rows[1][1].api_kwargs, {"style": "success"})
         self.assertEqual(len(rows), 2)
 
     def test_home_text_is_personal_and_escapes_telegram_html(self) -> None:
@@ -932,7 +931,7 @@ class BotKeyboardTests(unittest.TestCase):
 
         self.assertIn("Твоя Студия, &lt;Артём&gt;", text)
         self.assertIn("Подборка · 4/10", text)
-        self.assertIn("Канал и очередь — в Студии", text)
+        self.assertIn("Оформление и публикация — в Студии", text)
         self.assertIn("<code>артист — трек</code>", text)
 
     def test_home_keyboard_omits_webapp_button_outside_private_chat(self) -> None:
@@ -1382,6 +1381,16 @@ class PostEditorTests(unittest.TestCase):
         labels = [button.text for row in rows for button in row]
         self.assertNotIn("📤 В канал", labels)
 
+    def test_editor_rows_turn_added_item_into_crate_shortcut(self) -> None:
+        rows = _editor_rows(
+            "abc123",
+            self._draft(in_crate=True, crate_count=3),
+        )
+
+        self.assertEqual(rows[0][0].text, "✓ Добавлено · 3/10")
+        self.assertEqual(rows[0][0].callback_data, "v2|crate|open")
+        self.assertEqual(rows[0][0].api_kwargs, {"style": "success"})
+
     def test_editor_rows_show_quote_toggle_only_with_prefix(self) -> None:
         rows_without_quote = _editor_more_rows("abc123", self._draft())
         rows_with_quote = _editor_more_rows(
@@ -1395,7 +1404,7 @@ class PostEditorTests(unittest.TestCase):
         self.assertEqual(rows_without_quote[0][1].text, "🖼 Обложка большая")
         self.assertEqual(rows_without_quote[0][1].callback_data, "v2|editor|v|abc123")
 
-    def test_editor_rows_add_studio_webapp_button_when_configured(self) -> None:
+    def test_editor_rows_do_not_duplicate_studio_navigation(self) -> None:
         import os
         from unittest.mock import patch as env_patch
 
@@ -1406,10 +1415,9 @@ class PostEditorTests(unittest.TestCase):
         ):
             rows = _editor_rows("abc123", self._draft())
 
-        studio = rows[0][0]
-        self.assertEqual(studio.text, "🎛 Студия")
-        self.assertEqual(studio.web_app.url, "https://studio.example/app?draft=abc123")
-        self.assertEqual(studio.api_kwargs, {"style": "success"})
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0][0].text, "🧺 В подборку")
+        self.assertIsNone(rows[0][0].web_app)
 
     def test_render_track_draft_respects_toggles(self) -> None:
         draft = self._draft(
@@ -1443,6 +1451,19 @@ class PostEditorTests(unittest.TestCase):
             if button.callback_data
         ]
         self.assertEqual(editor_buttons, [])
+
+    def test_quick_card_is_capped_at_four_actions(self) -> None:
+        draft = self._draft()
+        draft["item"]["links"]["tidal"] = "https://tidal.com/track/1"
+
+        _, keyboard = _render_track_draft(draft, None, draft_id="abc123")
+        buttons = [button for row in keyboard.inline_keyboard for button in row]
+
+        self.assertEqual(len(buttons), 4)
+        self.assertEqual(buttons[0].text, "🟢 Spotify")
+        self.assertEqual(buttons[1].text, "🪩 Все платформы")
+        self.assertEqual(buttons[2].text, "↗️ Поделиться с кнопками")
+        self.assertEqual(buttons[3].text, "🧺 В подборку")
 
 
 class BotLookupTests(unittest.IsolatedAsyncioTestCase):
@@ -1574,12 +1595,12 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertIn("Пост пока не собран", message.replies[0])
+        self.assertIn("Не получилось собрать пост", message.replies[0])
         self.assertIn("<code>артист — название</code>", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "Повторить")
-        self.assertEqual(keyboard[1][0].text, "🔎 Найти релиз")
-        self.assertEqual(keyboard[2][0].text, "← Главное меню")
+        self.assertEqual(keyboard[1][0].text, "← Главное меню")
+        self.assertEqual(len(keyboard), 2)
         self.assertEqual(context.bot.sent_messages, [])
         self.assertEqual(context.bot.chat_actions, [])
         self.assertEqual(context.application.bot_data["runtime"].active_tasks, {})
@@ -1826,8 +1847,6 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             keyboard[0][0].url,
             "https://open.spotify.com/search/Bondage%20Fairies%20Star%20Signs",
         )
-        self.assertEqual(keyboard[0][1].text, "🟠 SoundCloud")
-        self.assertEqual(keyboard[0][1].url, "https://soundcloud.com/bondage-fairies/star-signs")
         # The synthetic Spotify search link must not become the preview.
         preview_options = message.reply_kwargs[0]["link_preview_options"]
         self.assertEqual(

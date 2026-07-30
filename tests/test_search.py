@@ -4,7 +4,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from music_links_bot.kvstore import KVStore
+from music_links_bot.kvstore import KVStore, KVUnavailableError
 from music_links_bot.search import (
     SearchClient,
     SearchLookupError,
@@ -169,6 +169,20 @@ class PreviewExtractionTests(unittest.TestCase):
 
 
 class KVStoreShapeTests(unittest.TestCase):
+    def test_required_json_write_surfaces_storage_failure(self) -> None:
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        store = KVStore("https://kv.example", "token")
+        store._command_or_raise = AsyncMock(
+            side_effect=KVUnavailableError("offline")
+        )
+        try:
+            with self.assertRaises(KVUnavailableError):
+                asyncio.run(store.set_json_required("queue", [{"id": "1"}]))
+        finally:
+            asyncio.run(store.aclose())
+
     def test_increment_window_sets_ttl_atomically(self) -> None:
         import asyncio
         from unittest.mock import AsyncMock

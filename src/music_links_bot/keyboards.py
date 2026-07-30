@@ -70,6 +70,7 @@ def _build_link_keyboard(
     release_kind: str = "song",
     release_format: str | None = None,
     platform_selection: list[str] | None = None,
+    max_visible_platforms: int | None = None,
 ) -> InlineKeyboardMarkup:
     if platform_selection is not None:
         selected_platforms = [
@@ -96,10 +97,11 @@ def _build_link_keyboard(
         ]
         final_platforms = [*ordered_platforms, *remaining_platforms]
 
-    # Song.link remains the complete hub. Showing only the first two preferred
-    # services keeps the Telegram card thumb-friendly instead of producing a
-    # wall of near-identical buttons.
-    if release_page_url:
+    # Song.link remains the complete hub. Callers can use a stricter limit for
+    # quick chat cards while Studio previews keep the selected services.
+    if max_visible_platforms is not None:
+        final_platforms = final_platforms[:max(0, max_visible_platforms)]
+    elif release_page_url:
         final_platforms = final_platforms[:MAX_VISIBLE_PLATFORM_BUTTONS]
 
     buttons = [

@@ -696,6 +696,9 @@ def _render_track_draft(
         release_kind=track.kind,
         release_format=track.release_format,
         platform_selection=_draft_platform_selection(draft),
+        # Keep the quick card to four useful actions: primary service, the
+        # complete hub, native button-preserving share, and the crate.
+        max_visible_platforms=1 if draft_id is not None else None,
     )
     keyboard = add_share_button(
         keyboard,
@@ -865,8 +868,13 @@ async def _run_primary_editor_action(
             draft_id=draft_id,
             item=draft["item"],
         )
+        draft["in_crate"] = True
+        draft["crate_count"] = len(items)
+        await _store_draft(context, draft_id, draft)
         await query.answer(
-            get_text(lang, "ed_crate_added") if added else f"Уже в подборке · {len(items)}/10",
+            get_text(lang, "ed_crate_added").format(count=len(items))
+            if added
+            else get_text(lang, "ed_crate_exists").format(count=len(items)),
             show_alert=False,
         )
         text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
@@ -1152,23 +1160,17 @@ async def _reply_with_flow_error(
     lang: str,
 ) -> None:
     detail_key = {
+        BotErrorCode.INVALID_INPUT: "no_url_hint",
         BotErrorCode.SEARCH_NOT_FOUND: "error_search",
+        BotErrorCode.RELEASE_NOT_FOUND: "error_search",
         BotErrorCode.PROVIDER_UNAVAILABLE: "error_provider",
     }.get(error.code, "no_url_hint")
     text = f"<b>{get_text(lang, 'error_title')}</b>\n\n{get_text(lang, detail_key)}"
-    rows: list[list[InlineKeyboardButton]] = []
-    if error.retryable:
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    get_text(lang, "retry"),
-                    callback_data=encode_callback("retry", "last"),
-                    api_kwargs={"style": "primary"},
-                )
-            ]
-        )
-    rows.extend(_build_error_keyboard(context.bot.username, lang=lang).inline_keyboard)
-    keyboard = InlineKeyboardMarkup(rows)
+    keyboard = _build_error_keyboard(
+        context.bot.username,
+        lang=lang,
+        retryable=error.retryable,
+    )
     placeholder = _take_placeholder(message.chat_id)
     if placeholder is not None:
         try:
@@ -1900,8 +1902,13 @@ def _build_error_keyboard(
     bot_username: str | None,
     *,
     lang: str = "ru",
+    retryable: bool = False,
 ) -> InlineKeyboardMarkup:
-    return _build_error_keyboard_view(bot_username, lang=lang)
+    return _build_error_keyboard_view(
+        bot_username,
+        lang=lang,
+        retryable=retryable,
+    )
 
 
 def _menu_button(label: str, callback_data: str, active: str | None) -> InlineKeyboardButton:

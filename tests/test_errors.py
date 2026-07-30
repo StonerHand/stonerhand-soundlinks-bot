@@ -16,6 +16,13 @@ class ApiErrorContractTests(unittest.TestCase):
         self.assertEqual(result["error_code"], "action_busy")
         self.assertTrue(result["retryable"])
 
+    def test_durable_storage_error_is_distinct_and_retryable(self) -> None:
+        result = normalize_api_response(
+            {"ok": False, "error": "storage_unavailable"}
+        )
+        self.assertEqual(result["error_code"], "storage_unavailable")
+        self.assertTrue(result["retryable"])
+
     def test_success_response_is_untouched(self) -> None:
         payload = {"ok": True, "items": []}
         self.assertIs(normalize_api_response(payload), payload)

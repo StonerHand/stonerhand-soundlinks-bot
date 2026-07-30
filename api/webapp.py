@@ -22,14 +22,13 @@ from music_links_bot.bot import (
     STATS_KV_KEY,
     _deliver_draft,
     _load_draft,
-    _lookup_tracks,
-    _lookup_youtube_videos,
     _publish_draft,
     _render_track_draft,
     _select_preview_url,
     _store_draft,
     build_application,
 )
+from music_links_bot import bot_lookup as _bot_lookup
 from music_links_bot.publication_state import (
     find_posted_record as _find_posted_record,
     mark_posted as _schedule_mark_posted,
@@ -56,12 +55,12 @@ from music_links_bot.mixed_post import (
 from music_links_bot.publish_queue import (
     MAX_DELAY_SECONDS,
     QueueBusyError,
+    QueueStorageError,
     add_job,
     load_jobs,
     remove_job,
     reschedule_job,
 )
-from music_links_bot.provider_runtime import ProviderTask, run_provider_tasks
 from music_links_bot.request_guard import rate_limited, run_idempotent
 from music_links_bot.rich_publications import (
     build_fallback_html,
@@ -94,7 +93,7 @@ _save_crate = _studio_storage._save_crate
 _crate_base_items = _studio_storage._crate_base_items
 _crate_response = _studio_storage._crate_response
 
-from music_links_bot.url_utils import extract_supported_urls, is_youtube_video_url
+from music_links_bot.url_utils import extract_supported_urls
 from api.webapp_transport import StudioRequestHandler
 from telegram import InlineQueryResultArticle, InputTextMessageContent
 from telegram.constants import ParseMode
@@ -295,17 +294,12 @@ async def _action_resolve(context, body: dict, user_id: int, is_admin: bool, lan
         source_urls = [candidates[0].url]
         candidate_preview = candidates[0].preview_url
 
-    tracks, _unavailable = await _lookup_tracks(
-        bot_data["songlink_client"],
-        source_urls,
-        soundcloud_client=bot_data["soundcloud_client"],
-        search_client=bot_data.get("search_client"),
-    )
-    tracks = [track for track in tracks if track.links]
-    if not tracks:
+    bundle = await _bot_lookup.resolve_sources(bot_data, source_urls)
+    resolved_items = _bundle_as_tracks(bundle)
+    if not resolved_items:
         return {"ok": False, "error": "not found"}
 
-    track = tracks[0]
+    track = resolved_items[0]
     draft = {
         "v": 1,
         "type": "track",
@@ -338,37 +332,11 @@ async def _action_resolve_batch(context, body: dict, user_id: int) -> dict:
     if len(source_urls) < 2:
         return {"ok": False, "error": "need urls"}
 
-    bot_data = context.application.bot_data
-    video_urls = [url for url in source_urls if is_youtube_video_url(url)]
-    music_urls = [url for url in source_urls if not is_youtube_video_url(url)]
-    tasks: list[ProviderTask] = []
-    if music_urls:
-        tasks.append(
-            ProviderTask(
-                "songlink",
-                _lookup_tracks(
-                    bot_data["songlink_client"],
-                    music_urls,
-                    soundcloud_client=bot_data["soundcloud_client"],
-                    search_client=bot_data.get("search_client"),
-                ),
-                ([], list(music_urls)),
-            )
-        )
-    if video_urls:
-        tasks.append(
-            ProviderTask(
-                "youtube",
-                _lookup_youtube_videos(bot_data["youtube_client"], video_urls),
-                [],
-            )
-        )
-    results = await run_provider_tasks(bot_data, tasks)
-    track_result = results.get("songlink", ([], []))
-    videos = results.get("youtube", [])
-    tracks, unavailable = track_result
-    tracks = [track for track in tracks if track.links]
-    resolved_items = [*tracks, *(as_video_track(video) for video in videos)]
+    bundle = await _bot_lookup.resolve_sources(
+        context.application.bot_data,
+        source_urls,
+    )
+    resolved_items = _bundle_as_tracks(bundle)
     if not resolved_items:
         return {"ok": False, "error": "not found"}
 
@@ -386,73 +354,60 @@ async def _action_resolve_batch(context, body: dict, user_id: int) -> dict:
         items.append(compact)
 
     result = _crate_view(items)
+    statuses = [asdict(status) for status in bundle.statuses]
+    retry_urls = [
+        status.source_url for status in bundle.statuses if status.retryable
+    ]
     result.update(
         {
             "requested_count": len(source_urls),
             "resolved_count": len(items),
-            "failed_count": max(0, len(source_urls) - len(items)),
-            "statuses": _batch_source_statuses(
-                source_urls,
-                tracks=tracks,
-                videos=videos,
-                unavailable_urls=unavailable,
+            "failed_count": sum(
+                status.state != "success" for status in bundle.statuses
             ),
-            "retry_urls": list(unavailable),
+            "statuses": statuses,
+            "retry_urls": retry_urls,
         }
     )
     return result
 
 
-def _batch_source_statuses(
-    source_urls: list[str],
-    *,
-    tracks: list[TrackMatch],
-    videos: list,
-    unavailable_urls: list[str],
-) -> list[dict]:
-    unavailable = set(unavailable_urls)
-    successful_urls = {
-        url
-        for track in tracks
-        for url in track.links.values()
-        if isinstance(url, str)
-    }
-    successful_urls.update(
-        str(video.url)
-        for video in videos
-        if getattr(video, "url", None)
-    )
-    music_candidates = [
-        url
-        for url in source_urls
-        if url not in unavailable and not is_youtube_video_url(url)
+def _bundle_as_tracks(bundle: _bot_lookup.LookupBundle) -> list[TrackMatch]:
+    """Adapt the shared resolver output to Studio's single card model."""
+    return [
+        *bundle.tracks,
+        *(as_video_track(video) for video in bundle.videos),
+        *(
+            TrackMatch(
+                title=radio.title,
+                artist=radio.station,
+                links={},
+                page_url=radio.url,
+                kind="radio",
+            )
+            for radio in bundle.radios
+        ),
+        *(
+            TrackMatch(
+                title=playlist.title,
+                artist=playlist.platform,
+                links={},
+                page_url=playlist.url,
+                kind="playlist",
+            )
+            for playlist in bundle.playlists
+        ),
+        *(
+            TrackMatch(
+                title=artist.title,
+                artist=artist.platform,
+                links={},
+                page_url=artist.url,
+                kind="artist",
+            )
+            for artist in bundle.artists
+        ),
     ]
-    successful_urls.update(music_candidates[: len(tracks)])
-    video_candidates = [
-        url
-        for url in source_urls
-        if url not in unavailable and is_youtube_video_url(url)
-    ]
-    successful_urls.update(video_candidates[: len(videos)])
-    statuses = []
-    for source_url in source_urls:
-        if source_url in unavailable:
-            state = "unavailable"
-            retryable = True
-        elif source_url in successful_urls:
-            state = "success"
-            retryable = False
-        else:
-            state = "not_found"
-            retryable = False
-        statuses.append(
-            {
-                "source_url": source_url,
-                "state": state,
-                "retryable": retryable,
-            }
-        )
-    return statuses
 
 
 async def _action_draft(context, body: dict, user_id: int, is_admin: bool) -> dict:
@@ -799,6 +754,8 @@ async def _action_schedule(context, body: dict, user_id: int, is_admin: bool) ->
         job = await add_job(context, draft, publish_at)
     except QueueBusyError:
         return {"ok": False, "error": "queue_busy", "retryable": True}
+    except QueueStorageError:
+        return {"ok": False, "error": "storage_unavailable", "retryable": True}
     return {"ok": True, "job_id": job["id"], "publish_at": job["publish_at"]}
 
 
@@ -806,7 +763,10 @@ async def _action_queue(context, is_admin: bool) -> dict:
     if not is_admin:
         return {"ok": False, "error": "admin only"}
 
-    jobs = await load_jobs(context)
+    try:
+        jobs = await load_jobs(context)
+    except QueueStorageError:
+        return {"ok": False, "error": "storage_unavailable", "retryable": True}
     items = []
     for job in jobs:
         draft = job.get("draft")
@@ -846,6 +806,8 @@ async def _action_unschedule(context, body: dict, is_admin: bool) -> dict:
         removed = await remove_job(context, job_id)
     except QueueBusyError:
         return {"ok": False, "error": "queue_busy", "retryable": True}
+    except QueueStorageError:
+        return {"ok": False, "error": "storage_unavailable", "retryable": True}
     return {"ok": removed, "error": None if removed else "job not found"}
 
 
@@ -867,6 +829,8 @@ async def _action_reschedule(context, body: dict, is_admin: bool) -> dict:
         moved = await reschedule_job(context, job_id, publish_at)
     except QueueBusyError:
         return {"ok": False, "error": "queue_busy", "retryable": True}
+    except QueueStorageError:
+        return {"ok": False, "error": "storage_unavailable", "retryable": True}
     return {
         "ok": moved,
         "error": None if moved else "job not found",
@@ -946,6 +910,7 @@ async def _action_dashboard(context, user_id: int, is_admin: bool) -> dict:
 
     queue_items = queue.get("items") if isinstance(queue, dict) else []
     queue_items = queue_items if isinstance(queue_items, list) else []
+    queue_available = bool(isinstance(queue, dict) and queue.get("ok"))
     next_at = min(
         (
             int(item.get("publish_at") or 0)
@@ -959,7 +924,11 @@ async def _action_dashboard(context, user_id: int, is_admin: bool) -> dict:
         "is_admin": is_admin,
         "history": history.get("items") or [],
         "crate": crate,
-        "queue": {"count": len(queue_items), "next_at": next_at},
+        "queue": {
+            "count": len(queue_items),
+            "next_at": next_at,
+            "available": queue_available,
+        },
     }
 
 

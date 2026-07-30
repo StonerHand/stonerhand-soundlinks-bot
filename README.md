@@ -31,9 +31,8 @@ Yandex Music, podcasts, Spotify playlists and artists, and NTS Radio are
 supported.
 
 Cards contain release data and actions without generated promotional filler or
-hidden heading links. The default keyboard shows two preferred services plus a
-universal hub. Use Studio's Share action when the complete keyboard must travel
-with the post.
+hidden heading links. A quick card is capped at four actions: the preferred
+service, the universal hub, button-preserving share, and Add to crate.
 
 Longreads use Telegram Rich Messages with a safe HTML fallback. A song and a
 YouTube clip become a native two-tile media album; the bot never downloads or
@@ -50,17 +49,18 @@ flowchart LR
     D --> E["Chat · channel · queue"]
 ```
 
-The bot exposes two clear modes: **Quick** for a finished chat card and
-**Studio** for longreads, crates, scheduling and publishing. A chat draft keeps
-only Studio and Add to crate actions. Provider clients are lazy, independent
-lookups run in parallel, and successful bundles are cached in memory and Redis.
-One request deadline bounds the entire lookup, while a repeatedly failing
-provider is temporarily isolated. Partial batches keep their successful cards
-and retry only failed links.
+The home menu keeps three actions: **Open Studio**, **Find a release**, and
+**Crate**. Settings, longreads, scheduling and publishing live in the Mini App,
+while chat stays a fast path. The bot and Studio use the same resolver. Provider
+clients are lazy, independent lookups run in parallel, and successful bundles
+are cached in memory and Redis. One request deadline bounds the entire lookup,
+while a repeatedly failing provider is temporarily isolated. Partial batches
+keep their successful cards and retry only failed links.
 
 Before channel delivery, the bot checks its posting rights. Duplicate records
 retain the previous post link and offer open, repeat or replace actions. The
-owner-only `/status` command summarizes Telegram, Redis, queue, permissions,
+Scheduled status is returned only after Redis confirms the durable queue write.
+The owner-only `/status` command summarizes Telegram, Redis, queue, permissions,
 latency, cache and provider circuits.
 
 ## Vercel setup

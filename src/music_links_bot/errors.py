@@ -45,6 +45,7 @@ _API_ERROR_CODES = {
     "job not found": "draft_expired",
     "request_in_progress": "action_busy",
     "queue_busy": "action_busy",
+    "storage_unavailable": "storage_unavailable",
     "duplicate": "action_duplicate",
     "admin only": "permission_denied",
     "unauthorized": "permission_denied",
@@ -64,6 +65,7 @@ _RETRYABLE_CODES = {
     "action_busy",
     "delivery_failed",
     "provider_unavailable",
+    "storage_unavailable",
     "rate_limited",
 }
 

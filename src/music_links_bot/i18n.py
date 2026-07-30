@@ -67,24 +67,22 @@ STRINGS: dict[str, dict[str, str]] = {
     "home_body": {
         RU: (
             "{greeting}\n\n"
-            "<b>Быстро</b> — пришли ссылку или <code>артист — трек</code>.\n"
-            "<b>Студия</b> — лонгрид, подборка, очередь и публикация.\n\n"
+            "Пришли ссылку или <code>артист — трек</code> — я соберу готовую карточку.\n\n"
             "<blockquote>Подборка · {crate_count}/10\n{mode}</blockquote>"
         ),
         EN: (
             "{greeting}\n\n"
-            "<b>Quick</b> — send a link or type <code>artist — track</code>.\n"
-            "<b>Studio</b> — longreads, crates, queue and publishing.\n\n"
+            "Send a link or type <code>artist — track</code> and I will build the card.\n\n"
             "<blockquote>Crate · {crate_count}/10\n{mode}</blockquote>"
         ),
     },
     "home_mode_admin": {
-        RU: "Канал и очередь — в Студии",
-        EN: "Channel and queue are in Studio",
+        RU: "Оформление и публикация — в Студии",
+        EN: "Formatting and publishing are in Studio",
     },
     "home_mode_user": {
-        RU: "Карточки и лонгриды — в Студии",
-        EN: "Cards and longreads are in Studio",
+        RU: "Оформление и лонгриды — в Студии",
+        EN: "Formatting and longreads are in Studio",
     },
     "start_returning": {
         RU: "🎧 <b>Что собираем сегодня?</b>\n\nПришли ссылку, название релиза или открой Студию.",
@@ -344,7 +342,12 @@ STRINGS: dict[str, dict[str, str]] = {
     "ed_more": {RU: "⚙️ Настроить", EN: "⚙️ Customize"},
     "ed_send_self": {RU: "✉️ Отправить себе", EN: "✉️ Send to me"},
     "ed_add_crate": {RU: "🧺 В подборку", EN: "🧺 Add to crate"},
-    "ed_crate_added": {RU: "Добавлено в подборку", EN: "Added to crate"},
+    "ed_crate_count": {RU: "✓ Добавлено · {count}/10", EN: "✓ Added · {count}/10"},
+    "ed_crate_added": {RU: "Добавлено · {count}/10", EN: "Added · {count}/10"},
+    "ed_crate_exists": {
+        RU: "Уже в подборке · {count}/10",
+        EN: "Already in crate · {count}/10",
+    },
     "ed_sent": {RU: "Готово — пост отправлен ниже", EN: "Done — the post is below"},
     "ed_publish": {RU: "📤 В канал", EN: "📤 To channel"},
     "ed_expired": {
@@ -394,29 +397,25 @@ STRINGS: dict[str, dict[str, str]] = {
         EN: "Open old post",
     },
     "cancel": {RU: "Отмена", EN: "Cancel"},
-    "error_title": {RU: "Пост пока не собран", EN: "The post is not ready yet"},
+    "error_title": {RU: "Не получилось собрать пост", EN: "Could not build the post"},
     "error_search": {
         RU: (
-            "Не нашёл точного релиза по этому запросу.\n\n"
-            "<blockquote>Попробуй формат <code>артист — название</code> "
-            "или пришли прямую ссылку Spotify, Apple Music, YouTube либо SoundCloud.</blockquote>"
+            "Релиз не найден. Уточни <code>артист — название</code> "
+            "или пришли прямую ссылку."
         ),
         EN: (
-            "I could not find an exact release for that query.\n\n"
-            "<blockquote>Try <code>artist — title</code> or send a direct Spotify, "
-            "Apple Music, YouTube, or SoundCloud link.</blockquote>"
+            "Release not found. Refine <code>artist — title</code> "
+            "or send a direct link."
         ),
     },
     "error_provider": {
         RU: (
-            "Музыкальный сервис временно не отвечает, но ссылка не потеряна.\n\n"
-            "<blockquote>Нажми «Повторить». Если ошибка останется — открой ссылку "
-            "и пришли её ещё раз через несколько минут.</blockquote>"
+            "Музыкальный сервис временно не отвечает. Ссылка сохранена — "
+            "нажми «Повторить»."
         ),
         EN: (
-            "The music provider is temporarily unavailable, but your link is safe.\n\n"
-            "<blockquote>Tap Retry. If it still fails, open the link and send it "
-            "again in a few minutes.</blockquote>"
+            "The music provider is temporarily unavailable. Your link is saved — "
+            "tap Retry."
         ),
     },
     "search_choose": {

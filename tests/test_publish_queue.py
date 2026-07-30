@@ -44,6 +44,35 @@ def make_draft() -> dict:
 
 
 class PublishQueueTests(unittest.TestCase):
+    def test_durable_write_failure_never_reports_a_scheduled_job(self) -> None:
+        from music_links_bot.kvstore import KVUnavailableError
+
+        class FailingDurableKV:
+            async def set_required(self, *args, **kwargs):
+                return True
+
+            async def get_json_required(self, key):
+                return None
+
+            async def set_json_required(self, key, value):
+                raise KVUnavailableError("offline")
+
+            async def delete_if_value(self, key, owner):
+                return True
+
+        context = make_context()
+        context.application.bot_data["kv_store"] = FailingDurableKV()
+
+        async def scenario():
+            with self.assertRaises(publish_queue.QueueStorageError):
+                await publish_queue.add_job(context, make_draft(), 1000)
+
+        asyncio.run(scenario())
+        self.assertEqual(
+            context.application.bot_data.get(publish_queue.QUEUE_MEMORY_KEY),
+            [],
+        )
+
     def test_claim_keeps_job_durable_until_publish_finishes(self) -> None:
         context = make_context()
 

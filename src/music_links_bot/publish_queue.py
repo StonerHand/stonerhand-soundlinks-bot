@@ -7,7 +7,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from music_links_bot.kvstore import KVStore
+from music_links_bot.kvstore import KVStore, KVUnavailableError
 
 LOGGER = logging.getLogger(__name__)
 
@@ -29,12 +29,19 @@ class QueueBusyError(RuntimeError):
     """Raised when a concurrent queue mutation still owns the Redis lease."""
 
 
+class QueueStorageError(RuntimeError):
+    """Raised when a durable queue read or write cannot be confirmed."""
+
+
 async def _acquire_lock(
     kv: KVStore, *, tries: int = 6, delay: float = 0.15
 ) -> str | None:
     owner = secrets.token_hex(12)
+    setter = getattr(kv, "set_required", None)
+    if setter is None:
+        setter = kv.set
     for attempt in range(tries):
-        if await kv.set(
+        if await setter(
             QUEUE_LOCK_KEY,
             owner,
             ttl_seconds=QUEUE_LOCK_TTL_SECONDS,
@@ -87,7 +94,10 @@ async def _locked_mutate(
             await save_jobs(context, new_jobs)
             return result
 
-    lock_owner = await _acquire_lock(kv)
+    try:
+        lock_owner = await _acquire_lock(kv)
+    except KVUnavailableError as exc:
+        raise QueueStorageError("publish queue storage is unavailable") from exc
     if lock_owner is None:
         raise QueueBusyError("publish queue is busy")
     try:
@@ -103,7 +113,15 @@ async def load_jobs(context) -> list[dict]:
     """Load normalized queue jobs from Redis or the local fallback."""
     kv: KVStore | None = context.application.bot_data.get("kv_store")
     if kv is not None:
-        jobs = await kv.get_json(QUEUE_KV_KEY)
+        try:
+            required_get = getattr(kv, "get_json_required", None)
+            jobs = (
+                await required_get(QUEUE_KV_KEY)
+                if required_get is not None
+                else await kv.get_json(QUEUE_KV_KEY)
+            )
+        except KVUnavailableError as exc:
+            raise QueueStorageError("could not read the publish queue") from exc
         if isinstance(jobs, list):
             cleaned = [
                 normalized
@@ -113,6 +131,11 @@ async def load_jobs(context) -> list[dict]:
             ]
             context.application.bot_data[QUEUE_MEMORY_KEY] = cleaned
             return cleaned
+        if jobs is None:
+            context.application.bot_data[QUEUE_MEMORY_KEY] = []
+            return []
+        if jobs is not None:
+            raise QueueStorageError("publish queue data is malformed")
 
     jobs = context.application.bot_data.get(QUEUE_MEMORY_KEY) or []
     return [
@@ -125,10 +148,17 @@ async def load_jobs(context) -> list[dict]:
 
 async def save_jobs(context, jobs: list[dict]) -> None:
     normalized = [job for job in (_normalize_job(item) for item in jobs) if job]
-    context.application.bot_data[QUEUE_MEMORY_KEY] = normalized
     kv: KVStore | None = context.application.bot_data.get("kv_store")
     if kv is not None:
-        await kv.set_json(QUEUE_KV_KEY, normalized)
+        try:
+            required_set = getattr(kv, "set_json_required", None)
+            if required_set is not None:
+                await required_set(QUEUE_KV_KEY, normalized)
+            elif not await kv.set_json(QUEUE_KV_KEY, normalized):
+                raise KVUnavailableError("Redis did not confirm the write")
+        except KVUnavailableError as exc:
+            raise QueueStorageError("could not save the publish queue") from exc
+    context.application.bot_data[QUEUE_MEMORY_KEY] = normalized
 
 
 async def add_job(context, draft: dict, publish_at: int) -> dict:
@@ -270,7 +300,7 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
     owner = secrets.token_hex(12)
     try:
         claimed = await _claim_due_jobs(context, now=now_ts, owner=owner)
-    except QueueBusyError:
+    except (QueueBusyError, QueueStorageError):
         return 0
 
     published = 0
@@ -295,7 +325,7 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
                 delivered=bool(delivered),
                 now=now_ts,
             )
-        except QueueBusyError:
+        except (QueueBusyError, QueueStorageError):
             LOGGER.warning("Could not finalize queue job %s; lease will recover it", job.get("id"))
             continue
 
