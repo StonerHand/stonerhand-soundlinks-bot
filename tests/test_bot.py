@@ -161,6 +161,15 @@ class PlaylistClientStub:
         )
 
 
+class ApplePlaylistClientStub:
+    async def lookup_playlist(self, source_url: str) -> PlaylistMatch:
+        return PlaylistMatch(
+            title="Anya Taylor-Joy: My Lucky Playlist",
+            platform="Apple Music",
+            url=source_url,
+        )
+
+
 class FailingPlaylistClientStub:
     async def lookup_playlist(self, source_url: str) -> PlaylistMatch:
         del source_url
@@ -408,6 +417,13 @@ class PrivateSoundCloudMessageStub(PrivateMessageStub):
 
 class PrivateSpotifyPlaylistMessageStub(PrivateMessageStub):
     text = "https://open.spotify.com/playlist/37i9dQZF1DX51TD2wakW3K?si=123"
+
+
+class PrivateApplePlaylistMessageStub(PrivateMessageStub):
+    text = (
+        "https://music.apple.com/tr/playlist/anya-taylor-joy-my-lucky-playlist/"
+        "pl.e245dcff90464785a675ec40e8c52abb"
+    )
 
 
 class PrivateSpotifyArtistMessageStub(PrivateMessageStub):
@@ -1019,6 +1035,7 @@ class BotKeyboardTests(unittest.TestCase):
             [
                 "https://open.spotify.com/artist/abc",
                 "https://open.spotify.com/playlist/abc",
+                "https://music.apple.com/tr/playlist/test/pl.abc",
                 "https://youtu.be/video",
                 "https://www.nts.live/shows/example",
                 "https://open.spotify.com/track/123",
@@ -1026,7 +1043,13 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         self.assertEqual(artist_urls, ["https://open.spotify.com/artist/abc"])
-        self.assertEqual(playlist_urls, ["https://open.spotify.com/playlist/abc"])
+        self.assertEqual(
+            playlist_urls,
+            [
+                "https://open.spotify.com/playlist/abc",
+                "https://music.apple.com/tr/playlist/test/pl.abc",
+            ],
+        )
         self.assertEqual(youtube_urls, ["https://youtu.be/video"])
         self.assertEqual(nts_urls, ["https://www.nts.live/shows/example"])
         self.assertEqual(music_urls, ["https://open.spotify.com/track/123"])
@@ -1338,6 +1361,23 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.title, "Women of Punk")
         keyboard = result.reply_markup.inline_keyboard
         self.assertEqual(keyboard[0][0].text, "🎛 Открыть плейлист")
+
+    async def test_inline_apple_music_playlist_uses_playlist_card(self) -> None:
+        source_url = (
+            "https://music.apple.com/tr/playlist/anya-taylor-joy-my-lucky-playlist/"
+            "pl.e245dcff90464785a675ec40e8c52abb"
+        )
+        result = await _build_inline_result(
+            source_url,
+            ContextStub(playlist_client=ApplePlaylistClientStub()),
+        )
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result.title, "Anya Taylor-Joy: My Lucky Playlist")
+        self.assertIn("Apple Music", result.input_message_content.message_text)
+        keyboard = result.reply_markup.inline_keyboard
+        self.assertEqual(keyboard[0][0].text, "🎛 Открыть плейлист")
+        self.assertEqual(keyboard[0][0].url, source_url)
 
 
 class PostEditorTests(unittest.TestCase):
@@ -1879,6 +1919,21 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(preview_options.show_above_text)
         record_playlists.assert_called_once()
 
+    async def test_apple_music_playlist_links_use_playlist_post(self) -> None:
+        message = PrivateApplePlaylistMessageStub()
+        context = ContextStub(playlist_client=ApplePlaylistClientStub())
+
+        with patch("music_links_bot.bot_stats.record_playlists") as record_playlists:
+            await track_lookup_message(UpdateStub(message), context)
+
+        self.assertEqual(len(message.replies), 1)
+        self.assertIn("<b>Anya Taylor-Joy: My Lucky Playlist</b>", message.replies[0])
+        self.assertIn("Apple Music", message.replies[0])
+        self.assertIn("#stonerhand #playlist", message.replies[0])
+        keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
+        self.assertEqual(keyboard[0][0].url, message.text)
+        record_playlists.assert_called_once()
+
     async def test_spotify_artist_links_use_artist_post(self) -> None:
         message = PrivateSpotifyArtistMessageStub()
         context = ContextStub()
@@ -2009,6 +2064,16 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(playlists), 1)
         self.assertEqual(playlists[0].title, "Spotify playlist")
         self.assertEqual(playlists[0].platform, "Spotify")
+
+    async def test_apple_playlist_lookup_uses_matching_fallback(self) -> None:
+        playlists = await _lookup_playlists(
+            FailingPlaylistClientStub(),
+            ["https://music.apple.com/tr/playlist/test/pl.abc"],
+        )
+
+        self.assertEqual(len(playlists), 1)
+        self.assertEqual(playlists[0].title, "Apple Music playlist")
+        self.assertEqual(playlists[0].platform, "Apple Music")
 
     async def test_artist_lookup_uses_fallback_when_metadata_fails(self) -> None:
         artists = await _lookup_artists(

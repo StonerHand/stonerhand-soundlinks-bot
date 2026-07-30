@@ -65,7 +65,7 @@ src/music_links_bot/
   search.py            iTunes Search, кандидаты, жанры, audio preview
   youtube.py           YouTube oEmbed
   soundcloud.py        SoundCloud oEmbed fallback
-  playlist.py          Spotify playlist oEmbed
+  playlist.py          плейлисты Spotify (oEmbed) и Apple Music (Open Graph)
   artist.py            Spotify artist oEmbed
   nts.py               Open Graph страниц NTS
   models.py            нормализованные модели контента
@@ -196,7 +196,8 @@ flowchart LR
     CLASSIFY -->|"music URL"| SONG["Song.link"]
     CLASSIFY -->|"YouTube"| YT["YouTube oEmbed"]
     CLASSIFY -->|"SoundCloud fallback"| SC["SoundCloud oEmbed"]
-    CLASSIFY -->|"Spotify playlist/artist"| SP["Spotify oEmbed"]
+    CLASSIFY -->|"Spotify/Apple Music playlist"| PL["Playlist metadata"]
+    CLASSIFY -->|"Spotify artist"| SP["Spotify oEmbed"]
     CLASSIFY -->|"NTS"| NTS["NTS Open Graph"]
     SONG --> MODEL["TrackMatch"]
     YT --> MODEL2["VideoMatch"]
