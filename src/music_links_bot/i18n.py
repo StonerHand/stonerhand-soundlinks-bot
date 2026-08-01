@@ -67,13 +67,13 @@ STRINGS: dict[str, dict[str, str]] = {
     "home_body": {
         RU: (
             "{greeting}\n\n"
-            "Пришли ссылку или <code>артист — трек</code> — я соберу готовую карточку.\n\n"
-            "<blockquote>Подборка · {crate_count}/10\n{mode}</blockquote>"
+            "Пришли ссылку или <code>артист — трек</code> — я соберу готовую карточку.\n"
+            "<i>{mode}</i>"
         ),
         EN: (
             "{greeting}\n\n"
-            "Send a link or type <code>artist — track</code> and I will build the card.\n\n"
-            "<blockquote>Crate · {crate_count}/10\n{mode}</blockquote>"
+            "Send a link or type <code>artist — track</code> and I will build the card.\n"
+            "<i>{mode}</i>"
         ),
     },
     "home_mode_admin": {
@@ -131,11 +131,12 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
     },
     "quick_tour": {RU: "▶ Как всё работает", EN: "▶ How it works"},
-    "quick_search": {RU: "🔎 Найти релиз", EN: "🔎 Find a release"},
+    "quick_search": {RU: "🔎 Найти", EN: "🔎 Find"},
     "quick_mode": {RU: "⚡ Быстро", EN: "⚡ Quick"},
     "studio_mode": {RU: "🎛 Студия", EN: "🎛 Studio"},
-    "open_studio": {RU: "🎛 Открыть Студию", EN: "🎛 Open Studio"},
+    "open_studio": {RU: "🎛 Студия", EN: "🎛 Studio"},
     "home_crate": {RU: "🧺 Подборка · {count}", EN: "🧺 Crate · {count}"},
+    "home_more": {RU: "••• Ещё", EN: "••• More"},
     "home_stats": {RU: "📊 Статистика канала", EN: "📊 Channel stats"},
     "home_queue": {RU: "🗓 Очередь", EN: "🗓 Queue"},
     "home_result": {RU: "✨ Пример поста", EN: "✨ Example post"},
@@ -150,8 +151,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "tab_demo": {RU: "🧪 Пример поста", EN: "🧪 Example post"},
     "share_button": {RU: "↗ Поделиться ботом", EN: "↗ Share the bot"},
     "share_post": {
-        RU: "↗️ Поделиться с кнопками",
-        EN: "↗️ Share with buttons",
+        RU: "↗ Поделиться",
+        EN: "↗ Share",
     },
     "error_platforms_button": {RU: "Что поддерживается", EN: "What is supported"},
     "menu_start": {
@@ -304,6 +305,24 @@ STRINGS: dict[str, dict[str, str]] = {
             "Try it now: send a link or a <code>track title</code>."
         ),
     },
+    "menu_more": {
+        RU: (
+            "••• <b>Ещё возможности</b>\n"
+            "<i>Всё полезное — без перегруженного главного экрана.</i>\n\n"
+            "<blockquote><b>Помощь</b> — короткая инструкция\n"
+            "<b>Сервисы</b> — поддерживаемые площадки\n"
+            "<b>Для каналов</b> — автозамена ссылок\n"
+            "<b>Пример</b> — как выглядит готовый пост</blockquote>"
+        ),
+        EN: (
+            "••• <b>More tools</b>\n"
+            "<i>Useful extras without crowding the home screen.</i>\n\n"
+            "<blockquote><b>Help</b> — a short guide\n"
+            "<b>Services</b> — supported platforms\n"
+            "<b>For channels</b> — automatic link replacement\n"
+            "<b>Example</b> — a finished post preview</blockquote>"
+        ),
+    },
     "no_url_hint": {
         RU: (
             "Пришли ссылку на трек, альбом, плейлист, артиста, подкаст, "
@@ -319,30 +338,28 @@ STRINGS: dict[str, dict[str, str]] = {
         EN: "Found nothing for that query. Try refining it: artist + title",
     },
     "inline_hint_empty": {
-        RU: "🎧 Вставь ссылку или название трека",
-        EN: "🎧 Paste a link or type a track name",
+        RU: "🎧 Введи артиста и трек или вставь ссылку",
+        EN: "🎧 Type an artist and track or paste a link",
     },
     "inline_hint_not_found": {
-        RU: "Не нашел площадок — открыть бота",
-        EN: "No platforms found — open the bot",
+        RU: "Ничего не найдено — измени запрос",
+        EN: "Nothing found — refine your query",
     },
-    # Editor toggles use language-free glyphs so the row stays one line
-    # on narrow screens: "#️⃣ ✓", "💬 ✗", "🖼 ⊞".
     "ed_hashtags": {RU: "# Хэштеги", EN: "# Hashtags"},
     "ed_quote": {RU: "💬 Цитата", EN: "💬 Quote"},
-    "ed_on": {RU: "✓", EN: "✓"},
-    "ed_off": {RU: "✗", EN: "✗"},
+    "ed_on": {RU: "вкл.", EN: "on"},
+    "ed_off": {RU: "выкл.", EN: "off"},
     "ed_studio": {RU: "🎛 Студия", EN: "🎛 Studio"},
     "menu_button_studio": {RU: "Студия", EN: "Studio"},
     "ed_preview": {RU: "🖼 Обложка", EN: "🖼 Cover"},
-    "ed_preview_small": {RU: "малая", EN: "small"},
-    "ed_preview_large": {RU: "большая", EN: "large"},
-    "ed_done": {RU: "✅ Готово", EN: "✅ Done"},
+    "ed_preview_small": {RU: "компактная", EN: "compact"},
+    "ed_preview_large": {RU: "крупная", EN: "large"},
+    "ed_done": {RU: "Готово", EN: "Done"},
     "ed_delete": {RU: "🗑 Удалить", EN: "🗑 Delete"},
-    "ed_more": {RU: "⚙️ Настроить", EN: "⚙️ Customize"},
-    "ed_send_self": {RU: "✉️ Отправить себе", EN: "✉️ Send to me"},
-    "ed_add_crate": {RU: "🧺 В подборку", EN: "🧺 Add to crate"},
-    "ed_crate_count": {RU: "✓ Добавлено · {count}/10", EN: "✓ Added · {count}/10"},
+    "ed_more": {RU: "••• Ещё", EN: "••• More"},
+    "ed_send_self": {RU: "Отправить себе", EN: "Send to me"},
+    "ed_add_crate": {RU: "+ В подборку", EN: "+ Add to crate"},
+    "ed_crate_count": {RU: "В подборке · {count}/10", EN: "In crate · {count}/10"},
     "ed_crate_added": {RU: "Добавлено · {count}/10", EN: "Added · {count}/10"},
     "ed_crate_exists": {
         RU: "Уже в подборке · {count}/10",
@@ -359,6 +376,13 @@ STRINGS: dict[str, dict[str, str]] = {
         EN: "Only the bot owner can publish to the channel",
     },
     "ed_published": {RU: "Опубликовано в канал 🎉", EN: "Published to the channel 🎉"},
+    "ed_open_publication": {RU: "Открыть публикацию", EN: "Open publication"},
+    "ed_create_more": {RU: "+ Создать ещё", EN: "+ Create another"},
+    "ed_delete_confirm": {
+        RU: "<b>Удалить эту карточку?</b>\n\nЧерновик исчезнет из чата. Это действие нельзя отменить.",
+        EN: "<b>Delete this card?</b>\n\nThe draft will disappear from the chat. This cannot be undone.",
+    },
+    "ed_delete_confirm_button": {RU: "Удалить карточку", EN: "Delete card"},
     "ed_duplicate": {
         RU: "⚠️ Уже публиковалось {date}. Нажми 📤 ещё раз, чтобы опубликовать снова",
         EN: "⚠️ Already published on {date}. Tap 📤 again to publish anyway",
@@ -418,13 +442,28 @@ STRINGS: dict[str, dict[str, str]] = {
             "tap Retry."
         ),
     },
+    "error_provider_named": {
+        RU: (
+            "Сервис <b>{provider}</b> временно не отвечает. Ссылка сохранена — "
+            "нажми «Повторить»."
+        ),
+        EN: (
+            "<b>{provider}</b> is temporarily unavailable. Your link is saved — "
+            "tap Retry."
+        ),
+    },
     "search_choose": {
         RU: "<b>Выбери релиз</b>\n\nНашёл несколько вариантов по запросу «{query}»:",
         EN: "<b>Choose a release</b>\n\nI found several matches for “{query}”:",
     },
+    "search_change": {RU: "Изменить запрос", EN: "Change query"},
     "progress_search": {RU: "1/3 · Ищу релиз…", EN: "1/3 · Finding the release…"},
     "progress_links": {RU: "2/3 · Собираю площадки…", EN: "2/3 · Collecting platforms…"},
     "progress_card": {RU: "3/3 · Собираю карточку…", EN: "3/3 · Building the card…"},
+    "progress_cancelled": {
+        RU: "Поиск отменён — обрабатываю новый запрос.",
+        EN: "Search cancelled — processing the new request.",
+    },
     "crate_empty": {
         RU: (
             "🧺 <b>Подборка пока пустая</b>\n"
@@ -439,11 +478,21 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "crate_title": {RU: "🧺 <b>Моя подборка · {count}/10</b>", EN: "🧺 <b>My crate · {count}/10</b>"},
     "crate_hint": {
-        RU: "<blockquote>↕️ Меняй порядок стрелками — всё сохраняется автоматически.</blockquote>",
-        EN: "<blockquote>↕️ Reorder with the arrows — every change is saved automatically.</blockquote>",
+        RU: "<blockquote>Выбери номер трека, чтобы изменить порядок или удалить его.</blockquote>",
+        EN: "<blockquote>Select a track number to reorder or remove it.</blockquote>",
     },
     "crate_up": {RU: "↑ Выше", EN: "↑ Up"},
     "crate_down": {RU: "↓ Ниже", EN: "↓ Down"},
     "crate_remove": {RU: "✕ Удалить", EN: "✕ Remove"},
+    "crate_clear": {RU: "Очистить", EN: "Clear"},
+    "crate_clear_confirm": {
+        RU: "<b>Очистить всю подборку?</b>\n\nВсе треки будут удалены. Отменить это действие нельзя.",
+        EN: "<b>Clear the whole crate?</b>\n\nAll tracks will be removed. This cannot be undone.",
+    },
+    "crate_clear_confirm_button": {RU: "Очистить подборку", EN: "Clear crate"},
+    "crate_undo": {RU: "Вернуть удалённый", EN: "Undo removal"},
+    "crate_removed": {RU: "Трек удалён", EN: "Track removed"},
+    "crate_restored": {RU: "Трек возвращён", EN: "Track restored"},
+    "crate_find": {RU: "+ Найти первый трек", EN: "+ Find the first track"},
     "crate_open_studio": {RU: "🎛 Собрать сет в Студии", EN: "🎛 Build the set in Studio"},
 }

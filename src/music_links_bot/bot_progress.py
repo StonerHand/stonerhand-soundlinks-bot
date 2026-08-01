@@ -49,3 +49,19 @@ def take_progress(chat_id: int) -> Message | None:
         return None
     _PLACEHOLDER.set(None)
     return placeholder
+
+
+async def cancel_progress(chat_id: int, lang: str = "ru") -> None:
+    """Remove a superseded progress indicator or mark it as cancelled."""
+    placeholder = take_progress(chat_id)
+    if placeholder is None:
+        return
+    try:
+        await placeholder.delete()
+        return
+    except TelegramError:
+        LOGGER.debug("Could not delete cancelled progress message", exc_info=True)
+    try:
+        await placeholder.edit_text(get_text(lang, "progress_cancelled"))
+    except TelegramError:
+        LOGGER.debug("Could not retire cancelled progress message", exc_info=True)

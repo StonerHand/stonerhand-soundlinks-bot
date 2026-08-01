@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from html import escape
 import re
-import hashlib
 
 from music_links_bot.models import (
     ArtistMatch,
@@ -12,7 +11,6 @@ from music_links_bot.models import (
     VideoMatch,
 )
 
-TRACK_EMOJIS = ("🎵", "🎧", "🎶", "🔊", "📻")
 MAX_METADATA_TEXT_LENGTH = 180
 MAX_COLLECTION_TEXT_LENGTH = 96
 
@@ -27,9 +25,7 @@ def pick_track_emoji(track: TrackMatch) -> str:
     if track.kind == "album":
         return "💿"
 
-    key = f"{track.artist}:{track.title}".encode("utf-8")
-    index = int(hashlib.sha256(key).hexdigest(), 16) % len(TRACK_EMOJIS)
-    return TRACK_EMOJIS[index]
+    return "🎧"
 
 
 def format_track_label(track: TrackMatch) -> str:

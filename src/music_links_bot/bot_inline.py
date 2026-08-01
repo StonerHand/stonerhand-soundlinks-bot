@@ -94,6 +94,7 @@ async def inline_query_handler(
         return
 
     personal_results = channel_safe
+    history_mode = False
     if not source_urls:
         search_query = normalize_search_query(query_text)
         if search_query is None:
@@ -102,6 +103,7 @@ async def inline_query_handler(
                 user_id,
             )
             personal_results = True
+            history_mode = True
             if not source_urls:
                 await _answer_inline_hint(
                     inline_query,
@@ -136,7 +138,11 @@ async def inline_query_handler(
     outcomes = await asyncio.gather(
         *(
             _build_inline_result(
-                source_url, context, lang=lang, channel_safe=channel_safe
+                source_url,
+                context,
+                lang=lang,
+                channel_safe=channel_safe,
+                history=history_mode,
             )
             for source_url in page_urls
         ),
@@ -284,6 +290,7 @@ async def _build_inline_result(
     *,
     lang: str = "ru",
     channel_safe: bool = False,
+    history: bool = False,
 ) -> InlineQueryResultArticle | None:
     bot_data = context.application.bot_data
     share_query = build_share_query([source_url])
@@ -298,10 +305,14 @@ async def _build_inline_result(
         return _inline_article(
             source_url,
             title=artist.title,
-            description=(
-                f"Artist card · {artist.platform}"
-                if lang == "en"
-                else f"Карточка артиста · {artist.platform}"
+            description=_inline_description(
+                (
+                    f"Artist card · {artist.platform}"
+                    if lang == "en"
+                    else f"Карточка артиста · {artist.platform}"
+                ),
+                lang=lang,
+                history=history,
             ),
             text=format_artist_message(artist, include_hashtags=True),
             keyboard=add_share_button(
@@ -322,10 +333,14 @@ async def _build_inline_result(
         return _inline_article(
             source_url,
             title=playlist.title,
-            description=(
-                f"Playlist · {playlist.platform}"
-                if lang == "en"
-                else f"Плейлист · {playlist.platform}"
+            description=_inline_description(
+                (
+                    f"Playlist · {playlist.platform}"
+                    if lang == "en"
+                    else f"Плейлист · {playlist.platform}"
+                ),
+                lang=lang,
+                history=history,
             ),
             text=format_playlist_message(playlist, include_hashtags=True),
             keyboard=add_share_button(
@@ -346,10 +361,14 @@ async def _build_inline_result(
         return _inline_article(
             source_url,
             title=video.title,
-            description=(
-                f"Video · {video.author}"
-                if lang == "en"
-                else f"Видео · {video.author}"
+            description=_inline_description(
+                (
+                    f"Video · {video.author}"
+                    if lang == "en"
+                    else f"Видео · {video.author}"
+                ),
+                lang=lang,
+                history=history,
             ),
             text=format_video_message(video, include_hashtags=True),
             keyboard=add_share_button(
@@ -373,10 +392,14 @@ async def _build_inline_result(
         return _inline_article(
             source_url,
             title=radio.title,
-            description=(
-                f"Radio show · {radio.station}"
-                if lang == "en"
-                else f"Эфир · {radio.station}"
+            description=_inline_description(
+                (
+                    f"Radio show · {radio.station}"
+                    if lang == "en"
+                    else f"Эфир · {radio.station}"
+                ),
+                lang=lang,
+                history=history,
             ),
             text=format_radio_message(radio, include_hashtags=True),
             keyboard=add_share_button(
@@ -402,10 +425,14 @@ async def _build_inline_result(
     return _inline_article(
         source_url,
         title=f"{track.artist} — {track.title}",
-        description=(
-            "Post with every platform button"
-            if lang == "en"
-            else "Пост с кнопками всех площадок"
+        description=_inline_description(
+            (
+                "Post with every platform button"
+                if lang == "en"
+                else "Пост с кнопками всех площадок"
+            ),
+            lang=lang,
+            history=history,
         ),
         text=format_track_message(track, include_hashtags=True),
         keyboard=add_share_button(
@@ -423,6 +450,13 @@ async def _build_inline_result(
         thumbnail_url=track.thumbnail_url,
         channel_safe=channel_safe,
     )
+
+
+def _inline_description(description: str, *, lang: str, history: bool) -> str:
+    if not history:
+        return description
+    prefix = "Recent" if lang == "en" else "Недавнее"
+    return f"{prefix} · {description}"
 
 
 async def _build_inline_collection_result(

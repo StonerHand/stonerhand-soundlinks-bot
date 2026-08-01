@@ -25,6 +25,9 @@ class SearchCandidate:
     artist: str
     artwork_url: str | None = None
     preview_url: str | None = None
+    album: str | None = None
+    year: str | None = None
+    kind: str | None = None
 
 
 class SearchClient:
@@ -234,6 +237,21 @@ def _extract_release_candidates(payload: object) -> list[SearchCandidate]:
                 artist=str(result.get("artistName") or ""),
                 artwork_url=artwork if isinstance(artwork, str) else None,
                 preview_url=preview if isinstance(preview, str) else None,
+                album=(
+                    str(result["collectionName"])
+                    if result.get("trackName") and result.get("collectionName")
+                    else None
+                ),
+                year=(
+                    str(result["releaseDate"])[:4]
+                    if str(result.get("releaseDate") or "")[:4].isdigit()
+                    else None
+                ),
+                kind=(
+                    "album"
+                    if result.get("wrapperType") == "collection"
+                    else str(result.get("kind") or "track")
+                ),
             )
         )
         if len(candidates) >= MAX_CANDIDATES:
