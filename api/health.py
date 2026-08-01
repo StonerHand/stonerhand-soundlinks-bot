@@ -27,8 +27,8 @@ class handler(BaseHTTPRequestHandler):
     """GET /api/health — the bot's pulse.
 
     Checks the Telegram API, the webhook registration and Redis, then ticks
-    the publish queue via /api/webapp. Returns 503 when a critical check
-    fails, so a free uptime monitor pointed here covers everything at once:
+    the publish queue through its protected worker. Returns 503 when a critical
+    check fails, so a free uptime monitor pointed here covers everything at once:
     outage detection, owner alerts, scheduled-post precision and warm
     instances. On failure the bot owner gets a Telegram DM (deduplicated,
     at most one per hour per problem).
@@ -261,22 +261,27 @@ def _summarize_queue_jobs(jobs: list, *, now: float | None = None) -> dict:
     return {"configured": True, "size": valid_jobs, "overdue": overdue}
 
 
-def _tick_queue(request_host: str | None) -> int:
+def _tick_queue(_request_host: str | None) -> int:
     """Piggyback the scheduled-posts tick on every health ping, so one
     uptime monitor keeps the queue delivering on time."""
     host = (
         os.getenv("VERCEL_PROJECT_PRODUCTION_URL", "").strip()
         or os.getenv("VERCEL_URL", "").strip()
-        or (request_host or "").strip()
     )
-    if not host:
+    secret = os.getenv("CRON_SECRET", "").strip()
+    if not host or not secret:
         return 0
+    host = host.removeprefix("https://").removeprefix("http://").split("/", 1)[0]
 
     try:
-        with urlopen(f"https://{host}/api/webapp", timeout=TIMEOUT_SECONDS) as response:
+        request = Request(
+            f"https://{host}/api/queue_worker",
+            headers={"Authorization": f"Bearer {secret}"},
+        )
+        with urlopen(request, timeout=TIMEOUT_SECONDS) as response:
             payload = json.loads(response.read().decode("utf-8"))
         if isinstance(payload, dict):
-            return int(payload.get("queue_published") or 0)
+            return int(payload.get("published") or 0)
     except Exception:
         LOGGER.debug("Queue tick via health failed", exc_info=True)
 

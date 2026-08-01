@@ -73,6 +73,9 @@ share one publication pipeline.
 Before channel delivery, the bot checks its posting rights. Duplicate records
 retain the previous post link and offer open, repeat or replace actions. The
 Scheduled status is returned only after Redis confirms the durable queue write.
+Queue ticks run only through a `CRON_SECRET`-protected worker, one leased job at
+a time, with a bounded batch per invocation. Warm-instance caches are bounded,
+draft ownership is fail-closed, and Studio payloads are normalized before storage.
 The owner-only `/status` command summarizes Telegram, Redis, queue, permissions,
 latency, cache and provider circuits.
 
@@ -101,12 +104,12 @@ See [.env.example](.env.example) for every setting.
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt pyflakes playwright
+pip install -e '.[dev]'
 python -m playwright install chromium
 cp .env.example .env
 
 python -m pyflakes src api tests
-PYTHONPATH=src python -m unittest discover -s tests
+python -m pytest -q
 python tests/e2e/smoke.py
 ```
 

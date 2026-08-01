@@ -71,14 +71,15 @@ class ProviderRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(result["slow"], "fallback")
 
-    async def test_lookup_cache_uses_memory_without_redis(self) -> None:
+    async def test_lookup_cache_preserves_source_order(self) -> None:
         urls = ["https://example.test/b", "https://example.test/a"]
         payload = {"tracks": [{"title": "Dragonaut"}]}
 
         await set_cached_lookup({}, urls, payload)
 
-        self.assertEqual(await get_cached_lookup({}, list(reversed(urls))), payload)
-        self.assertEqual(
+        self.assertEqual(await get_cached_lookup({}, urls), payload)
+        self.assertIsNone(await get_cached_lookup({}, list(reversed(urls))))
+        self.assertNotEqual(
             lookup_cache_key(urls),
             lookup_cache_key(list(reversed(urls))),
         )

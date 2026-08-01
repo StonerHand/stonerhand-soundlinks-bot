@@ -88,6 +88,44 @@ class OverallHealthTests(unittest.TestCase):
 
         self.assertEqual(status, {"configured": False, "size": 0, "overdue": 0})
 
+    def test_queue_tick_uses_protected_worker_and_trusted_host(self) -> None:
+        import os
+        from unittest.mock import MagicMock, patch
+
+        from api.health import _tick_queue
+
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = b'{"ok":true,"published":2}'
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "VERCEL_PROJECT_PRODUCTION_URL": "bot.example",
+                    "CRON_SECRET": "secret",
+                },
+                clear=True,
+            ),
+            patch("api.health.urlopen", return_value=response) as open_mock,
+        ):
+            self.assertEqual(_tick_queue("attacker.example"), 2)
+
+        request = open_mock.call_args.args[0]
+        self.assertEqual(request.full_url, "https://bot.example/api/queue_worker")
+        self.assertEqual(request.get_header("Authorization"), "Bearer secret")
+
+    def test_queue_tick_is_disabled_without_secret(self) -> None:
+        import os
+        from unittest.mock import patch
+
+        from api.health import _tick_queue
+
+        with patch.dict(
+            os.environ,
+            {"VERCEL_PROJECT_PRODUCTION_URL": "bot.example"},
+            clear=True,
+        ):
+            self.assertEqual(_tick_queue("bot.example"), 0)
+
     def test_queue_summary_skips_corrupt_jobs(self) -> None:
         from api.health import _summarize_queue_jobs
 

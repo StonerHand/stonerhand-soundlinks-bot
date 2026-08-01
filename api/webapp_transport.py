@@ -7,11 +7,9 @@ import secrets
 import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
-from types import SimpleNamespace
 
 from music_links_bot.errors import normalize_api_response
 from music_links_bot.loop_runner import run_on_loop
-from music_links_bot.publish_queue import process_due_jobs
 from music_links_bot.webapp_auth import validate_init_data
 
 LOGGER = logging.getLogger(__name__)
@@ -22,7 +20,6 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
 
     max_body_bytes = 128 * 1024
     action_timeout_seconds = 25
-    queue_timeout_seconds = 20
 
     def ensure_application(self):
         raise NotImplementedError
@@ -31,22 +28,10 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
         raise NotImplementedError
 
     def do_GET(self) -> None:
-        published = 0
-        try:
-            loop, application, _settings = self.ensure_application()
-            context = SimpleNamespace(application=application, bot=application.bot)
-            published = run_on_loop(
-                loop,
-                process_due_jobs(context),
-                timeout=self.queue_timeout_seconds,
-            )
-        except Exception:
-            LOGGER.exception("Queue tick failed")
         self._send_json(
             {
                 "ok": True,
                 "service": "StonerHand studio API",
-                "queue_published": published,
             }
         )
 

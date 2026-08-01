@@ -56,3 +56,5 @@ class BotEditorStateTests(unittest.TestCase):
     def test_private_draft_rejects_another_user(self) -> None:
         self.assertTrue(draft_owned_by({"chat_id": 7}, 7))
         self.assertFalse(draft_owned_by({"chat_id": 7}, 8))
+        self.assertFalse(draft_owned_by({}, 7))
+        self.assertFalse(draft_owned_by({"chat_id": "7"}, 7))

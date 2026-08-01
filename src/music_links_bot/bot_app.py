@@ -106,7 +106,11 @@ def build_application(settings: Settings) -> Application:
             "soundcloud_client": LazyAsyncClient(SoundCloudClient),
             "playlist_client": LazyAsyncClient(PlaylistClient),
             "artist_client": LazyAsyncClient(ArtistClient),
-            "search_client": LazyAsyncClient(SearchClient),
+            "search_client": LazyAsyncClient(
+                lambda: SearchClient(
+                    country=(settings.songlink_user_countries or ("US",))[0]
+                )
+            ),
             "kv_store": kv_store,
             "drafts": {},
             "publish_chat_id": settings.publish_chat_id,

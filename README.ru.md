@@ -75,6 +75,10 @@ Mini App; чат остаётся быстрым сценарием. Бот и �
 Перед публикацией бот проверяет право писать в канал. Антидубль хранит ссылку
 на прежний пост и предлагает открыть его, опубликовать ещё раз либо заменить.
 Статус «Запланировано» возвращается только после подтверждённой записи в Redis.
+Очередь запускается только через защищённый `CRON_SECRET` worker: задания
+захватываются по одному, а один запуск обрабатывает ограниченный пакет. Кеши
+тёплого инстанса имеют предел, владение черновиком закрыто по умолчанию, а данные
+Студии нормализуются до записи в хранилище.
 Владельцу доступна скрытая команда `/status`: Telegram, Redis, очередь, права,
 скорость, кеш и состояние провайдеров.
 
@@ -103,12 +107,12 @@ PUBLISH_CHAT_ID=@channel
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt pyflakes playwright
+pip install -e '.[dev]'
 python -m playwright install chromium
 cp .env.example .env
 
 python -m pyflakes src api tests
-PYTHONPATH=src python -m unittest discover -s tests
+python -m pytest -q
 python tests/e2e/smoke.py
 ```
 

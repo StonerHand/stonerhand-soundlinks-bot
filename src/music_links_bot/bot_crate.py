@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from music_links_bot.bot_storage import remember_bounded
 from music_links_bot.kvstore import KVStore
 
 CRATE_TTL_SECONDS = 14 * 24 * 3600
 MAX_CRATE_ITEMS = 10
+MAX_MEMORY_CRATES = 500
 
 
 def _memory_crates(bot_data: dict) -> dict[int, list[dict[str, Any]]]:
@@ -20,13 +22,23 @@ async def load_crate(bot_data: dict, user_id: int) -> list[dict[str, Any]]:
     kv: KVStore | None = bot_data.get("kv_store")
     payload = await kv.get_json(f"bot-crate:v1:{user_id}") if kv else None
     items = [item for item in payload if isinstance(item, dict)] if isinstance(payload, list) else []
-    memory[user_id] = items[:MAX_CRATE_ITEMS]
+    remember_bounded(
+        memory,
+        user_id,
+        items[:MAX_CRATE_ITEMS],
+        max_size=MAX_MEMORY_CRATES,
+    )
     return list(memory[user_id])
 
 
 async def save_crate(bot_data: dict, user_id: int, items: list[dict[str, Any]]) -> None:
     normalized = items[:MAX_CRATE_ITEMS]
-    _memory_crates(bot_data)[user_id] = normalized
+    remember_bounded(
+        _memory_crates(bot_data),
+        user_id,
+        normalized,
+        max_size=MAX_MEMORY_CRATES,
+    )
     kv: KVStore | None = bot_data.get("kv_store")
     if kv is not None:
         await kv.set_json(

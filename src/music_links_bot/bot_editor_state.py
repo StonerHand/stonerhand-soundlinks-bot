@@ -8,7 +8,7 @@ PRESET_ORDER = ("clean", "editorial", "poster")
 
 def draft_owned_by(draft: dict, user_id: int) -> bool:
     owner_id = draft.get("chat_id")
-    return not isinstance(owner_id, int) or owner_id <= 0 or owner_id == user_id
+    return isinstance(owner_id, int) and owner_id > 0 and owner_id == user_id
 
 
 def remember_draft(session, draft_id: str) -> None:

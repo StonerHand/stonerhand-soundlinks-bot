@@ -32,7 +32,7 @@ flowchart TB
     TELEGRAM --> CHANNEL
     HEALTH --> TELEGRAM
     HEALTH --> REDIS
-    HEALTH --> WEBAPP
+    HEALTH --> WORKER
     WORKER --> CORE
 ```
 
@@ -299,7 +299,7 @@ draft:<id> → {
 }
 ```
 
-Draft живёт 48 часов в Redis и в bounded memory cache до 300 элементов. Владение проверяется по `chat_id`.
+Draft живёт 48 часов в Redis и в bounded memory cache до 300 элементов. Владение проверяется по положительному числовому `chat_id`; черновик без корректного владельца закрыт по умолчанию. Внешние state ID принимают только компактный алфавит и длину до 64 символов.
 Запись в Redis завершается до ответа webhook/API: черновик не зависит от того,
 успеет ли Vercel сохранить фоновую задачу перед заморозкой инстанса. Обновление
 существующего элемента не вытесняет другой активный draft, а чтение из Redis
@@ -393,7 +393,7 @@ draft, поэтому одинаково работает для отправк�
 | тема, onboarding, presets, active draft | Telegram CloudStorage | localStorage вне Telegram |
 | crate | CloudStorage клиента | `crate:<user>` в Redis на 14 дней |
 | draft | Redis на 48 часов | bounded memory текущего инстанса |
-| history | Redis на 90 дней | memory текущего инстанса |
+| history | Redis на 90 дней | bounded memory текущего инстанса |
 | published fingerprints | Redis | ограниченный memory state |
 | stats | Redis merge | локальный JSON/memory |
 | queue | Redis `queue:v1` | memory текущего инстанса |
@@ -416,7 +416,7 @@ Job shape:
 }
 ```
 
-Ограничения: до 50 jobs, планирование максимум на 90 дней, processing lease 90 секунд.
+Ограничения: до 50 jobs, планирование максимум на 90 дней, processing lease 90 секунд и до трёх последовательных публикаций за один tick. Worker захватывает по одному заданию: следующие jobs не держат истекающий lease, пока предыдущая публикация ещё отправляется.
 
 ```mermaid
 stateDiagram-v2
@@ -438,7 +438,7 @@ stateDiagram-v2
 - тремя попытками с backoff 2, 10 и 30 минут;
 - alert владельцу после исчерпания попыток.
 
-Queue tick запускается после Telegram update, при `GET /api/webapp` и из `/api/health`. Vercel Cron не является поминутным scheduler: для точности около пяти минут нужен внешний uptime monitor.
+Queue tick запускается после Telegram update и защищённым `/api/queue_worker`. Health вызывает worker только по доверенному production-домену и передаёт `Authorization: Bearer $CRON_SECRET`; публичный `GET /api/webapp` остаётся read-only status endpoint и не может запустить публикацию. Vercel Cron не является поминутным scheduler: для точности около пяти минут нужен внешний uptime monitor.
 
 В production независимый GitHub canary вызывает health каждые 10 минут.
 Поэтому без пользовательского трафика бесплатный контур даёт точность примерно
@@ -483,7 +483,7 @@ Queue tick запускается после Telegram update, при `GET /api/w
 3. Redis ping, если Redis настроен;
 4. размер и число просроченных queue jobs;
 5. последний runtime metrics snapshot;
-6. запускает queue tick через `/api/webapp`.
+6. запускает queue tick через защищённый `/api/queue_worker`, только если настроен `CRON_SECRET`.
 
 Telegram и webhook критичны всегда; Redis критичен только когда настроен. HTTP 503 позволяет внешнему монитору заметить отказ. Health и queue-stuck alerts дедуплицируются примерно на час.
 
@@ -508,6 +508,8 @@ Endpoint:
 - Telegram update: secret token, constant-time comparison, size limit;
 - Studio: HMAC-подпись, age check, user ownership и server-side admin check;
 - idempotency key хешируется и ограничен по длине;
+- draft/selection/retry ID валидируются до обращения к Redis;
+- пользовательские URL, типы и строки crate нормализуются и ограничиваются по длине;
 - rate limit имеет Redis и memory implementation;
 - внешние значения экранируются перед Telegram HTML;
 - логируемый action очищается от control characters и обрезается;
@@ -543,11 +545,11 @@ Endpoint:
 
 - Python 3.12;
 - `pyflakes` для `src`, `api`, `tests`;
-- полный `unittest` suite;
+- полный `pytest`/`unittest` suite;
 - `node --check` для всех ES modules;
 - отдельный Playwright/Chromium smoke: boot → search → candidate/result → crate и batch flow.
 
-Vercel Git Integration создаёт Preview для feature branch и Production deployment после merge в `main`. `vercel.json` отдельно объявляет Python functions, Web App assets, routes, security headers и два допустимых для Hobby daily cron: синхронизацию webhook и аварийный queue worker. GitHub production canary каждые 10 минут и после успешного CI проверяет Telegram, webhook, Redis и оболочку Mini App; вызов health также безопасно запускает lease-защищённый queue tick.
+Vercel Git Integration создаёт Preview для feature branch и Production deployment после merge в `main`. `vercel.json` отдельно объявляет Python functions, Web App assets, routes, security headers и два допустимых для Hobby daily cron: синхронизацию webhook и аварийный queue worker. GitHub production canary каждые 10 минут и после успешного CI проверяет Telegram, webhook, Redis, оболочку Mini App и её ключевые JS/CSS assets; вызов health безопасно запускает защищённый lease-worker.
 
 ## 14. Правила изменения системы
 

@@ -48,10 +48,14 @@ def _parse_user_countries() -> tuple[str, ...]:
         raw_value = os.getenv("SONGLINK_USER_COUNTRY", "US").strip()
 
     countries = tuple(
-        country.strip().upper()
-        for country in raw_value.split(",")
-        if country.strip()
-    )
+        dict.fromkeys(
+            country
+            for raw_country in raw_value.split(",")
+            if len(country := raw_country.strip().upper()) == 2
+            and country.isascii()
+            and country.isalpha()
+        )
+    )[:4]
 
     return countries or ("US",)
 

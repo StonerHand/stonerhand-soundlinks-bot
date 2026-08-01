@@ -10,6 +10,7 @@ INLINE_SEARCH_TTL_SECONDS = 30 * 60
 INLINE_HISTORY_TTL_SECONDS = 30 * 24 * 3600
 MAX_INLINE_CACHE = 300
 MAX_INLINE_HISTORY = 8
+MAX_INLINE_HISTORY_USERS = 500
 
 
 def _query_key(query: str) -> str:
@@ -70,7 +71,12 @@ async def remember_inline_urls(
             [*(str(url) for url in urls if url), *history]
         )
     )[:MAX_INLINE_HISTORY]
-    bot_data.setdefault("inline_history", {})[user_id] = clean
+    remember_bounded(
+        bot_data.setdefault("inline_history", {}),
+        user_id,
+        clean,
+        max_size=MAX_INLINE_HISTORY_USERS,
+    )
     kv: KVStore | None = bot_data.get("kv_store")
     if kv is not None:
         await kv.set_json(
@@ -96,6 +102,10 @@ async def load_inline_history(bot_data: dict, user_id: int) -> list[str]:
         if isinstance(payload, list)
         else []
     )
-    memory[user_id] = urls
+    remember_bounded(
+        memory,
+        user_id,
+        urls,
+        max_size=MAX_INLINE_HISTORY_USERS,
+    )
     return urls
-

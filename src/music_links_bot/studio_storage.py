@@ -4,6 +4,7 @@ import asyncio
 import secrets
 import time
 
+from music_links_bot.bot_storage import remember_bounded
 from music_links_bot.kvstore import KVStore
 from music_links_bot.models import TrackMatch
 from music_links_bot.formatter import pick_track_emoji
@@ -18,6 +19,8 @@ from music_links_bot.studio_models import (
 MAX_HISTORY_ITEMS = 10
 HISTORY_TTL_SECONDS = 90 * 24 * 3600
 CRATE_TTL_SECONDS = 14 * 24 * 3600
+MAX_MEMORY_USERS = 500
+
 
 async def _acquire_kv_lock(
     kv: KVStore, key: str, *, tries: int = 5, delay: float = 0.1, ttl: int = 10
@@ -61,7 +64,12 @@ async def _record_history(context, user_id: int, track: TrackMatch, source_url: 
         items = [entry, *items][:MAX_HISTORY_ITEMS]
 
         histories: dict = context.application.bot_data.setdefault("webapp_history", {})
-        histories[user_id] = items
+        remember_bounded(
+            histories,
+            user_id,
+            items,
+            max_size=MAX_MEMORY_USERS,
+        )
         if kv is not None:
             await kv.set_json(f"hist:{user_id}", items, ttl_seconds=HISTORY_TTL_SECONDS)
     finally:
@@ -110,7 +118,12 @@ async def _load_crate(context, user_id: int) -> list[dict]:
 
 async def _save_crate(context, user_id: int, items: list[dict]) -> None:
     crates: dict = context.application.bot_data.setdefault("webapp_crate", {})
-    crates[user_id] = items
+    remember_bounded(
+        crates,
+        user_id,
+        items,
+        max_size=MAX_MEMORY_USERS,
+    )
     kv: KVStore | None = context.application.bot_data.get("kv_store")
     if kv is not None:
         await kv.set_json(f"crate:{user_id}", items, ttl_seconds=CRATE_TTL_SECONDS)

@@ -5,7 +5,10 @@ from time import monotonic
 
 from telegram.error import TelegramError
 
+from music_links_bot.bot_storage import remember_bounded
+
 PERMISSION_CACHE_SECONDS = 300
+MAX_PERMISSION_CACHE = 100
 
 
 @dataclass(slots=True, frozen=True)
@@ -26,8 +29,21 @@ async def check_publish_access(context, target: int | str) -> PublishAccess:
     cache_key = str(target)
     now = monotonic()
     cached = cache.get(cache_key)
-    if isinstance(cached, tuple) and len(cached) == 2 and cached[0] > now:
+    if (
+        isinstance(cached, tuple)
+        and len(cached) == 2
+        and isinstance(cached[0], (int, float))
+        and cached[0] > now
+    ):
         return cached[1]
+    for key, value in list(cache.items()):
+        if (
+            not isinstance(value, tuple)
+            or len(value) != 2
+            or not isinstance(value[0], (int, float))
+            or value[0] <= now
+        ):
+            cache.pop(key, None)
 
     try:
         member = await bot.get_chat_member(chat_id=target, user_id=bot.id)
@@ -63,6 +79,10 @@ async def check_publish_access(context, target: int | str) -> PublishAccess:
             checked=False,
         )
 
-    cache[cache_key] = (now + PERMISSION_CACHE_SECONDS, result)
+    remember_bounded(
+        cache,
+        cache_key,
+        (now + PERMISSION_CACHE_SECONDS, result),
+        max_size=MAX_PERMISSION_CACHE,
+    )
     return result
-

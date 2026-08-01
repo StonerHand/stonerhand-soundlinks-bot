@@ -26,6 +26,19 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(settings.songlink_user_countries, ("US", "DE"))
         self.assertEqual(settings.admin_chat_id, 12345)
 
+    def test_country_list_is_validated_deduplicated_and_bounded(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "BOT_TOKEN": "token",
+                "SONGLINK_USER_COUNTRIES": "us, de, US, invalid, 1x, fr, gb, tr",
+            },
+            clear=False,
+        ):
+            settings = Settings.from_env()
+
+        self.assertEqual(settings.songlink_user_countries, ("US", "DE", "FR", "GB"))
+
     def test_from_env_ignores_invalid_admin_chat_id(self) -> None:
         with patch.dict(
             os.environ,
