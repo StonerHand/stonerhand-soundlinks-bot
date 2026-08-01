@@ -348,6 +348,18 @@ def main() -> int:
             failures.append("result view not shown after search")
         elif "Dopesmoker" not in page.eval_on_selector("#v-result", "el => el.innerText"):
             failures.append("result card missing track title")
+        card_heading = page.eval_on_selector(
+            "#post-card .post-headrow",
+            "el => el.textContent",
+        )
+        if "Sleep" not in card_heading or "Dopesmoker" not in card_heading:
+            failures.append(
+                "result card is missing artist or title: " + repr(card_heading)
+            )
+        if "Stoner Metal" in card_heading or "1999" in card_heading:
+            failures.append("result card still duplicates genre or year metadata")
+        if page.locator("#post-card .genre-badge").count():
+            failures.append("result card still renders the removed genre badge")
         if page.locator("#result-readiness span").count() != 3:
             failures.append("result readiness summary is incomplete")
         score = int(page.eval_on_selector("#result-score-value", "el => el.textContent"))

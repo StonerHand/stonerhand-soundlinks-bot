@@ -77,22 +77,24 @@ class FormatterTests(unittest.TestCase):
         self.assertNotIn("<a href=", message)
         self.assertIn("<b>Black Sabbath</b>\nParanoid", message)
 
-    def test_format_track_message_includes_heading_and_hashtag(self) -> None:
+    def test_format_track_message_keeps_only_artist_title_and_hashtags(self) -> None:
         track = TrackMatch(
             title="Song",
             artist="Artist",
             links={"spotify": "https://open.spotify.com/track/1"},
             release_year="2006",
+            release_format="single",
+            genre="Hard Rock",
         )
 
         self.assertEqual(
             format_track_message(track),
             f"{pick_track_emoji(track)} · <b>Artist</b>\n"
-            "Song\n<i>2006</i>\n\n"
-            "#stonerhand #track",
+            "Song\n\n"
+            "#stonerhand #track #single",
         )
 
-    def test_format_track_message_omits_missing_year(self) -> None:
+    def test_format_track_message_without_metadata_stays_compact(self) -> None:
         track = TrackMatch(
             title="Song",
             artist="Artist",
@@ -143,7 +145,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "💿 · <b>Artist</b>\nAlbum\n<i>Album · 2007</i>\n\n"
+            "💿 · <b>Artist</b>\nAlbum\n\n"
             "#stonerhand #album",
         )
 
@@ -158,7 +160,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "💿 · <b>Artist</b>\nEP\n<i>EP</i>\n\n"
+            "💿 · <b>Artist</b>\nEP\n\n"
             "#stonerhand #album #ep",
         )
 
@@ -172,7 +174,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "🎙️ · <b>Podcast Show</b>\nвыпуск: Episode\n<i>Podcast</i>\n\n"
+            "🎙️ · <b>Podcast Show</b>\nEpisode\n\n"
             "#stonerhand #podcast",
         )
 
@@ -187,7 +189,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "🎙️ · <b>Spotify</b>\nшоу: Podcast show\n<i>Show</i>\n\n"
+            "🎙️ · <b>Spotify</b>\nPodcast show\n\n"
             "#stonerhand #podcast #show",
         )
 

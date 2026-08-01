@@ -31,7 +31,9 @@ Yandex Music, podcasts, Spotify and Apple Music playlists, Spotify artists,
 and NTS Radio are supported.
 
 Cards contain release data and actions without generated promotional filler or
-hidden heading links. The quick surface is predictable: the primary service
+hidden heading links. Below the cover, only artist and title remain; genre,
+format and year are not repeated, while genre still powers the useful automatic
+hashtag. The quick surface is predictable: the primary service
 plus the universal hub, followed by **Edit** and **Add to crate**. Editing stays
 in the same Telegram message and exposes only style, text, hashtags and
 platforms; delivery, sharing and destructive actions live in the overflow.

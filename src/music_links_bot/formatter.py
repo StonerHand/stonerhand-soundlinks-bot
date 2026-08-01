@@ -40,16 +40,6 @@ def format_track_heading(track: TrackMatch) -> str:
 
 
 def format_release_heading(track: TrackMatch) -> str:
-    if track.kind == "album":
-        return f"💿 · <b>{_display_text(track.artist)}</b>\n{_display_text(track.title)}"
-
-    if track.kind == "podcast":
-        label = "шоу" if track.release_format == "show" else "выпуск"
-        return (
-            f"🎙️ · <b>{_display_text(track.artist)}</b>\n"
-            f"{label}: {_display_text(track.title)}"
-        )
-
     return (
         f"{pick_track_emoji(track)} · <b>{_display_text(track.artist)}</b>\n"
         f"{_display_text(track.title)}"
@@ -62,39 +52,11 @@ def format_track_message(
     include_hashtags: bool = True,
     hashtags: str | None = None,
 ) -> str:
-    lines = [format_release_heading(track)]
-    meta = format_release_meta(track)
-    if meta:
-        lines.append(f"<i>{meta}</i>")
     return _with_hashtags(
-        lines,
+        [format_release_heading(track)],
         hashtags if hashtags is not None else build_auto_hashtags(track),
         include_hashtags=include_hashtags,
     )
-
-
-def format_release_meta(track: TrackMatch) -> str:
-    """Compact format/year metadata without repeating the release genre."""
-    format_labels = {
-        "single": "Single",
-        "ep": "EP",
-        "show": "Show",
-        "episode": "Episode",
-    }
-    release_format = str(track.release_format or "").casefold()
-    kind_label = format_labels.get(release_format)
-    if not kind_label:
-        kind_label = {
-            "album": "Album",
-            "podcast": "Podcast",
-            "video": "Video",
-        }.get(track.kind)
-    values = [
-        str(value)
-        for value in (kind_label, track.release_year)
-        if value
-    ]
-    return " · ".join(_display_text(value, 64) for value in values)
 
 
 def format_video_message(video: VideoMatch, *, include_hashtags: bool = True) -> str:
