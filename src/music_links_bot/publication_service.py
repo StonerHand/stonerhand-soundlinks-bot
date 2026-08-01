@@ -8,6 +8,7 @@ from telegram.constants import ParseMode
 from telegram.error import TelegramError
 
 from music_links_bot.chat_access import PublishAccess, check_publish_access
+from music_links_bot.channel_templates import save_channel_template
 from music_links_bot.constants import PLATFORM_LABELS
 from music_links_bot.models import TrackMatch
 from music_links_bot.text_utils import normalize_hashtag
@@ -128,6 +129,8 @@ class PublicationService:
             return None
 
         self._record_publication(sent is not None)
+        if channel_style and sent is not None:
+            await save_channel_template(self.context, target, draft)
         await self._persist_metrics()
         return sent if sent is not None else True
 

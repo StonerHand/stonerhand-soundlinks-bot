@@ -72,7 +72,7 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_track_message(track),
             f"{pick_track_emoji(track)} · <b>Artist</b>\n"
-            "Song\n\n"
+            "Song\n<i>2006</i>\n\n"
             "#stonerhand #track",
         )
 
@@ -127,7 +127,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "💿 · <b>Artist</b>\nAlbum\n\n"
+            "💿 · <b>Artist</b>\nAlbum\n<i>Album · 2007</i>\n\n"
             "#stonerhand #album",
         )
 
@@ -142,7 +142,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "💿 · <b>Artist</b>\nEP\n\n"
+            "💿 · <b>Artist</b>\nEP\n<i>EP</i>\n\n"
             "#stonerhand #album #ep",
         )
 
@@ -156,7 +156,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "🎙️ · <b>Podcast Show</b>\nвыпуск: Episode\n\n"
+            "🎙️ · <b>Podcast Show</b>\nвыпуск: Episode\n<i>Podcast</i>\n\n"
             "#stonerhand #podcast",
         )
 
@@ -171,7 +171,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "🎙️ · <b>Spotify</b>\nшоу: Podcast show\n\n"
+            "🎙️ · <b>Spotify</b>\nшоу: Podcast show\n<i>Show</i>\n\n"
             "#stonerhand #podcast #show",
         )
 
@@ -187,7 +187,7 @@ class FormatterTests(unittest.TestCase):
                 "<b>Подборка</b>\n\n"
                 f"1. {pick_track_emoji(tracks[0])} · <b>Artist</b>\nSong\n"
                 "2. 💿 · <b>Band</b>\nAlbum\n\n"
-                "#stonerhand #collection #track #album"
+                "#stonerhand #track #album"
             ),
         )
 
@@ -199,7 +199,7 @@ class FormatterTests(unittest.TestCase):
 
         message = format_collection_message(tracks)
 
-        self.assertIn("#stonerhand #collection #track #album #single #ep", message)
+        self.assertIn("#stonerhand #track #album", message)
 
     def test_collection_editor_formats_groups_notes_and_custom_copy(self) -> None:
         tracks = [
@@ -391,7 +391,7 @@ class FormatterTests(unittest.TestCase):
         self.assertIn("🎧 · <b>Artist</b>\nSong", message)
         self.assertIn("📺 · <b>Live</b>", message)
         self.assertNotIn("<a href=", message)
-        self.assertIn("#stonerhand #collection #track #video", message)
+        self.assertIn("#stonerhand #track #video", message)
 
     def test_format_mixed_collection_message_lists_playlists(self) -> None:
         playlists = [
@@ -410,7 +410,7 @@ class FormatterTests(unittest.TestCase):
         self.assertIn("🎛 · <b>Women of Punk</b>", message)
         self.assertIn("📺 · <b>Live</b>", message)
         self.assertNotIn("<a href=", message)
-        self.assertIn("#stonerhand #collection #playlist #video", message)
+        self.assertIn("#stonerhand #playlist #video", message)
 
     def test_format_mixed_collection_message_lists_artists(self) -> None:
         artists = [
@@ -429,7 +429,7 @@ class FormatterTests(unittest.TestCase):
         self.assertIn("🧬 · <b>1.Kla$</b>", message)
         self.assertIn("📺 · <b>Live</b>", message)
         self.assertNotIn("<a href=", message)
-        self.assertIn("#stonerhand #collection #artist #video", message)
+        self.assertIn("#stonerhand #artist #video", message)
 
     def test_format_mixed_collection_message_lists_radios(self) -> None:
         radios = [
@@ -448,7 +448,7 @@ class FormatterTests(unittest.TestCase):
         self.assertIn("📡 · <b>Dark Energy</b>", message)
         self.assertIn("📺 · <b>Live</b>", message)
         self.assertNotIn("<a href=", message)
-        self.assertIn("#stonerhand #collection #radio #video", message)
+        self.assertIn("#stonerhand #radio #video", message)
 
 
 if __name__ == "__main__":

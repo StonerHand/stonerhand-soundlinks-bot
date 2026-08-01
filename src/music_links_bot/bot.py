@@ -16,6 +16,7 @@ from telegram import (
     InlineKeyboardMarkup,
     Message,
     Update,
+    WebAppInfo,
 )
 from telegram.constants import ChatAction, ParseMode
 from telegram.error import BadRequest, Forbidden, TelegramError
@@ -90,6 +91,7 @@ _build_podcast_fallback = _bot_lookup._build_podcast_fallback
 
 from music_links_bot.config import Settings
 from music_links_bot.chat_access import check_publish_access
+from music_links_bot.channel_templates import apply_channel_template
 from music_links_bot.ephemeral import (
     ephemeral_group_replies_enabled,
     send_ephemeral_message,
@@ -135,6 +137,13 @@ from music_links_bot.bot_crate import (
     restore_crate_item,
     save_crate,
 )
+from music_links_bot.bot_editor_state import (
+    cycle_preset as _cycle_draft_preset,
+    draft_owned_by as _draft_owned_by,
+    draft_status as _draft_status,
+    remember_draft as _remember_session_draft,
+    toggle_platform_selection as _toggle_draft_platforms,
+)
 from music_links_bot.bot_runtime import (
     BotErrorCode,
     BotFlowError,
@@ -161,7 +170,9 @@ from music_links_bot.bot_progress import (
     take_progress as _take_placeholder,
     update_progress as _update_loading_placeholder,
 )
+from music_links_bot.bot_recent import render_recent_view
 from music_links_bot.bot_ui import (
+    build_deleted_draft_keyboard as _deleted_draft_keyboard,
     build_delete_confirmation_keyboard as _delete_confirmation_keyboard,
     build_duplicate_post_keyboard as _duplicate_post_keyboard,
     build_error_keyboard as _build_error_keyboard_view,
@@ -170,6 +181,7 @@ from music_links_bot.bot_ui import (
     build_section_keyboard as _build_section_keyboard,
     build_start_keyboard as _build_start_keyboard,
     editor_more_rows as _editor_more_rows,
+    editor_overflow_rows as _editor_overflow_rows,
     editor_rows as _editor_rows,
     render_crate as _render_bot_crate,
 )
@@ -205,6 +217,7 @@ from music_links_bot.sharing import (
     make_channel_safe_keyboard,
     track_share_url,
 )
+from music_links_bot.studio_storage import _record_history as _record_recent_item
 from music_links_bot.text_utils import normalize_hashtag
 from music_links_bot.url_utils import (
     cache_key_for_url,
@@ -237,10 +250,20 @@ MENU_GUIDE = "menu:guide"
 MENU_PLATFORMS = "menu:platforms"
 MENU_DEMO = "menu:demo"
 MENU_MORE = "menu:more"
+MENU_RECENT = "menu:recent"
 MENU_KEYS = frozenset(
-    (MENU_START, MENU_HELP, MENU_GUIDE, MENU_PLATFORMS, MENU_DEMO, MENU_MORE)
+    (
+        MENU_START,
+        MENU_HELP,
+        MENU_GUIDE,
+        MENU_PLATFORMS,
+        MENU_DEMO,
+        MENU_MORE,
+        MENU_RECENT,
+    )
 )
-CRATE_UNDO_SECONDS = 5 * 60
+CRATE_UNDO_SECONDS = 15
+DRAFT_UNDO_SECONDS = 15
 DEFAULT_UI_MODE = "stonerhand"
 MAX_BUTTON_TEXT_LENGTH = 64
 STATS_KV_KEY = "stats:v1"
@@ -345,6 +368,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         is_admin=is_admin,
         show_tour=not session.onboarding_seen,
         include_studio=update.message.chat.type == "private",
+        active_draft_id=session.active_draft_id or None,
     )
     sent = await update.message.reply_text(
         text,
@@ -483,6 +507,7 @@ async def _home_view(query, context, *, lang: str) -> tuple[str, InlineKeyboardM
     user = query.from_user
     user_id = user.id if user else 0
     crate_count, is_admin = await _home_state(context, user_id)
+    session = await _runtime(context).get_session(user_id, lang=lang)
     text = _build_home_text(
         lang=lang,
         first_name=user.first_name if user else "",
@@ -497,6 +522,7 @@ async def _home_view(query, context, *, lang: str) -> tuple[str, InlineKeyboardM
         include_studio=(
             query.message is not None and query.message.chat.type == "private"
         ),
+        active_draft_id=session.active_draft_id or None,
     )
     return text, keyboard
 
@@ -582,6 +608,12 @@ async def _dispatch_menu_action(query, context, action: CallbackAction) -> None:
         await _safe_edit(query, text, keyboard)
         return
 
+    if action.action == "recent":
+        await query.answer()
+        text, keyboard = await _recent_view(query, context, lang=lang)
+        await _safe_edit(query, text, keyboard)
+        return
+
     menu_key = {
         "start": MENU_START,
         "help": MENU_HELP,
@@ -605,6 +637,23 @@ async def _dispatch_menu_action(query, context, action: CallbackAction) -> None:
             ),
             active=action.action,
         ),
+    )
+
+
+async def _recent_view(
+    query,
+    context: ContextTypes.DEFAULT_TYPE,
+    *,
+    lang: str,
+) -> tuple[str, InlineKeyboardMarkup]:
+    user_id = query.from_user.id if query.from_user else 0
+    session = await _runtime(context).get_session(user_id, lang=lang)
+    return await render_recent_view(
+        context,
+        user_id=user_id,
+        lang=lang,
+        draft_ids=session.recent_draft_ids,
+        load_draft=_load_draft,
     )
 
 
@@ -679,7 +728,14 @@ async def _send_track_draft(
         "can_publish": (
             admin_chat_id is not None and user_id == admin_chat_id
         ),
+        "preset": "clean",
     }
+    if draft["can_publish"]:
+        target = (
+            context.application.bot_data.get("publish_chat_id")
+            or f"@{CHANNEL_USERNAME}"
+        )
+        await apply_channel_template(context, target, draft)
 
     text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
     await _reply_with_track(
@@ -690,6 +746,12 @@ async def _send_track_draft(
         prefer_large_preview=bool(draft.get("large_preview")),
     )
     await _store_draft(context, draft_id, draft)
+    session = await _runtime(context).get_session(user_id, lang=lang)
+    _remember_session_draft(session, draft_id)
+    await _runtime(context).save_session(session)
+    source_url = track_share_url(track) or track.page_url or ""
+    if source_url:
+        await _record_recent_item(context, user_id, track, source_url)
 
 
 def _render_track_draft(
@@ -697,6 +759,8 @@ def _render_track_draft(
     context: ContextTypes.DEFAULT_TYPE | None,
     *,
     draft_id: str | None = None,
+    settings: bool = False,
+    show_status: bool = False,
 ) -> tuple[str, InlineKeyboardMarkup]:
     track = TrackMatch(**draft["item"])
     prefix = draft.get("prefix") or ""
@@ -708,6 +772,10 @@ def _render_track_draft(
         include_hashtags=include_hashtags,
         **overrides,
     )
+    if show_status:
+        lang = draft.get("lang") or "ru"
+        status = _draft_status(draft, track, lang=lang)
+        text = f"{text}\n\n<i>{escape(status)}</i>"
     keyboard = _build_link_keyboard(
         track.links,
         context=context,
@@ -718,31 +786,25 @@ def _render_track_draft(
         platform_selection=_draft_platform_selection(draft),
         # Two preferred services are enough for the quick surface. The hub and
         # contextual editor remain available without a long button wall.
-        max_visible_platforms=2 if draft_id is not None else None,
-    )
-    keyboard = add_share_button(
-        keyboard,
-        share_query=build_share_query(
-            [url] if (url := track_share_url(track)) else []
-        ),
-        label=get_text(draft.get("lang") or "ru", "share_post"),
+        max_visible_platforms=1 if draft_id is not None else None,
     )
     if draft_id is None:
-        return text, keyboard
+        return text, add_share_button(
+            keyboard,
+            share_query=build_share_query(
+                [url] if (url := track_share_url(track)) else []
+            ),
+            label=get_text(draft.get("lang") or "ru", "share_post"),
+        )
 
     base_rows = [list(row) for row in keyboard.inline_keyboard]
-    rows = [base_rows[0]] if base_rows else []
-    hub_button = next(
-        (
-            button
-            for row in base_rows[1:]
-            for button in row
-            if track.page_url and button.url == track.page_url
-        ),
-        None,
+    url_buttons = [button for row in base_rows for button in row]
+    rows = [url_buttons[:2]] if url_buttons else []
+    rows.extend(
+        _editor_more_rows(draft_id, draft)
+        if settings
+        else _editor_rows(draft_id, draft)
     )
-    more_button = _editor_rows(draft_id, draft)[0][1]
-    rows.append([button for button in (hub_button, more_button) if button])
     return text, InlineKeyboardMarkup(rows)
 
 
@@ -840,6 +902,12 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
         return
 
     lang = draft.get("lang") or user_lang
+    if (
+        query.from_user is not None
+        and not _draft_owned_by(draft, query.from_user.id)
+    ):
+        await query.answer(get_text(lang, "ed_owner_only"), show_alert=True)
+        return
 
     if action == "a":
         search_query = str(draft.get("search_query") or "").strip()
@@ -861,9 +929,40 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
 
     if action == "m":
         await query.answer()
-        text, base_keyboard = _render_track_draft(draft, context, draft_id=None)
+        text, keyboard = _render_track_draft(
+            draft,
+            context,
+            draft_id=draft_id,
+            settings=True,
+            show_status=True,
+        )
+        await _edit_editor_message(query, context, draft, text, keyboard)
+        return
+    if action == "o":
+        await query.answer()
+        text, base_keyboard = _render_track_draft(
+            draft,
+            context,
+            draft_id=draft_id,
+            show_status=True,
+        )
+        overflow_rows = _editor_overflow_rows(draft_id, draft)
+        track = TrackMatch(**draft["item"])
+        share_query = build_share_query(
+            [url] if (url := track_share_url(track)) else []
+        )
+        if share_query:
+            overflow_rows.insert(
+                max(1, len(overflow_rows) - 2),
+                [
+                    InlineKeyboardButton(
+                        get_text(lang, "share_post"),
+                        switch_inline_query=share_query,
+                    )
+                ],
+            )
         keyboard = InlineKeyboardMarkup(
-            [*base_keyboard.inline_keyboard, *_editor_more_rows(draft_id, draft)]
+            [*base_keyboard.inline_keyboard[:1], *overflow_rows]
         )
         await _edit_editor_message(query, context, draft, text, keyboard)
         return
@@ -886,8 +985,44 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
 
     if action == "dc":
         await query.answer()
-        if query.message is not None:
-            await _try_delete_message(query.message)
+        draft["deleted_at"] = int(time.time())
+        await _store_draft(context, draft_id, draft)
+        if query.from_user is not None:
+            session = await _runtime(context).get_session(
+                query.from_user.id,
+                lang=lang,
+            )
+            if session.active_draft_id == draft_id:
+                session.active_draft_id = ""
+                await _runtime(context).save_session(session)
+        await _edit_editor_message(
+            query,
+            context,
+            draft,
+            get_text(lang, "ed_deleted"),
+            _deleted_draft_keyboard(draft_id, lang=lang),
+        )
+        return
+
+    if action == "du":
+        deleted_at = int(draft.get("deleted_at") or 0)
+        if not deleted_at or time.time() - deleted_at > DRAFT_UNDO_SECONDS:
+            await query.answer(get_text(lang, "ed_undo_expired"), show_alert=True)
+            if query.message is not None:
+                await _try_delete_message(query.message)
+            return
+        draft.pop("deleted_at", None)
+        await _store_draft(context, draft_id, draft)
+        if query.from_user is not None:
+            session = await _runtime(context).get_session(
+                query.from_user.id,
+                lang=lang,
+            )
+            _remember_session_draft(session, draft_id)
+            await _runtime(context).save_session(session)
+        await query.answer()
+        text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
+        await _edit_editor_message(query, context, draft, text, keyboard)
         return
 
     if action in {"p", "r", "x", "s", "c"}:
@@ -909,17 +1044,31 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
 
     if action == "h":
         draft["hashtags"] = not draft.get("hashtags")
-    elif action == "q":
+    elif action in {"q", "t"}:
         draft["quote"] = not draft.get("quote")
     elif action == "v":
         draft["large_preview"] = not draft.get("large_preview")
+    elif action == "l":
+        _toggle_draft_platforms(
+            draft,
+            TrackMatch(**draft["item"]),
+            _get_platform_order(context),
+        )
+    elif action == "z":
+        _cycle_draft_preset(draft)
     elif action != "f":
         await query.answer()
         return
 
     await query.answer()
     await _store_draft(context, draft_id, draft)
-    text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
+    text, keyboard = _render_track_draft(
+        draft,
+        context,
+        draft_id=draft_id,
+        settings=action != "f",
+        show_status=action != "f",
+    )
     await _edit_editor_message(query, context, draft, text, keyboard)
 
 
@@ -1200,12 +1349,17 @@ async def _dispatch_crate_action(query, context, action: CallbackAction) -> None
         selected_index = min(index, len(items) - 1) if items else None
     elif action.action == "undo":
         if undo_record:
-            items, restored = await restore_crate_item(
-                bot_data,
-                user_id,
-                index=int(undo_record.get("index") or 0),
-                entry=undo_record.get("entry") or {},
-            )
+            if undo_record.get("kind") == "clear":
+                items = list(undo_record.get("items") or [])
+                await save_crate(bot_data, user_id, items)
+                restored = bool(items)
+            else:
+                items, restored = await restore_crate_item(
+                    bot_data,
+                    user_id,
+                    index=int(undo_record.get("index") or 0),
+                    entry=undo_record.get("entry") or {},
+                )
             if restored:
                 selected_index = min(
                     int(undo_record.get("index") or 0), len(items) - 1
@@ -1224,9 +1378,15 @@ async def _dispatch_crate_action(query, context, action: CallbackAction) -> None
         await _safe_edit(query, text, keyboard)
         return
     elif action.action == "clear_confirm":
+        previous_items = await load_crate(bot_data, user_id)
         await save_crate(bot_data, user_id, [])
-        undo_map.pop(user_id, None)
-        undo_record = None
+        undo_record = {
+            "kind": "clear",
+            "items": previous_items,
+            "index": 0,
+            "expires_at": time.time() + CRATE_UNDO_SECONDS,
+        }
+        undo_map[user_id] = undo_record
         items = []
     elif action.action == "clear_cancel":
         items = await load_crate(bot_data, user_id)
@@ -1310,6 +1470,7 @@ async def _reply_with_flow_error(
     *,
     lang: str,
     search_query: str | None = None,
+    source_url: str | None = None,
 ) -> None:
     detail_key = {
         BotErrorCode.INVALID_INPUT: "no_url_hint",
@@ -1336,6 +1497,7 @@ async def _reply_with_flow_error(
         lang=lang,
         retryable=error.retryable,
         search_query=search_query,
+        source_url=source_url,
     )
     placeholder = _take_placeholder(message.chat_id)
     if placeholder is not None:
@@ -1400,7 +1562,7 @@ async def _resolve_search_sources(
                 context,
                 user_id=user_id,
                 query=search_query,
-                urls=[candidate.url for candidate in candidates[:6]],
+                urls=[candidate.url for candidate in candidates[:3]],
             )
             placeholder = _take_placeholder(message.chat_id)
             lines = [
@@ -1409,7 +1571,7 @@ async def _resolve_search_sources(
                 ),
                 "",
             ]
-            for index, candidate in enumerate(candidates[:6], start=1):
+            for index, candidate in enumerate(candidates[:3], start=1):
                 artist = escape(str(getattr(candidate, "artist", "") or "—"))
                 title = escape(str(getattr(candidate, "title", "") or "—"))
                 lines.append(f"<b>{index}.</b> {artist} — {title}")
@@ -1434,7 +1596,7 @@ async def _resolve_search_sources(
                             ),
                         )
                     ]
-                    for index, candidate in enumerate(candidates[:6])
+                    for index, candidate in enumerate(candidates[:3])
                 ]
                 + [
                     [
@@ -1565,6 +1727,7 @@ async def _handle_empty_lookup(
                 provider="songlink",
             ),
             lang=lang,
+            source_url=source_urls[0] if source_urls else None,
         )
     else:
         await _reply_with_flow_error(
@@ -1572,6 +1735,7 @@ async def _handle_empty_lookup(
             context,
             BotFlowError(BotErrorCode.RELEASE_NOT_FOUND),
             lang=lang,
+            source_url=source_urls[0] if source_urls else None,
         )
     return True
 
@@ -1643,38 +1807,57 @@ async def _send_track_matches(
     include_channel_button: bool,
     include_hashtags: bool,
     search_query: str | None = None,
+    requested_count: int | None = None,
 ) -> None:
     """Deliver one release or a collection without mixing lookup concerns."""
     if len(tracks) > 1:
-        collection_keyboard = add_share_button(
-            _build_collection_keyboard(
-                tracks,
-                include_channel_button=include_channel_button,
-            ),
-            share_query=build_share_query(
-                [track_share_url(track) or "" for track in tracks]
-            ),
-            label=get_text(lang, "share_post"),
+        total = max(len(tracks), int(requested_count or len(tracks)))
+        title = get_text(lang, "crate_found").format(
+            found=len(tracks),
+            total=total,
         )
         if is_private:
-            crate_items = await _add_track_drafts_to_crate(
+            await _add_track_drafts_to_crate(
                 message,
                 context,
                 tracks,
                 user_id=user_id,
                 lang=lang,
             )
-            collection_keyboard = InlineKeyboardMarkup(
+            rows = [
                 [
-                    *collection_keyboard.inline_keyboard,
-                    [
-                        InlineKeyboardButton(
-                            f"Подборка · {len(crate_items)}/10",
-                            callback_data=encode_callback("crate", "open"),
-                            api_kwargs={"style": "success"},
-                        )
-                    ],
-                ]
+                    InlineKeyboardButton(
+                        get_text(lang, "crate_view"),
+                        callback_data=encode_callback("crate", "open"),
+                        api_kwargs={"style": "primary"},
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        get_text(lang, "crate_reorder"),
+                        callback_data=encode_callback("crate", "open"),
+                    )
+                ],
+            ]
+            studio_url = _webapp_url()
+            if studio_url:
+                rows[1].append(
+                    InlineKeyboardButton(
+                        get_text(lang, "crate_style"),
+                        web_app=WebAppInfo(url=f"{studio_url}?view=crate"),
+                    )
+                )
+            collection_keyboard = InlineKeyboardMarkup(rows)
+        else:
+            collection_keyboard = add_share_button(
+                _build_collection_keyboard(
+                    tracks,
+                    include_channel_button=include_channel_button,
+                ),
+                share_query=build_share_query(
+                    [track_share_url(track) or "" for track in tracks]
+                ),
+                label=get_text(lang, "share_post"),
             )
         await _send_track_result(
             context.bot,
@@ -1683,6 +1866,7 @@ async def _send_track_matches(
             + format_collection_message(
                 tracks,
                 include_hashtags=include_hashtags,
+                title=title,
             ),
             preview_url=_select_preview_url(tracks[0].links, context)
             or tracks[0].thumbnail_url,
@@ -1855,6 +2039,7 @@ async def _track_lookup_message_impl(
             include_channel_button=include_channel_button,
             include_hashtags=include_hashtags,
             search_query=search_query,
+            requested_count=len(source_urls),
         )
         await _send_partial_lookup_status(
             message, context, bundle, user_id=user_id, lang=lang
@@ -2122,12 +2307,14 @@ def _build_error_keyboard(
     lang: str = "ru",
     retryable: bool = False,
     search_query: str | None = None,
+    source_url: str | None = None,
 ) -> InlineKeyboardMarkup:
     return _build_error_keyboard_view(
         bot_username,
         lang=lang,
         retryable=retryable,
         search_query=search_query,
+        source_url=source_url,
     )
 
 

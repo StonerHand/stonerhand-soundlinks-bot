@@ -11,7 +11,7 @@ CHANNEL_URL = f"https://t.me/{CHANNEL_USERNAME}"
 CHANNEL_BUTTON_TEXT = "🪨 Открыть канал"
 DEFAULT_UI_MODE = "stonerhand"
 MAX_BUTTON_TEXT_LENGTH = 64
-MAX_VISIBLE_PLATFORM_BUTTONS = 2
+MAX_VISIBLE_PLATFORM_BUTTONS = 1
 SPOTIFY_SEARCH_URL = "https://open.spotify.com/search/"
 DEFAULT_PLATFORM_ORDER = (
     "spotify", "appleMusic", "applePodcasts", "youtubeMusic",
@@ -81,6 +81,7 @@ def _build_link_keyboard(
     else:
         selected_platforms = []
 
+    has_explicit_selection = bool(selected_platforms)
     if selected_platforms:
         final_platforms = selected_platforms
     else:
@@ -101,7 +102,7 @@ def _build_link_keyboard(
     # quick chat cards while Studio previews keep the selected services.
     if max_visible_platforms is not None:
         final_platforms = final_platforms[:max(0, max_visible_platforms)]
-    elif release_page_url:
+    elif release_page_url and not has_explicit_selection:
         final_platforms = final_platforms[:MAX_VISIBLE_PLATFORM_BUTTONS]
 
     buttons = []

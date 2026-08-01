@@ -35,6 +35,7 @@ from music_links_bot.publication_state import (
     release_fingerprint as _release_fingerprint,
 )
 from music_links_bot.config import Settings
+from music_links_bot.channel_templates import apply_channel_template
 from music_links_bot.formatter import (
     format_collection_message,
     pick_track_emoji,
@@ -316,6 +317,12 @@ async def _action_resolve(context, body: dict, user_id: int, is_admin: bool, lan
         # so search no longer waits on an extra iTunes round-trip.
         "preview": candidate_preview,
     }
+    if is_admin:
+        target = (
+            context.application.bot_data.get("publish_chat_id")
+            or "@stonerhand"
+        )
+        await apply_channel_template(context, target, draft)
     if candidate_preview is None and track.kind == "song":
         draft["preview_pending"] = True
     draft_id = secrets.token_hex(8)
