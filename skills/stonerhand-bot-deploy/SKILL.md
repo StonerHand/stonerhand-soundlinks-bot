@@ -1,6 +1,6 @@
 ---
 name: stonerhand-bot-deploy
-description: Use when deploying, migrating, restarting, or debugging hosting for StonerHand Soundlinks Bot on Vercel, Railway, Render, VPS, or local Mac. Applies to webhook setup, polling, environment variables, logs, and deployment failures.
+description: Use when deploying, migrating, restarting, or debugging StonerHand Soundlinks Bot on Vercel, a VPS, or a local Mac. Applies to webhook setup, polling, environment variables, logs, and deployment failures.
 ---
 
 # StonerHand Bot Deploy
@@ -12,7 +12,7 @@ Use this skill for deployment and production troubleshooting.
 Only one runtime must receive Telegram updates:
 
 - Vercel/serverless uses webhook
-- Railway/VPS/local uses polling
+- VPS/local uses polling
 
 Never keep webhook and polling active for the same bot token at the same time.
 
@@ -66,9 +66,9 @@ Never print, commit, quote, or expose real tokens.
 
 Vercel root `404` is normal. The useful routes are API routes.
 
-## Polling Flow
+## Local / VPS Polling Flow
 
-Use for local, Railway, VPS:
+Use for local development or a dedicated VPS:
 
 ```bash
 PYTHONPATH=src python -m music_links_bot
