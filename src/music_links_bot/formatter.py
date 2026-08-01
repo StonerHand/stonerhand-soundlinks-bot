@@ -74,7 +74,7 @@ def format_track_message(
 
 
 def format_release_meta(track: TrackMatch) -> str:
-    """Compact, predictable metadata line for every single-release card."""
+    """Compact format/year metadata without repeating the release genre."""
     format_labels = {
         "single": "Single",
         "ep": "EP",
@@ -91,7 +91,7 @@ def format_release_meta(track: TrackMatch) -> str:
         }.get(track.kind)
     values = [
         str(value)
-        for value in (track.genre, kind_label, track.release_year)
+        for value in (kind_label, track.release_year)
         if value
     ]
     return " · ".join(_display_text(value, 64) for value in values)

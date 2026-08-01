@@ -48,6 +48,22 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(build_auto_hashtags(track), "#stonerhand #track #heavymetal")
 
+    def test_track_genre_is_a_hashtag_not_visible_metadata(self) -> None:
+        track = TrackMatch(
+            title="Rickets",
+            artist="Deftones",
+            links={"spotify": "https://open.spotify.com/track/1"},
+            genre="Hard Rock",
+        )
+
+        message = format_track_message(track)
+
+        self.assertEqual(
+            message,
+            "🎧 · <b>Deftones</b>\nRickets\n\n"
+            "#stonerhand #track #hardrock",
+        )
+
     def test_track_heading_stays_plain_when_release_hub_exists(self) -> None:
         track = TrackMatch(
             title="Paranoid",
