@@ -13,6 +13,7 @@ from music_links_bot.rich_publications import (
     apply_publication_patch,
     build_fallback_html,
     build_rich_html,
+    default_longread,
     longread_view,
     rich_api_unavailable,
     sanitize_longread,
@@ -36,6 +37,16 @@ def _track() -> TrackMatch:
 
 
 class RichPublicationModelTests(unittest.TestCase):
+    def test_default_longread_does_not_repeat_release_metadata(self) -> None:
+        self.assertEqual(
+            default_longread(_track()),
+            {
+                "title": "Sleep — Dopesmoker",
+                "lead": "",
+                "blocks": [],
+            },
+        )
+
     def test_sanitizer_keeps_supported_blocks_and_applies_total_budget(self) -> None:
         value = {
             "title": "  Sleep   <script>  ",

@@ -655,11 +655,10 @@ import {
         "</div>";
     }
 
-    const genre = r.genre ? '<span class="genre-badge" id="genre-badge">'+esc(r.genre)+"</span>" : "";
     const headBlock =
       '<div class="post-headrow"><div style="min-width:0;flex:1">'+
       '<div class="post-title">'+esc(r.title)+"</div>"+
-      '<div class="post-artist">'+esc(r.emoji)+" · "+esc(r.artist)+(r.year?" · "+esc(r.year):"")+"</div></div>"+genre+"</div>";
+      '<div class="post-artist">'+esc(r.emoji)+" · "+esc(r.artist)+"</div></div></div>";
 
     const tagsBlock = (f.hashtags && r.hashtags)
       ? '<div class="post-tags" id="tags-line">'+r.hashtags.split(/\s+/).filter(Boolean).map((t)=>"<span>"+esc(t)+"</span>").join("")+'<span class="pencil">✏️</span></div>'
@@ -739,14 +738,11 @@ import {
       const apply = () => {
         if (!dyn) return;
         card.style.setProperty("--release-accent",dyn);
-        const g = $("genre-badge");
-        if (g) { g.style.background = dyn.replace("rgb(", "rgba(").replace(")", ",0.13)"); g.style.color = dyn; g.style.border = "1px solid " + dyn.replace("rgb(", "rgba(").replace(")", ",0.4)"); }
         card.style.boxShadow = "0 8px 32px " + dyn.replace("rgb(", "rgba(").replace(")", ",0.25)");
       };
       if (img.complete) extractAccent(img, apply); else img.addEventListener("load", () => extractAccent(img, apply));
     } else if (r.accentColor) {
       card.style.setProperty("--release-accent",acc);
-      const g=$("genre-badge"); if(g){g.style.background=acc+"22";g.style.color=acc;g.style.border="1px solid "+acc+"44";}
     }
 
     /* dock */

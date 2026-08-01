@@ -54,20 +54,10 @@ def default_longread(
     lang: str = "ru",
 ) -> dict:
     title = f"{track.artist} — {track.title}".strip(" —")
-    details = [
-        value
-        for value in (
-            track.genre,
-            track.release_format or track.kind,
-            str(track.release_year) if track.release_year else None,
-        )
-        if value
-    ]
-    lead = " · ".join(details)
     del lang
     return {
         "title": title[:MAX_LONGREAD_TITLE],
-        "lead": lead[:MAX_LONGREAD_LEAD],
+        "lead": "",
         "blocks": [],
     }
 

@@ -158,7 +158,6 @@
   .post-headrow { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
   .post-title { font-family: "Unbounded", "Golos Text", sans-serif; font-size: 19px; font-weight: 600; line-height: 1.15; }
   .post-artist { font-size: 13px; color: var(--muted); margin-top: 2px; }
-  .genre-badge { font-family: "JetBrains Mono"; font-size: 10px; text-transform: uppercase; padding: 4px 8px; border-radius: 8px; flex-shrink: 0; white-space: nowrap; }
   .post-tags .pencil { font-style: normal; opacity: .4; margin-left: 5px; font-size: 11px; }
   .post-tags { display: flex; flex-wrap: wrap; gap: 6px 10px; margin-bottom: 14px; }
   .post-tags span { font-family: "JetBrains Mono"; font-size: 11px; color: var(--muted); }
@@ -453,7 +452,6 @@ body::after { content:"";position:fixed;inset:0;pointer-events:none;z-index:0;ba
 .post-inner { padding:20px; }
 .post-title { font-size:23px;letter-spacing:-.045em; }
 .post-artist { font-family:"JetBrains Mono";font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-top:6px; }
-.genre-badge { border-radius:999px!important; }
 .post-tags span { padding:4px 8px;border-radius:999px;background:var(--surface); }
 .plat { flex:1;justify-content:center;border-radius:14px;min-width:115px; }
 .plat .pb,.picker-badge,.pm-badge { border-radius:50%; }
