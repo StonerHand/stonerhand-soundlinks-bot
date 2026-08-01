@@ -96,6 +96,19 @@ class RuntimeSafetyTests(unittest.IsolatedAsyncioTestCase):
         await runtime.release_action("7:publish:d1", token)
         self.assertIsNotNone(await runtime.acquire_action("7:publish:d1"))
 
+    async def test_equal_intents_are_debounced_but_distinct_ones_pass(self) -> None:
+        runtime = BotRuntime()
+
+        self.assertTrue(
+            await runtime.claim_intent(7, kind="search", value=" Sleep   Dragonaut ")
+        )
+        self.assertFalse(
+            await runtime.claim_intent(7, kind="search", value="sleep dragonaut")
+        )
+        self.assertTrue(
+            await runtime.claim_intent(7, kind="search", value="Sleep Dopesmoker")
+        )
+
     async def test_new_request_cancels_stale_task(self) -> None:
         runtime = BotRuntime()
         ready = asyncio.Event()

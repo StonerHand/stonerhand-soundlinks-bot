@@ -309,6 +309,8 @@ class EditableReplyStub:
         self._index = index
 
     async def edit_text(self, text: str, **kwargs: object) -> "EditableReplyStub":
+        if self._owner.reply_edit_error is not None:
+            raise self._owner.reply_edit_error
         self._owner.replies[self._index] = text
         self._owner.reply_kwargs[self._index] = kwargs
         return self
@@ -337,6 +339,7 @@ class ChannelMessageStub:
     def __init__(self) -> None:
         self.replies: list[str] = []
         self.reply_kwargs: list[dict[str, object]] = []
+        self.reply_edit_error: Exception | None = None
 
     async def reply_text(self, text: str, **kwargs: object) -> EditableReplyStub:
         self.replies.append(text)
@@ -473,7 +476,7 @@ class StartUpdateStub:
 
 
 class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
-    async def test_repeated_start_sends_visible_home_and_retires_old_one(self) -> None:
+    async def test_repeated_start_is_debounced(self) -> None:
         message = PrivateMessageStub()
         update = StartUpdateStub(message)
         context = ContextStub()
@@ -481,12 +484,9 @@ class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
         await start_command(update, context)
         await start_command(update, context)
 
-        self.assertEqual(len(message.replies), 2)
+        self.assertEqual(len(message.replies), 1)
         self.assertEqual(context.bot.edited_messages, [])
-        self.assertEqual(
-            context.bot.deleted_messages,
-            [{"chat_id": message.chat_id, "message_id": 1000}],
-        )
+        self.assertEqual(context.bot.deleted_messages, [])
         self.assertIn("StonerHand Studio", message.replies[-1])
 
     async def test_help_sends_visible_reply_and_retires_home(self) -> None:
@@ -509,7 +509,9 @@ class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
 
         await start_command(update, context)
         context.bot.delete_error = BadRequest("Message to delete not found")
-        await start_command(update, context)
+        runtime = context.application.bot_data["runtime"]
+        with patch.object(runtime, "claim_intent", return_value=True):
+            await start_command(update, context)
 
         self.assertEqual(len(message.replies), 2)
         runtime = context.application.bot_data["runtime"]
@@ -543,9 +545,10 @@ class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
 
         await start_command(update, context)
         context.bot.delete_error = BadRequest("Message to delete not found")
-        await start_command(update, context)
-
         runtime = context.application.bot_data["runtime"]
+        with patch.object(runtime, "claim_intent", return_value=True):
+            await start_command(update, context)
+
         session = await runtime.get_session(message.chat_id)
         self.assertEqual(len(message.replies), 2)
         self.assertEqual(session.home_message_id, 1001)
@@ -1476,6 +1479,20 @@ class PostEditorTests(unittest.TestCase):
         self.assertEqual(rows_without_quote[2][0].text, "🖼 Обложка крупная")
         self.assertEqual(rows_without_quote[2][0].callback_data, "v2|editor|v|abc123")
 
+    def test_editor_offers_fast_search_correction_for_search_drafts(self) -> None:
+        rows = _editor_more_rows(
+            "abc123",
+            self._draft(search_query="Sleep — Dragonaut"),
+        )
+
+        self.assertEqual(rows[0][0].text, "Другой релиз")
+        self.assertEqual(rows[0][0].callback_data, "v2|editor|a|abc123")
+        self.assertEqual(rows[0][1].text, "Изменить запрос")
+        self.assertEqual(
+            rows[0][1].switch_inline_query_current_chat,
+            "Sleep — Dragonaut",
+        )
+
     def test_editor_rows_do_not_duplicate_studio_navigation(self) -> None:
         import os
         from unittest.mock import patch as env_patch
@@ -1533,8 +1550,8 @@ class PostEditorTests(unittest.TestCase):
 
         self.assertEqual(len(buttons), 4)
         self.assertEqual(buttons[0].text, "🟢 Spotify")
-        self.assertEqual(buttons[1].text, "🪩 Все платформы")
-        self.assertEqual(buttons[2].text, "↗ Поделиться")
+        self.assertEqual(buttons[1].text, "⚫ Tidal")
+        self.assertEqual(buttons[2].text, "🪩 Все платформы")
         self.assertEqual(buttons[3].text, "••• Ещё")
 
 
@@ -1671,11 +1688,34 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("<code>артист — название</code>", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "Повторить")
+        self.assertEqual(keyboard[0][1].text, "Изменить запрос")
+        self.assertEqual(keyboard[0][1].switch_inline_query_current_chat, "привет")
         self.assertEqual(keyboard[1][0].text, "← Главное меню")
         self.assertEqual(len(keyboard), 2)
         self.assertEqual(context.bot.sent_messages, [])
         self.assertEqual(context.bot.chat_actions, [])
         self.assertEqual(context.application.bot_data["runtime"].active_tasks, {})
+
+    async def test_equal_private_lookups_are_debounced(self) -> None:
+        message = PrivateSpotifyTrackMessageStub()
+        context = ContextStub()
+
+        with patch("music_links_bot.bot_stats.record_matches"):
+            await track_lookup_message(UpdateStub(message), context)
+            await track_lookup_message(UpdateStub(message), context)
+
+        self.assertEqual(len(message.replies), 1)
+
+    async def test_failed_progress_edit_is_deleted_before_fallback_reply(self) -> None:
+        message = PrivateSpotifyTrackMessageStub()
+        message.reply_edit_error = BadRequest("message cannot be edited")
+        context = ContextStub()
+
+        with patch("music_links_bot.bot_stats.record_matches"):
+            await track_lookup_message(UpdateStub(message), context)
+
+        self.assertEqual(message.replies[0], "<deleted>")
+        self.assertIn("<b>Youth Code</b>\nTransitions", message.replies[1])
 
     async def test_search_candidate_heading_escapes_user_html(self) -> None:
         class HtmlQueryMessageStub(PrivateMessageStub):
@@ -1898,8 +1938,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("#stonerhand #track", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "🟢 Spotify")
-        self.assertEqual(keyboard[0][1].text, "🪩 Все платформы")
-        self.assertEqual(keyboard[0][1].url, "https://song.link/transitions")
+        self.assertEqual(keyboard[1][0].text, "🪩 Все платформы")
+        self.assertEqual(keyboard[1][0].url, "https://song.link/transitions")
+        self.assertEqual(keyboard[1][1].text, "••• Ещё")
         preview_options = message.reply_kwargs[0]["link_preview_options"]
         self.assertTrue(preview_options.prefer_large_media)
         self.assertFalse(bool(preview_options.prefer_small_media))

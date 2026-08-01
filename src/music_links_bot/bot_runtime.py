@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import asdict, dataclass, field
+import hashlib
 import secrets
 from time import monotonic, time
 from typing import Any
@@ -19,6 +20,7 @@ BotFlowError = _BotFlowError
 CALLBACK_VERSION = "v2"
 CALLBACK_TTL_SECONDS = 15 * 60
 ACTION_LOCK_SECONDS = 45
+INTENT_TTL_SECONDS = 4
 SESSION_TTL_SECONDS = 30 * 24 * 3600
 MAX_MEMORY_SESSIONS = 500
 MAX_MEMORY_KEYS = 2_000
@@ -135,6 +137,7 @@ class BotRuntime:
         self.sessions: dict[int, UserSession] = {}
         self.seen_callbacks: dict[str, float] = {}
         self.action_locks: dict[str, float] = {}
+        self.recent_intents: dict[str, float] = {}
         self.active_tasks: dict[int, asyncio.Task[Any]] = {}
         self.diagnostics: dict[str, ProviderDiagnostic] = {}
         self.metrics: dict[str, int] = {
@@ -227,6 +230,41 @@ class BotRuntime:
         self.action_locks.pop(key, None)
         if self.kv is not None:
             await self.kv.delete_if_value(f"action:v1:{key}", token)
+
+    async def claim_intent(
+        self,
+        user_id: int,
+        *,
+        kind: str,
+        value: str = "",
+        ttl_seconds: int = INTENT_TTL_SECONDS,
+    ) -> bool:
+        """Debounce equal user intents across warm instances and Redis.
+
+        Telegram creates a new update for every tap or sent message, so update
+        ID deduplication alone cannot stop an accidental double ``/start`` or
+        two identical lookups. Distinct requests are never blocked.
+        """
+        normalized = " ".join(value.casefold().split())[:1_000]
+        digest = hashlib.sha256(f"{kind}:{normalized}".encode()).hexdigest()[:24]
+        key = f"{user_id}:{digest}"
+        redis_key = f"intent:v1:{key}"
+        ttl = max(1, int(ttl_seconds))
+        now = monotonic()
+        self._drop_expired(self.recent_intents, now)
+        if self.kv is not None:
+            if await self.kv.set(redis_key, "1", ttl_seconds=ttl, nx=True):
+                self._cap(self.recent_intents, MAX_MEMORY_KEYS)
+                self.recent_intents[key] = now + ttl
+                return True
+            if await self.kv.get(redis_key) is not None:
+                return False
+
+        if key in self.recent_intents:
+            return False
+        self._cap(self.recent_intents, MAX_MEMORY_KEYS)
+        self.recent_intents[key] = now + ttl
+        return True
 
     def register_request(self, user_id: int) -> asyncio.Task[Any] | None:
         current = asyncio.current_task()

@@ -48,6 +48,7 @@ from music_links_bot.youtube import YouTubeClient, YouTubeLookupError
 from music_links_bot.provider_runtime import (
     ProviderTask,
     get_cached_lookup,
+    lookup_cache_key,
     run_provider_tasks_detailed,
     set_cached_lookup,
 )
@@ -141,6 +142,37 @@ async def resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBundl
         restored = _bundle_from_cache(cached)
         if restored is not None:
             return restored
+
+    key = lookup_cache_key(source_urls)
+    inflight: dict[str, asyncio.Task[LookupBundle]] = bot_data.setdefault(
+        "lookup_inflight", {}
+    )
+    pending = inflight.get(key)
+    if pending is not None:
+        return await asyncio.shield(pending)
+
+    task = asyncio.create_task(_resolve_sources_uncached(bot_data, source_urls))
+    inflight[key] = task
+
+    def finish(completed: asyncio.Task[LookupBundle]) -> None:
+        if inflight.get(key) is completed:
+            inflight.pop(key, None)
+        if completed.done() and not completed.cancelled():
+            completed.exception()
+
+    task.add_done_callback(finish)
+    try:
+        return await asyncio.shield(task)
+    finally:
+        if task.done():
+            finish(task)
+
+
+async def _resolve_sources_uncached(
+    bot_data: dict,
+    source_urls: list[str],
+) -> LookupBundle:
+    """Resolve one canonical batch; concurrent callers share this task."""
 
     grouped = DEFAULT_PROVIDER_REGISTRY.group(source_urls)
     artist_urls = grouped["artists"]

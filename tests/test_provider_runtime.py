@@ -1,6 +1,9 @@
 import asyncio
 import unittest
+from unittest.mock import patch
 
+from music_links_bot import bot_lookup
+from music_links_bot.bot_lookup import LookupBundle
 from music_links_bot.bot_runtime import BotRuntime
 from music_links_bot.provider_runtime import (
     ProviderTask,
@@ -12,6 +15,29 @@ from music_links_bot.provider_runtime import (
 
 
 class ProviderRuntimeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_parallel_equal_batches_share_one_lookup(self) -> None:
+        calls = 0
+        release = asyncio.Event()
+
+        async def resolve(_bot_data, _source_urls):
+            nonlocal calls
+            calls += 1
+            await release.wait()
+            return LookupBundle([], [], [], [], [], [])
+
+        bot_data: dict = {}
+        urls = ["https://example.test/unique-singleflight"]
+        with patch.object(bot_lookup, "_resolve_sources_uncached", resolve):
+            first = asyncio.create_task(bot_lookup.resolve_sources(bot_data, urls))
+            second = asyncio.create_task(bot_lookup.resolve_sources(bot_data, urls))
+            await asyncio.sleep(0)
+            release.set()
+            first_result, second_result = await asyncio.gather(first, second)
+
+        self.assertEqual(calls, 1)
+        self.assertIs(first_result, second_result)
+        self.assertEqual(bot_data["lookup_inflight"], {})
+
     async def test_failed_provider_keeps_successful_partial_result(self) -> None:
         async def ok():
             return ["track"]

@@ -1,3 +1,4 @@
+import asyncio
 import unittest
 from pathlib import Path
 import sys
@@ -87,6 +88,51 @@ class SearchQueryTests(unittest.TestCase):
 
 
 class SearchCacheTests(unittest.IsolatedAsyncioTestCase):
+    async def test_parallel_equal_searches_share_one_request(self) -> None:
+        class ResponseStub:
+            def raise_for_status(self) -> None:
+                return None
+
+            def json(self) -> dict:
+                return {
+                    "results": [
+                        {
+                            "trackViewUrl": "https://music.apple.com/track/1",
+                            "trackName": "Dragonaut",
+                            "artistName": "Sleep",
+                        }
+                    ]
+                }
+
+        class ClientStub:
+            def __init__(self) -> None:
+                self.calls = 0
+                self.release = asyncio.Event()
+
+            async def get(self, *args, **kwargs):
+                del args, kwargs
+                self.calls += 1
+                await self.release.wait()
+                return ResponseStub()
+
+            async def aclose(self) -> None:
+                return None
+
+        search = SearchClient()
+        await search._client.aclose()
+        fake = ClientStub()
+        search._client = fake
+        first = asyncio.create_task(search.search_release_candidates("Sleep Dragonaut"))
+        second = asyncio.create_task(search.search_release_candidates(" sleep  dragonaut "))
+        await asyncio.sleep(0)
+        fake.release.set()
+        try:
+            first_result, second_result = await asyncio.gather(first, second)
+            self.assertEqual(fake.calls, 1)
+            self.assertEqual(first_result, second_result)
+        finally:
+            await search.aclose()
+
     async def test_known_miss_is_not_requested_twice(self) -> None:
         class ResponseStub:
             def raise_for_status(self) -> None:
