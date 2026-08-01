@@ -48,6 +48,9 @@ class SearchQueryTests(unittest.TestCase):
                     "trackName": "Paranoid",
                     "artistName": "Black Sabbath",
                     "artworkUrl100": "https://images.example/1.jpg",
+                    "collectionName": "Paranoid",
+                    "releaseDate": "1970-09-18T00:00:00Z",
+                    "kind": "song",
                 },
                 {"trackViewUrl": "https://music.apple.com/track/1"},
                 {"trackViewUrl": "https://music.apple.com/track/2"},
@@ -62,6 +65,9 @@ class SearchQueryTests(unittest.TestCase):
         self.assertEqual(candidates[0].title, "Paranoid")
         self.assertEqual(candidates[0].artist, "Black Sabbath")
         self.assertEqual(candidates[0].artwork_url, "https://images.example/1.jpg")
+        self.assertEqual(candidates[0].album, "Paranoid")
+        self.assertEqual(candidates[0].year, "1970")
+        self.assertEqual(candidates[0].kind, "song")
         self.assertEqual(
             [candidate.url for candidate in candidates],
             [

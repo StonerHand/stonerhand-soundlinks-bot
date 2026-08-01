@@ -50,27 +50,42 @@ def build_start_keyboard(
     show_tour: bool = False,
     include_studio: bool = True,
 ) -> InlineKeyboardMarkup:
-    del bot_username, is_admin, show_tour
+    del bot_username, is_admin
     rows: list[list[InlineKeyboardButton]] = []
-    studio_url = webapp_url()
-    if studio_url and include_studio:
+    if show_tour:
         rows.append(
             [
                 InlineKeyboardButton(
-                    get_text(lang, "open_studio"),
-                    web_app=WebAppInfo(url=studio_url),
-                    api_kwargs={"style": "success"},
+                    get_text(lang, "quick_tour"),
+                    callback_data=encode_callback("menu", "onboard1"),
+                    api_kwargs={"style": "primary"},
                 )
             ]
         )
+    studio_url = webapp_url()
+    primary_row: list[InlineKeyboardButton] = []
+    if studio_url and include_studio:
+        primary_row.append(
+            InlineKeyboardButton(
+                get_text(lang, "open_studio"),
+                web_app=WebAppInfo(url=studio_url),
+                api_kwargs={"style": "primary"},
+            )
+        )
+    primary_row.append(
+        InlineKeyboardButton(
+            get_text(lang, "quick_search"),
+            switch_inline_query_current_chat="",
+        )
+    )
+    rows.append(primary_row)
     rows.append(
         [
-            InlineKeyboardButton(
-                get_text(lang, "quick_search"),
-                switch_inline_query_current_chat="",
-                api_kwargs={"style": "primary"},
-            ),
             _crate_button(lang, crate_count),
+            InlineKeyboardButton(
+                get_text(lang, "home_more"),
+                callback_data=encode_callback("menu", "more"),
+            ),
         ]
     )
     return InlineKeyboardMarkup(rows)
@@ -87,48 +102,43 @@ def build_section_keyboard(
     del bot_username
     rows: list[list[InlineKeyboardButton]] = []
     studio_url = webapp_url()
+    primary_row: list[InlineKeyboardButton] = []
     if studio_url and include_studio:
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    get_text(lang, "open_studio"),
-                    web_app=WebAppInfo(url=studio_url),
-                    api_kwargs={"style": "success"},
-                )
-            ]
+        primary_row.append(
+            InlineKeyboardButton(
+                get_text(lang, "open_studio"),
+                web_app=WebAppInfo(url=studio_url),
+                api_kwargs={"style": "primary"},
+            )
         )
+    primary_row.append(
+        InlineKeyboardButton(
+            get_text(lang, "quick_search"),
+            switch_inline_query_current_chat="",
+        )
+    )
+    rows.append(primary_row)
     rows.append(
         [
-            InlineKeyboardButton(
-                get_text(lang, "quick_search"),
-                switch_inline_query_current_chat="",
-                api_kwargs={"style": "primary"},
-            ),
             _crate_button(lang, crate_count),
+            InlineKeyboardButton(
+                get_text(lang, "home_more"),
+                callback_data=encode_callback("menu", "more"),
+            ),
         ]
     )
 
-    related_actions = {
-        "help": ("platforms", "guide"),
-        "platforms": ("help", "guide"),
-        "guide": ("help", "platforms"),
-        "demo": ("help", "platforms"),
-    }.get(active, ("help", "platforms"))
-    label_keys = {
-        "help": "tab_help",
-        "platforms": "tab_platforms",
-        "guide": "tab_guide",
-        "demo": "tab_demo",
-    }
-    rows.append(
-        [
-            InlineKeyboardButton(
-                get_text(lang, label_keys[action]),
-                callback_data=encode_callback("menu", action),
+    if active == "more":
+        for action_row in (("help", "platforms"), ("guide", "demo")):
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        get_text(lang, f"tab_{action}"),
+                        callback_data=encode_callback("menu", action),
+                    )
+                    for action in action_row
+                ]
             )
-            for action in related_actions
-        ]
-    )
     rows.append(
         [
             InlineKeyboardButton(
@@ -271,7 +281,16 @@ def editor_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
             get_text(lang, "ed_add_crate"),
             callback_data=encode_callback("editor", "c", draft_id),
         )
-    return [[button]]
+    return [
+        [
+            button,
+            InlineKeyboardButton(
+                get_text(lang, "ed_more"),
+                callback_data=encode_callback("editor", "m", draft_id),
+                api_kwargs={"style": "primary"},
+            ),
+        ]
+    ]
 
 
 def editor_more_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
@@ -280,14 +299,16 @@ def editor_more_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButt
     def state(flag: str) -> str:
         return get_text(lang, "ed_on" if draft.get(flag) else "ed_off")
 
-    toggles = [
-        InlineKeyboardButton(
-            f"{get_text(lang, 'ed_hashtags')} {state('hashtags')}",
-            callback_data=encode_callback("editor", "h", draft_id),
-        )
+    toggle_rows = [
+        [
+            InlineKeyboardButton(
+                f"{get_text(lang, 'ed_hashtags')} {state('hashtags')}",
+                callback_data=encode_callback("editor", "h", draft_id),
+            )
+        ]
     ]
     if draft.get("prefix"):
-        toggles.append(
+        toggle_rows[0].append(
             InlineKeyboardButton(
                 f"{get_text(lang, 'ed_quote')} {state('quote')}",
                 callback_data=encode_callback("editor", "q", draft_id),
@@ -297,19 +318,36 @@ def editor_more_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButt
         lang,
         "ed_preview_large" if draft.get("large_preview") else "ed_preview_small",
     )
-    toggles.append(
+    toggle_rows.append(
+        [
+            InlineKeyboardButton(
+                f"{get_text(lang, 'ed_preview')} {preview_state}",
+                callback_data=encode_callback("editor", "v", draft_id),
+            )
+        ]
+    )
+    crate_button = (
         InlineKeyboardButton(
-            f"{get_text(lang, 'ed_preview')} {preview_state}",
-            callback_data=encode_callback("editor", "v", draft_id),
+            get_text(lang, "ed_crate_count").format(
+                count=max(0, min(10, int(draft.get("crate_count") or 0)))
+            ),
+            callback_data=encode_callback("crate", "open"),
+            api_kwargs={"style": "success"},
+        )
+        if draft.get("in_crate")
+        else InlineKeyboardButton(
+            get_text(lang, "ed_add_crate"),
+            callback_data=encode_callback("editor", "c", draft_id),
         )
     )
     return [
-        toggles,
+        [crate_button],
+        *toggle_rows,
         [
             InlineKeyboardButton(
                 get_text(lang, "ed_done"),
                 callback_data=encode_callback("editor", "f", draft_id),
-                api_kwargs={"style": "success"},
+                api_kwargs={"style": "primary"},
             ),
             InlineKeyboardButton(
                 get_text(lang, "ed_delete"),
@@ -326,7 +364,55 @@ def editor_more_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButt
     ]
 
 
-def render_crate(items: list[dict], *, lang: str) -> tuple[str, InlineKeyboardMarkup]:
+def build_delete_confirmation_keyboard(
+    draft_id: str, *, lang: str
+) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "ed_delete_confirm_button"),
+                    callback_data=encode_callback("editor", "dc", draft_id),
+                    api_kwargs={"style": "danger"},
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "cancel"),
+                    callback_data=encode_callback("editor", "b", draft_id),
+                )
+            ],
+        ]
+    )
+
+
+def render_crate(
+    items: list[dict],
+    *,
+    lang: str,
+    selected_index: int | None = None,
+    can_undo: bool = False,
+    confirm_clear: bool = False,
+) -> tuple[str, InlineKeyboardMarkup]:
+    if confirm_clear:
+        return get_text(lang, "crate_clear_confirm"), InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        get_text(lang, "crate_clear_confirm_button"),
+                        callback_data=encode_callback("crate", "clear_confirm"),
+                        api_kwargs={"style": "danger"},
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        get_text(lang, "cancel"),
+                        callback_data=encode_callback("crate", "clear_cancel"),
+                    )
+                ],
+            ]
+        )
+
     if not items:
         text = get_text(lang, "crate_empty")
     else:
@@ -342,39 +428,77 @@ def render_crate(items: list[dict], *, lang: str) -> tuple[str, InlineKeyboardMa
         text = "\n".join(lines)
 
     rows: list[list[InlineKeyboardButton]] = []
-    for index, entry in enumerate(items):
-        item = entry.get("item") or {}
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    f"{index + 1}. {item.get('artist') or '—'} — {item.get('title') or '—'}"[:64],
-                    callback_data=encode_callback("noop", "item"),
-                )
-            ]
+    if items:
+        selected_index = (
+            selected_index
+            if selected_index is not None and 0 <= selected_index < len(items)
+            else 0
         )
+        selectors = [
+            InlineKeyboardButton(
+                f"{'● ' if index == selected_index else ''}{index + 1}",
+                callback_data=encode_callback("crate", "select", str(index)),
+                **(
+                    {"api_kwargs": {"style": "primary"}}
+                    if index == selected_index
+                    else {}
+                ),
+            )
+            for index in range(len(items))
+        ]
+        rows.extend(
+            selectors[index : index + 5] for index in range(0, len(selectors), 5)
+        )
+
         controls: list[InlineKeyboardButton] = []
-        if index > 0:
+        if selected_index > 0:
             controls.append(
                 InlineKeyboardButton(
                     get_text(lang, "crate_up"),
-                    callback_data=encode_callback("crate", "up", str(index)),
+                    callback_data=encode_callback("crate", "up", str(selected_index)),
                 )
             )
-        if index < len(items) - 1:
+        if selected_index < len(items) - 1:
             controls.append(
                 InlineKeyboardButton(
                     get_text(lang, "crate_down"),
-                    callback_data=encode_callback("crate", "down", str(index)),
+                    callback_data=encode_callback("crate", "down", str(selected_index)),
                 )
             )
         controls.append(
             InlineKeyboardButton(
                 get_text(lang, "crate_remove"),
-                callback_data=encode_callback("crate", "remove", str(index)),
+                callback_data=encode_callback("crate", "remove", str(selected_index)),
                 api_kwargs={"style": "danger"},
             )
         )
         rows.append(controls)
+        footer: list[InlineKeyboardButton] = []
+        if can_undo:
+            footer.append(
+                InlineKeyboardButton(
+                    get_text(lang, "crate_undo"),
+                    callback_data=encode_callback("crate", "undo"),
+                )
+            )
+        footer.append(
+            InlineKeyboardButton(
+                get_text(lang, "crate_clear"),
+                callback_data=encode_callback("crate", "clear"),
+                api_kwargs={"style": "danger"},
+            )
+        )
+        rows.append(footer)
+    else:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "crate_find"),
+                    switch_inline_query_current_chat="",
+                    api_kwargs={"style": "primary"},
+                )
+            ]
+        )
     studio_url = webapp_url()
     if studio_url:
         rows.append(

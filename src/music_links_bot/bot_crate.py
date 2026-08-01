@@ -93,6 +93,26 @@ async def remove_crate_item(
     return items
 
 
+async def restore_crate_item(
+    bot_data: dict,
+    user_id: int,
+    *,
+    index: int,
+    entry: dict[str, Any],
+) -> tuple[list[dict[str, Any]], bool]:
+    """Restore one recently removed item without creating duplicates."""
+    items = await load_crate(bot_data, user_id)
+    item = entry.get("item") if isinstance(entry, dict) else None
+    if not isinstance(item, dict) or len(items) >= MAX_CRATE_ITEMS:
+        return items, False
+    fingerprint = _fingerprint(item)
+    if any(_fingerprint(existing.get("item") or {}) == fingerprint for existing in items):
+        return items, False
+    items.insert(max(0, min(index, len(items))), entry)
+    await save_crate(bot_data, user_id, items)
+    return items, True
+
+
 def _fingerprint(item: dict[str, Any]) -> str:
     links = item.get("links") if isinstance(item.get("links"), dict) else {}
     first_url = next(iter(links.values()), "")

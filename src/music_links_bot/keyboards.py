@@ -3,7 +3,7 @@ from __future__ import annotations
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, LinkPreviewOptions, Message
 from telegram.ext import ContextTypes
 
-from music_links_bot.constants import PLATFORM_BUTTON_STYLES, PLATFORM_LABELS
+from music_links_bot.constants import PLATFORM_LABELS
 from music_links_bot.models import ArtistMatch, PlaylistMatch, RadioMatch, TrackMatch, VideoMatch
 
 CHANNEL_USERNAME = "stonerhand"
@@ -104,14 +104,15 @@ def _build_link_keyboard(
     elif release_page_url:
         final_platforms = final_platforms[:MAX_VISIBLE_PLATFORM_BUTTONS]
 
-    buttons = [
-        _url_button(
-            text=f"{prefix}{_platform_button_label(platform_key, context)}",
-            url=links[platform_key],
-            style=PLATFORM_BUTTON_STYLES.get(platform_key),
+    buttons = []
+    for index, platform_key in enumerate(final_platforms):
+        buttons.append(
+            _url_button(
+                text=f"{prefix}{_platform_button_label(platform_key, context)}",
+                url=links[platform_key],
+                style="primary" if index == 0 else None,
+            )
         )
-        for platform_key in final_platforms
-    ]
     rows = _button_rows(buttons)
     if release_page_url:
         rows.append(
@@ -119,7 +120,6 @@ def _build_link_keyboard(
                 _url_button(
                     _release_hub_button_label(release_kind, release_format, context),
                     url=release_page_url,
-                    style="danger",
                 )
             ]
         )
@@ -162,7 +162,7 @@ def _build_collection_keyboard(
             _url_button(
                 text=_shorten_button_text(text),
                 url=destination,
-                style="danger" if track.kind == "video" else "primary",
+                style="primary" if is_track_video_pair and track.kind == "song" else None,
             )
         )
 
@@ -177,7 +177,7 @@ def _build_youtube_keyboard(
     return _single_url_keyboard(
         "📺 Смотреть на YouTube",
         url=url,
-        style="danger",
+        style="primary",
         include_channel_button=include_channel_button,
     )
 
@@ -232,7 +232,7 @@ def _build_youtube_collection_keyboard(
             _url_button(
                 text=_shorten_button_text(f"📺 {index}. {video.title}"),
                 url=video.url,
-                style="danger",
+                style=None,
             )
         )
 
@@ -250,7 +250,7 @@ def _build_nts_collection_keyboard(
             _url_button(
                 text=_shorten_button_text(f"📡 {index}. {radio.title}"),
                 url=radio.url,
-                style="primary",
+                style=None,
             )
         )
 
@@ -268,7 +268,7 @@ def _build_playlist_collection_keyboard(
             _url_button(
                 text=_shorten_button_text(f"🎛 {index}. {playlist.title}"),
                 url=playlist.url,
-                style="primary",
+                style=None,
             )
         )
 
@@ -286,7 +286,7 @@ def _build_artist_collection_keyboard(
             _url_button(
                 text=_shorten_button_text(f"🧬 {index}. {artist.title}"),
                 url=artist.url,
-                style="primary",
+                style=None,
             )
         )
 
@@ -330,7 +330,7 @@ def _build_mixed_collection_keyboard(
                     )
                 ),
                 url=destination,
-                style="primary",
+                style="primary" if is_track_video_pair else None,
             )
         )
         index += 1
@@ -340,7 +340,7 @@ def _build_mixed_collection_keyboard(
             _url_button(
                 text=_shorten_button_text(f"🎛 {index}. {playlist.title}"),
                 url=playlist.url,
-                style="primary",
+                style=None,
             )
         )
         index += 1
@@ -350,7 +350,7 @@ def _build_mixed_collection_keyboard(
             _url_button(
                 text=_shorten_button_text(f"🧬 {index}. {artist.title}"),
                 url=artist.url,
-                style="primary",
+                style=None,
             )
         )
         index += 1
@@ -360,7 +360,7 @@ def _build_mixed_collection_keyboard(
             _url_button(
                 text=_shorten_button_text(f"📡 {index}. {radio.title}"),
                 url=radio.url,
-                style="primary",
+                style=None,
             )
         )
         index += 1
@@ -374,7 +374,7 @@ def _build_mixed_collection_keyboard(
                     else _shorten_button_text(f"📺 {index}. {video.title}")
                 ),
                 url=video.url,
-                style="danger",
+                style=None,
             )
         )
         index += 1
@@ -501,7 +501,7 @@ def _single_url_keyboard(
     text: str,
     *,
     url: str,
-    style: str,
+    style: str | None,
     include_channel_button: bool,
 ) -> InlineKeyboardMarkup:
     return _keyboard_with_optional_channel(
@@ -511,7 +511,7 @@ def _single_url_keyboard(
 
 
 def _channel_button() -> InlineKeyboardButton:
-    return _url_button(CHANNEL_BUTTON_TEXT, url=CHANNEL_URL, style="primary")
+    return _url_button(CHANNEL_BUTTON_TEXT, url=CHANNEL_URL)
 
 
 def _url_button(text: str, url: str, style: str | None = None) -> InlineKeyboardButton:

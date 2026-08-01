@@ -26,6 +26,11 @@ PUBLIC_BOT_COMMANDS = (
     BotCommand("help", "как пользоваться"),
     BotCommand("crate", "моя подборка"),
 )
+PUBLIC_BOT_COMMANDS_EN = (
+    BotCommand("start", "menu and quick start"),
+    BotCommand("help", "how to use the bot"),
+    BotCommand("crate", "my music crate"),
+)
 BOT_DESCRIPTIONS = {
     "": (
         "Музыкальный редактор для Telegram.\n\n"
@@ -152,6 +157,10 @@ def build_application(settings: Settings) -> Application:
 async def sync_application_commands(application: Application) -> None:
     try:
         await application.bot.set_my_commands(PUBLIC_BOT_COMMANDS)
+        await application.bot.set_my_commands(
+            PUBLIC_BOT_COMMANDS_EN,
+            language_code="en",
+        )
         studio_url = webapp_url()
         if studio_url:
             await application.bot.set_chat_menu_button(

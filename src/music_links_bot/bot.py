@@ -8,6 +8,7 @@ import hashlib
 from html import escape
 import logging
 import secrets
+import time
 
 from telegram import (
     Bot,
@@ -131,6 +132,8 @@ from music_links_bot.bot_crate import (
     load_crate,
     move_crate_item,
     remove_crate_item,
+    restore_crate_item,
+    save_crate,
 )
 from music_links_bot.bot_runtime import (
     BotErrorCode,
@@ -153,11 +156,13 @@ from music_links_bot.bot_storage import (
 )
 from music_links_bot.bot_progress import (
     adopt_progress_message as _adopt_progress_message,
+    cancel_progress as _cancel_progress,
     start_progress as _send_loading_placeholder,
     take_progress as _take_placeholder,
     update_progress as _update_loading_placeholder,
 )
 from music_links_bot.bot_ui import (
+    build_delete_confirmation_keyboard as _delete_confirmation_keyboard,
     build_duplicate_post_keyboard as _duplicate_post_keyboard,
     build_error_keyboard as _build_error_keyboard_view,
     build_home_text as _build_home_text,
@@ -230,7 +235,11 @@ MENU_HELP = "menu:help"
 MENU_GUIDE = "menu:guide"
 MENU_PLATFORMS = "menu:platforms"
 MENU_DEMO = "menu:demo"
-MENU_KEYS = frozenset((MENU_START, MENU_HELP, MENU_GUIDE, MENU_PLATFORMS, MENU_DEMO))
+MENU_MORE = "menu:more"
+MENU_KEYS = frozenset(
+    (MENU_START, MENU_HELP, MENU_GUIDE, MENU_PLATFORMS, MENU_DEMO, MENU_MORE)
+)
+CRATE_UNDO_SECONDS = 5 * 60
 DEFAULT_UI_MODE = "stonerhand"
 MAX_BUTTON_TEXT_LENGTH = 64
 STATS_KV_KEY = "stats:v1"
@@ -570,6 +579,7 @@ async def _dispatch_menu_action(query, context, action: CallbackAction) -> None:
         "guide": MENU_GUIDE,
         "platforms": MENU_PLATFORMS,
         "demo": MENU_DEMO,
+        "more": MENU_MORE,
     }.get(action.action, MENU_START)
     await query.answer()
     user_id = query.from_user.id if query.from_user else 0
@@ -710,7 +720,15 @@ def _render_track_draft(
     if draft_id is None:
         return text, keyboard
 
-    rows = [*keyboard.inline_keyboard, *_editor_rows(draft_id, draft)]
+    quick_buttons = [
+        button for row in keyboard.inline_keyboard for button in row
+    ]
+    editor_actions = _editor_rows(draft_id, draft)[0]
+    rows = [quick_buttons[:2]] if quick_buttons else []
+    if len(quick_buttons) > 2:
+        rows.append([quick_buttons[2], editor_actions[1]])
+    else:
+        rows.append([editor_actions[1]])
     return text, InlineKeyboardMarkup(rows)
 
 
@@ -819,6 +837,17 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
 
     if action == "d":
         await query.answer()
+        await _edit_editor_message(
+            query,
+            context,
+            draft,
+            get_text(lang, "ed_delete_confirm"),
+            _delete_confirmation_keyboard(draft_id, lang=lang),
+        )
+        return
+
+    if action == "dc":
+        await query.answer()
         if query.message is not None:
             await _try_delete_message(query.message)
         return
@@ -852,8 +881,7 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
 
     await query.answer()
     await _store_draft(context, draft_id, draft)
-    editor_id = None if action == "f" else draft_id
-    text, keyboard = _render_track_draft(draft, context, draft_id=editor_id)
+    text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
     await _edit_editor_message(query, context, draft, text, keyboard)
 
 
@@ -968,18 +996,41 @@ async def _run_primary_editor_action(
             message=published,
             target=target,
         )
-        success_keyboard = InlineKeyboardMarkup(
+        published_link = (
+            getattr(published, "link", None)
+            if not isinstance(published, bool)
+            else None
+        )
+        success_rows = [
             [
+                InlineKeyboardButton(
+                    get_text(lang, "ed_published"),
+                    callback_data=encode_callback("noop", "done"),
+                    api_kwargs={"style": "success"},
+                )
+            ]
+        ]
+        if isinstance(published_link, str) and published_link.startswith("http"):
+            success_rows.append(
                 [
                     InlineKeyboardButton(
-                        get_text(lang, "ed_published"),
-                        callback_data=encode_callback("noop", "done"),
-                        api_kwargs={"style": "success"},
+                        get_text(lang, "ed_open_publication"),
+                        url=published_link,
                     )
-                ],
-                [_channel_button()],
+                ]
+            )
+        else:
+            success_rows.append([_channel_button()])
+        success_rows.append(
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "ed_create_more"),
+                    switch_inline_query_current_chat="",
+                    api_kwargs={"style": "primary"},
+                )
             ]
         )
+        success_keyboard = InlineKeyboardMarkup(success_rows)
         text, _ = _render_track_draft(draft, context, draft_id=None)
         await _edit_editor_message(query, context, draft, text, success_keyboard)
     await query.answer(
@@ -1075,23 +1126,84 @@ async def _dispatch_crate_action(query, context, action: CallbackAction) -> None
         return
     lang = resolve_lang(query.from_user.language_code)
     user_id = query.from_user.id
+    bot_data = context.application.bot_data
+    undo_map = bot_data.setdefault("crate_undo", {})
+    undo_record = undo_map.get(user_id)
+    if undo_record and float(undo_record.get("expires_at") or 0) <= time.time():
+        undo_map.pop(user_id, None)
+        undo_record = None
     try:
         index = int(action.payload)
-    except ValueError:
+    except (TypeError, ValueError):
         index = -1
+    selected_index: int | None = None
+    notice: str | None = None
     if action.action == "up":
-        items = await move_crate_item(context.application.bot_data, user_id, index, -1)
+        items = await move_crate_item(bot_data, user_id, index, -1)
+        selected_index = max(0, index - 1)
     elif action.action == "down":
-        items = await move_crate_item(context.application.bot_data, user_id, index, 1)
+        items = await move_crate_item(bot_data, user_id, index, 1)
+        selected_index = min(len(items) - 1, index + 1) if items else None
+    elif action.action == "select":
+        items = await load_crate(bot_data, user_id)
+        selected_index = index
     elif action.action == "remove":
-        items = await remove_crate_item(context.application.bot_data, user_id, index)
+        before = await load_crate(bot_data, user_id)
+        removed = before[index] if 0 <= index < len(before) else None
+        items = await remove_crate_item(bot_data, user_id, index)
+        if removed is not None:
+            undo_record = {
+                "entry": removed,
+                "index": index,
+                "expires_at": time.time() + CRATE_UNDO_SECONDS,
+            }
+            undo_map[user_id] = undo_record
+            notice = get_text(lang, "crate_removed")
+        selected_index = min(index, len(items) - 1) if items else None
+    elif action.action == "undo":
+        if undo_record:
+            items, restored = await restore_crate_item(
+                bot_data,
+                user_id,
+                index=int(undo_record.get("index") or 0),
+                entry=undo_record.get("entry") or {},
+            )
+            if restored:
+                selected_index = min(
+                    int(undo_record.get("index") or 0), len(items) - 1
+                )
+                notice = get_text(lang, "crate_restored")
+                undo_map.pop(user_id, None)
+                undo_record = None
+        else:
+            items = await load_crate(bot_data, user_id)
+    elif action.action == "clear":
+        items = await load_crate(bot_data, user_id)
+        await query.answer()
+        text, keyboard = _render_bot_crate(
+            items, lang=lang, confirm_clear=True
+        )
+        await _safe_edit(query, text, keyboard)
+        return
+    elif action.action == "clear_confirm":
+        await save_crate(bot_data, user_id, [])
+        undo_map.pop(user_id, None)
+        undo_record = None
+        items = []
+    elif action.action == "clear_cancel":
+        items = await load_crate(bot_data, user_id)
     elif action.action == "open":
-        items = await load_crate(context.application.bot_data, user_id)
+        items = await load_crate(bot_data, user_id)
     else:
         await query.answer()
         return
-    await query.answer()
-    text, keyboard = _render_bot_crate(items, lang=lang)
+    await query.answer(notice)
+    text, keyboard = _render_bot_crate(
+        items,
+        lang=lang,
+        selected_index=selected_index,
+        can_undo=undo_record is not None,
+    )
     await _safe_edit(query, text, keyboard)
 
 
@@ -1165,7 +1277,20 @@ async def _reply_with_flow_error(
         BotErrorCode.RELEASE_NOT_FOUND: "error_search",
         BotErrorCode.PROVIDER_UNAVAILABLE: "error_provider",
     }.get(error.code, "no_url_hint")
-    text = f"<b>{get_text(lang, 'error_title')}</b>\n\n{get_text(lang, detail_key)}"
+    detail = get_text(lang, detail_key)
+    if error.code == BotErrorCode.PROVIDER_UNAVAILABLE and error.provider:
+        provider_labels = {
+            "songlink": "Song.link",
+            "youtube": "YouTube",
+            "nts": "NTS Radio",
+            "apple": "Apple Music",
+            "spotify": "Spotify",
+        }
+        provider = provider_labels.get(error.provider.casefold(), error.provider)
+        detail = get_text(lang, "error_provider_named").format(
+            provider=escape(provider)
+        )
+    text = f"<b>{get_text(lang, 'error_title')}</b>\n\n{detail}"
     keyboard = _build_error_keyboard(
         context.bot.username,
         lang=lang,
@@ -1237,16 +1362,32 @@ async def _resolve_search_sources(
             )
             placeholder = _take_placeholder(message.chat_id)
             target = placeholder or message
-            text = get_text(lang, "search_choose").replace(
-                "{query}", escape(search_query)
-            )
+            lines = [
+                get_text(lang, "search_choose").replace(
+                    "{query}", escape(search_query)
+                ),
+                "",
+            ]
+            for index, candidate in enumerate(candidates[:6], start=1):
+                artist = escape(str(getattr(candidate, "artist", "") or "—"))
+                title = escape(str(getattr(candidate, "title", "") or "—"))
+                lines.append(f"<b>{index}.</b> {artist} — {title}")
+                meta = [
+                    escape(str(value))
+                    for value in (
+                        getattr(candidate, "album", None),
+                        getattr(candidate, "year", None),
+                    )
+                    if value
+                ]
+                if meta:
+                    lines.append(f"<i>{' · '.join(meta)}</i>")
+            text = "\n".join(lines)
             keyboard = InlineKeyboardMarkup(
                 [
                     [
                         InlineKeyboardButton(
-                            f"{index + 1}. {candidate.artist} — {candidate.title}"[
-                                :64
-                            ],
+                            f"{index + 1} · {candidate.title}"[:64],
                             callback_data=encode_callback(
                                 "select", "pick", f"{selection_id}:{index}"
                             ),
@@ -1259,7 +1400,11 @@ async def _resolve_search_sources(
                         InlineKeyboardButton(
                             get_text(lang, "retry"),
                             callback_data=encode_callback("retry", "last"),
-                        )
+                        ),
+                        InlineKeyboardButton(
+                            get_text(lang, "search_change"),
+                            switch_inline_query_current_chat=search_query,
+                        ),
                     ]
                 ]
             )
@@ -1305,6 +1450,8 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         # A newer private-chat request superseded this one. Treat cancellation
         # as an expected UX event, not a failed Telegram webhook delivery.
         LOGGER.debug("Stale lookup cancelled in favor of a newer request")
+        if message is not None:
+            await _cancel_progress(message.chat_id, _update_lang(update))
     except TelegramError as exc:
         if message is not None and message.chat.type == "channel":
             await _notify_admin(
@@ -1368,10 +1515,10 @@ async def _handle_empty_lookup(
             lang=lang,
         )
     else:
-        await _reply_with_error(
+        await _reply_with_flow_error(
             message,
             context,
-            _format_not_found_message(source_urls),
+            BotFlowError(BotErrorCode.RELEASE_NOT_FOUND),
             lang=lang,
         )
     return True
@@ -1911,22 +2058,13 @@ def _build_error_keyboard(
     )
 
 
-def _menu_button(label: str, callback_data: str, active: str | None) -> InlineKeyboardButton:
-    prefix = "• " if callback_data == active else ""
-    style = "success" if callback_data == active else "primary"
-    return InlineKeyboardButton(
-        f"{prefix}{label}",
-        callback_data=callback_data,
-        api_kwargs={"style": style},
-    )
-
-
 def _menu_text(menu_key: str, *, lang: str = "ru") -> str:
     key_map = {
         MENU_HELP: "menu_help",
         MENU_DEMO: "menu_demo",
         MENU_GUIDE: "menu_guide",
         MENU_PLATFORMS: "menu_platforms",
+        MENU_MORE: "menu_more",
     }
     return get_text(lang, key_map.get(menu_key, "menu_start"))
 

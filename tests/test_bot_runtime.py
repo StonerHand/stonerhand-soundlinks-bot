@@ -7,6 +7,7 @@ from music_links_bot.bot_crate import (
     load_crate,
     move_crate_item,
     remove_crate_item,
+    restore_crate_item,
 )
 from music_links_bot.bot_runtime import (
     BotRuntime,
@@ -14,6 +15,11 @@ from music_links_bot.bot_runtime import (
     decode_callback,
     detect_action,
     encode_callback,
+)
+from music_links_bot.bot_progress import (
+    adopt_progress_message,
+    cancel_progress,
+    take_progress,
 )
 
 
@@ -58,6 +64,24 @@ class CallbackContractTests(unittest.TestCase):
 
 
 class RuntimeSafetyTests(unittest.IsolatedAsyncioTestCase):
+    async def test_cancelled_lookup_retires_progress_message(self) -> None:
+        class ProgressMessage:
+            chat_id = 17
+
+            def __init__(self) -> None:
+                self.deleted = False
+
+            async def delete(self) -> None:
+                self.deleted = True
+
+        message = ProgressMessage()
+        adopt_progress_message(message)
+
+        await cancel_progress(17)
+
+        self.assertTrue(message.deleted)
+        self.assertIsNone(take_progress(17))
+
     async def test_callback_is_claimed_only_once(self) -> None:
         runtime = BotRuntime()
         self.assertTrue(await runtime.claim_callback("callback-1"))
@@ -126,6 +150,15 @@ class BotCrateTests(unittest.IsolatedAsyncioTestCase):
         items = await remove_crate_item(bot_data, 7, 0)
         self.assertEqual([item["draft_id"] for item in items], ["d1"])
         self.assertEqual(len(await load_crate(bot_data, 7)), 1)
+
+        items, restored = await restore_crate_item(
+            bot_data,
+            7,
+            index=0,
+            entry={"draft_id": "d2", "item": second},
+        )
+        self.assertTrue(restored)
+        self.assertEqual([item["draft_id"] for item in items], ["d2", "d1"])
 
     async def test_batch_add_dedupes_and_persists_once(self) -> None:
         class KVStub:

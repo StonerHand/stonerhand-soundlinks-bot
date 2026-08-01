@@ -23,7 +23,7 @@
 | Clean title, artwork, hashtags and compact buttons | Card or block-based Rich longread |
 | Several links → one collection with per-link status | Up to 10 releases, ordering and failed-link retry |
 | Song + YouTube clip → two-tile media preview | Song artwork and video thumbnail |
-| Inline search with history, cache and pagination | History, queue, undo and owner analytics |
+| Inline search with labeled history, cache and pagination | History, queue, undo and owner analytics |
 | Automatic link replacement in chats and channels | Native sharing that preserves buttons |
 
 Spotify, Apple Music, YouTube, SoundCloud, Bandcamp, Deezer, Tidal,
@@ -32,7 +32,10 @@ and NTS Radio are supported.
 
 Cards contain release data and actions without generated promotional filler or
 hidden heading links. A quick card is capped at four actions: the preferred
-service, the universal hub, button-preserving share, and Add to crate.
+service, the universal hub, button-preserving share, and a compact More menu.
+More contains clear cover, quote and hashtag toggles plus Add to crate. The
+chat crate uses numbered selection instead of one control row per release,
+confirms clearing and can restore a recently removed item.
 
 Longreads use Telegram Rich Messages with a safe HTML fallback. A song and a
 YouTube clip become a native two-tile media album; the bot never downloads or
@@ -49,8 +52,9 @@ flowchart LR
     D --> E["Chat · channel · queue"]
 ```
 
-The home menu keeps three actions: **Open Studio**, **Find a release**, and
-**Crate**. Settings, longreads, scheduling and publishing live in the Mini App,
+The home menu is a two-column grid: **Studio**, **Find**, **Crate**, and
+**More**. The guided tour is shown only on the first visit. Settings, longreads,
+scheduling and publishing live in the Mini App,
 while chat stays a fast path. The bot and Studio use the same resolver. Provider
 clients are lazy, independent lookups run in parallel, and successful bundles
 are cached in memory and Redis. One request deadline bounds the entire lookup,
