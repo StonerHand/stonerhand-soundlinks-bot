@@ -312,10 +312,16 @@ class _CrateBotStub:
         self.media_groups: list[dict] = []
 
     async def send_message(self, **kwargs):
+        from types import SimpleNamespace
+
         self.sent.append(kwargs)
+        return SimpleNamespace(message_id=len(self.sent))
 
     async def send_photo(self, **kwargs):
+        from types import SimpleNamespace
+
         self.photos.append(kwargs)
+        return SimpleNamespace(message_id=len(self.photos))
 
     async def send_media_group(self, **kwargs):
         self.media_groups.append(kwargs)
@@ -390,6 +396,16 @@ class DashboardApiTests(unittest.TestCase):
             result["queue"],
             {"count": 0, "next_at": None, "available": True},
         )
+
+    def test_posted_records_are_returned_as_display_dates(self) -> None:
+        from api.webapp import _posted_date_from_raw
+
+        self.assertEqual(
+            _posted_date_from_raw('{"date":"01.08.2026","message_id":42}'),
+            "01.08.2026",
+        )
+        self.assertEqual(_posted_date_from_raw("31.07.2026"), "31.07.2026")
+        self.assertIsNone(_posted_date_from_raw(None))
 
     def test_queue_screen_skips_corrupt_jobs(self) -> None:
         import asyncio
@@ -809,6 +825,24 @@ class CrateApiTests(unittest.TestCase):
                     {"artist": "X", "title": "Y", "page_url": malformed, "links": {}}
                 )["page_url"]
             )
+
+    def test_crate_data_is_compact_and_safe(self) -> None:
+        from api.webapp import _compact_track_data
+
+        compact = _compact_track_data(
+            {
+                "artist": "  Sleep   " + "x" * 300,
+                "title": " Dragonaut " + "y" * 300,
+                "kind": "unsupported",
+                "thumbnail_url": "javascript:alert(1)",
+                "links": {"spotify": "javascript:alert(1)"},
+            }
+        )
+        self.assertLessEqual(len(compact["artist"]), 180)
+        self.assertLessEqual(len(compact["title"]), 180)
+        self.assertEqual(compact["kind"], "song")
+        self.assertIsNone(compact["thumbnail_url"])
+        self.assertIsNone(compact["page_url"])
 
     def test_crate_deliver_client_items_deduped_and_need_two(self) -> None:
         import asyncio

@@ -21,6 +21,7 @@ MAX_DELAY_SECONDS = 90 * 24 * 3600
 MAX_JOB_ATTEMPTS = 3
 RETRY_BACKOFF_SECONDS = (120, 600, 1800)
 PROCESSING_LEASE_SECONDS = 90
+MAX_JOBS_PER_TICK = 3
 JOB_PENDING = "pending"
 JOB_PROCESSING = "processing"
 
@@ -212,8 +213,14 @@ async def reschedule_job(context, job_id: str, publish_at: int) -> bool:
     return await _locked_mutate(context, mutate)
 
 
-async def _claim_due_jobs(context, *, now: int, owner: str) -> list[dict]:
-    """Lease due jobs without removing them from durable storage."""
+async def _claim_due_jobs(
+    context,
+    *,
+    now: int,
+    owner: str,
+    limit: int = 1,
+) -> list[dict]:
+    """Lease a bounded number of due jobs without removing them."""
 
     def mutate(jobs: list[dict]):
         claimed: list[dict] = []
@@ -225,7 +232,7 @@ async def _claim_due_jobs(context, *, now: int, owner: str) -> list[dict]:
             claimable = due and (
                 status == JOB_PENDING or (status == JOB_PROCESSING and lease_expired)
             )
-            if not claimable:
+            if not claimable or len(claimed) >= max(1, limit):
                 updated.append(job)
                 continue
             leased = dict(job)
@@ -298,13 +305,20 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
 
     now_ts = int(now if now is not None else time.time())
     owner = secrets.token_hex(12)
-    try:
-        claimed = await _claim_due_jobs(context, now=now_ts, owner=owner)
-    except (QueueBusyError, QueueStorageError):
-        return 0
-
     published = 0
-    for job in claimed:
+    for _ in range(MAX_JOBS_PER_TICK):
+        try:
+            claimed = await _claim_due_jobs(
+                context,
+                now=now_ts,
+                owner=owner,
+                limit=1,
+            )
+        except (QueueBusyError, QueueStorageError):
+            break
+        if not claimed:
+            break
+        job = claimed[0]
         draft = job.get("draft")
         valid = isinstance(draft, dict) and isinstance(draft.get("item"), dict)
         delivered = None

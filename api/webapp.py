@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import logging
 import threading
 import time
@@ -884,7 +885,10 @@ async def _action_history(context, user_id: int, is_admin: bool) -> dict:
             _release_fingerprint(str(item.get("artist") or ""), str(item.get("title") or ""))
             for item in items
         ]
-        posted_dates = await kv.mget(keys)
+        posted_dates = [
+            _posted_date_from_raw(value)
+            for value in await kv.mget(keys)
+        ]
 
     return {
         "ok": True,
@@ -894,6 +898,18 @@ async def _action_history(context, user_id: int, is_admin: bool) -> dict:
             for index, item in enumerate(items)
         ],
     }
+
+
+def _posted_date_from_raw(value: object) -> str | None:
+    if value is None or value == "":
+        return None
+    try:
+        payload = json.loads(value) if isinstance(value, str) else value
+    except (TypeError, ValueError):
+        return str(value)
+    if isinstance(payload, dict):
+        return str(payload.get("date") or "") or None
+    return str(payload) if payload is not None else None
 
 
 async def _action_dashboard(context, user_id: int, is_admin: bool) -> dict:

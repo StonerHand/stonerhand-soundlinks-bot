@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import hashlib
 
+from music_links_bot.bot_storage import remember_bounded
 from music_links_bot.constants import PLATFORM_LABELS
 from music_links_bot.kvstore import KVStore
 
 CHANNEL_TEMPLATE_TTL_SECONDS = 180 * 24 * 3600
+MAX_MEMORY_TEMPLATES = 100
 _TEMPLATE_FIELDS = (
     "hashtags",
     "large_preview",
@@ -54,7 +56,12 @@ async def load_channel_template(context, target: int | str) -> dict:
     stored = await kv.get_json(key) if kv is not None else None
     template = _sanitize_template(stored)
     if template:
-        memory[key] = template
+        remember_bounded(
+            memory,
+            key,
+            template,
+            max_size=MAX_MEMORY_TEMPLATES,
+        )
     return template
 
 
@@ -72,7 +79,12 @@ async def save_channel_template(context, target: int | str, draft: dict) -> None
     if not template:
         return
     key = _template_key(target)
-    context.application.bot_data.setdefault("channel_templates", {})[key] = template
+    remember_bounded(
+        context.application.bot_data.setdefault("channel_templates", {}),
+        key,
+        template,
+        max_size=MAX_MEMORY_TEMPLATES,
+    )
     kv: KVStore | None = context.application.bot_data.get("kv_store")
     if kv is not None:
         await kv.set_json(

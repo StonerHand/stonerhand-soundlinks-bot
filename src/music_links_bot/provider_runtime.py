@@ -149,7 +149,7 @@ def _close_awaitable(awaitable: Awaitable[Any]) -> None:
 
 def lookup_cache_key(source_urls: list[str]) -> str:
     canonical = json.dumps(
-        sorted(dict.fromkeys(source_urls)),
+        list(dict.fromkeys(source_urls)),
         ensure_ascii=True,
         separators=(",", ":"),
     )

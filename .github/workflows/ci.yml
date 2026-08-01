@@ -22,6 +22,9 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt pyflakes
 
+      - name: Dependency consistency
+        run: python -m pip check
+
       - name: Lint
         run: python -m pyflakes src api tests
 

@@ -194,6 +194,22 @@ class PublishQueueTests(unittest.TestCase):
         self.assertEqual(asyncio.run(scenario()), 0)
         self.assertEqual(context.bot.sent, [])
 
+    def test_tick_claims_only_a_bounded_batch(self) -> None:
+        context = make_context()
+
+        async def scenario():
+            for _ in range(publish_queue.MAX_JOBS_PER_TICK + 2):
+                await publish_queue.add_job(context, make_draft(), 100)
+            published = await publish_queue.process_due_jobs(context, now=200)
+            return published, await publish_queue.load_jobs(context)
+
+        published, jobs = asyncio.run(scenario())
+        self.assertEqual(published, publish_queue.MAX_JOBS_PER_TICK)
+        self.assertEqual(len(jobs), 2)
+        self.assertTrue(
+            all(job["status"] == publish_queue.JOB_PENDING for job in jobs)
+        )
+
     def test_queue_caps_job_count(self) -> None:
         context = make_context()
 

@@ -245,6 +245,25 @@ class PartialBatchJourneyTests(unittest.IsolatedAsyncioTestCase):
 
 
 class PermissionPreflightTests(unittest.IsolatedAsyncioTestCase):
+    async def test_corrupt_warm_permission_cache_is_ignored(self) -> None:
+        class Bot:
+            id = 99
+
+            async def get_chat_member(self, **kwargs):
+                del kwargs
+                return SimpleNamespace(status="creator")
+
+        context = SimpleNamespace(
+            bot=Bot(),
+            application=SimpleNamespace(
+                bot_data={"publish_access_cache": {"@stonerhand": ("bad", None)}}
+            ),
+        )
+
+        access = await check_publish_access(context, "@stonerhand")
+
+        self.assertTrue(access.allowed)
+
     async def test_missing_channel_post_right_is_reported_before_send(self) -> None:
         class Bot:
             id = 99

@@ -128,11 +128,12 @@ class PublicationService:
             await self._persist_metrics()
             return None
 
-        self._record_publication(sent is not None)
-        if channel_style and sent is not None:
+        delivered = sent is not None and sent is not False
+        self._record_publication(delivered)
+        if channel_style and delivered:
             await save_channel_template(self.context, target, draft)
         await self._persist_metrics()
-        return sent if sent is not None else True
+        return sent if delivered else None
 
     async def _send(
         self,

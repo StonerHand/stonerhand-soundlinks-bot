@@ -11,6 +11,19 @@ from music_links_bot.text_utils import normalize_hashtag
 
 MAX_CUSTOM_TAGS = 8
 MAX_CRATE_ITEMS = 10
+ALLOWED_KINDS = {
+    "song",
+    "album",
+    "podcast",
+    "video",
+    "radio",
+    "playlist",
+    "artist",
+}
+
+
+def _compact_text(value: object, limit: int) -> str:
+    return " ".join(str(value or "").split())[:limit]
 
 
 def is_web_url(value: object) -> bool:
@@ -21,21 +34,30 @@ def is_web_url(value: object) -> bool:
 
 
 def compact_track_data(item: dict) -> dict:
-    links = item.get("links") if isinstance(item.get("links"), dict) else {}
+    raw_links = item.get("links") if isinstance(item.get("links"), dict) else {}
+    links = {
+        key: value
+        for key, value in raw_links.items()
+        if isinstance(key, str) and is_web_url(value)
+    }
     page_url = item.get("page_url")
     if not is_web_url(page_url):
         page_url = None
     if not page_url:
         page_url = next((value for value in links.values() if is_web_url(value)), None)
+    kind = _compact_text(item.get("kind"), 16).casefold()
+    thumbnail_url = item.get("thumbnail_url")
+    if not is_web_url(thumbnail_url):
+        thumbnail_url = None
     return {
-        "title": str(item.get("title") or ""),
-        "artist": str(item.get("artist") or ""),
-        "kind": str(item.get("kind") or "song"),
-        "release_format": item.get("release_format") or None,
-        "genre": item.get("genre") or None,
+        "title": _compact_text(item.get("title"), 180),
+        "artist": _compact_text(item.get("artist"), 180),
+        "kind": kind if kind in ALLOWED_KINDS else "song",
+        "release_format": _compact_text(item.get("release_format"), 32) or None,
+        "genre": _compact_text(item.get("genre"), 80) or None,
         "page_url": page_url or None,
-        "release_year": item.get("release_year") or None,
-        "thumbnail_url": item.get("thumbnail_url") or None,
+        "release_year": _compact_text(item.get("release_year"), 16) or None,
+        "thumbnail_url": thumbnail_url,
     }
 
 

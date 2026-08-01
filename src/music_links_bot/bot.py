@@ -160,6 +160,7 @@ from music_links_bot.bot_storage import (
     load_draft as _load_draft,
     load_retry_sources as _load_retry_sources,
     load_search_selection as _load_search_selection,
+    remember_bounded as _remember_bounded,
     store_draft as _store_draft,
     store_search_selection as _store_search_selection,
 )
@@ -263,6 +264,7 @@ MENU_KEYS = frozenset(
     )
 )
 CRATE_UNDO_SECONDS = 15
+MAX_CRATE_UNDO_RECORDS = 300
 DRAFT_UNDO_SECONDS = 15
 DEFAULT_UI_MODE = "stonerhand"
 MAX_BUTTON_TEXT_LENGTH = 64
@@ -1315,10 +1317,18 @@ async def _dispatch_crate_action(query, context, action: CallbackAction) -> None
     user_id = query.from_user.id
     bot_data = context.application.bot_data
     undo_map = bot_data.setdefault("crate_undo", {})
+    now = time.time()
+    for key, value in list(undo_map.items()):
+        try:
+            active = (
+                isinstance(value, dict)
+                and float(value.get("expires_at") or 0) > now
+            )
+        except (TypeError, ValueError):
+            active = False
+        if not active:
+            undo_map.pop(key, None)
     undo_record = undo_map.get(user_id)
-    if undo_record and float(undo_record.get("expires_at") or 0) <= time.time():
-        undo_map.pop(user_id, None)
-        undo_record = None
     try:
         index = int(action.payload)
     except (TypeError, ValueError):
@@ -1344,7 +1354,12 @@ async def _dispatch_crate_action(query, context, action: CallbackAction) -> None
                 "index": index,
                 "expires_at": time.time() + CRATE_UNDO_SECONDS,
             }
-            undo_map[user_id] = undo_record
+            _remember_bounded(
+                undo_map,
+                user_id,
+                undo_record,
+                max_size=MAX_CRATE_UNDO_RECORDS,
+            )
             notice = get_text(lang, "crate_removed")
         selected_index = min(index, len(items) - 1) if items else None
     elif action.action == "undo":
@@ -1386,7 +1401,12 @@ async def _dispatch_crate_action(query, context, action: CallbackAction) -> None
             "index": 0,
             "expires_at": time.time() + CRATE_UNDO_SECONDS,
         }
-        undo_map[user_id] = undo_record
+        _remember_bounded(
+            undo_map,
+            user_id,
+            undo_record,
+            max_size=MAX_CRATE_UNDO_RECORDS,
+        )
         items = []
     elif action.action == "clear_cancel":
         items = await load_crate(bot_data, user_id)
