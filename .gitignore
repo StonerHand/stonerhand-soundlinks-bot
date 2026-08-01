@@ -1,11 +1,36 @@
+# Operating-system files
 .DS_Store
+Thumbs.db
+
+# Local configuration and environments
 .env
+.env.*
+!.env.example
 .venv/
+.vercel/
+
+# Python build and test output
 __pycache__/
 *.py[cod]
+*.egg-info/
+build/
+dist/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-data/*.json
-*.egg-info/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
 
+# Browser and test artifacts
+test-results/
+playwright-report/
+blob-report/
+
+# Runtime and temporary files
+data/*.json
+*.log
+*.tmp
+*.bak
+*~

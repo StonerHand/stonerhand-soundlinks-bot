@@ -129,7 +129,7 @@ tests/
 | Режим | Точка входа | Получение updates |
 | --- | --- | --- |
 | Production | `api/telegram.py` | Telegram webhook |
-| Local / Railway | `python -m music_links_bot` | `run_polling()` |
+| Local / VPS | `python -m music_links_bot` | `run_polling()` |
 
 В serverless-функциях PTB Application и сетевые клиенты сохраняются в module-level state тёплого инстанса. `loop_runner.py` держит постоянный asyncio event loop в отдельном потоке. Инициализация сериализована lock, но обработка независимых запросов не удерживает этот lock во время сети.
 
