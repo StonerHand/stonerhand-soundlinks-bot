@@ -207,6 +207,7 @@ from music_links_bot.sharing import (
 )
 from music_links_bot.text_utils import normalize_hashtag
 from music_links_bot.url_utils import (
+    cache_key_for_url,
     extract_supported_urls,
 )
 
@@ -249,6 +250,12 @@ MAX_MEMORY_DRAFTS = _MAX_MEMORY_DRAFTS
 
 _INPUT_OVERRIDE: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "input_override", default=None
+)
+_SEARCH_QUERY_OVERRIDE: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "search_query_override", default=None
+)
+_BYPASS_INTENT_GUARD: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "bypass_intent_guard", default=False
 )
 DEFAULT_PLATFORM_ORDER = (
     "spotify",
@@ -320,6 +327,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     lang = _update_lang(update)
     user_id = update.effective_user.id if update.effective_user else update.message.chat_id
     runtime = _runtime(context)
+    if not await runtime.claim_intent(user_id, kind="command", value="start"):
+        return
     session = await runtime.get_session(user_id, lang=lang)
     crate_count, is_admin = await _home_state(context, user_id)
     text = _build_home_text(
@@ -651,6 +660,8 @@ async def _send_track_draft(
     *,
     user_prefix: str,
     lang: str,
+    user_id: int,
+    search_query: str | None = None,
 ) -> None:
     admin_chat_id = context.application.bot_data.get("admin_chat_id")
     draft_id = secrets.token_hex(8)
@@ -664,10 +675,9 @@ async def _send_track_draft(
         "large_preview": True,
         "chat_id": message.chat_id,
         "lang": lang,
+        "search_query": (search_query or "")[:120],
         "can_publish": (
-            message.from_user is not None
-            and admin_chat_id is not None
-            and message.from_user.id == admin_chat_id
+            admin_chat_id is not None and user_id == admin_chat_id
         ),
     }
 
@@ -706,9 +716,9 @@ def _render_track_draft(
         release_kind=track.kind,
         release_format=track.release_format,
         platform_selection=_draft_platform_selection(draft),
-        # Keep the quick card to four useful actions: primary service, the
-        # complete hub, native button-preserving share, and the crate.
-        max_visible_platforms=1 if draft_id is not None else None,
+        # Two preferred services are enough for the quick surface. The hub and
+        # contextual editor remain available without a long button wall.
+        max_visible_platforms=2 if draft_id is not None else None,
     )
     keyboard = add_share_button(
         keyboard,
@@ -720,15 +730,19 @@ def _render_track_draft(
     if draft_id is None:
         return text, keyboard
 
-    quick_buttons = [
-        button for row in keyboard.inline_keyboard for button in row
-    ]
-    editor_actions = _editor_rows(draft_id, draft)[0]
-    rows = [quick_buttons[:2]] if quick_buttons else []
-    if len(quick_buttons) > 2:
-        rows.append([quick_buttons[2], editor_actions[1]])
-    else:
-        rows.append([editor_actions[1]])
+    base_rows = [list(row) for row in keyboard.inline_keyboard]
+    rows = [base_rows[0]] if base_rows else []
+    hub_button = next(
+        (
+            button
+            for row in base_rows[1:]
+            for button in row
+            if track.page_url and button.url == track.page_url
+        ),
+        None,
+    )
+    more_button = _editor_rows(draft_id, draft)[0][1]
+    rows.append([button for button in (hub_button, more_button) if button])
     return text, InlineKeyboardMarkup(rows)
 
 
@@ -755,10 +769,14 @@ async def _dispatch_selection_action(query, context, action: CallbackAction) -> 
         return
     _adopt_progress_message(query.message)
     token = _INPUT_OVERRIDE.set(source_url)
+    search_token = _SEARCH_QUERY_OVERRIDE.set(str(payload.get("query") or ""))
+    guard_token = _BYPASS_INTENT_GUARD.set(True)
     try:
         synthetic = Update(update_id=0, callback_query=query)
         await track_lookup_message(synthetic, context)
     finally:
+        _BYPASS_INTENT_GUARD.reset(guard_token)
+        _SEARCH_QUERY_OVERRIDE.reset(search_token)
         _INPUT_OVERRIDE.reset(token)
 
 
@@ -786,9 +804,11 @@ async def _dispatch_retry_action(query, context, action: CallbackAction) -> None
     await query.answer(get_text(lang, "progress_search"))
     _adopt_progress_message(query.message)
     token = _INPUT_OVERRIDE.set(value)
+    guard_token = _BYPASS_INTENT_GUARD.set(True)
     try:
         await track_lookup_message(Update(update_id=0, callback_query=query), context)
     finally:
+        _BYPASS_INTENT_GUARD.reset(guard_token)
         _INPUT_OVERRIDE.reset(token)
 
 
@@ -820,6 +840,24 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
         return
 
     lang = draft.get("lang") or user_lang
+
+    if action == "a":
+        search_query = str(draft.get("search_query") or "").strip()
+        if not search_query or query.message is None:
+            await query.answer(get_text(lang, "ed_expired"), show_alert=True)
+            return
+        await query.answer(get_text(lang, "progress_search"))
+        _adopt_progress_message(query.message)
+        token = _INPUT_OVERRIDE.set(search_query)
+        guard_token = _BYPASS_INTENT_GUARD.set(True)
+        try:
+            await track_lookup_message(
+                Update(update_id=0, callback_query=query), context
+            )
+        finally:
+            _BYPASS_INTENT_GUARD.reset(guard_token)
+            _INPUT_OVERRIDE.reset(token)
+        return
 
     if action == "m":
         await query.answer()
@@ -1260,6 +1298,7 @@ async def _reply_with_error(
             return
         except TelegramError:
             LOGGER.debug("Could not edit loading placeholder", exc_info=True)
+            await _try_delete_message(placeholder)
 
     await message.reply_text(text, reply_markup=reply_markup)
 
@@ -1270,6 +1309,7 @@ async def _reply_with_flow_error(
     error: BotFlowError,
     *,
     lang: str,
+    search_query: str | None = None,
 ) -> None:
     detail_key = {
         BotErrorCode.INVALID_INPUT: "no_url_hint",
@@ -1295,6 +1335,7 @@ async def _reply_with_flow_error(
         context.bot.username,
         lang=lang,
         retryable=error.retryable,
+        search_query=search_query,
     )
     placeholder = _take_placeholder(message.chat_id)
     if placeholder is not None:
@@ -1305,6 +1346,7 @@ async def _reply_with_flow_error(
             return
         except TelegramError:
             LOGGER.debug("Could not edit flow-error placeholder", exc_info=True)
+            await _try_delete_message(placeholder)
     await message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
 
@@ -1325,7 +1367,7 @@ async def _resolve_search_sources(
     *,
     user_id: int,
     lang: str,
-) -> tuple[list[str], bool] | None:
+) -> tuple[list[str], bool, str] | None:
     """Resolve a private text query or finish the flow with a picker/error."""
     search_query = normalize_search_query(
         _strip_bot_mention(message_text or "", context.bot.username)
@@ -1361,7 +1403,6 @@ async def _resolve_search_sources(
                 urls=[candidate.url for candidate in candidates[:6]],
             )
             placeholder = _take_placeholder(message.chat_id)
-            target = placeholder or message
             lines = [
                 get_text(lang, "search_choose").replace(
                     "{query}", escape(search_query)
@@ -1409,25 +1450,30 @@ async def _resolve_search_sources(
                 ]
             )
             if placeholder is not None:
-                await placeholder.edit_text(
-                    text,
-                    parse_mode=ParseMode.HTML,
-                    reply_markup=keyboard,
-                )
-            else:
-                await target.reply_text(
-                    text,
-                    parse_mode=ParseMode.HTML,
-                    reply_markup=keyboard,
-                )
+                try:
+                    await placeholder.edit_text(
+                        text,
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=keyboard,
+                    )
+                    return None
+                except TelegramError:
+                    LOGGER.debug("Could not edit search progress", exc_info=True)
+                    await _try_delete_message(placeholder)
+            await message.reply_text(
+                text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=keyboard,
+            )
             return None
-        return [candidates[0].url], True
+        return [candidates[0].url], True, search_query
     except (SearchLookupError, IndexError):
         await _reply_with_flow_error(
             message,
             context,
             BotFlowError(BotErrorCode.SEARCH_NOT_FOUND, retryable=True),
             lang=lang,
+            search_query=search_query,
         )
         return None
 
@@ -1453,6 +1499,8 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
         if message is not None:
             await _cancel_progress(message.chat_id, _update_lang(update))
     except TelegramError as exc:
+        if message is not None and message.chat.type == "private":
+            await _cancel_progress(message.chat_id, _update_lang(update))
         if message is not None and message.chat.type == "channel":
             await _notify_admin(
                 context,
@@ -1460,6 +1508,10 @@ async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYP
                 f"{type(exc).__name__}: {str(exc)[:180]}",
                 only_for_channel_message=message,
             )
+        raise
+    except Exception:
+        if message is not None and message.chat.type == "private":
+            await _cancel_progress(message.chat_id, _update_lang(update))
         raise
     finally:
         runtime = _runtime(context)
@@ -1590,6 +1642,7 @@ async def _send_track_matches(
     lang: str,
     include_channel_button: bool,
     include_hashtags: bool,
+    search_query: str | None = None,
 ) -> None:
     """Deliver one release or a collection without mixing lookup concerns."""
     if len(tracks) > 1:
@@ -1646,6 +1699,8 @@ async def _send_track_matches(
             track,
             user_prefix=user_prefix,
             lang=lang,
+            user_id=user_id,
+            search_query=search_query,
         )
     else:
         await _send_track_result(
@@ -1697,23 +1752,37 @@ async def _track_lookup_message_impl(
     lang = _update_lang(update) if is_private else "ru"
     user_id = update.effective_user.id if update.effective_user else message.chat_id
     runtime = _runtime(context)
+    search_query = (_SEARCH_QUERY_OVERRIDE.get() or "").strip() or None
     if is_private:
-        runtime.register_request(user_id)
         action_kind = detect_action(message_text or "", source_urls, is_private=True)
+        intent_value = (
+            "\n".join(sorted(cache_key_for_url(url) for url in source_urls))
+            if source_urls
+            else message_text or ""
+        )
+        if (
+            not _BYPASS_INTENT_GUARD.get()
+            and not await runtime.claim_intent(
+                user_id,
+                kind=action_kind,
+                value=intent_value,
+            )
+        ):
+            return
         if action_kind == "help":
             await _reply_with_menu(message, context, MENU_HELP, lang=lang)
             return
+        runtime.register_request(user_id)
+        remembered_value = search_query or message_text or ""
+        if not search_query and len(source_urls) == 1:
+            remembered_value = source_urls[0]
         await runtime.remember_action(
             user_id,
-            kind="resolve" if source_urls else "search",
-            value=(
-                message_text or ""
-                if len(source_urls) > 1
-                else source_urls[0] if source_urls else message_text or ""
-            ),
+            kind="search" if search_query or not source_urls else "resolve",
+            value=remembered_value,
             lang=lang,
         )
-    found_via_search = False
+    found_via_search = search_query is not None
     if not source_urls:
         if not is_private:
             return
@@ -1727,7 +1796,7 @@ async def _track_lookup_message_impl(
         )
         if search_result is None:
             return
-        source_urls, found_via_search = search_result
+        source_urls, found_via_search, search_query = search_result
 
     if message.chat.type == "channel":
         access = await check_publish_access(context, message.chat_id)
@@ -1785,6 +1854,7 @@ async def _track_lookup_message_impl(
             lang=lang,
             include_channel_button=include_channel_button,
             include_hashtags=include_hashtags,
+            search_query=search_query,
         )
         await _send_partial_lookup_status(
             message, context, bundle, user_id=user_id, lang=lang
@@ -2022,6 +2092,7 @@ async def _reply_with_track(
             )
         except TelegramError:
             LOGGER.debug("Could not edit loading placeholder", exc_info=True)
+            await _try_delete_message(placeholder)
 
     return await message.reply_text(
         text=text,
@@ -2050,11 +2121,13 @@ def _build_error_keyboard(
     *,
     lang: str = "ru",
     retryable: bool = False,
+    search_query: str | None = None,
 ) -> InlineKeyboardMarkup:
     return _build_error_keyboard_view(
         bot_username,
         lang=lang,
         retryable=retryable,
+        search_query=search_query,
     )
 
 

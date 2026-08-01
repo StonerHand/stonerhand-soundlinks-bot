@@ -31,9 +31,11 @@ Yandex Music, podcasts, Spotify and Apple Music playlists, Spotify artists,
 and NTS Radio are supported.
 
 Cards contain release data and actions without generated promotional filler or
-hidden heading links. A quick card is capped at four actions: the preferred
-service, the universal hub, button-preserving share, and a compact More menu.
-More contains clear cover, quote and hashtag toggles plus Add to crate. The
+hidden heading links. A quick card is capped at four actions: up to two
+preferred services, the universal hub, and a contextual More menu. Sharing,
+Add to crate and relevant formatting controls expand only when requested. A
+release found by title also keeps **Another release** and **Change query** close
+to the result. The
 chat crate uses numbered selection instead of one control row per release,
 confirms clearing and can restore a recently removed item.
 
@@ -57,7 +59,9 @@ The home menu is a two-column grid: **Studio**, **Find**, **Crate**, and
 scheduling and publishing live in the Mini App,
 while chat stays a fast path. The bot and Studio use the same resolver. Provider
 clients are lazy, independent lookups run in parallel, and successful bundles
-are cached in memory and Redis. One request deadline bounds the entire lookup,
+are cached in memory and Redis. Equal concurrent searches and resolver batches
+share one upstream request, while accidental repeated messages and `/start`
+taps are debounced across warm instances. One request deadline bounds the entire lookup,
 while a repeatedly failing provider is temporarily isolated. Partial batches
 keep their successful cards and retry only failed links.
 

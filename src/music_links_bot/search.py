@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 import logging
 
@@ -50,8 +51,15 @@ class SearchClient:
         self._miss_cache: TTLCache[bool] = TTLCache(ttl_seconds=10 * 60)
         self._genre_cache: TTLCache[str] = TTLCache(ttl_seconds=24 * 3600)
         self._preview_cache: TTLCache[str] = TTLCache(ttl_seconds=24 * 3600)
+        self._inflight: dict[str, asyncio.Task[list[SearchCandidate]]] = {}
 
     async def aclose(self) -> None:
+        pending = list(self._inflight.values())
+        for task in pending:
+            task.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+        self._inflight.clear()
         await self._client.aclose()
 
     async def search_release_url(self, query: str) -> str:
@@ -135,6 +143,39 @@ class SearchClient:
             return cached_candidates
         if self._miss_cache.get(cache_key):
             raise SearchLookupError("No release matched the query.")
+
+        pending = self._inflight.get(cache_key)
+        if pending is not None:
+            return await asyncio.shield(pending)
+
+        task = asyncio.create_task(
+            self._search_and_cache(normalized_query, cache_key)
+        )
+        self._inflight[cache_key] = task
+        task.add_done_callback(
+            lambda completed, key=cache_key: self._finish_inflight(key, completed)
+        )
+        try:
+            return await asyncio.shield(task)
+        finally:
+            if task.done():
+                self._finish_inflight(cache_key, task)
+
+    def _finish_inflight(
+        self,
+        cache_key: str,
+        task: asyncio.Task[list[SearchCandidate]],
+    ) -> None:
+        if self._inflight.get(cache_key) is task:
+            self._inflight.pop(cache_key, None)
+        if task.done() and not task.cancelled():
+            task.exception()
+
+    async def _search_and_cache(
+        self,
+        normalized_query: str,
+        cache_key: str,
+    ) -> list[SearchCandidate]:
 
         try:
             response = await self._client.get(

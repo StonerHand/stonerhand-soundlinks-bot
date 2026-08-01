@@ -155,6 +155,7 @@ def build_error_keyboard(
     *,
     lang: str = "ru",
     retryable: bool = False,
+    search_query: str | None = None,
 ) -> InlineKeyboardMarkup:
     """Keep recovery contextual: one primary action and one predictable back."""
     if retryable:
@@ -169,10 +170,18 @@ def build_error_keyboard(
             switch_inline_query_current_chat="",
             api_kwargs={"style": "primary"},
         )
+    recovery_row = [primary]
+    if search_query:
+        recovery_row.append(
+            InlineKeyboardButton(
+                get_text(lang, "search_change"),
+                switch_inline_query_current_chat=search_query[:120],
+            )
+        )
     del bot_username
     return InlineKeyboardMarkup(
         [
-            [primary],
+            recovery_row,
             [
                 InlineKeyboardButton(
                     get_text(lang, "home_back"),
@@ -287,7 +296,6 @@ def editor_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
             InlineKeyboardButton(
                 get_text(lang, "ed_more"),
                 callback_data=encode_callback("editor", "m", draft_id),
-                api_kwargs={"style": "primary"},
             ),
         ]
     ]
@@ -340,7 +348,23 @@ def editor_more_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButt
             callback_data=encode_callback("editor", "c", draft_id),
         )
     )
+    search_rows: list[list[InlineKeyboardButton]] = []
+    search_query = str(draft.get("search_query") or "").strip()
+    if search_query:
+        search_rows.append(
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "search_other"),
+                    callback_data=encode_callback("editor", "a", draft_id),
+                ),
+                InlineKeyboardButton(
+                    get_text(lang, "search_change"),
+                    switch_inline_query_current_chat=search_query[:120],
+                ),
+            ]
+        )
     return [
+        *search_rows,
         [crate_button],
         *toggle_rows,
         [

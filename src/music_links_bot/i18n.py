@@ -457,6 +457,7 @@ STRINGS: dict[str, dict[str, str]] = {
         EN: "<b>Choose a release</b>\n\nI found several matches for “{query}”:",
     },
     "search_change": {RU: "Изменить запрос", EN: "Change query"},
+    "search_other": {RU: "Другой релиз", EN: "Another release"},
     "progress_search": {RU: "1/3 · Ищу релиз…", EN: "1/3 · Finding the release…"},
     "progress_links": {RU: "2/3 · Собираю площадки…", EN: "2/3 · Collecting platforms…"},
     "progress_card": {RU: "3/3 · Собираю карточку…", EN: "3/3 · Building the card…"},
