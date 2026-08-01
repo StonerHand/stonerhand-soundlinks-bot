@@ -63,11 +63,38 @@ def format_track_message(
     hashtags: str | None = None,
 ) -> str:
     lines = [format_release_heading(track)]
+    meta = format_release_meta(track)
+    if meta:
+        lines.append(f"<i>{meta}</i>")
     return _with_hashtags(
         lines,
         hashtags if hashtags is not None else build_auto_hashtags(track),
         include_hashtags=include_hashtags,
     )
+
+
+def format_release_meta(track: TrackMatch) -> str:
+    """Compact, predictable metadata line for every single-release card."""
+    format_labels = {
+        "single": "Single",
+        "ep": "EP",
+        "show": "Show",
+        "episode": "Episode",
+    }
+    release_format = str(track.release_format or "").casefold()
+    kind_label = format_labels.get(release_format)
+    if not kind_label:
+        kind_label = {
+            "album": "Album",
+            "podcast": "Podcast",
+            "video": "Video",
+        }.get(track.kind)
+    values = [
+        str(value)
+        for value in (track.genre, kind_label, track.release_year)
+        if value
+    ]
+    return " · ".join(_display_text(value, 64) for value in values)
 
 
 def format_video_message(video: VideoMatch, *, include_hashtags: bool = True) -> str:
@@ -366,13 +393,13 @@ def build_auto_hashtags(track: TrackMatch) -> str:
 
     if track.kind == "video":
         hashtags.append("#video")
-        return " ".join(hashtags)
+        return " ".join(hashtags[:3])
 
     if track.kind == "podcast":
         hashtags.append("#podcast")
         if track.release_format == "show":
             hashtags.append("#show")
-        return " ".join(hashtags)
+        return " ".join(hashtags[:3])
 
     if track.kind == "album":
         hashtags.append("#album")
@@ -381,14 +408,14 @@ def build_auto_hashtags(track: TrackMatch) -> str:
         elif track.release_format == "single":
             hashtags.append("#single")
         hashtags.extend(genre_hashtags(track.genre))
-        return " ".join(hashtags)
+        return " ".join(hashtags[:3])
 
     hashtags.append("#track")
     if track.release_format == "single":
         hashtags.append("#single")
     hashtags.extend(genre_hashtags(track.genre))
 
-    return " ".join(hashtags)
+    return " ".join(hashtags[:3])
 
 
 def genre_hashtags(genre: str | None, *, limit: int = 2) -> list[str]:
@@ -423,7 +450,10 @@ def build_mixed_collection_hashtags(
     has_radios: bool = False,
     has_videos: bool = True,
 ) -> str:
-    hashtags = build_collection_hashtags(tracks).split()
+    hashtags = ["#stonerhand"]
+    for tag in build_collection_hashtags(tracks).split():
+        if tag not in {"#stonerhand", "#collection"} and tag not in hashtags:
+            hashtags.append(tag)
     if has_playlists and "#playlist" not in hashtags:
         hashtags.append("#playlist")
 
@@ -436,11 +466,12 @@ def build_mixed_collection_hashtags(
     if has_videos and "#video" not in hashtags:
         hashtags.append("#video")
 
-    return " ".join(hashtags)
+    hashtags.append("#collection")
+    return " ".join(hashtags[:3])
 
 
 def build_collection_hashtags(tracks: list[TrackMatch]) -> str:
-    hashtags = ["#stonerhand", "#collection"]
+    hashtags = ["#stonerhand"]
     kinds = {track.kind for track in tracks}
     formats = {track.release_format for track in tracks if track.release_format}
 
@@ -465,4 +496,5 @@ def build_collection_hashtags(tracks: list[TrackMatch]) -> str:
     if "ep" in formats:
         hashtags.append("#ep")
 
-    return " ".join(hashtags)
+    hashtags.append("#collection")
+    return " ".join(hashtags[:3])

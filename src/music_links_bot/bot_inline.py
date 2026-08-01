@@ -258,7 +258,7 @@ async def _search_source_urls(
         )
         return []
 
-    urls = [candidate.url for candidate in candidates]
+    urls = [candidate.url for candidate in candidates[:3]]
     await store_cached_search(bot_data, search_query, urls)
     return urls
 

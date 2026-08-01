@@ -84,6 +84,8 @@ class UserSession:
     onboarding_seen: bool = False
     last_query: str = ""
     last_action: dict[str, Any] = field(default_factory=dict)
+    active_draft_id: str = ""
+    recent_draft_ids: list[str] = field(default_factory=list)
     home_chat_id: int | None = None
     home_message_id: int | None = None
     updated_at: int = field(default_factory=lambda: int(time()))
@@ -101,6 +103,16 @@ class UserSession:
                     if isinstance(payload.get("last_action"), dict)
                     else {}
                 ),
+                active_draft_id=str(payload.get("active_draft_id") or "")[:32],
+                recent_draft_ids=[
+                    str(value)[:32]
+                    for value in (
+                        payload.get("recent_draft_ids")
+                        if isinstance(payload.get("recent_draft_ids"), list)
+                        else []
+                    )[:5]
+                    if value
+                ],
                 home_chat_id=_optional_int(payload.get("home_chat_id")),
                 home_message_id=_optional_int(payload.get("home_message_id")),
                 updated_at=int(payload.get("updated_at") or time()),

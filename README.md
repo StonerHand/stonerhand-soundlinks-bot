@@ -31,13 +31,13 @@ Yandex Music, podcasts, Spotify and Apple Music playlists, Spotify artists,
 and NTS Radio are supported.
 
 Cards contain release data and actions without generated promotional filler or
-hidden heading links. A quick card is capped at four actions: up to two
-preferred services, the universal hub, and a contextual More menu. Sharing,
-Add to crate and relevant formatting controls expand only when requested. A
-release found by title also keeps **Another release** and **Change query** close
-to the result. The
-chat crate uses numbered selection instead of one control row per release,
-confirms clearing and can restore a recently removed item.
+hidden heading links. The quick surface is predictable: the primary service
+plus the universal hub, followed by **Edit** and **Add to crate**. Editing stays
+in the same Telegram message and exposes only style, text, hashtags and
+platforms; delivery, sharing and destructive actions live in the overflow.
+Drafts autosave, `/start` resumes the active one, and Recent keeps the last five
+posts. The crate uses numbered selection and offers a 15-second undo. Automatic
+hashtags are capped at three useful tags.
 
 Longreads use Telegram Rich Messages with a safe HTML fallback. A song and a
 YouTube clip become a native two-tile media album; the bot never downloads or
@@ -54,8 +54,8 @@ flowchart LR
     D --> E["Chat · channel · queue"]
 ```
 
-The home menu is a two-column grid: **Studio**, **Find**, **Crate**, and
-**More**. The guided tour is shown only on the first visit. Settings, longreads,
+The home menu has four destinations: **Create**, **Crate**, **Recent**, and
+**Studio**. The guided tour is shown only on the first visit. Settings, longreads,
 scheduling and publishing live in the Mini App,
 while chat stays a fast path. The bot and Studio use the same resolver. Provider
 clients are lazy, independent lookups run in parallel, and successful bundles
@@ -64,6 +64,11 @@ share one upstream request, while accidental repeated messages and `/start`
 taps are debounced across warm instances. One request deadline bounds the entire lookup,
 while a repeatedly failing provider is temporarily isolated. Partial batches
 keep their successful cards and retry only failed links.
+
+The channel remembers the last successful presentation preset (card/longread,
+cover mode, hashtags and platform selection) and applies it to the next owner
+draft. Telegram Rich Messages, prepared inline messages and safe HTML fallback
+share one publication pipeline.
 
 Before channel delivery, the bot checks its posting rights. Duplicate records
 retain the previous post link and offer open, repeat or replace actions. The

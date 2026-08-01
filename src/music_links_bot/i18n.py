@@ -135,6 +135,23 @@ STRINGS: dict[str, dict[str, str]] = {
     "quick_mode": {RU: "⚡ Быстро", EN: "⚡ Quick"},
     "studio_mode": {RU: "🎛 Студия", EN: "🎛 Studio"},
     "open_studio": {RU: "🎛 Студия", EN: "🎛 Studio"},
+    "home_create": {RU: "＋ Создать пост", EN: "＋ Create post"},
+    "home_continue": {RU: "Продолжить черновик", EN: "Continue draft"},
+    "home_recent": {RU: "Недавние", EN: "Recent"},
+    "recent_title": {RU: "<b>Недавние посты</b>", EN: "<b>Recent posts</b>"},
+    "recent_empty": {
+        RU: "<b>Недавних постов пока нет</b>\n\nСоздай первую карточку — она появится здесь.",
+        EN: "<b>No recent posts yet</b>\n\nCreate your first card and it will appear here.",
+    },
+    "recent_repeat": {RU: "Повторить", EN: "Repeat"},
+    "recent_add": {RU: "+ В подборку", EN: "+ To crate"},
+    "crate_view": {RU: "Открыть подборку", EN: "Open crate"},
+    "crate_reorder": {RU: "Порядок", EN: "Reorder"},
+    "crate_style": {RU: "Оформление", EN: "Style"},
+    "crate_found": {
+        RU: "Подборка · найдено {found} из {total}",
+        EN: "Crate · found {found} of {total}",
+    },
     "home_crate": {RU: "🧺 Подборка · {count}", EN: "🧺 Crate · {count}"},
     "home_more": {RU: "••• Ещё", EN: "••• More"},
     "home_stats": {RU: "📊 Статистика канала", EN: "📊 Channel stats"},
@@ -155,6 +172,7 @@ STRINGS: dict[str, dict[str, str]] = {
         EN: "↗ Share",
     },
     "error_platforms_button": {RU: "Что поддерживается", EN: "What is supported"},
+    "error_open_source": {RU: "Открыть исходник", EN: "Open source"},
     "menu_start": {
         RU: (
             "🎧 <b>StonerHand Soundlinks</b>\n\n"
@@ -346,6 +364,25 @@ STRINGS: dict[str, dict[str, str]] = {
         EN: "Nothing found — refine your query",
     },
     "ed_hashtags": {RU: "# Хэштеги", EN: "# Hashtags"},
+    "ed_edit": {RU: "Изменить", EN: "Edit"},
+    "ed_text_on": {RU: "Текст · есть", EN: "Text · on"},
+    "ed_text_off": {RU: "Текст · без текста", EN: "Text · none"},
+    "ed_platforms_compact": {RU: "Площадки · кратко", EN: "Platforms · compact"},
+    "ed_platforms_all": {RU: "Площадки · все", EN: "Platforms · all"},
+    "ed_preset_clean": {RU: "Стиль · Чисто", EN: "Style · Clean"},
+    "ed_preset_editorial": {RU: "Стиль · Редакция", EN: "Style · Editorial"},
+    "ed_preset_poster": {RU: "Стиль · Постер", EN: "Style · Poster"},
+    "ed_studio_full": {RU: "Все настройки в Студии", EN: "All settings in Studio"},
+    "ed_status": {
+        RU: "Черновик · {preset} · {services} серв. · сохранено",
+        EN: "Draft · {preset} · {services} services · saved",
+    },
+    "ed_deleted": {
+        RU: "<b>Карточка удалена</b>\n\nОтменить можно в течение 15 секунд.",
+        EN: "<b>Card deleted</b>\n\nYou can undo this for 15 seconds.",
+    },
+    "ed_undo_delete": {RU: "Вернуть карточку", EN: "Restore card"},
+    "ed_undo_expired": {RU: "Время для отмены истекло", EN: "Undo time has expired"},
     "ed_quote": {RU: "💬 Цитата", EN: "💬 Quote"},
     "ed_on": {RU: "вкл.", EN: "on"},
     "ed_off": {RU: "выкл.", EN: "off"},
@@ -371,6 +408,10 @@ STRINGS: dict[str, dict[str, str]] = {
         RU: "Черновик устарел — пришли ссылку заново",
         EN: "This draft has expired — send the link again",
     },
+    "ed_owner_only": {
+        RU: "Этот черновик принадлежит другому пользователю",
+        EN: "This draft belongs to another user",
+    },
     "ed_admin_only": {
         RU: "Публиковать в канал может только владелец бота",
         EN: "Only the bot owner can publish to the channel",
@@ -379,8 +420,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "ed_open_publication": {RU: "Открыть публикацию", EN: "Open publication"},
     "ed_create_more": {RU: "+ Создать ещё", EN: "+ Create another"},
     "ed_delete_confirm": {
-        RU: "<b>Удалить эту карточку?</b>\n\nЧерновик исчезнет из чата. Это действие нельзя отменить.",
-        EN: "<b>Delete this card?</b>\n\nThe draft will disappear from the chat. This cannot be undone.",
+        RU: "<b>Удалить эту карточку?</b>\n\nПосле удаления будет 15 секунд на отмену.",
+        EN: "<b>Delete this card?</b>\n\nYou will have 15 seconds to undo it.",
     },
     "ed_delete_confirm_button": {RU: "Удалить карточку", EN: "Delete card"},
     "ed_duplicate": {
