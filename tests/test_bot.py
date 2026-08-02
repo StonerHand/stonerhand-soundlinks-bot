@@ -2059,7 +2059,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             )
         )
         self.assertIn("<b>Песня + клип</b>", caption)
-        self.assertIn("<b>Youth Code</b>\nTransitions", caption)
+        self.assertIn("<b>Youth Code</b> — Transitions", caption)
         self.assertIn("<b>SANSAE Live Session Vol.3 - Melon</b>", caption)
         self.assertNotIn("<a href=", caption)
         self.assertIn("#stonerhand #track #video", caption)

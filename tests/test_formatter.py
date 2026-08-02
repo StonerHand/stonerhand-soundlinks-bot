@@ -203,11 +203,30 @@ class FormatterTests(unittest.TestCase):
             format_collection_message(tracks),
             (
                 "<b>Подборка</b>\n\n"
-                f"1. {pick_track_emoji(tracks[0])} · <b>Artist</b>\nSong\n"
-                "2. 💿 · <b>Band</b>\nAlbum\n\n"
+                f"1. {pick_track_emoji(tracks[0])} · <b>Artist</b> — Song\n"
+                "2. 💿 · <b>Band</b> — Album\n\n"
                 "#stonerhand #track #album"
             ),
         )
+
+    def test_collection_keeps_artist_and_title_on_one_logical_line(self) -> None:
+        tracks = [
+            TrackMatch(title="A Torinói Ló", artist="Kokomo", links={}),
+            TrackMatch(
+                title="The Lonesome Foghorn Blows",
+                artist="Kokomo",
+                links={},
+            ),
+        ]
+
+        message = format_collection_message(tracks)
+
+        self.assertIn("1. 🎧 · <b>Kokomo</b> — A Torinói Ló", message)
+        self.assertIn(
+            "2. 🎧 · <b>Kokomo</b> — The Lonesome Foghorn Blows",
+            message,
+        )
+        self.assertNotIn("<b>Kokomo</b>\n", message)
 
     def test_format_collection_message_includes_release_format_tags(self) -> None:
         tracks = [
@@ -406,7 +425,7 @@ class FormatterTests(unittest.TestCase):
         message = format_mixed_collection_message(tracks, videos)
 
         self.assertIn("<b>Песня + клип</b>", message)
-        self.assertIn("🎧 · <b>Artist</b>\nSong", message)
+        self.assertIn("🎧 · <b>Artist</b> — Song", message)
         self.assertIn("📺 · <b>Live</b>", message)
         self.assertNotIn("<a href=", message)
         self.assertIn("#stonerhand #track #video", message)
