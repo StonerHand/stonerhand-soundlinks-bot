@@ -26,10 +26,11 @@ def format_track_label(track: TrackMatch) -> str:
 
 
 def format_track_heading(track: TrackMatch) -> str:
-    return (
-        f"<b>{_display_text(track.artist, MAX_COLLECTION_TEXT_LENGTH)}</b>\n"
-        f"{_display_text(track.title, MAX_COLLECTION_TEXT_LENGTH)}"
-    )
+    artist = _display_text(track.artist, MAX_COLLECTION_TEXT_LENGTH)
+    title = _display_text(track.title, MAX_COLLECTION_TEXT_LENGTH)
+    if artist and title:
+        return f"<b>{artist}</b> — {title}"
+    return f"<b>{artist or title}</b>"
 
 
 def format_release_heading(track: TrackMatch) -> str:
