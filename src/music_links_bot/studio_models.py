@@ -6,6 +6,7 @@ from music_links_bot.constants import PLATFORM_LABELS
 from music_links_bot.formatter import pick_track_emoji
 from music_links_bot.models import TrackMatch
 from music_links_bot.publication_state import release_fingerprint
+from music_links_bot.release_presentation import apply_preset
 from music_links_bot.rich_publications import apply_publication_patch
 from music_links_bot.text_utils import normalize_hashtag
 
@@ -116,6 +117,8 @@ def crate_view(items: list[dict]) -> dict:
 
 
 def apply_draft_patch(draft: dict, body: dict) -> None:
+    if isinstance(body.get("preset"), str):
+        apply_preset(draft, body["preset"])
     for flag in ("hashtags", "quote", "large_preview", "as_photo"):
         if isinstance(body.get(flag), bool):
             draft[flag] = body[flag]

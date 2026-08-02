@@ -8,7 +8,12 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600&family=Golos+Text:wght@400;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="modulepreload" href="/webapp/api-client.js">
+<link rel="modulepreload" href="/webapp/studio-core.js">
+<link rel="modulepreload" href="/webapp/studio-presets.js">
+<link rel="modulepreload" href="/webapp/presentation-ui.js">
 <link rel="stylesheet" href="/webapp/styles.css">
+<link rel="stylesheet" href="/webapp/design-tokens.css">
 <link rel="stylesheet" href="/webapp/studio-shell.css">
 </head>
 <body class="dark">
@@ -156,11 +161,6 @@
         <button class="format-pill" id="open-format"><svg class="icon s14"><use href="#i-sliders"/></svg>Оформление</button></div>
       <div class="result-scroll">
         <div class="result-intro"><span id="result-kicker">READY TO AIR</span><strong id="result-copy">Так пост увидит аудитория</strong></div>
-        <div class="publication-mode" id="publication-mode" role="group" aria-label="Формат публикации">
-          <button type="button" data-mode="card" aria-pressed="true"><svg class="icon s16"><use href="#i-disc"/></svg><span><b id="mode-card-title">Карточка</b><small id="mode-card-copy">Быстрый пост</small></span></button>
-          <button type="button" data-mode="longread" aria-pressed="false"><svg class="icon s16"><use href="#i-layers"/></svg><span><b id="mode-longread-title">Лонгрид</b><small id="mode-longread-copy">Музыкальная статья</small></span></button>
-        </div>
-        <button class="longread-edit hidden" id="longread-edit" type="button"><span><b id="longread-edit-title">Редактировать материал</b><small id="longread-edit-copy">Заголовки, цитаты, списки и секции</small></span><svg class="icon s16"><use href="#i-cr"/></svg></button>
         <div class="result-health">
           <div class="health-score" id="result-score" aria-label="Готовность поста">
             <strong id="result-score-value">0</strong><span>%</span>
@@ -170,6 +170,11 @@
         </div>
         <div class="post-card" id="post-card"></div>
         <div class="status-note" id="status"></div>
+        <div class="inline-alert hidden" id="result-alert" role="alert">
+          <span class="alert-icon"><svg class="icon s16"><use href="#i-undo"/></svg></span>
+          <span><b id="result-alert-title">Не удалось выполнить действие</b><small id="result-alert-copy"></small></span>
+          <button id="result-retry" type="button">Ещё раз</button>
+        </div>
       </div>
     </div>
 
@@ -188,12 +193,10 @@
           <button type="button" data-target="format-services"><span>03</span><b id="format-nav-services">Сервисы</b></button>
         </nav>
         <div class="fsec" id="format-presets">
-          <div class="fsec-head" style="display:flex;align-items:center;justify-content:space-between">
-            <span class="seclabel" id="t-presets">Пресеты</span>
-            <button id="preset-save" style="background:none;border:none;color:var(--primary);font-family:'JetBrains Mono';font-size:11px">+ <span id="t-preset-save">сохранить</span></button>
-          </div>
-          <div class="fsec-body pad"><div class="chips" id="preset-list"></div></div>
+          <div class="fsec-head"><span class="seclabel" id="t-presets">Стиль публикации</span></div>
+          <div class="fsec-body pad"><div class="preset-grid" id="preset-list" role="radiogroup" aria-label="Стиль публикации"></div></div>
         </div>
+        <button class="longread-edit hidden" id="longread-edit" type="button"><span><b id="longread-edit-title">Редактировать материал</b><small id="longread-edit-copy">Заголовки, цитаты, списки и секции</small></span><svg class="icon s16"><use href="#i-cr"/></svg></button>
         <div class="fsec" id="format-content-section">
           <div class="fsec-head"><span class="seclabel" id="format-content">Содержимое</span></div>
           <div class="fsec-body" id="toggles"></div>

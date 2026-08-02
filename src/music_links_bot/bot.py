@@ -91,7 +91,7 @@ _build_podcast_fallback = _bot_lookup._build_podcast_fallback
 
 from music_links_bot.config import Settings
 from music_links_bot.chat_access import check_publish_access
-from music_links_bot.channel_templates import apply_channel_template
+from music_links_bot.channel_templates import apply_channel_template, save_channel_template
 from music_links_bot.ephemeral import (
     ephemeral_group_replies_enabled,
     send_ephemeral_message,
@@ -730,8 +730,9 @@ async def _send_track_draft(
         "can_publish": (
             admin_chat_id is not None and user_id == admin_chat_id
         ),
-        "preset": "clean",
+        "preset": "cover",
     }
+    await apply_channel_template(context, f"user:{user_id}", draft)
     if draft["can_publish"]:
         target = (
             context.application.bot_data.get("publish_chat_id")
@@ -1064,6 +1065,8 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
 
     await query.answer()
     await _store_draft(context, draft_id, draft)
+    if query.from_user is not None:
+        await save_channel_template(context, f"user:{query.from_user.id}", draft)
     text, keyboard = _render_track_draft(
         draft,
         context,

@@ -372,6 +372,9 @@ STRINGS: dict[str, dict[str, str]] = {
     "ed_preset_clean": {RU: "Стиль · Чисто", EN: "Style · Clean"},
     "ed_preset_editorial": {RU: "Стиль · Редакция", EN: "Style · Editorial"},
     "ed_preset_poster": {RU: "Стиль · Постер", EN: "Style · Poster"},
+    "ed_preset_minimal": {RU: "Стиль · Минимал", EN: "Style · Minimal"},
+    "ed_preset_cover": {RU: "Стиль · Обложка", EN: "Style · Cover"},
+    "ed_preset_longread": {RU: "Стиль · Лонгрид", EN: "Style · Longread"},
     "ed_studio_full": {RU: "Все настройки в Студии", EN: "All settings in Studio"},
     "ed_status": {
         RU: "Черновик · {preset} · {services} серв. · сохранено",
