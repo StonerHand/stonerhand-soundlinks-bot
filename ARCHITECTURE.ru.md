@@ -72,6 +72,7 @@ src/music_links_bot/
   nts.py               Open Graph страниц NTS
   models.py            нормализованные модели контента
   formatter.py         компактный HTML постов, чистые заголовки и хэштеги
+  release_presentation.py единая модель «Минимал / Обложка / Лонгрид»
   mixed_post.py        пара песня+клип, media preview и Studio-нормализация
   rich_publications.py валидация блоков, Rich HTML, fallback и raw Bot API transport
   keyboards.py         кнопки платформ и Telegram actions
@@ -103,12 +104,16 @@ src/music_links_bot/
 
 webapp/
   index.html           семантическая разметка экранов и dialog sheets
-  styles.css           responsive темы и визуальная система
+  design-tokens.css    единые цвета, размеры, focus и reduced motion
+  styles.css           responsive темы и базовые компоненты
   studio-shell.css     адаптивный Telegram workspace и component polish
   app.js               state machine, UI, Telegram WebApp integration
   api-client.js        JSON transport, timeout/cancel, request_id
   cloud-storage.js     Promise/callback adapter Telegram CloudStorage
   error-ui.js          перевод error_code в понятное восстановление
+  preference-store.js  безопасные пользовательские настройки CloudStorage
+  presentation-ui.js   адаптер серверной presentation-модели для карточки
+  studio-presets.js    три стабильных пресета и их атомарные patch
   studio-core.js       query mode, preflight, нормализация лонгрида и Markdown import
 
 tests/
@@ -294,6 +299,7 @@ draft:<id> → {
   flags,
   custom_hashtags,
   platform_order,
+  preset: minimal | cover | longread,
   publication_mode: card | longread,
   longread: { title, lead, blocks[] },
   preview,
@@ -330,11 +336,12 @@ Draft живёт 48 часов в Redis и в bounded memory cache до 300 эл
 Studio не требует Node build:
 
 - `index.html` содержит экраны Home, Candidates, Loading, Result, Format, Longread Editor, Crate, Queue, Stats и bottom sheets;
-- `styles.css` задаёт editorial design system, CSS variables, light/dark theme, safe areas, touch targets и reduced motion;
-- `app.js` управляет state/view transitions, Telegram WebApp API, player, Card/Longread, блочным редактором, preview, crate, queue и stats;
+- `design-tokens.css` задаёт единую светлую/тёмную палитру, размеры касаний, focus-visible и reduced motion; `styles.css` и `studio-shell.css` используют эти токены;
+- `app.js` управляет state/view transitions, Telegram WebApp API, player, блочным редактором, preview, crate, queue и stats;
 - `api-client.js` создаёт `request_id`, ставит timeout, поддерживает abort и нормализует ошибки;
-- `cloud-storage.js` хранит тему, onboarding, presets, active draft и client-authoritative crate;
+- `cloud-storage.js` хранит тему, onboarding, active draft и client-authoritative crate, а `preference-store.js` — нормализованные пользовательские настройки;
 - `error-ui.js` переводит стабильный `error_code` API в единообразное сообщение и следующий шаг;
+- `studio-presets.js` атомарно переключает «Минимал / Обложка / Лонгрид», `presentation-ui.js` отображает серверный контракт без дублирования правил;
 - `studio-core.js` независимо от транспорта распознаёт single/batch query, оценивает готовность поста/подборки, нормализует лонгрид, импортирует Markdown и сериализует active draft snapshot. Batch resolve разделяет музыкальные и YouTube-ссылки: видео хранится в crate как типизированный материал с оригинальным URL и thumbnail. Пара песня+клип получает отдельное двухплиточное превью, но остаётся совместима с общей сортировкой, оформлением и отправкой crate.
 
 Home загружается одним action `dashboard`: history, зеркало crate и очередь читаются
@@ -348,8 +355,15 @@ Home загружается одним action `dashboard`: history, зеркал
 нераспознанных позиций. Ошибка изображения заменяет его спокойным fallback и не
 засчитывается как стопроцентная готовность. Режим лонгрида хранится в том же
 draft, поэтому одинаково работает для отправки себе, канала, очереди и нативного
-`shareMessage`. Markdown-файл разбирается локально в разрешённые блоки, а сервер
+`shareMessage`. Результат — отдельный шаг с одним главным действием; пресет и
+прочие параметры находятся в «Оформлении». Markdown-файл разбирается локально в разрешённые блоки, а сервер
 повторно проверяет типы, длины, URL и общий бюджет текста.
+
+`studio_presenters.py` добавляет в каждый draft-response версионированный
+`presentation` с preset, mode, заголовком, видимостью обложки/хэштегов и
+порядком площадок. Telegram-редактор и Studio используют те же правила из
+`release_presentation.py`; старые `clean/editorial/poster` нормализуются при
+чтении и не создают второй набор UI-условий.
 
 Сервер не доверяет отображаемому клиентом admin-state. Каждое privileged действие снова проверяет `user.id == ADMIN_CHAT_ID`.
 
@@ -374,7 +388,7 @@ draft, поэтому одинаково работает для отправк�
 | `resolve_batch` | пользователь | 2+ URL → дедуплицированные элементы crate |
 | `draft` | владелец draft | открыть draft из Telegram |
 | `preview` | владелец draft | лениво получить audio preview |
-| `update` | владелец draft | применить flags, tags, platform order и Card/Longread blocks |
+| `update` | владелец draft | применить preset, flags, tags, platform order и Longread blocks |
 | `dashboard` | пользователь | history + crate + краткое состояние очереди одним запросом |
 | `history` | пользователь | последние 10 релизов и published state |
 | `send` | пользователь | отправить карточку или Rich Message себе |

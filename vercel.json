@@ -46,11 +46,27 @@
       "use": "@vercel/static"
     },
     {
+      "src": "webapp/preference-store.js",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "webapp/presentation-ui.js",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "webapp/studio-presets.js",
+      "use": "@vercel/static"
+    },
+    {
       "src": "webapp/studio-core.js",
       "use": "@vercel/static"
     },
     {
       "src": "webapp/studio-shell.css",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "webapp/design-tokens.css",
       "use": "@vercel/static"
     },
     {
@@ -118,12 +134,28 @@
       "dest": "webapp/error-ui.js"
     },
     {
+      "src": "/webapp/preference-store.js",
+      "dest": "webapp/preference-store.js"
+    },
+    {
+      "src": "/webapp/presentation-ui.js",
+      "dest": "webapp/presentation-ui.js"
+    },
+    {
+      "src": "/webapp/studio-presets.js",
+      "dest": "webapp/studio-presets.js"
+    },
+    {
       "src": "/webapp/studio-core.js",
       "dest": "webapp/studio-core.js"
     },
     {
       "src": "/webapp/studio-shell.css",
       "dest": "webapp/studio-shell.css"
+    },
+    {
+      "src": "/webapp/design-tokens.css",
+      "dest": "webapp/design-tokens.css"
     },
     {
       "src": "/assets/studio-demo.svg",

@@ -10,22 +10,15 @@ from music_links_bot.models import (
     TrackMatch,
     VideoMatch,
 )
+from music_links_bot.release_presentation import release_emoji
 
 MAX_METADATA_TEXT_LENGTH = 180
 MAX_COLLECTION_TEXT_LENGTH = 96
 
 
 def pick_track_emoji(track: TrackMatch) -> str:
-    if track.kind == "video":
-        return "📺"
-
-    if track.kind == "podcast":
-        return "🎙️"
-
-    if track.kind == "album":
-        return "💿"
-
-    return "🎧"
+    """Backward-compatible alias for the shared presentation model."""
+    return release_emoji(track)
 
 
 def format_track_label(track: TrackMatch) -> str:

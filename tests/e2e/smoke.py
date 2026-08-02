@@ -18,11 +18,15 @@ from playwright.sync_api import sync_playwright
 HTML = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "index.html").read_text()
 CSS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "styles.css").read_text()
 STUDIO_SHELL_CSS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "studio-shell.css").read_text()
+DESIGN_TOKENS_CSS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "design-tokens.css").read_text()
 JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "app.js").read_text()
 API_JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "api-client.js").read_text()
 CLOUD_JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "cloud-storage.js").read_text()
 ERROR_JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "error-ui.js").read_text()
 CORE_JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "studio-core.js").read_text()
+PRESETS_JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "studio-presets.js").read_text()
+PRESENTATION_JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "presentation-ui.js").read_text()
+PREFERENCES_JS = (pathlib.Path(__file__).resolve().parents[2] / "webapp" / "preference-store.js").read_text()
 COVER = "https://cover.local/a.jpg"
 
 RELEASE = {
@@ -38,6 +42,7 @@ RELEASE = {
 DRAFT = {"ok": True, "draft_id": "d1", "ttl": 3600,
          "flags": {"hashtags": True, "quote": False, "large_preview": True, "as_photo": False, "has_prefix": False},
          "can_publish": False, "release": RELEASE,
+         "presentation": {"version": 1, "preset": "cover", "mode": "card", "artist": "Sleep", "title": "Dopesmoker", "emoji": "📻", "show_cover": True, "show_hashtags": True, "platform_keys": ["spotify", "appleMusic"]},
          "publication": {
              "mode": "card", "rich_supported": True,
              "longread": {
@@ -133,12 +138,26 @@ def _route_api(route):
         return
     if action == "update":
         payload = body.get("payload") or {}
+        preset = payload.get("preset") or (
+            "longread"
+            if payload.get("publication_mode") == "longread"
+            else DRAFT["presentation"]["preset"]
+        )
         publication = {
             "mode": payload.get("publication_mode", DRAFT["publication"]["mode"]),
             "rich_supported": True,
             "longread": payload.get("longread", DRAFT["publication"]["longread"]),
         }
-        route.fulfill(json={**DRAFT, "publication": publication}, content_type="application/json")
+        presentation = {
+            **DRAFT["presentation"],
+            "preset": preset,
+            "mode": "longread" if preset == "longread" else "card",
+            "show_cover": preset != "minimal",
+        }
+        route.fulfill(
+            json={**DRAFT, "publication": publication, "presentation": presentation},
+            content_type="application/json",
+        )
         return
     route.fulfill(json=RESPONSES.get(action, {"ok": True}), content_type="application/json")
 
@@ -194,11 +213,15 @@ def main() -> int:
         page.route("https://studio.local/app*", lambda r: r.fulfill(body=HTML, content_type="text/html"))
         page.route("https://studio.local/webapp/styles.css", lambda r: r.fulfill(body=CSS, content_type="text/css"))
         page.route("https://studio.local/webapp/studio-shell.css", lambda r: r.fulfill(body=STUDIO_SHELL_CSS, content_type="text/css"))
+        page.route("https://studio.local/webapp/design-tokens.css", lambda r: r.fulfill(body=DESIGN_TOKENS_CSS, content_type="text/css"))
         page.route("https://studio.local/webapp/app.js", lambda r: r.fulfill(body=JS, content_type="application/javascript"))
         page.route("https://studio.local/webapp/api-client.js", lambda r: r.fulfill(body=API_JS, content_type="application/javascript"))
         page.route("https://studio.local/webapp/cloud-storage.js", lambda r: r.fulfill(body=CLOUD_JS, content_type="application/javascript"))
         page.route("https://studio.local/webapp/error-ui.js", lambda r: r.fulfill(body=ERROR_JS, content_type="application/javascript"))
         page.route("https://studio.local/webapp/studio-core.js", lambda r: r.fulfill(body=CORE_JS, content_type="application/javascript"))
+        page.route("https://studio.local/webapp/studio-presets.js", lambda r: r.fulfill(body=PRESETS_JS, content_type="application/javascript"))
+        page.route("https://studio.local/webapp/presentation-ui.js", lambda r: r.fulfill(body=PRESENTATION_JS, content_type="application/javascript"))
+        page.route("https://studio.local/webapp/preference-store.js", lambda r: r.fulfill(body=PREFERENCES_JS, content_type="application/javascript"))
 
         errors: list[str] = []
         page.on("pageerror", lambda e: errors.append(str(e)))
@@ -348,9 +371,10 @@ def main() -> int:
             failures.append("result view not shown after search")
         elif "Dopesmoker" not in page.eval_on_selector("#v-result", "el => el.innerText"):
             failures.append("result card missing track title")
-        card_heading = page.eval_on_selector(
-            "#post-card .post-headrow",
-            "el => el.textContent",
+        card_heading = (
+            page.eval_on_selector("#post-card .post-headrow", "el => el.textContent")
+            if page.locator("#post-card .post-headrow").count()
+            else ""
         )
         if "Sleep" not in card_heading or "Dopesmoker" not in card_heading:
             failures.append(
@@ -399,6 +423,17 @@ def main() -> int:
         page.eval_on_selector("#open-format", "el => el.click()")
         if page.locator("#format-nav button").count() != 3:
             failures.append("format editor navigation is incomplete")
+        page.wait_for_timeout(350)
+        format_visibility = page.evaluate(
+            """() => ({
+              opacity: Number(getComputedStyle(document.getElementById('v-format')).opacity),
+              overlays: [...document.querySelectorAll('.mask.open,.coach-mask.open')]
+                .map((el) => el.id),
+            })"""
+        )
+        if format_visibility["opacity"] < 0.99 or format_visibility["overlays"]:
+            failures.append("format editor is dimmed by a stale transition or overlay: " + str(format_visibility))
+        _capture(page, "03-format-presets-dark")
         page.eval_on_selector('#format-nav [data-target="tags-sec"]', "el => el.click()")
         if not page.eval_on_selector('#format-nav [data-target="tags-sec"]', "el => el.classList.contains('active')"):
             failures.append("format editor navigation does not expose its active section")
@@ -426,9 +461,11 @@ def main() -> int:
         page.eval_on_selector("#fmt-apply", "el => el.click()")
         page.wait_for_timeout(250)
 
-        # Card/Longread is a real publication mode with a touch-first block
-        # editor and an exact Telegram Rich Message preview.
-        page.eval_on_selector('#publication-mode [data-mode="longread"]', "el => el.click()")
+        # Longread stays an advanced preset instead of crowding the result.
+        page.eval_on_selector("#open-format", "el => el.click()")
+        if page.locator("#preset-list .preset-card").count() != 3:
+            failures.append("format editor does not expose exactly three stable presets")
+        page.eval_on_selector('#preset-list [data-preset="longread"]', "el => el.click()")
         page.wait_for_timeout(250)
         if page.eval_on_selector("#longread-edit", "el => el.classList.contains('hidden')"):
             failures.append("longread mode does not expose the block editor")
@@ -735,7 +772,7 @@ def main() -> int:
             })""",
         )
         if (
-            light_hero["color"] != "rgb(23, 25, 34)"
+            light_hero["color"] != "rgb(23, 26, 36)"
             or "rgb(255, 255, 255)" not in light_hero["backgroundImage"]
         ):
             failures.append("light theme hero still renders as a dark panel: " + str(light_hero))

@@ -54,7 +54,11 @@ def main() -> int:
 
     for path, expected_type, marker in (
         ("/webapp/app.js", "javascript", "prepare_share"),
+        ("/webapp/studio-presets.js", "javascript", "presetDefinitions"),
+        ("/webapp/preference-store.js", "javascript", "createPreferenceStore"),
+        ("/webapp/presentation-ui.js", "javascript", "normalizePresentation"),
         ("/webapp/styles.css", "text/css", "height: 100dvh"),
+        ("/webapp/design-tokens.css", "text/css", "--tap-min: 48px"),
         ("/webapp/studio-shell.css", "text/css", ".brand-lockup"),
     ):
         try:

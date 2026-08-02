@@ -9,6 +9,7 @@ class WebAppAssetTests(unittest.TestCase):
     def test_page_loads_split_assets(self) -> None:
         html = (ROOT / "webapp" / "index.html").read_text()
         self.assertIn('href="/webapp/styles.css"', html)
+        self.assertIn('href="/webapp/design-tokens.css"', html)
         self.assertIn('href="/webapp/studio-shell.css"', html)
         self.assertIn('type="module" src="/webapp/app.js"', html)
         self.assertIn('<span class="wordmark">Telegram Mini App</span>', html)
@@ -26,11 +27,19 @@ class WebAppAssetTests(unittest.TestCase):
         self.assertIn("webapp/error-ui.js", build_sources)
         self.assertIn("webapp/studio-core.js", build_sources)
         self.assertIn("webapp/studio-shell.css", build_sources)
+        self.assertIn("webapp/design-tokens.css", build_sources)
+        self.assertIn("webapp/studio-presets.js", build_sources)
+        self.assertIn("webapp/presentation-ui.js", build_sources)
+        self.assertIn("webapp/preference-store.js", build_sources)
         self.assertIn("assets/studio-demo.svg", build_sources)
         self.assertIn("/webapp/api-client.js", route_sources)
         self.assertIn("/webapp/studio-core.js", route_sources)
         self.assertIn("/webapp/error-ui.js", route_sources)
         self.assertIn("/webapp/studio-shell.css", route_sources)
+        self.assertIn("/webapp/design-tokens.css", route_sources)
+        self.assertIn("/webapp/studio-presets.js", route_sources)
+        self.assertIn("/webapp/presentation-ui.js", route_sources)
+        self.assertIn("/webapp/preference-store.js", route_sources)
         self.assertIn("/assets/studio-demo.svg", route_sources)
         app_route = next(item for item in config["routes"] if item["src"] == "/app")
         self.assertIn("Content-Security-Policy", app_route["headers"])
@@ -39,12 +48,16 @@ class WebAppAssetTests(unittest.TestCase):
     def test_mobile_and_accessibility_contracts_are_kept(self) -> None:
         html = (ROOT / "webapp" / "index.html").read_text()
         css = (ROOT / "webapp" / "styles.css").read_text()
+        tokens = (ROOT / "webapp" / "design-tokens.css").read_text()
         self.assertNotIn("user-scalable=no", html)
         self.assertIn('role="dialog"', html)
         self.assertIn('aria-label="Основная навигация"', html)
         self.assertIn("height: 100dvh", css)
         self.assertIn("prefers-reduced-motion", css)
         self.assertIn("min-height: 48px", css)
+        self.assertIn("focus-visible", tokens)
+        self.assertIn("prefers-reduced-motion", tokens)
+        self.assertIn("--tap-min: 48px", tokens)
 
     def test_editorial_redesign_contracts_are_present(self) -> None:
         html = (ROOT / "webapp" / "index.html").read_text()
@@ -83,7 +96,8 @@ class WebAppAssetTests(unittest.TestCase):
             "crate-health",
             "queue-intro-title",
             "stats-intro-title",
-            "publication-mode",
+            "preset-list",
+            "result-alert",
             "longread-edit",
             "v-longread",
             "longread-blocks",

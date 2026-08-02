@@ -36,7 +36,7 @@ from music_links_bot.publication_state import (
     release_fingerprint as _release_fingerprint,
 )
 from music_links_bot.config import Settings
-from music_links_bot.channel_templates import apply_channel_template
+from music_links_bot.channel_templates import apply_channel_template, save_channel_template
 from music_links_bot.formatter import (
     format_collection_message,
     pick_track_emoji,
@@ -317,7 +317,9 @@ async def _action_resolve(context, body: dict, user_id: int, is_admin: bool, lan
         # client asks for the audio via the "preview" action only if needed,
         # so search no longer waits on an extra iTunes round-trip.
         "preview": candidate_preview,
+        "preset": "cover",
     }
+    await apply_channel_template(context, f"user:{user_id}", draft)
     if is_admin:
         target = (
             context.application.bot_data.get("publish_chat_id")
@@ -462,6 +464,7 @@ async def _action_update(context, body: dict, user_id: int, is_admin: bool) -> d
 
     _apply_draft_patch(draft, body)
     await _store_draft(context, draft_id, draft)
+    await save_channel_template(context, f"user:{user_id}", draft)
     return await _draft_response(context, draft_id, draft, is_admin)
 
 

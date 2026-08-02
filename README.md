@@ -20,7 +20,7 @@
 | Telegram bot | Studio Mini App |
 | --- | --- |
 | Link or title → exact release | Search, candidates and audio preview |
-| Clean title, artwork, hashtags and compact buttons | Card or block-based Rich longread |
+| Clean title, artwork, hashtags and compact buttons | Minimal, Cover and block-based Longread presets |
 | Several links → one collection with per-link status | Up to 10 releases, ordering and failed-link retry |
 | Song + YouTube clip → two-tile media preview | Song artwork and video thumbnail |
 | Inline search with labeled history, cache and pagination | History, queue, undo and owner analytics |
@@ -41,6 +41,11 @@ Drafts autosave, `/start` resumes the active one, and Recent keeps the last five
 posts. The crate uses numbered selection and offers a 15-second undo. Automatic
 hashtags are capped at three useful tags.
 
+Bot and Studio render the same server-side presentation model. The result screen
+has one primary action; advanced controls live under **Style**. The last preset,
+hashtags, photo mode and platform order are remembered per user, while the
+published channel keeps its own defaults.
+
 Longreads use Telegram Rich Messages with a safe HTML fallback. A song and a
 YouTube clip become a native two-tile media album; the bot never downloads or
 re-uploads the copyrighted video.
@@ -51,7 +56,7 @@ re-uploads the copyrighted video.
 flowchart LR
     A["Link / title"] --> B["Exact release"]
     A2["Several links"] --> C["Collection / media mix"]
-    B --> D["Card / Longread"]
+    B --> D["Minimal / Cover / Longread"]
     C --> D
     D --> E["Chat · channel · queue"]
 ```
@@ -67,10 +72,10 @@ taps are debounced across warm instances. One request deadline bounds the entire
 while a repeatedly failing provider is temporarily isolated. Partial batches
 keep their successful cards and retry only failed links.
 
-The channel remembers the last successful presentation preset (card/longread,
-cover mode, hashtags and platform selection) and applies it to the next owner
-draft. Telegram Rich Messages, prepared inline messages and safe HTML fallback
-share one publication pipeline.
+The user and channel remember the last successful presentation preset (minimal,
+cover or longread), hashtags, photo mode and platform selection, then apply it to
+the next owner draft. Telegram Rich Messages, prepared inline messages and safe
+HTML fallback share one publication pipeline.
 
 Before channel delivery, the bot checks its posting rights. Duplicate records
 retain the previous post link and offer open, repeat or replace actions. The

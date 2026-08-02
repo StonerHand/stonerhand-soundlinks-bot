@@ -1485,13 +1485,14 @@ class PostEditorTests(unittest.TestCase):
 
         self.assertEqual(rows_without_quote[0][1].text, "Текст · без текста")
         self.assertEqual(rows_with_quote[0][1].text, "Текст · есть")
-        cover = next(
-            button
-            for row in rows_without_quote
-            for button in row
-            if button.callback_data == "v2|editor|v|abc123"
+        self.assertFalse(
+            any(
+                button.callback_data == "v2|editor|v|abc123"
+                for row in rows_without_quote
+                for button in row
+            )
         )
-        self.assertEqual(cover.text, "🖼 Обложка крупная")
+        self.assertLessEqual(len(rows_without_quote), 4)
 
     def test_editor_offers_fast_search_correction_for_search_drafts(self) -> None:
         rows = _editor_overflow_rows(

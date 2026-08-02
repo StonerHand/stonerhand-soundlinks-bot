@@ -2,37 +2,6 @@
    Kept separate from component CSS so the visual system can evolve without
    mixing product layout with legacy component behavior. */
 
-:root,
-.dark {
-  --s8-bg: #090b11;
-  --s8-panel: #121620;
-  --s8-panel-strong: #171c28;
-  --s8-line: #2a3142;
-  --s8-violet: #93a0ff;
-  --s8-mint: #7ee0b8;
-  --s8-text: #f3f5fb;
-  --s8-muted: #9299aa;
-  --bg: var(--s8-bg);
-  --card: var(--s8-panel-strong);
-  --surface: var(--s8-panel);
-  --border: var(--s8-line);
-  --fg: var(--s8-text);
-  --muted: var(--s8-muted);
-  --primary: var(--s8-violet);
-  --acid: var(--s8-mint);
-}
-
-.light {
-  --s8-bg: #f3f5fa;
-  --s8-panel: #e9ecf4;
-  --s8-panel-strong: #ffffff;
-  --s8-line: #d8ddea;
-  --s8-violet: #5365da;
-  --s8-mint: #247f62;
-  --s8-text: #171a24;
-  --s8-muted: #646b7d;
-}
-
 body {
   background:
     radial-gradient(circle at 50% -10%, color-mix(in srgb, var(--primary) 13%, transparent), transparent 34%),
@@ -440,7 +409,8 @@ body::before { opacity: .014; }
     grid-template-areas:
       "intro intro"
       "health card"
-      "status card";
+      "status card"
+      "alert card";
     align-content: start;
     align-items: start;
     gap: 12px 18px;
@@ -460,6 +430,7 @@ body::before { opacity: .014; }
   #v-result .result-readiness { width: 100%; grid-template-columns: 1fr; }
   #v-result .post-card { grid-area: card; width: 100%; max-width: none; margin: 0; }
   #v-result .status-note { grid-area: status; }
+  #v-result .inline-alert { grid-area: alert; margin: 0; }
   #v-result .post-card.large {
     display: grid;
     grid-template-columns: minmax(190px,.9fr) minmax(0,1.1fr);
@@ -955,48 +926,41 @@ body::before { opacity: .014; }
   .tabbar button { font-size: 11px; }
 }
 
-/* Rich music publications — card/longread switch, Telegram preview and editor. */
-.publication-mode {
+/* Three predictable publication styles replace a growing set of switches. */
+.preset-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  width: 100%;
-  max-width: 520px;
-  margin: 0 auto 12px;
-  padding: 5px;
-  border: 1px solid var(--border);
-  border-radius: 19px;
-  background: var(--surface);
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 8px;
 }
-.publication-mode button {
+.preset-card {
   min-width: 0;
-  min-height: 54px;
+  min-height: 92px;
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
-  border: 1px solid transparent;
-  border-radius: 14px;
-  background: transparent;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
   color: var(--muted);
   text-align: left;
   font-family: inherit;
 }
-.publication-mode button.active {
-  border-color: color-mix(in srgb,var(--primary) 34%,var(--border));
-  background: var(--card);
+.preset-card.active {
+  border-color: color-mix(in srgb,var(--primary) 58%,var(--border));
+  background: linear-gradient(145deg,color-mix(in srgb,var(--primary) 14%,var(--card)),var(--card));
   color: var(--primary);
-  box-shadow: 0 7px 18px rgba(0,0,0,.12);
+  box-shadow: 0 9px 24px color-mix(in srgb,var(--primary) 12%,transparent);
 }
-.publication-mode button > span { min-width: 0; display: grid; gap: 2px; }
-.publication-mode b { color: var(--fg); font-size: 13px; line-height: 1.2; }
-.publication-mode small {
-  overflow: hidden;
+.preset-card > span:last-child { min-width: 0; display: grid; gap: 3px; }
+.preset-icon { font: 700 18px/1 "JetBrains Mono",monospace; }
+.preset-card b { color: var(--fg); font-size: 13px; line-height: 1.2; }
+.preset-card small {
   color: var(--muted);
   font-size: 10px;
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
 }
 .longread-edit {
   width: 100%;
@@ -1226,20 +1190,19 @@ body::before { opacity: .014; }
   #v-result .result-scroll {
     grid-template-areas:
       "intro intro"
-      "mode mode"
-      "edit edit"
       "health card"
-      "status card";
+      "status card"
+      "alert card";
   }
-  #publication-mode { grid-area: mode; max-width: none; margin: 0; }
-  #longread-edit { grid-area: edit; max-width: none; margin: 0; }
   #v-result .post-card.longread { display: block; }
 }
 
 @media (max-width: 719px) {
-  .publication-mode button { min-height: 62px; padding: 10px; }
-  .publication-mode b { font-size: 14px; }
-  .publication-mode small { font-size: 11px; }
+  .preset-grid { grid-template-columns: 1fr; }
+  .preset-card { min-height: 72px; flex-direction: row; align-items: center; justify-content: flex-start; }
+  .preset-card b { font-size: 15px; }
+  .preset-card small { font-size: 12px; }
+  .preset-icon { width: 34px; text-align: center; }
   .longread-edit { min-height: 70px; }
   .longread-edit b { font-size: 15px; }
   .longread-edit small { font-size: 12px; }
@@ -1255,9 +1218,6 @@ body::before { opacity: .014; }
 }
 
 @media (max-width: 360px) {
-  .publication-mode { gap: 4px; padding: 4px; }
-  .publication-mode button { gap: 7px; padding: 8px; }
-  .publication-mode small { display: none; }
   .block-actions { gap: 3px; }
   .block-actions button { width: 40px; min-width: 40px; min-height: 40px; }
 }

@@ -140,12 +140,15 @@ class StudioApiHelperTests(unittest.TestCase):
             draft,
             {
                 "hashtags": True,
+                "preset": "minimal",
                 "tags": ["#Doom", "stoner rock", "!!!"],
                 "platforms": ["tidal", "bogus", "spotify"],
             },
         )
 
         self.assertTrue(draft["hashtags"])
+        self.assertEqual(draft["preset"], "minimal")
+        self.assertFalse(draft["large_preview"])
         self.assertEqual(draft["custom_tags"], ["#doom", "#stonerrock"])
         self.assertEqual(draft["platforms"], ["tidal", "spotify"])
 

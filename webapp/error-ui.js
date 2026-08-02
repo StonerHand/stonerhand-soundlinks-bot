@@ -49,3 +49,19 @@ export function createErrorText({ strings, english }) {
     return strings.err;
   };
 }
+
+export function createErrorRecovery({ english }) {
+  return function errorRecovery(error) {
+    const raw = typeof error === "object" && error
+      ? error.error_code || error.error
+      : error;
+    const key = ERROR_KEYS[String(raw || "")] || "unknown";
+    if (key === "draftExpired") {
+      return { action:"restart", label:english ? "Find again" : "Найти заново" };
+    }
+    if (key === "unauthorized") {
+      return { action:"reopen", label:english ? "Reopen" : "Переоткрыть" };
+    }
+    return { action:"retry", label:english ? "Retry" : "Ещё раз" };
+  };
+}

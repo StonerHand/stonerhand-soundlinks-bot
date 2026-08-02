@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from music_links_bot.i18n import get_text
 from music_links_bot.models import TrackMatch
-
-PRESET_ORDER = ("clean", "editorial", "poster")
+from music_links_bot.release_presentation import (
+    PRESET_ORDER,
+    apply_preset,
+    normalize_preset,
+)
 
 
 def draft_owned_by(draft: dict, user_id: int) -> bool:
@@ -20,10 +23,10 @@ def remember_draft(session, draft_id: str) -> None:
 
 
 def draft_status(draft: dict, track: TrackMatch, *, lang: str) -> str:
-    preset = str(draft.get("preset") or "clean")
+    preset = normalize_preset(draft.get("preset"), draft)
     preset_label = get_text(
         lang,
-        f"ed_preset_{preset if preset in PRESET_ORDER else 'clean'}",
+        f"ed_preset_{preset}",
     )
     preset_name = preset_label.split("·", 1)[-1].strip()
     selected = draft.get("platforms")
@@ -52,10 +55,7 @@ def toggle_platform_selection(
 
 
 def cycle_preset(draft: dict) -> str:
-    current = str(draft.get("preset") or "clean")
-    index = PRESET_ORDER.index(current) if current in PRESET_ORDER else -1
+    current = normalize_preset(draft.get("preset"), draft)
+    index = PRESET_ORDER.index(current)
     preset = PRESET_ORDER[(index + 1) % len(PRESET_ORDER)]
-    draft["preset"] = preset
-    draft["as_photo"] = preset == "poster"
-    draft["large_preview"] = preset != "editorial"
-    return preset
+    return apply_preset(draft, preset)

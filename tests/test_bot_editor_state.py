@@ -23,14 +23,16 @@ class BotEditorStateTests(unittest.TestCase):
         )
 
     def test_preset_cycle_updates_delivery_flags(self) -> None:
-        draft = {"preset": "clean"}
+        draft = {"preset": "cover"}
 
-        self.assertEqual(cycle_preset(draft), "editorial")
+        self.assertEqual(cycle_preset(draft), "longread")
+        self.assertFalse(draft["as_photo"])
+        self.assertTrue(draft["large_preview"])
+        self.assertEqual(draft["publication_mode"], "longread")
+        self.assertEqual(cycle_preset(draft), "minimal")
         self.assertFalse(draft["as_photo"])
         self.assertFalse(draft["large_preview"])
-        self.assertEqual(cycle_preset(draft), "poster")
-        self.assertTrue(draft["as_photo"])
-        self.assertTrue(draft["large_preview"])
+        self.assertEqual(draft["publication_mode"], "card")
 
     def test_platform_toggle_switches_between_compact_and_all(self) -> None:
         draft = {}
@@ -49,8 +51,8 @@ class BotEditorStateTests(unittest.TestCase):
         self.assertEqual(session.active_draft_id, "6")
         self.assertEqual(session.recent_draft_ids, ["6", "5", "4", "3", "2"])
         self.assertEqual(
-            draft_status({"preset": "clean"}, self.track, lang="ru"),
-            "Черновик · Чисто · 1 серв. · сохранено",
+            draft_status({"preset": "cover"}, self.track, lang="ru"),
+            "Черновик · Обложка · 1 серв. · сохранено",
         )
 
     def test_private_draft_rejects_another_user(self) -> None:

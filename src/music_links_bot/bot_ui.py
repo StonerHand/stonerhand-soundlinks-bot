@@ -324,7 +324,9 @@ def editor_more_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButt
     def state(flag: str) -> str:
         return get_text(lang, "ed_on" if draft.get(flag) else "ed_off")
 
-    preset = str(draft.get("preset") or "clean")
+    from music_links_bot.release_presentation import normalize_preset
+
+    preset = normalize_preset(draft.get("preset"), draft)
     toggle_rows = [
         [
             InlineKeyboardButton(
@@ -355,18 +357,6 @@ def editor_more_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButt
             ),
         ]
     ]
-    preview_state = get_text(
-        lang,
-        "ed_preview_large" if draft.get("large_preview") else "ed_preview_small",
-    )
-    toggle_rows.append(
-        [
-            InlineKeyboardButton(
-                f"{get_text(lang, 'ed_preview')} {preview_state}",
-                callback_data=encode_callback("editor", "v", draft_id),
-            )
-        ]
-    )
     rows = [
         *toggle_rows,
         [

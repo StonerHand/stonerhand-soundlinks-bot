@@ -5,6 +5,7 @@ import hashlib
 from music_links_bot.bot_storage import remember_bounded
 from music_links_bot.constants import PLATFORM_LABELS
 from music_links_bot.kvstore import KVStore
+from music_links_bot.release_presentation import apply_preset, normalize_preset
 
 CHANNEL_TEMPLATE_TTL_SECONDS = 180 * 24 * 3600
 MAX_MEMORY_TEMPLATES = 100
@@ -38,8 +39,8 @@ def _sanitize_template(value: object) -> dict:
             if isinstance(key, str) and key in PLATFORM_LABELS
         ]
     preset = value.get("preset")
-    if preset in {"clean", "editorial", "poster"}:
-        template["preset"] = preset
+    if isinstance(preset, str):
+        template["preset"] = normalize_preset(preset, value)
     publication_mode = value.get("publication_mode")
     if publication_mode in {"card", "longread"}:
         template["publication_mode"] = publication_mode
@@ -67,7 +68,11 @@ async def load_channel_template(context, target: int | str) -> dict:
 
 async def apply_channel_template(context, target: int | str, draft: dict) -> None:
     template = await load_channel_template(context, target)
+    if "preset" in template:
+        apply_preset(draft, template["preset"])
     for key, value in template.items():
+        if key == "preset":
+            continue
         draft[key] = list(value) if isinstance(value, list) else value
     draft["channel_template_applied"] = bool(template)
 

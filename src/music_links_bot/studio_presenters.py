@@ -3,6 +3,7 @@ from __future__ import annotations
 from music_links_bot.constants import PLATFORM_BUTTON_STYLES, PLATFORM_LABELS
 from music_links_bot.formatter import build_auto_hashtags, pick_track_emoji
 from music_links_bot.models import TrackMatch
+from music_links_bot.release_presentation import build_release_presentation
 from music_links_bot.rich_publications import longread_view
 
 
@@ -46,6 +47,12 @@ def build_draft_response(
         if isinstance(custom_tags, list)
         else auto_hashtags
     )
+    presentation = build_release_presentation(
+        track,
+        draft,
+        hashtags=hashtags,
+        platform_keys=[item["key"] for item in platforms if item["enabled"]],
+    )
     return {
         "ok": True,
         "draft_id": draft_id,
@@ -58,6 +65,7 @@ def build_draft_response(
             "has_prefix": bool(draft.get("prefix")),
         },
         "can_publish": bool(is_admin and draft.get("can_publish", True)),
+        "presentation": presentation,
         "release": {
             "artist": track.artist,
             "title": track.title,

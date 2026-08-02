@@ -21,7 +21,7 @@ class ChannelTemplateTests(unittest.IsolatedAsyncioTestCase):
                 "large_preview": False,
                 "as_photo": True,
                 "platforms": ["spotify", "tidal", "unknown"],
-                "preset": "poster",
+                "preset": "cover",
                 "publication_mode": "card",
                 "custom_tags": ["#release-specific"],
             },
@@ -34,7 +34,7 @@ class ChannelTemplateTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(draft["large_preview"])
         self.assertTrue(draft["as_photo"])
         self.assertEqual(draft["platforms"], ["spotify", "tidal"])
-        self.assertEqual(draft["preset"], "poster")
+        self.assertEqual(draft["preset"], "cover")
         self.assertNotIn("custom_tags", draft)
         self.assertTrue(draft["channel_template_applied"])
 

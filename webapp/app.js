@@ -1,6 +1,14 @@
 import { createApiClient } from "/webapp/api-client.js";
 import { createCloudStorage } from "/webapp/cloud-storage.js";
-import { createErrorText } from "/webapp/error-ui.js";
+import { createErrorRecovery, createErrorText } from "/webapp/error-ui.js";
+import { createPreferenceStore } from "/webapp/preference-store.js";
+import { cardMode, normalizePresentation } from "/webapp/presentation-ui.js";
+import {
+  applyPresetLocally,
+  normalizePreset,
+  presetDefinitions,
+  presetPatch,
+} from "/webapp/studio-presets.js";
 import {
   analyzeQuery,
   assessCollection,
@@ -25,6 +33,7 @@ import {
     },
   };
   const cloud = createCloudStorage(tg.CloudStorage);
+  const preferences = createPreferenceStore(cloud);
   tg.ready(); tg.expand();
 
   const EN = !((tg.initDataUnsafe?.user?.language_code || "ru").match(/^(ru|uk|be|kk)/));
@@ -40,7 +49,7 @@ import {
     err: "The signal got noisy. Try again.", network: "No connection. Check your internet and retry.", timeout: "The server needs more time. Try again.", busy: "Still working on it. Try again in a moment.", allPlatforms: "All",
     toCrate: "In crate", crateFull: "CRATE IS FULL",
     secContent: "Content", secTags: "Hashtags", secPm: "Platforms & order",
-    rHashtags: "Hashtags", rQuote: "Quote", rPhoto: "Photo mode (no player)", rBig: "Large preview",
+    rHashtags: "Hashtags", rQuote: "Quote", rPhoto: "Photo mode (no player)",
     addTrack: "Add track", crateEmpty: "ADD TRACKS FROM ANY CARD", needMore: "ADD AT LEAST 2 TRACKS",
     crateSend: "Send to me", cratePublish: "Publish collection", crateClear: "Clear crate", crateShare: "Share collection",
     crateTitle: "tracks", queueTitle: "posts", queueEmpty: "QUEUE IS EMPTY",
@@ -69,8 +78,7 @@ import {
     sharePostCopy: "Choose a Telegram chat, group or channel",
     sharePreparing: "Preparing post…", shareFailed: "Could not open sharing. Try again.",
     shareLinks: "OR SHARE A LINK",
-    presets: "Presets", presetSave: "save", presetEmpty: "Save the current look to reuse it",
-    presetName: "Preset", reschedule: "Reschedule",
+    presets: "Publication style", reschedule: "Reschedule",
     queueEmptyT: "Queue is empty", queueEmptyS: "Scheduled posts will show up here",
     statsEmptyT: "No stats yet", statsEmptyS: "Numbers appear once you start posting",
     nowPlaying: "Preview", confirmRemove: "Remove this item?", confirmClear: "Clear the whole crate?",
@@ -80,7 +88,6 @@ import {
     crateItemEditor: "Track details", crateSection: "Group", crateNote: "Comment", crateItemSave: "Save track",
     tagRecommended: "RECOMMENDED", tagHealthy: "Good set: clear and relevant", tagTooMany: "Keep up to 6–8 focused tags",
     longread: {
-      card:["Card","Quick music post"], article:["Longread","Music article"],
       edit:["Edit article","Headings, quotes, lists and sections"],
       kicker:"BLOCK EDITOR", title:"Music publication", import:"Markdown",
       note:["Build it block by block","The order here exactly matches the final Telegram message."],
@@ -102,7 +109,7 @@ import {
     err: "Связь зашумела. Попробуем ещё раз.", network: "Нет соединения. Проверь интернет и повтори.", timeout: "Серверу нужно больше времени. Попробуй ещё раз.", busy: "Ещё работаем над запросом. Повтори через секунду.", allPlatforms: "Все",
     toCrate: "В подборке", crateFull: "ПОДБОРКА ЗАПОЛНЕНА",
     secContent: "Содержимое", secTags: "Хэштеги", secPm: "Платформы и порядок",
-    rHashtags: "Хэштеги", rQuote: "Цитата", rPhoto: "Фото-режим (без плеера)", rBig: "Большое превью",
+    rHashtags: "Хэштеги", rQuote: "Цитата", rPhoto: "Фото-режим (без плеера)",
     addTrack: "Добавить трек", crateEmpty: "ДОБАВЛЯЙ ТРЕКИ С ЛЮБОЙ КАРТОЧКИ", needMore: "НУЖНО МИНИМУМ 2 ТРЕКА",
     crateSend: "Отправить себе", cratePublish: "Опубликовать подборку", crateClear: "Очистить подборку", crateShare: "Поделиться подборкой",
     crateTitle: "треков", queueTitle: "постов", queueEmpty: "ОЧЕРЕДЬ ПУСТА",
@@ -131,8 +138,7 @@ import {
     sharePostCopy: "Выбрать чат, группу или канал в Telegram",
     sharePreparing: "Готовим пост…", shareFailed: "Не удалось открыть отправку. Попробуй ещё раз.",
     shareLinks: "ИЛИ ПОДЕЛИТЬСЯ ССЫЛКОЙ",
-    presets: "Пресеты", presetSave: "сохранить", presetEmpty: "Сохрани текущее оформление, чтобы применять в один тап",
-    presetName: "Пресет", reschedule: "Перенести",
+    presets: "Стиль публикации", reschedule: "Перенести",
     queueEmptyT: "Очередь пуста", queueEmptyS: "Отложенные посты появятся здесь",
     statsEmptyT: "Пока нет статистики", statsEmptyS: "Цифры появятся, как начнёшь постить",
     nowPlaying: "Превью", confirmRemove: "Удалить этот элемент?", confirmClear: "Очистить всю подборку?",
@@ -142,7 +148,6 @@ import {
     crateItemEditor: "Настройка трека", crateSection: "Группа", crateNote: "Комментарий", crateItemSave: "Сохранить трек",
     tagRecommended: "РЕКОМЕНДУЕМ", tagHealthy: "Хороший набор: понятно и по теме", tagTooMany: "Лучше оставить 6–8 точных тегов",
     longread: {
-      card:["Карточка","Быстрый музыкальный пост"], article:["Лонгрид","Музыкальная статья"],
       edit:["Редактировать материал","Заголовки, цитаты, списки и секции"],
       kicker:"БЛОЧНЫЙ РЕДАКТОР", title:"Музыкальная публикация", import:"Markdown",
       note:["Собери материал блоками","Порядок здесь полностью совпадает с будущим сообщением в Telegram."],
@@ -293,7 +298,6 @@ import {
   $("top-chats-lbl").textContent = T.topChats;
   $("toast-cancel").textContent = T.cancel;
   $("t-presets").textContent = T.presets;
-  $("t-preset-save").textContent = T.presetSave;
   $("share-title").textContent = T.shareTitle;
   $("share-kicker").textContent = T.shareKicker;
   $("share-post-title").textContent = T.sharePost;
@@ -328,10 +332,6 @@ import {
   $("format-nav-tags").textContent = EN ? "Tags" : "Теги";
   $("format-nav-services").textContent = EN ? "Services" : "Сервисы";
   $("result-score-label").textContent = EN ? "ready" : "готово";
-  $("mode-card-title").textContent = T.longread.card[0];
-  $("mode-card-copy").textContent = T.longread.card[1];
-  $("mode-longread-title").textContent = T.longread.article[0];
-  $("mode-longread-copy").textContent = T.longread.article[1];
   $("longread-edit-title").textContent = T.longread.edit[0];
   $("longread-edit-copy").textContent = T.longread.edit[1];
   $("longread-kicker").textContent = T.longread.kicker;
@@ -467,6 +467,28 @@ import {
     clearTimeout(el._t); el._t = setTimeout(() => { el.style.opacity = "0"; }, 2400);
   }
   const errorText = createErrorText({ strings: T, english: EN });
+  const errorRecovery = createErrorRecovery({ english: EN });
+  let resultRetry = null;
+  function clearResultError() {
+    resultRetry = null;
+    $("result-alert").classList.add("hidden");
+  }
+  function showResultError(error, retry) {
+    const recovery = errorRecovery(error);
+    $("result-alert-copy").textContent = errorText(error);
+    $("result-retry").textContent = recovery.label;
+    $("result-alert").classList.remove("hidden");
+    resultRetry = recovery.action === "restart"
+      ? () => { clearResultError(); loadHome(); show("home"); $("query").focus(); }
+      : recovery.action === "reopen"
+        ? () => { try { tg.close(); } catch (_error) { location.reload(); } }
+        : retry;
+  }
+  $("result-retry").addEventListener("click", () => {
+    const retry = resultRetry;
+    clearResultError();
+    retry?.();
+  });
   function confirmAction(message) {
     return new Promise((resolve) => {
       try {
@@ -483,8 +505,6 @@ import {
     loadSeq++;
     apiTransport.cancelPending();
   }
-  function loadPrefs(cb){ cloud.get("prefs",(e,v)=>{let p=null;try{p=v?JSON.parse(v):null}catch(x){}cb(p)}); }
-  function savePrefs(p){ cloud.set("prefs",JSON.stringify(p)); }
   // When Telegram's signed initData expires (Studio left open for hours), every
   // request 401s — tell the user plainly instead of failing silently.
   let authGone = false;
@@ -574,13 +594,10 @@ import {
     };
   }
   function drawPublicationMode() {
-    const publication = currentPublication();
-    document.querySelectorAll("#publication-mode [data-mode]").forEach((button) => {
-      const active = button.dataset.mode === publication.mode;
-      button.classList.toggle("active", active);
-      button.setAttribute("aria-pressed", String(active));
-    });
-    $("longread-edit").classList.toggle("hidden", publication.mode !== "longread");
+    $("longread-edit").classList.toggle(
+      "hidden",
+      normalizePresentation(state).mode !== "longread",
+    );
   }
   function previewLongreadBlocks(longread) {
     return longread.blocks.map((block) => {
@@ -619,15 +636,15 @@ import {
   /* ── render result ── */
   function renderCard() {
     const r = state.release, f = state.flags;
-    const publication = currentPublication();
-    const longreadMode = publication.mode === "longread";
+    const presentation = normalizePresentation(state);
+    const longreadMode = presentation.mode === "longread";
     drawPublicationMode();
-    const photo = Boolean(f.as_photo), mode = photo || f.large_preview ? "large" : "compact";
+    const mode = cardMode(state);
     const card = $("post-card");
     card.classList.toggle("large", !longreadMode && mode === "large");
     card.classList.toggle("compact", !longreadMode && mode === "compact");
     card.classList.toggle("longread", longreadMode);
-    const artSrc = r.artwork_failed ? "" : safeUrl(r.artwork);
+    const artSrc = r.artwork_failed || !presentation.showCover ? "" : safeUrl(r.artwork);
     const acc = r.accentColor || "var(--primary)";
     dyn = null;
     const artEmoji = esc(r.emoji || "🎵");
@@ -657,10 +674,10 @@ import {
 
     const headBlock =
       '<div class="post-headrow"><div style="min-width:0;flex:1">'+
-      '<div class="post-title">'+esc(r.title)+"</div>"+
-      '<div class="post-artist">'+esc(r.emoji)+" · "+esc(r.artist)+"</div></div></div>";
+      '<div class="post-title">'+esc(presentation.title)+"</div>"+
+      '<div class="post-artist">'+esc(presentation.emoji)+" · "+esc(presentation.artist)+"</div></div></div>";
 
-    const tagsBlock = (f.hashtags && r.hashtags)
+    const tagsBlock = presentation.showHashtags
       ? '<div class="post-tags" id="tags-line">'+r.hashtags.split(/\s+/).filter(Boolean).map((t)=>"<span>"+esc(t)+"</span>").join("")+'<span class="pencil">✏️</span></div>'
       : "";
 
@@ -868,25 +885,6 @@ import {
     drawLongreadEditor();
     show("longread");
   }
-  function setPublicationMode(mode) {
-    if (!state || !["card","longread"].includes(mode)) return;
-    hap.pick();
-    const publication = currentPublication();
-    if (publication.mode === mode) {
-      if (mode === "longread") openLongreadEditor();
-      return;
-    }
-    publication.mode = mode;
-    renderCard();
-    syncDraft({
-      publication_mode:mode,
-      longread:publication.longread,
-    }, true);
-    if (mode === "longread") flash(EN?"Longread mode enabled":"Режим лонгрида включён");
-  }
-  document.querySelectorAll("#publication-mode [data-mode]").forEach((button) => {
-    button.addEventListener("click", () => setPublicationMode(button.dataset.mode));
-  });
   $("longread-edit").addEventListener("click", openLongreadEditor);
   $("longread-title-input").addEventListener("input", () => {
     if (!editingLongread) return;
@@ -923,7 +921,10 @@ import {
     publication.longread = normalizeLongread(editingLongread,state.release);
     editingLongread = publication.longread;
     syncDraft(publicationPayload(),true);
-    goBack();
+    while (["longread", "format"].includes(navStack[navStack.length - 1])) {
+      navStack.pop();
+    }
+    show("result", false);
     renderCard();
   });
   $("longread-import").addEventListener("click", () => {
@@ -951,7 +952,7 @@ import {
     if (!pick && (q.match(/https?:\/\/\S+/g) || []).length >= 2) { return searchBatch(q); }
     lastQuery = q;
     cancelPending(); const seq = loadSeq;
-    closeFormat(); show("loading");
+    show("loading");
     try {
       const res = await api("resolve", { query: q, pick: Boolean(pick) }, { abortable: true });
       if (seq !== loadSeq) return;
@@ -973,7 +974,7 @@ import {
   async function searchBatch(q) {
     lastQuery = q;
     cancelPending(); const seq = loadSeq;
-    closeFormat(); show("loading");
+    show("loading");
     try {
       const res = await api("resolve_batch", { query: q }, { abortable: true, timeout: 30000 });
       if (seq !== loadSeq) return;
@@ -1029,10 +1030,12 @@ import {
     } catch(e) { if (seq !== loadSeq) return; $("nf-query").textContent = q; show("notfound"); hap.err(); }
   }
   function openDraftResult(res, applyDefaults) {
-    state = res; saveActiveDraft(); show("result"); renderCard(); hap.ok(); maybeCoach();
-    if (applyDefaults) loadPrefs((prefs) => {
+    state = res; clearResultError(); saveActiveDraft(); show("result"); renderCard(); hap.ok(); maybeCoach();
+    if (applyDefaults) preferences.load((prefs) => {
       if (!prefs) return; const patch = {};
-      if (typeof prefs.large_preview==="boolean" && prefs.large_preview!==state.flags.large_preview) patch.large_preview=prefs.large_preview;
+      if (prefs.preset) Object.assign(patch, presetPatch(prefs.preset));
+      if (typeof prefs.hashtags === "boolean") patch.hashtags = prefs.hashtags;
+      if (typeof prefs.as_photo === "boolean") patch.as_photo = prefs.as_photo;
       if (Array.isArray(prefs.platforms) && prefs.platforms.length) patch.platforms=prefs.platforms;
       if (Object.keys(patch).length) syncDraft(patch, true);
     });
@@ -1224,58 +1227,35 @@ import {
     show("format");
   }
 
-  /* ── style presets (CloudStorage) ── */
-  let presets = [];
-  function loadPresets(cb) {
-    cloud.get("presets", (e,v) => { try { presets = v?JSON.parse(v):[]; } catch(x){ presets=[]; } if(!Array.isArray(presets)) presets=[]; cb&&cb(); });
-  }
-  function savePresetsStore() { cloud.set("presets", JSON.stringify(presets.slice(0,4))); }
+  /* ── three stable publishing presets ── */
   function drawPresets() {
     const box = $("preset-list");
-    const render = () => {
-      box.innerHTML = "";
-      if (!presets.length) { box.innerHTML = '<div class="eb-s" style="font-size:12px">'+esc(T.presetEmpty)+"</div>"; return; }
-      presets.forEach((p, i) => {
-        const chip = document.createElement("button"); chip.className = "chip";
-        chip.innerHTML = esc(p.name)+' <span class="x">✕</span>';
-        chip.addEventListener("click", (ev) => {
-          if (ev.target.closest(".x")) { hap.pick(); presets.splice(i,1); savePresetsStore(); render(); return; }
-          applyPreset(p);
-        });
-        box.appendChild(chip);
-      });
-    };
-    if (!presets.length) loadPresets(render); else render();
-  }
-  function applyPreset(p) {
-    hap.ok();
-    if (typeof p.hashtags === "boolean") state.flags.hashtags = p.hashtags;
-    if (typeof p.as_photo === "boolean") state.flags.as_photo = p.as_photo;
-    if (typeof p.large_preview === "boolean") state.flags.large_preview = p.large_preview;
-    const patch = { hashtags: state.flags.hashtags, as_photo: state.flags.as_photo, large_preview: state.flags.large_preview };
-    if (Array.isArray(p.platforms) && p.platforms.length) patch.platforms = p.platforms;
-    if (Array.isArray(p.tags)) patch.tags = p.tags;
-    drawToggles();
-    syncDraft(patch, true);
-    goBack();
-  }
-  $("preset-save").addEventListener("click", () => {
-    hap.tap();
-    loadPresets(() => {
-      const n = presets.length + 1;
-      presets.push({
-        name: T.presetName + " " + n,
-        hashtags: state.flags.hashtags, as_photo: Boolean(state.flags.as_photo),
-        large_preview: state.flags.large_preview,
-        platforms: pmSelection(), tags: editTags.slice(),
-      });
-      savePresetsStore(); drawPresets();
+    const current = normalizePreset(state?.presentation?.preset, state);
+    box.innerHTML = "";
+    presetDefinitions(EN).forEach((preset) => {
+      const button = document.createElement("button");
+      const active = preset.key === current;
+      button.type = "button";
+      button.dataset.preset = preset.key;
+      button.className = "preset-card" + (active ? " active" : "");
+      button.setAttribute("role", "radio");
+      button.setAttribute("aria-checked", String(active));
+      button.innerHTML = '<span class="preset-icon">'+esc(preset.icon)+'</span><span><b>'+esc(preset.title)+'</b><small>'+esc(preset.copy)+'</small></span>';
+      button.addEventListener("click", () => applyPreset(preset.key));
+      box.appendChild(button);
     });
-  });
-  function closeFormat() { if (!$("v-format").classList.contains("hidden")) {} }
+  }
+  function applyPreset(value) {
+    hap.ok();
+    const patch = applyPresetLocally(state, value);
+    drawToggles(); drawPresets(); drawPublicationMode();
+    preferences.save({ preset:patch.preset, hashtags:state.flags.hashtags, as_photo:state.flags.as_photo, platforms:pmSelection() });
+    syncDraft(patch, true);
+    if (patch.preset === "longread") flash(EN ? "Longread is ready to edit" : "Лонгрид готов к редактированию");
+  }
   function drawToggles() {
     const box = $("toggles"); box.innerHTML = "";
-    const defs = [["hashtags",T.rHashtags],["quote",T.rQuote,!state.flags.has_prefix],["as_photo",T.rPhoto],["large_preview",T.rBig,Boolean(state.flags.as_photo)]];
+    const defs = [["hashtags",T.rHashtags],["quote",T.rQuote,!state.flags.has_prefix],["as_photo",T.rPhoto]];
     defs.forEach(([k,label,skip]) => {
       if (skip) return;
       const btn = document.createElement("button"); btn.className = "toggle-row";
@@ -1345,7 +1325,12 @@ import {
     if (pending && pending.value.trim()) editTags.push(pending.value.trim());
     const patch = { tags: editTags };
     if (editTags.length && !state.flags.hashtags) patch.hashtags = true;
-    savePrefs({ platforms: pmSelection(), large_preview: state.flags.large_preview });
+    preferences.save({
+      preset: normalizePreset(state?.presentation?.preset, state),
+      platforms: pmSelection(),
+      hashtags: state.flags.hashtags,
+      as_photo: Boolean(state.flags.as_photo),
+    });
     syncDraft(patch, true);
     goBack();
   });
@@ -1361,12 +1346,19 @@ import {
         const res = await api("update", { draft_id: draftId, ...patch });
         // a newer edit already fired — don't let this stale response revert it
         if (seq !== syncSeq) return;
-        if (!res || !res.ok) { setFormatSync("error"); setLongreadSync("error"); return; }
+        if (!res || !res.ok) {
+          setFormatSync("error"); setLongreadSync("error");
+          if (!$("v-result").classList.contains("hidden")) {
+            showResultError(res?.error || "save_failed", () => syncDraft(patch, true));
+          }
+          return;
+        }
         state = res; saveActiveDraft();
+        clearResultError();
         setFormatSync("saved");
         setLongreadSync("saved");
         if (!$("v-result").classList.contains("hidden")) renderCard();
-      } catch(e) { if (seq === syncSeq) { setFormatSync("error"); setLongreadSync("error"); flash(errorText(e.message)); } }
+      } catch(e) { if (seq === syncSeq) { setFormatSync("error"); setLongreadSync("error"); flash(errorText(e.message)); if (!$("v-result").classList.contains("hidden")) showResultError(e.message, () => syncDraft(patch, true)); } }
     };
     if (immediate) run(); else syncTimer = setTimeout(run, 350);
   }
@@ -1395,6 +1387,7 @@ import {
   });
   async function deliver(action, extra) {
     const main = $("action-main"); main.disabled = true; setNativeMainBusy(true);
+    clearResultError();
     try {
       const res = await api(action, { draft_id: state.draft_id, hashtags: state.flags.hashtags, quote: state.flags.quote, large_preview: state.flags.large_preview, as_photo: Boolean(state.flags.as_photo), ...publicationPayload(), ...(extra||{}) });
       if (res.ok) {
@@ -1409,8 +1402,8 @@ import {
         $("toast-msg").innerHTML = duplicateMessage(res);
         setToastOpen(true); $("toast-confirm").textContent = T.confirm;
         $("toast-confirm").onclick = () => { setToastOpen(false); deliver("publish", {force:true}); };
-      } else { hap.err(); $("status").textContent = errorText(res.error); }
-    } catch(e) { hap.err(); $("status").textContent = errorText("network"); }
+      } else { hap.err(); showResultError(res.error, () => deliver(action, extra)); }
+    } catch(e) { hap.err(); showResultError("network", () => deliver(action, extra)); }
     finally { setNativeMainBusy(false); if ($("dock-done").classList.contains("hidden")) $("action-main").disabled = false; }
   }
   function closePublish() { setSheetOpen("publish-sheet", "publish-mask", false); }
@@ -2112,6 +2105,7 @@ import {
     openDraftResult({
       ok:true, draft_id:"demo", can_publish:true,
       flags:{hashtags:true,quote:false,large_preview:true,as_photo:false,has_prefix:false},
+      presentation:{version:1,preset:"cover",mode:"card",artist:"Electric Wizard",title:"Funeralopolis",emoji:"⚡",show_cover:true,show_hashtags:true,platform_keys:["spotify","appleMusic","youtubeMusic"]},
       release:{artist:"Electric Wizard",title:"Funeralopolis",kind:"song",emoji:"⚡",year:"2000",genre:"Doom Metal",artwork:location.origin+"/assets/studio-demo.svg",page_url:"https://song.link/demo",preview:null,preview_pending:false,hashtags:"#stonerhand #doom #electricwizard",platforms:[{key:"spotify",label:"Spotify",url:"https://open.spotify.com",enabled:true},{key:"appleMusic",label:"Apple Music",url:"https://music.apple.com",enabled:true},{key:"youtubeMusic",label:"YouTube",url:"https://music.youtube.com",enabled:true}]},
       publication:{mode:"card",rich_supported:true,longread:{title:"Electric Wizard — Funeralopolis",lead:"Doom Metal · 2000",blocks:[]}}
     }, false);
