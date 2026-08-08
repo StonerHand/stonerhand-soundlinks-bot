@@ -2056,6 +2056,9 @@ async def _track_lookup_message_impl(
         return
 
     content_type_count = bundle.content_type_count
+    # A multi-item post is already self-explanatory. Quoting the source message
+    # adds visual noise and can expose the raw links above the collection.
+    result_user_prefix = "" if bundle.item_count > 1 else user_prefix
     if content_type_count == 1 and tracks:
         await _send_track_matches(
             message,
@@ -2063,7 +2066,7 @@ async def _track_lookup_message_impl(
             tracks,
             is_private=is_private,
             user_id=user_id,
-            user_prefix=user_prefix,
+            user_prefix=result_user_prefix,
             lang=lang,
             include_channel_button=include_channel_button,
             include_hashtags=include_hashtags,
@@ -2080,7 +2083,7 @@ async def _track_lookup_message_impl(
             context.bot,
             message,
             videos,
-            user_prefix=user_prefix,
+            user_prefix=result_user_prefix,
             include_channel_button=include_channel_button,
             include_hashtags=include_hashtags,
             lang=lang,
@@ -2096,7 +2099,7 @@ async def _track_lookup_message_impl(
             context.bot,
             message,
             radios,
-            user_prefix=user_prefix,
+            user_prefix=result_user_prefix,
             include_channel_button=include_channel_button,
             include_hashtags=include_hashtags,
             lang=lang,
@@ -2112,7 +2115,7 @@ async def _track_lookup_message_impl(
             context.bot,
             message,
             playlists,
-            user_prefix=user_prefix,
+            user_prefix=result_user_prefix,
             include_channel_button=include_channel_button,
             include_hashtags=include_hashtags,
             lang=lang,
@@ -2128,7 +2131,7 @@ async def _track_lookup_message_impl(
             context.bot,
             message,
             artists,
-            user_prefix=user_prefix,
+            user_prefix=result_user_prefix,
             include_channel_button=include_channel_button,
             include_hashtags=include_hashtags,
             lang=lang,
@@ -2147,7 +2150,7 @@ async def _track_lookup_message_impl(
         radios,
         playlists,
         artists,
-        user_prefix=user_prefix,
+        user_prefix=result_user_prefix,
         include_channel_button=include_channel_button,
         include_hashtags=include_hashtags,
         context=context,

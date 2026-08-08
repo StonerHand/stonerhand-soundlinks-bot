@@ -1896,7 +1896,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         labels = [button.text for row in keyboard for button in row]
         self.assertEqual(labels, ["Открыть подборку", "Порядок"])
 
-    async def test_collection_preserves_note_but_removes_source_links(self) -> None:
+    async def test_collection_omits_note_and_source_links(self) -> None:
         class DistinctLookupClient:
             async def lookup_track(self, source_url: str) -> TrackMatch:
                 track_id = source_url.split("/track/", 1)[-1].split("?", 1)[0]
@@ -1919,8 +1919,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertIn("Три трека для вечерней подборки", message.replies[0])
+        self.assertNotIn("Три трека для вечерней подборки", message.replies[0])
         self.assertNotIn("open.spotify.com", message.replies[0])
+        self.assertNotIn("<blockquote>", message.replies[0])
 
     async def test_youtube_video_links_use_video_post(self) -> None:
         message = PrivateYouTubeMessageStub()
@@ -2083,11 +2084,8 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(context.bot.sent_media_groups), 1)
         media = context.bot.sent_media_groups[0]["media"]
         caption = media[0].caption
-        self.assertTrue(
-            caption.startswith(
-                "<blockquote>вечерний набор</blockquote>\n\n"
-            )
-        )
+        self.assertNotIn("вечерний набор", caption)
+        self.assertNotIn("<blockquote>", caption)
         self.assertIn("<b>Песня + клип</b>", caption)
         self.assertIn("<b>Youth Code</b> — Transitions", caption)
         self.assertIn("<b>SANSAE Live Session Vol.3 - Melon</b>", caption)
@@ -2108,11 +2106,8 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertTrue(
-            message.replies[0].startswith(
-                "<blockquote>пачка ссылок</blockquote>\n\n"
-            )
-        )
+        self.assertNotIn("пачка ссылок", message.replies[0])
+        self.assertNotIn("<blockquote>", message.replies[0])
         self.assertIn("<b>Women of Punk</b>", message.replies[0])
         self.assertIn(
             "<b>SANSAE Live Session Vol.3 - Melon</b>",
@@ -2133,11 +2128,8 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertTrue(
-            message.replies[0].startswith(
-                "<blockquote>радио и видео</blockquote>\n\n"
-            )
-        )
+        self.assertNotIn("радио и видео", message.replies[0])
+        self.assertNotIn("<blockquote>", message.replies[0])
         self.assertIn("<b>Dark Energy w/ Guest</b>", message.replies[0])
         self.assertIn(
             "<b>SANSAE Live Session Vol.3 - Melon</b>",
