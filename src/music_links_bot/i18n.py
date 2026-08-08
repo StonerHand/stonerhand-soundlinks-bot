@@ -148,10 +148,6 @@ STRINGS: dict[str, dict[str, str]] = {
     "crate_view": {RU: "Открыть подборку", EN: "Open crate"},
     "crate_reorder": {RU: "Порядок", EN: "Reorder"},
     "crate_style": {RU: "Оформление", EN: "Style"},
-    "crate_found": {
-        RU: "Подборка · найдено {found} из {total}",
-        EN: "Crate · found {found} of {total}",
-    },
     "home_crate": {RU: "🧺 Подборка · {count}", EN: "🧺 Crate · {count}"},
     "home_more": {RU: "••• Ещё", EN: "••• More"},
     "home_stats": {RU: "📊 Статистика канала", EN: "📊 Channel stats"},

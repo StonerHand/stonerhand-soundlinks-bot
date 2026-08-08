@@ -4,6 +4,7 @@ import asyncio
 from collections.abc import Callable
 from datetime import datetime, timezone
 import logging
+import re
 
 from telegram import Message, MessageEntity
 from telegram.ext import ContextTypes
@@ -43,12 +44,19 @@ def message_entities(message: Message) -> tuple[MessageEntity, ...]:
     return tuple(getattr(message, "caption_entities", None) or ())
 
 
-def build_user_prefix(message: Message) -> str:
+def build_user_prefix(message: Message, *, bot_username: str | None = None) -> str:
     body_html = format_user_note_html(
         message_text(message),
         message_entities(message),
         max_length=MAX_USER_NOTE_LENGTH,
     )
+    if bot_username:
+        body_html = re.sub(
+            rf"^@{re.escape(bot_username)}\b[\s,:;—–-]*",
+            "",
+            body_html,
+            flags=re.IGNORECASE,
+        ).strip()
     if not body_html:
         return ""
 

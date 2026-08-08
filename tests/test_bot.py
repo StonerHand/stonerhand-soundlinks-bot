@@ -1888,9 +1888,39 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
+        self.assertIn("<b>Подборка · 3 релиза</b>", message.replies[0])
+        self.assertNotIn("найдено", message.replies[0])
+        self.assertNotIn("open.spotify.com", message.replies[0])
+        self.assertNotIn("<blockquote>", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         labels = [button.text for row in keyboard for button in row]
         self.assertEqual(labels, ["Открыть подборку", "Порядок"])
+
+    async def test_collection_preserves_note_but_removes_source_links(self) -> None:
+        class DistinctLookupClient:
+            async def lookup_track(self, source_url: str) -> TrackMatch:
+                track_id = source_url.split("/track/", 1)[-1].split("?", 1)[0]
+                return TrackMatch(
+                    title=f"Track {track_id}",
+                    artist="Artist",
+                    links={"spotify": source_url},
+                    page_url=f"https://song.link/{track_id}",
+                )
+
+        message = PrivateSpotifyCollectionMessageStub()
+        message.text = (
+            "Три трека для вечерней подборки\n"
+            "https://open.spotify.com/track/abc\n"
+            "https://open.spotify.com/track/def\n"
+            "https://open.spotify.com/track/ghi"
+        )
+        context = ContextStub(songlink_client=DistinctLookupClient())
+
+        await track_lookup_message(UpdateStub(message), context)
+
+        self.assertEqual(len(message.replies), 1)
+        self.assertIn("Три трека для вечерней подборки", message.replies[0])
+        self.assertNotIn("open.spotify.com", message.replies[0])
 
     async def test_youtube_video_links_use_video_post(self) -> None:
         message = PrivateYouTubeMessageStub()
