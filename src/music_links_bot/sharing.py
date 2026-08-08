@@ -172,27 +172,27 @@ def render_inline_share_card(
     if bundle.content_type_count == 1 and bundle.tracks:
         text = format_collection_message(bundle.tracks, include_hashtags=True)
         keyboard = _build_collection_keyboard(bundle.tracks)
-        title = _collection_title(lang, len(bundle.tracks), "release")
+        title = collection_title(lang, len(bundle.tracks), "release")
     elif bundle.content_type_count == 1 and bundle.videos:
         text = format_video_collection_message(bundle.videos, include_hashtags=True)
         keyboard = _build_youtube_collection_keyboard(bundle.videos)
-        title = _collection_title(lang, len(bundle.videos), "video")
+        title = collection_title(lang, len(bundle.videos), "video")
     elif bundle.content_type_count == 1 and bundle.radios:
         text = format_radio_collection_message(bundle.radios, include_hashtags=True)
         keyboard = _build_nts_collection_keyboard(bundle.radios)
-        title = _collection_title(lang, len(bundle.radios), "radio")
+        title = collection_title(lang, len(bundle.radios), "radio")
     elif bundle.content_type_count == 1 and bundle.playlists:
         text = format_playlist_collection_message(
             bundle.playlists, include_hashtags=True
         )
         keyboard = _build_playlist_collection_keyboard(bundle.playlists)
-        title = _collection_title(lang, len(bundle.playlists), "playlist")
+        title = collection_title(lang, len(bundle.playlists), "playlist")
     elif bundle.content_type_count == 1 and bundle.artists:
         text = format_artist_collection_message(
             bundle.artists, include_hashtags=True
         )
         keyboard = _build_artist_collection_keyboard(bundle.artists)
-        title = _collection_title(lang, len(bundle.artists), "artist")
+        title = collection_title(lang, len(bundle.artists), "artist")
     else:
         text = format_mixed_collection_message(
             bundle.tracks,
@@ -209,7 +209,7 @@ def render_inline_share_card(
             bundle.artists,
             bundle.radios,
         )
-        title = _collection_title(lang, bundle.item_count, "item")
+        title = collection_title(lang, bundle.item_count, "item")
 
     return InlineShareCard(
         title=title,
@@ -243,7 +243,7 @@ def _bundle_preview_url(bundle: Any, context: Any) -> str | None:
     return None
 
 
-def _collection_title(lang: str, count: int, item_kind: str) -> str:
+def collection_title(lang: str, count: int, item_kind: str = "release") -> str:
     if lang == "en":
         nouns = {
             "release": ("release", "releases"),
@@ -272,6 +272,21 @@ def _collection_title(lang: str, count: int, item_kind: str) -> str:
     else:
         noun = many
     return f"Подборка · {count} {noun}"
+
+
+def collection_result_title(
+    lang: str,
+    *,
+    found: int,
+    total: int,
+    item_kind: str = "release",
+) -> str:
+    """Describe a complete collection compactly and flag partial results."""
+    if found < total:
+        if lang == "en":
+            return f"⚠️ Collection · {found} of {total}"
+        return f"⚠️ Подборка · {found} из {total}"
+    return collection_title(lang, found, item_kind)
 
 
 def _compact_share_url(url: str) -> str | None:

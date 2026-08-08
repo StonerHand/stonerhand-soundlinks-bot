@@ -6,12 +6,30 @@ from music_links_bot.sharing import (
     MAX_SHARE_QUERY_LENGTH,
     add_share_button,
     build_share_query,
+    collection_result_title,
+    collection_title,
     make_channel_safe_keyboard,
     parse_share_query,
 )
 
 
 class SharingTests(unittest.TestCase):
+    def test_collection_titles_are_compact_and_use_correct_plural(self) -> None:
+        self.assertEqual(collection_title("ru", 1), "Подборка · 1 релиз")
+        self.assertEqual(collection_title("ru", 4), "Подборка · 4 релиза")
+        self.assertEqual(collection_title("ru", 12), "Подборка · 12 релизов")
+        self.assertEqual(collection_title("en", 2), "Collection · 2 releases")
+
+    def test_partial_collection_title_shows_warning_and_progress(self) -> None:
+        self.assertEqual(
+            collection_result_title("ru", found=3, total=4),
+            "⚠️ Подборка · 3 из 4",
+        )
+        self.assertEqual(
+            collection_result_title("en", found=3, total=4),
+            "⚠️ Collection · 3 of 4",
+        )
+
     def test_spotify_collection_is_compact_and_round_trips(self) -> None:
         urls = [
             f"https://open.spotify.com/track/{item_id}?si=tracking"

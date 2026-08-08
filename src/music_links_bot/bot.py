@@ -215,6 +215,7 @@ from music_links_bot.publication_service import (
 from music_links_bot.sharing import (
     add_share_button,
     build_share_query,
+    collection_result_title,
     make_channel_safe_keyboard,
     track_share_url,
 )
@@ -1835,7 +1836,8 @@ async def _send_track_matches(
     """Deliver one release or a collection without mixing lookup concerns."""
     if len(tracks) > 1:
         total = max(len(tracks), int(requested_count or len(tracks)))
-        title = get_text(lang, "crate_found").format(
+        title = collection_result_title(
+            lang,
             found=len(tracks),
             total=total,
         )
@@ -2022,7 +2024,11 @@ async def _track_lookup_message_impl(
             return
 
     # The whole message was the search query, so quoting it back is noise.
-    user_prefix = "" if found_via_search else _build_user_prefix(message)
+    user_prefix = (
+        ""
+        if found_via_search
+        else _build_user_prefix(message, bot_username=context.bot.username)
+    )
     if is_private:
         await _send_loading_placeholder(message, lang)
         await _update_loading_placeholder(lang, "progress_links")
