@@ -2,138 +2,89 @@
 
 # 🎧 StonerHand Soundlinks Bot
 
-### A music link → a finished Telegram publication
+### Music link → ready-to-publish Telegram post
 
-[Open the bot](https://t.me/StonerHandBot) · [Channel](https://t.me/stonerhand) · [Русская версия](README.ru.md) · [Architecture (RU)](ARCHITECTURE.ru.md)
+[Open bot](https://t.me/StonerHandBot) · [Channel](https://t.me/stonerhand) · [Русский](README.ru.md) · [Architecture](ARCHITECTURE.ru.md)
 
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)
-![Telegram](https://img.shields.io/badge/Telegram-Bot%20%2B%20Mini%20App-26A5E4?style=flat-square&logo=telegram&logoColor=white)
+![Telegram](https://img.shields.io/badge/Telegram-Bot-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-Production-000?style=flat-square&logo=vercel)
 ![CI](https://img.shields.io/github/actions/workflow/status/StonerHand/stonerhand-soundlinks-bot/ci.yml?style=flat-square&label=CI)
-
-<img src="assets/studio-demo.svg" alt="Animated StonerHand Studio search, longread and publishing flow" width="100%">
 
 </div>
 
 ## Features
 
-| Telegram bot | Studio Mini App |
-| --- | --- |
-| Link or title → exact release | Search, candidates and audio preview |
-| Clean title, artwork, hashtags and compact buttons | Minimal, Cover and block-based Longread presets |
-| Several links → one collection with per-link status | Up to 10 releases, ordering and failed-link retry |
-| Song + YouTube clip → two-tile media preview | Song artwork and video thumbnail |
-| Inline search with labeled history, cache and pagination | History, queue, undo and owner analytics |
-| Automatic link replacement in chats and channels | Native sharing that preserves buttons |
+- accepts a music URL or an `artist — track` query;
+- resolves release metadata, artwork and platform links;
+- builds a clean Telegram card with compact buttons;
+- combines several links into one numbered collection;
+- pairs a song and YouTube clip in one media post;
+- includes an in-chat editor, drafts and recent posts;
+- sends to the user, another chat or a configured channel;
+- supports a durable scheduled-publishing queue;
+- works inline: `@StonerHandBot artist — track`.
 
-Spotify, Apple Music, YouTube, SoundCloud, Bandcamp, Deezer, Tidal,
-Yandex Music, podcasts, Spotify and Apple Music playlists, Spotify artists,
-and NTS Radio are supported.
-
-Cards contain release data and actions without generated promotional filler or
-hidden heading links. Below the cover, only artist and title remain; genre,
-format and year are not repeated, while genre still powers the useful automatic
-hashtag. The quick surface is predictable: the primary service
-plus the universal hub, followed by **Edit** and **Add to crate**. Editing stays
-in the same Telegram message and exposes only style, text, hashtags and
-platforms; delivery, sharing and destructive actions live in the overflow.
-Drafts autosave, `/start` resumes the active one, and Recent keeps the last five
-posts. The crate uses numbered selection and offers a 15-second undo. Automatic
-hashtags are capped at three useful tags.
-
-Bot and Studio render the same server-side presentation model. The result screen
-has one primary action; advanced controls live under **Style**. The last preset,
-hashtags, photo mode and platform order are remembered per user, while the
-published channel keeps its own defaults.
-
-Longreads use Telegram Rich Messages with a safe HTML fallback. A song and a
-YouTube clip become a native two-tile media album; the bot never downloads or
-re-uploads the copyrighted video.
+Supported sources include Spotify, Apple Music, YouTube, SoundCloud, Bandcamp,
+Deezer, Tidal, Yandex Music, podcasts, Spotify and Apple Music playlists,
+Spotify artists and NTS Radio.
 
 ## Flow
 
 ```mermaid
 flowchart LR
-    A["Link / title"] --> B["Exact release"]
-    A2["Several links"] --> C["Collection / media mix"]
-    B --> D["Minimal / Cover / Longread"]
-    C --> D
-    D --> E["Chat · channel · queue"]
+    A["Link or release name"] --> B["Resolve"]
+    B --> C["Card or collection"]
+    C --> D["Edit inside Telegram"]
+    D --> E["Self · chat · channel · queue"]
 ```
 
-The home menu has four destinations: **Create**, **Crate**, **Recent**, and
-**Studio**. The guided tour is shown only on the first visit. Settings, longreads,
-scheduling and publishing live in the Mini App,
-while chat stays a fast path. The bot and Studio use the same resolver. Provider
-clients are lazy, independent lookups run in parallel, and successful bundles
-are cached in memory and Redis. Equal concurrent searches and resolver batches
-share one upstream request, while accidental repeated messages and `/start`
-taps are debounced across warm instances. One request deadline bounds the entire lookup,
-while a repeatedly failing provider is temporarily isolated. Partial batches
-keep their successful cards and retry only failed links.
+Cards keep only useful information: artwork, artist, title, a small set of
+hashtags and platform actions. Multi-link inputs are not quoted back into the
+result. The editor updates one Telegram message; destructive actions require
+confirmation and collection removals can be undone.
 
-The user and channel remember the last successful presentation preset (minimal,
-cover or longread), hashtags, photo mode and platform selection, then apply it to
-the next owner draft. Telegram Rich Messages, prepared inline messages and safe
-HTML fallback share one publication pipeline.
-
-Before channel delivery, the bot checks its posting rights. Duplicate records
-retain the previous post link and offer open, repeat or replace actions. The
-Scheduled status is returned only after Redis confirms the durable queue write.
-Queue ticks run only through a `CRON_SECRET`-protected worker, one leased job at
-a time, with a bounded batch per invocation. Warm-instance caches are bounded,
-draft ownership is fail-closed, and Studio payloads are normalized before storage.
-The owner-only `/status` command summarizes Telegram, Redis, queue, permissions,
-latency, cache and provider circuits.
-
-## Vercel setup
-
-```dotenv
-BOT_TOKEN=123456:telegram-token
-SET_WEBHOOK_SECRET=long-random-secret
-CRON_SECRET=another-long-random-secret
-ADMIN_CHAT_ID=123456789
-PUBLISH_CHAT_ID=@channel
-```
-
-1. Create a bot with [@BotFather](https://t.me/BotFather) and enable `/setinline`.
-2. Import the repository into Vercel with `./` as the project root.
-3. Connect Upstash Redis from Vercel Marketplace for drafts, queue, history,
-   analytics and cross-instance deduplication.
-4. Open `https://<domain>/api/set_webhook?secret=<SET_WEBHOOK_SECRET>`.
-5. Verify `https://<domain>/api/health` returns HTTP 200 and `"ok": true`.
-
-See [.env.example](.env.example) for every setting.
-
-<details>
-<summary><b>Local development and verification</b></summary>
+## Local setup
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e '.[dev]'
-python -m playwright install chromium
+pip install -r requirements.txt
 cp .env.example .env
-
-python -m pyflakes src api tests
-python -m pytest -q
-python tests/e2e/smoke.py
+PYTHONPATH=src python -m music_links_bot
 ```
 
-Do not run polling and the production webhook against the same token.
+Minimum environment:
 
-</details>
+```env
+BOT_TOKEN=...
+SONGLINK_USER_COUNTRIES=US
+LOG_LEVEL=INFO
+PRIMARY_PLATFORM=spotify
+```
 
-## Code map
+Production also uses webhook secrets, a cron secret and Upstash Redis.
+
+## Validation
+
+```bash
+PYTHONPATH=src python -m unittest discover -s tests -v
+python -m compileall -q src api tests
+python -m pyflakes src api tests
+python -m json.tool vercel.json >/dev/null
+```
+
+## Layout
 
 ```text
-api/                    webhook, Studio API, health and queue worker
-src/music_links_bot/    handlers, provider registry, publication, queue and Redis
-webapp/                 build-free modular Telegram Mini App
-tests/                  unit/integration, mobile smoke and production canary
+api/                    webhook, health, webhook setup and queue worker
+src/music_links_bot/    bot logic, providers, editor and persistence
+tests/                  unit and integration tests
+vercel.json             production routes and cron jobs
 ```
 
-See [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md) for request flows, API actions,
-Redis keyspace, security and extension rules.
+Production runs on Vercel using a Telegram webhook. Redis stores caches,
+sessions, drafts, collections, history, the publishing queue and deduplication
+claims. Non-critical flows have a bounded in-memory fallback.
 
-[MIT](LICENSE)
+License: [MIT](LICENSE).

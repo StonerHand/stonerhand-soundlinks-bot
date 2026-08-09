@@ -1,9 +1,8 @@
 import asyncio
 import unittest
-import os
 from pathlib import Path
 import sys
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import BadRequest
 from telegram.ext import CommandHandler
@@ -56,6 +55,7 @@ from music_links_bot.bot import (
     _render_bot_crate,
     _render_track_draft,
     build_application,
+    sync_application_commands,
     channel_command,
     crate_command,
     guide_command,
@@ -477,6 +477,22 @@ class StartUpdateStub:
 
 
 class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
+    async def test_profile_sync_restores_standard_command_menu(self) -> None:
+        application = type("ApplicationStub", (), {})()
+        application.bot = type("BotStub", (), {})()
+        application.bot.set_my_commands = AsyncMock()
+        application.bot.set_chat_menu_button = AsyncMock()
+        application.bot.set_my_description = AsyncMock()
+        application.bot.set_my_short_description = AsyncMock()
+
+        await sync_application_commands(application)
+
+        application.bot.set_chat_menu_button.assert_awaited_once()
+        menu_button = application.bot.set_chat_menu_button.await_args.kwargs[
+            "menu_button"
+        ]
+        self.assertEqual(menu_button.to_dict(), {"type": "commands"})
+
     async def test_repeated_start_is_debounced(self) -> None:
         message = PrivateMessageStub()
         update = StartUpdateStub(message)
@@ -488,7 +504,7 @@ class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 1)
         self.assertEqual(context.bot.edited_messages, [])
         self.assertEqual(context.bot.deleted_messages, [])
-        self.assertIn("StonerHand Studio", message.replies[-1])
+        self.assertIn("StonerHandBot", message.replies[-1])
 
     async def test_help_sends_visible_reply_and_retires_home(self) -> None:
         message = PrivateMessageStub()
@@ -878,14 +894,13 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[1][0].text, "🧺 Подборка · 0")
         self.assertEqual(rows[1][1].text, "••• Ещё")
         self.assertEqual(rows[2][0].text, "← Главное меню")
-        self.assertFalse(rows[0][0].api_kwargs)
+        self.assertEqual(rows[0][0].api_kwargs, {"style": "primary"})
 
     def test_section_keyboard_offers_related_pages_and_back_last(self) -> None:
         keyboard = _build_section_keyboard(
             "StonerHandBot",
             lang="ru",
             active="more",
-            include_studio=False,
         )
 
         rows = keyboard.inline_keyboard
@@ -958,15 +973,14 @@ class BotKeyboardTests(unittest.TestCase):
             "v2|crate|undo",
         )
 
-    def test_home_keyboard_prioritizes_studio_and_reflects_state(self) -> None:
-        with patch.dict(os.environ, {"WEBAPP_URL": "https://studio.example/app"}):
-            keyboard = _build_start_keyboard(
-                "StonerHandBot",
-                lang="ru",
-                crate_count=3,
-                is_admin=True,
-                show_tour=True,
-            )
+    def test_home_keyboard_prioritizes_creation_and_reflects_state(self) -> None:
+        keyboard = _build_start_keyboard(
+            "StonerHandBot",
+            lang="ru",
+            crate_count=3,
+            is_admin=True,
+            show_tour=True,
+        )
 
         rows = keyboard.inline_keyboard
         self.assertEqual(rows[0][0].text, "▶ Как всё работает")
@@ -976,8 +990,7 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[2][0].text, "🧺 Подборка · 3")
         self.assertEqual(rows[2][0].api_kwargs, {"style": "success"})
         self.assertEqual(rows[2][1].text, "Недавние")
-        self.assertEqual(rows[3][0].text, "🎛 Студия")
-        self.assertEqual(len(rows), 4)
+        self.assertEqual(len(rows), 3)
 
     def test_home_text_is_personal_and_escapes_telegram_html(self) -> None:
         text = _build_home_text(
@@ -987,23 +1000,10 @@ class BotKeyboardTests(unittest.TestCase):
             is_admin=True,
         )
 
-        self.assertIn("Твоя Студия, &lt;Артём&gt;", text)
+        self.assertIn("Музыкальный редактор, &lt;Артём&gt;", text)
         self.assertNotIn("Подборка · 4/10", text)
-        self.assertIn("Оформление и публикация — в Студии", text)
+        self.assertIn("Редактор, очередь и публикация доступны прямо в боте", text)
         self.assertIn("<code>артист — трек</code>", text)
-
-    def test_home_keyboard_omits_webapp_button_outside_private_chat(self) -> None:
-        with patch.dict(os.environ, {"WEBAPP_URL": "https://studio.example/app"}):
-            keyboard = _build_start_keyboard(
-                "StonerHandBot",
-                lang="ru",
-                include_studio=False,
-            )
-
-        self.assertNotIn(
-            "🎛 Студия",
-            [button.text for row in keyboard.inline_keyboard for button in row],
-        )
 
     def test_menu_text_uses_compact_html_headings(self) -> None:
         self.assertTrue(_menu_text("menu:start").startswith("🎧 <b>"))
@@ -1460,7 +1460,7 @@ class PostEditorTests(unittest.TestCase):
         self.assertEqual(more[1][0].text, "# Хэштеги вкл.")
         self.assertEqual(more[1][0].callback_data, "v2|editor|h|abc123")
 
-    def test_editor_rows_keep_admin_actions_in_studio(self) -> None:
+    def test_editor_rows_keep_admin_actions_in_overflow(self) -> None:
         rows = _editor_rows("abc123", self._draft(can_publish=True))
 
         labels = [button.text for row in rows for button in row]
@@ -1509,20 +1509,11 @@ class PostEditorTests(unittest.TestCase):
             "Sleep — Dragonaut",
         )
 
-    def test_editor_rows_do_not_duplicate_studio_navigation(self) -> None:
-        import os
-        from unittest.mock import patch as env_patch
-
-        with env_patch.dict(
-            os.environ,
-            {"WEBAPP_URL": "https://studio.example/app"},
-            clear=False,
-        ):
-            rows = _editor_rows("abc123", self._draft())
+    def test_editor_rows_keep_one_compact_action_row(self) -> None:
+        rows = _editor_rows("abc123", self._draft())
 
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0][0].text, "Изменить")
-        self.assertIsNone(rows[0][0].web_app)
 
     def test_render_track_draft_respects_toggles(self) -> None:
         draft = self._draft(
@@ -2319,7 +2310,7 @@ if __name__ == "__main__":
     unittest.main()
 
 
-class StudioOverrideTests(unittest.TestCase):
+class PublicationOverrideTests(unittest.TestCase):
     def _draft(self, **overrides: object) -> dict:
         draft = {
             "v": 1,

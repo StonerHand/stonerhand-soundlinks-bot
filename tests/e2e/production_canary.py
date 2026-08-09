@@ -40,39 +40,6 @@ def main() -> int:
     except Exception as exc:
         failures.append(f"health request failed: {type(exc).__name__}")
 
-    try:
-        status, raw, content_type = fetch("/app")
-        html = raw.decode("utf-8", errors="replace")
-        if status != 200:
-            failures.append(f"app status={status}")
-        if "text/html" not in content_type:
-            failures.append("app content-type is not HTML")
-        if "StonerHand" not in html or "/webapp/app.js" not in html:
-            failures.append("app shell is incomplete")
-    except Exception as exc:
-        failures.append(f"app request failed: {type(exc).__name__}")
-
-    for path, expected_type, marker in (
-        ("/webapp/app.js", "javascript", "prepare_share"),
-        ("/webapp/studio-presets.js", "javascript", "presetDefinitions"),
-        ("/webapp/preference-store.js", "javascript", "createPreferenceStore"),
-        ("/webapp/presentation-ui.js", "javascript", "normalizePresentation"),
-        ("/webapp/styles.css", "text/css", "height: 100dvh"),
-        ("/webapp/design-tokens.css", "text/css", "--tap-min: 48px"),
-        ("/webapp/studio-shell.css", "text/css", ".brand-lockup"),
-    ):
-        try:
-            status, raw, content_type = fetch(path)
-            text = raw.decode("utf-8", errors="replace")
-            if status != 200:
-                failures.append(f"asset {path} status={status}")
-            if expected_type not in content_type:
-                failures.append(f"asset {path} content-type={content_type}")
-            if marker not in text:
-                failures.append(f"asset {path} is incomplete")
-        except Exception as exc:
-            failures.append(f"asset {path} failed: {type(exc).__name__}")
-
     if failures:
         print("\n".join(failures), file=sys.stderr)
         return 1

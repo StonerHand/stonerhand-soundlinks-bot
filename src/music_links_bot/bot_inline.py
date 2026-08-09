@@ -172,7 +172,6 @@ async def inline_query_handler(
             cache_time=0 if channel_safe else INLINE_CACHE_SECONDS,
             is_personal=personal_results,
             next_offset=next_offset,
-            button=_studio_button(lang),
         )
     except TelegramError:
         LOGGER.debug("Could not answer inline query", exc_info=True)
@@ -220,7 +219,6 @@ async def _answer_inline_collection(
             [result],
             cache_time=0 if (is_direct or channel_safe) else INLINE_CACHE_SECONDS,
             is_personal=is_direct or channel_safe,
-            button=_studio_button(lang),
         )
     except TelegramError:
         LOGGER.debug("Could not answer inline collection query", exc_info=True)
@@ -261,13 +259,6 @@ async def _search_source_urls(
     urls = [candidate.url for candidate in candidates[:3]]
     await store_cached_search(bot_data, search_query, urls)
     return urls
-
-
-def _studio_button(lang: str) -> InlineQueryResultsButton:
-    return InlineQueryResultsButton(
-        text=get_text(lang, "open_studio"),
-        start_parameter="studio",
-    )
 
 
 async def _answer_inline_hint(inline_query, button_text: str) -> None:

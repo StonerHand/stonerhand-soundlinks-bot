@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 3
     steps:
       - uses: actions/checkout@v4
-      - name: Verify bot, Redis and Mini App
+      - name: Verify bot, webhook and Redis
         run: |
           for attempt in 1 2 3 4 5 6; do
             python tests/e2e/production_canary.py && exit 0

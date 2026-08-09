@@ -3,20 +3,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import hashlib
 import json
-import os
 from typing import Any
 
 from music_links_bot.kvstore import KVStore
 from music_links_bot.models import TrackMatch
-
-
-def webapp_url() -> str | None:
-    explicit = os.getenv("WEBAPP_URL", "").strip()
-    if explicit:
-        return explicit
-
-    domain = os.getenv("VERCEL_PROJECT_PRODUCTION_URL", "").strip()
-    return f"https://{domain}/app" if domain else None
 
 
 def release_fingerprint(artist: str, title: str) -> str:

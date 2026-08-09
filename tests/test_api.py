@@ -1,7 +1,7 @@
 import json
 import os
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 from urllib.parse import parse_qs, urlparse
 
 from api.set_webhook import (
@@ -173,6 +173,11 @@ class VercelWebhookTests(unittest.TestCase):
         try:
             with (
                 patch.object(telegram_api, "build_application", fake_build_application),
+                patch.object(
+                    telegram_api,
+                    "sync_application_commands",
+                    new=AsyncMock(),
+                ),
                 patch.object(
                     telegram_api.Settings,
                     "from_env",

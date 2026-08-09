@@ -21,7 +21,7 @@ def draft_message_overrides(
     *,
     include_hashtags: bool,
 ) -> tuple[bool, dict]:
-    """Custom Studio tags replace generated house tags."""
+    """Custom draft tags replace generated house tags."""
     overrides: dict = {}
     custom_tags = draft.get("custom_tags")
     if isinstance(custom_tags, list):
@@ -50,7 +50,7 @@ def draft_platform_selection(draft: dict) -> list[str] | None:
 
 
 class PublicationService:
-    """One Telegram delivery pipeline shared by bot, Studio and queue."""
+    """One Telegram delivery pipeline shared by the bot and queue."""
 
     def __init__(
         self,

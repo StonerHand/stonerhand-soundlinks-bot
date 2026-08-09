@@ -12,9 +12,7 @@ from music_links_bot.models import TrackMatch
 
 LOGGER = logging.getLogger(__name__)
 
-CARD_MODE = "card"
 LONGREAD_MODE = "longread"
-PUBLICATION_MODES = frozenset({CARD_MODE, LONGREAD_MODE})
 
 MAX_LONGREAD_TITLE = 140
 MAX_LONGREAD_LEAD = 420
@@ -163,40 +161,6 @@ def sanitize_longread(
                 )
 
     return {"title": title, "lead": lead, "blocks": blocks}
-
-
-def apply_publication_patch(draft: dict, body: dict) -> None:
-    mode = body.get("publication_mode")
-    if isinstance(mode, str) and mode in PUBLICATION_MODES:
-        draft["publication_mode"] = mode
-
-    if "longread" not in body:
-        return
-    item = draft.get("item")
-    if not isinstance(item, dict):
-        return
-    track = TrackMatch(**item)
-    draft["longread"] = sanitize_longread(
-        body.get("longread"),
-        track,
-        lang=draft.get("lang") or "ru",
-    )
-
-
-def longread_view(
-    draft: dict,
-    track: TrackMatch,
-) -> dict:
-    longread = sanitize_longread(
-        draft.get("longread"),
-        track,
-        lang=draft.get("lang") or "ru",
-    )
-    return {
-        "mode": LONGREAD_MODE if is_longread(draft) else CARD_MODE,
-        "rich_supported": True,
-        "longread": longread,
-    }
 
 
 def _lines(text: str) -> str:

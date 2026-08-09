@@ -7,7 +7,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from music_links_bot.bot_runtime import encode_callback
 from music_links_bot.i18n import get_text
-from music_links_bot.studio_storage import _load_history_items
+from music_links_bot.bot_history import load_history_items
 
 
 async def render_recent_view(
@@ -43,7 +43,7 @@ async def render_recent_view(
         )
 
     if not drafts:
-        history = await _load_history_items(context, user_id)
+        history = await load_history_items(context, user_id)
         if not history:
             return _empty_recent_view(lang)
         for index, item in enumerate(history[:5], start=1):

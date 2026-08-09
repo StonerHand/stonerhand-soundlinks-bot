@@ -4,7 +4,6 @@ from typing import Final
 
 from music_links_bot.models import TrackMatch
 
-PRESENTATION_VERSION: Final = 1
 PRESET_ORDER: Final = ("minimal", "cover", "longread")
 LEGACY_PRESET_ALIASES: Final = {
     "clean": "cover",
@@ -58,27 +57,3 @@ def apply_preset(draft: dict, value: object) -> str:
     draft["preset"] = preset
     draft.update(PRESET_PROFILES[preset])
     return preset
-
-
-def build_release_presentation(
-    track: TrackMatch,
-    draft: dict,
-    *,
-    hashtags: str,
-    platform_keys: list[str],
-) -> dict:
-    """Stable presentation contract shared by the bot and Telegram Mini App."""
-    preset = normalize_preset(draft.get("preset"), draft)
-    mode = "longread" if preset == "longread" else "card"
-    return {
-        "version": PRESENTATION_VERSION,
-        "preset": preset,
-        "mode": mode,
-        "artist": track.artist,
-        "title": track.title,
-        "emoji": release_emoji(track),
-        "show_cover": preset != "minimal" and bool(track.thumbnail_url),
-        "show_hashtags": bool(draft.get("hashtags") and hashtags),
-        "hashtags": hashtags,
-        "platform_keys": platform_keys,
-    }

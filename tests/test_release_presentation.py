@@ -3,7 +3,6 @@ import unittest
 from music_links_bot.models import TrackMatch
 from music_links_bot.release_presentation import (
     apply_preset,
-    build_release_presentation,
     normalize_preset,
 )
 
@@ -31,16 +30,3 @@ class ReleasePresentationTests(unittest.TestCase):
         self.assertTrue(draft["large_preview"])
         self.assertFalse(draft["as_photo"])
         self.assertEqual(draft["publication_mode"], "longread")
-
-    def test_presentation_is_server_authoritative(self) -> None:
-        draft = {"preset": "minimal", "hashtags": True}
-        view = build_release_presentation(
-            self.track,
-            draft,
-            hashtags="#stonerhand #track",
-            platform_keys=["spotify"],
-        )
-        self.assertEqual(view["preset"], "minimal")
-        self.assertFalse(view["show_cover"])
-        self.assertTrue(view["show_hashtags"])
-        self.assertEqual(view["platform_keys"], ["spotify"])

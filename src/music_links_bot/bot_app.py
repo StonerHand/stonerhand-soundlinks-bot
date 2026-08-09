@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from telegram import BotCommand, MenuButtonWebApp, WebAppInfo
+from telegram import BotCommand, MenuButtonCommands
 from telegram.error import TelegramError
 from telegram.ext import (
     Application,
@@ -17,9 +17,7 @@ from music_links_bot.bot_runtime import BotRuntime
 from music_links_bot.config import Settings
 from music_links_bot.kvstore import KVStore
 from music_links_bot.lazy_client import LazyAsyncClient
-from music_links_bot.i18n import get_text
 from music_links_bot.logging_config import quiet_transport_logs
-from music_links_bot.publication_state import webapp_url
 
 PUBLIC_BOT_COMMANDS = (
     BotCommand("start", "меню и быстрый старт"),
@@ -39,7 +37,7 @@ BOT_DESCRIPTIONS = {
         "• Обложка, чистый заголовок и компактные кнопки площадок\n"
         "• Нативная отправка поста с кнопками в любой чат\n"
         "• Inline: @StonerHandBot + запрос прямо в переписке\n"
-        "• Студия: карточка или Rich-лонгрид, превью, очередь и канал\n\n"
+        "• Редактор, подборки, очередь и публикация прямо в боте\n\n"
         "Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
         "Yandex Music, NTS Radio."
     ),
@@ -50,19 +48,19 @@ BOT_DESCRIPTIONS = {
         "• Artwork, a clean heading and compact platform actions\n"
         "• Native sharing that preserves buttons in any chat\n"
         "• Inline: @StonerHandBot + a query inside any conversation\n"
-        "• Studio: card or Rich longread, preview, queue and publishing\n\n"
+        "• Editing, crates, queueing and publishing inside the bot\n\n"
         "Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
         "Yandex Music and NTS Radio."
     ),
 }
 BOT_SHORT_DESCRIPTIONS = {
     "": (
-        "Ссылка или несколько треков → карточка, лонгрид или подборка. "
-        "Обложка, площадки и публикация — в 🎛 Студии."
+        "Ссылка или несколько треков → карточка или подборка. "
+        "Обложка, площадки и публикация — прямо в боте."
     ),
     "en": (
-        "A link or tracks → a card, longread or crate. "
-        "Artwork, platforms and publishing — in 🎛 Studio."
+        "A link or tracks → a card or crate. "
+        "Artwork, platforms and publishing — directly in the bot."
     ),
 }
 
@@ -165,14 +163,7 @@ async def sync_application_commands(application: Application) -> None:
             PUBLIC_BOT_COMMANDS_EN,
             language_code="en",
         )
-        studio_url = webapp_url()
-        if studio_url:
-            await application.bot.set_chat_menu_button(
-                menu_button=MenuButtonWebApp(
-                    text=get_text("ru", "menu_button_studio"),
-                    web_app=WebAppInfo(url=studio_url),
-                )
-            )
+        await application.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
         for language_code, description in BOT_DESCRIPTIONS.items():
             await application.bot.set_my_description(
                 description,
