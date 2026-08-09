@@ -5,6 +5,7 @@ from telegram.ext import ContextTypes
 
 from music_links_bot.constants import PLATFORM_LABELS
 from music_links_bot.models import ArtistMatch, PlaylistMatch, RadioMatch, TrackMatch, VideoMatch
+from music_links_bot.telegram_buttons import ButtonTone, url_button
 
 CHANNEL_USERNAME = "stonerhand"
 CHANNEL_URL = f"https://t.me/{CHANNEL_USERNAME}"
@@ -516,9 +517,8 @@ def _channel_button() -> InlineKeyboardButton:
 
 
 def _url_button(text: str, url: str, style: str | None = None) -> InlineKeyboardButton:
-    # Keep compatibility while python-telegram-bot catches up with newer Bot API fields.
-    api_kwargs = {"style": style} if style else None
-    return InlineKeyboardButton(text=text, url=url, api_kwargs=api_kwargs)
+    tone = ButtonTone(style) if style else None
+    return url_button(text=text, url=url, tone=tone)
 
 
 def _get_platform_order(context: ContextTypes.DEFAULT_TYPE | None) -> tuple[str, ...]:

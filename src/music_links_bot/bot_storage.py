@@ -4,6 +4,7 @@ import re
 import secrets
 
 from music_links_bot.kvstore import KVStore
+from music_links_bot.draft_model import normalize_track_draft
 
 DRAFT_TTL_SECONDS = 48 * 3600
 MAX_MEMORY_DRAFTS = 300
@@ -35,6 +36,9 @@ def valid_state_id(value: object) -> bool:
 
 
 async def store_draft(context, draft_id: str, draft: dict) -> None:
+    normalized = normalize_track_draft(draft)
+    if normalized is not None:
+        draft = normalized
     drafts: dict = context.application.bot_data.setdefault("drafts", {})
     remember_bounded(
         drafts,
@@ -59,20 +63,25 @@ async def load_draft(context, draft_id: str) -> dict | None:
     drafts: dict = context.application.bot_data.setdefault("drafts", {})
     draft = drafts.get(draft_id)
     if isinstance(draft, dict):
+        normalized = normalize_track_draft(draft)
+        if normalized is not None:
+            drafts[draft_id] = normalized
+            return normalized
         return draft
 
     kv: KVStore | None = context.application.bot_data.get("kv_store")
     if kv is None:
         return None
     draft = await kv.get_json(f"draft:{draft_id}")
-    if isinstance(draft, dict) and draft.get("type") == "track":
+    normalized = normalize_track_draft(draft)
+    if normalized is not None:
         remember_bounded(
             drafts,
             draft_id,
-            draft,
+            normalized,
             max_size=MAX_MEMORY_DRAFTS,
         )
-        return draft
+        return normalized
     return None
 
 

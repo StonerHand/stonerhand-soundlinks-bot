@@ -8,6 +8,7 @@ from music_links_bot.kvstore import KVStore
 CRATE_TTL_SECONDS = 14 * 24 * 3600
 MAX_CRATE_ITEMS = 10
 MAX_MEMORY_CRATES = 500
+CRATE_SCHEMA_VERSION = 2
 
 
 def _memory_crates(bot_data: dict) -> dict[int, list[dict[str, Any]]]:
@@ -20,7 +21,13 @@ async def load_crate(bot_data: dict, user_id: int) -> list[dict[str, Any]]:
         return list(memory[user_id])
 
     kv: KVStore | None = bot_data.get("kv_store")
-    payload = await kv.get_json(f"bot-crate:v1:{user_id}") if kv else None
+    payload = await kv.get_json(f"bot-crate:v2:{user_id}") if kv else None
+    if isinstance(payload, dict):
+        payload = payload.get("items")
+    migrated = False
+    if payload is None and kv is not None:
+        payload = await kv.get_json(f"bot-crate:v1:{user_id}")
+        migrated = isinstance(payload, list)
     items = [item for item in payload if isinstance(item, dict)] if isinstance(payload, list) else []
     remember_bounded(
         memory,
@@ -28,7 +35,10 @@ async def load_crate(bot_data: dict, user_id: int) -> list[dict[str, Any]]:
         items[:MAX_CRATE_ITEMS],
         max_size=MAX_MEMORY_CRATES,
     )
-    return list(memory[user_id])
+    result = list(memory[user_id])
+    if migrated:
+        await save_crate(bot_data, user_id, result)
+    return result
 
 
 async def save_crate(bot_data: dict, user_id: int, items: list[dict[str, Any]]) -> None:
@@ -42,7 +52,9 @@ async def save_crate(bot_data: dict, user_id: int, items: list[dict[str, Any]]) 
     kv: KVStore | None = bot_data.get("kv_store")
     if kv is not None:
         await kv.set_json(
-            f"bot-crate:v1:{user_id}", normalized, ttl_seconds=CRATE_TTL_SECONDS
+            f"bot-crate:v2:{user_id}",
+            {"v": CRATE_SCHEMA_VERSION, "items": normalized},
+            ttl_seconds=CRATE_TTL_SECONDS,
         )
 
 

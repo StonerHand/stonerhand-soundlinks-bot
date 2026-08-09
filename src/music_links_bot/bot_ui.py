@@ -1,10 +1,16 @@
 from __future__ import annotations
 
 from html import escape
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardMarkup
 
 from music_links_bot.bot_runtime import encode_callback
 from music_links_bot.i18n import get_text
+from music_links_bot.models import TrackMatch
+from music_links_bot.telegram_buttons import (
+    ButtonTone,
+    button as InlineKeyboardButton,
+    callback_button,
+)
 
 
 def _crate_button(lang: str, crate_count: int) -> InlineKeyboardButton:
@@ -57,7 +63,6 @@ def build_start_keyboard(
                 InlineKeyboardButton(
                     get_text(lang, "quick_tour"),
                     callback_data=encode_callback("menu", "onboard1"),
-                    api_kwargs={"style": "primary"},
                 )
             ]
         )
@@ -157,33 +162,70 @@ def build_error_keyboard(
             switch_inline_query_current_chat="",
             api_kwargs={"style": "primary"},
         )
-    recovery_row = [primary]
+    rows = [[primary]]
+    secondary_row: list[InlineKeyboardButton] = []
     if search_query:
-        recovery_row.append(
+        secondary_row.append(
             InlineKeyboardButton(
                 get_text(lang, "search_change"),
                 switch_inline_query_current_chat=search_query[:120],
             )
         )
     if source_url and source_url.startswith(("http://", "https://")):
-        recovery_row.append(
+        secondary_row.append(
             InlineKeyboardButton(
                 get_text(lang, "error_open_source"),
                 url=source_url,
             )
         )
     del bot_username
-    return InlineKeyboardMarkup(
+    if secondary_row:
+        rows.append(secondary_row)
+    rows.append(
         [
-            recovery_row,
+            InlineKeyboardButton(
+                get_text(lang, "home_back"),
+                callback_data=encode_callback("menu", "start"),
+            )
+        ]
+    )
+    return InlineKeyboardMarkup(
+        rows
+    )
+
+
+def build_publish_confirmation(
+    draft_id: str,
+    draft: dict,
+    track: TrackMatch,
+    *,
+    target: str,
+    lang: str,
+) -> tuple[str, InlineKeyboardMarkup]:
+    """Compact last check before the only externally visible action."""
+    text = get_text(lang, "publish_confirm").format(
+        artist=escape(track.artist),
+        title=escape(track.title),
+        target=escape(target),
+    )
+    keyboard = InlineKeyboardMarkup(
+        [
             [
-                InlineKeyboardButton(
-                    get_text(lang, "home_back"),
-                    callback_data=encode_callback("menu", "start"),
+                callback_button(
+                    get_text(lang, "publish_confirm_button"),
+                    encode_callback("editor", "pc", draft_id),
+                    tone=ButtonTone.SUCCESS,
+                )
+            ],
+            [
+                callback_button(
+                    get_text(lang, "back"),
+                    encode_callback("editor", "o", draft_id),
                 )
             ],
         ]
     )
+    return text, keyboard
 
 
 def build_duplicate_post_keyboard(
@@ -289,7 +331,6 @@ def editor_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
             InlineKeyboardButton(
                 get_text(lang, "ed_edit"),
                 callback_data=encode_callback("editor", "m", draft_id),
-                api_kwargs={"style": "primary"},
             ),
             button,
         ]
@@ -360,7 +401,7 @@ def editor_overflow_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboard
             InlineKeyboardButton(
                 get_text(lang, "ed_send_self"),
                 callback_data=encode_callback("editor", "s", draft_id),
-                api_kwargs={"style": "success"},
+                api_kwargs={"style": "primary"},
             )
         ]
     ]
