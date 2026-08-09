@@ -46,23 +46,23 @@ STRINGS: dict[str, dict[str, str]] = {
         RU: (
             "🎧 <b>Соберём музыкальный пост за минуту</b>\n\n"
             "Пришли ссылку или напиши <i>артист — трек</i>. Я найду релиз, "
-            "соберу площадки и дам выбрать карточку или блочный лонгрид.\n\n"
+            "соберу площадки и дам настроить готовую карточку.\n\n"
             "Начать можно с короткого знакомства или сразу с поиска 👇"
         ),
         EN: (
             "🎧 <b>Build a music post in a minute</b>\n\n"
             "Send a link or type <i>artist — track</i>. I will find the release, "
-            "collect its platforms and let you choose a card or block-based longread.\n\n"
+            "collect its platforms and let you tune the finished card.\n\n"
             "Take the quick tour or jump straight into search 👇"
         ),
     },
     "home_title_new": {
-        RU: "🎚 <b>StonerHand Studio</b>",
-        EN: "🎚 <b>StonerHand Studio</b>",
+        RU: "🎧 <b>StonerHandBot</b>",
+        EN: "🎧 <b>StonerHandBot</b>",
     },
     "home_title": {
-        RU: "🎚 <b>Твоя Студия{name}</b>",
-        EN: "🎚 <b>Your Studio{name}</b>",
+        RU: "🎧 <b>Музыкальный редактор{name}</b>",
+        EN: "🎧 <b>Music post editor{name}</b>",
     },
     "home_body": {
         RU: (
@@ -77,16 +77,16 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
     },
     "home_mode_admin": {
-        RU: "Оформление и публикация — в Студии",
-        EN: "Formatting and publishing are in Studio",
+        RU: "Редактор, очередь и публикация доступны прямо в боте",
+        EN: "Editing, queueing and publishing are available right in the bot",
     },
     "home_mode_user": {
-        RU: "Оформление и лонгриды — в Студии",
-        EN: "Formatting and longreads are in Studio",
+        RU: "Карточку можно изменить и отправить прямо в этом чате",
+        EN: "Edit and send the card directly in this chat",
     },
     "start_returning": {
-        RU: "🎧 <b>Что собираем сегодня?</b>\n\nПришли ссылку, название релиза или открой Студию.",
-        EN: "🎧 <b>What are we building today?</b>\n\nSend a link, a release name or open Studio.",
+        RU: "🎧 <b>Что собираем сегодня?</b>\n\nПришли ссылку или название релиза.",
+        EN: "🎧 <b>What are we building today?</b>\n\nSend a link or a release name.",
     },
     "onboarding_1": {
         RU: (
@@ -106,14 +106,12 @@ STRINGS: dict[str, dict[str, str]] = {
         RU: (
             "🎛 <b>Шаг 2 из 3 · Выбери формат</b>\n\n"
             "<blockquote>Бот найдёт обложку, площадки и подготовит хэштеги.</blockquote>\n"
-            "В чате можно быстро изменить цитату и превью. В <b>Студии</b> — "
-            "собрать карточку или блочный лонгрид, настроить текст и кнопки."
+            "Нажми <b>Изменить</b>, чтобы настроить стиль, текст, хэштеги и площадки."
         ),
         EN: (
             "🎛 <b>Step 2 of 3 · Choose the format</b>\n\n"
             "<blockquote>The bot finds artwork, platforms and prepares hashtags.</blockquote>\n"
-            "Quickly change the quote and preview in chat. Use <b>Studio</b> to "
-            "build a card or block-based longread and tune its text and buttons."
+            "Tap <b>Edit</b> to tune the style, text, hashtags and platforms."
         ),
     },
     "onboarding_3": {
@@ -133,8 +131,6 @@ STRINGS: dict[str, dict[str, str]] = {
     "quick_tour": {RU: "▶ Как всё работает", EN: "▶ How it works"},
     "quick_search": {RU: "🔎 Найти", EN: "🔎 Find"},
     "quick_mode": {RU: "⚡ Быстро", EN: "⚡ Quick"},
-    "studio_mode": {RU: "🎛 Студия", EN: "🎛 Studio"},
-    "open_studio": {RU: "🎛 Студия", EN: "🎛 Studio"},
     "home_create": {RU: "＋ Создать пост", EN: "＋ Create post"},
     "home_continue": {RU: "Продолжить черновик", EN: "Continue draft"},
     "home_recent": {RU: "Недавние", EN: "Recent"},
@@ -147,7 +143,6 @@ STRINGS: dict[str, dict[str, str]] = {
     "recent_add": {RU: "+ В подборку", EN: "+ To crate"},
     "crate_view": {RU: "Открыть подборку", EN: "Open crate"},
     "crate_reorder": {RU: "Порядок", EN: "Reorder"},
-    "crate_style": {RU: "Оформление", EN: "Style"},
     "home_crate": {RU: "🧺 Подборка · {count}", EN: "🧺 Crate · {count}"},
     "home_more": {RU: "••• Ещё", EN: "••• More"},
     "home_stats": {RU: "📊 Статистика канала", EN: "📊 Channel stats"},
@@ -180,7 +175,7 @@ STRINGS: dict[str, dict[str, str]] = {
             "• Поиск по названию: просто напиши <i>artist - track</i>\n"
             "• Несколько ссылок разом → нумерованная подборка\n"
             "• Подводка над ссылкой → цитата в посте\n"
-            "• Студия → карточка или музыкальный Rich-лонгрид\n"
+            "• Встроенный редактор карточки и публикация в канал\n"
             "• Inline: набери @StonerHandBot + ссылку в любом чате\n\n"
             "Пришли ссылку или название 👇"
         ),
@@ -194,7 +189,7 @@ STRINGS: dict[str, dict[str, str]] = {
             "• Search by name: just type <i>artist - track</i>\n"
             "• Several links at once → a numbered collection\n"
             "• Text above a link → a quote in the post\n"
-            "• Studio → a card or a music Rich longread\n"
+            "• Built-in card editor and channel publishing\n"
             "• Inline: type @StonerHandBot + a link in any chat\n\n"
             "Send a link or a name 👇"
         ),
@@ -371,7 +366,6 @@ STRINGS: dict[str, dict[str, str]] = {
     "ed_preset_minimal": {RU: "Стиль · Минимал", EN: "Style · Minimal"},
     "ed_preset_cover": {RU: "Стиль · Обложка", EN: "Style · Cover"},
     "ed_preset_longread": {RU: "Стиль · Лонгрид", EN: "Style · Longread"},
-    "ed_studio_full": {RU: "Все настройки в Студии", EN: "All settings in Studio"},
     "ed_status": {
         RU: "Черновик · {preset} · {services} серв. · сохранено",
         EN: "Draft · {preset} · {services} services · saved",
@@ -385,8 +379,6 @@ STRINGS: dict[str, dict[str, str]] = {
     "ed_quote": {RU: "💬 Цитата", EN: "💬 Quote"},
     "ed_on": {RU: "вкл.", EN: "on"},
     "ed_off": {RU: "выкл.", EN: "off"},
-    "ed_studio": {RU: "🎛 Студия", EN: "🎛 Studio"},
-    "menu_button_studio": {RU: "Студия", EN: "Studio"},
     "ed_preview": {RU: "🖼 Обложка", EN: "🖼 Cover"},
     "ed_preview_small": {RU: "компактная", EN: "compact"},
     "ed_preview_large": {RU: "крупная", EN: "large"},
@@ -535,5 +527,4 @@ STRINGS: dict[str, dict[str, str]] = {
     "crate_removed": {RU: "Трек удалён", EN: "Track removed"},
     "crate_restored": {RU: "Трек возвращён", EN: "Track restored"},
     "crate_find": {RU: "+ Найти первый трек", EN: "+ Find the first track"},
-    "crate_open_studio": {RU: "🎛 Собрать сет в Студии", EN: "🎛 Build the set in Studio"},
 }

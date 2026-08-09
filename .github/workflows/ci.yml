@@ -37,29 +37,3 @@ jobs:
         run: python -m unittest discover -s tests -v
         env:
           PYTHONPATH: src
-
-      - name: Mini App JS syntax
-        run: |
-          node --check webapp/app.js
-          node --check webapp/api-client.js
-          node --check webapp/cloud-storage.js
-          node --check webapp/error-ui.js
-          node --check webapp/studio-core.js
-
-  e2e:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-
-      - name: Install Playwright + Chromium
-        run: |
-          pip install playwright
-          python -m playwright install --with-deps chromium
-
-      - name: Studio smoke test
-        run: python tests/e2e/smoke.py

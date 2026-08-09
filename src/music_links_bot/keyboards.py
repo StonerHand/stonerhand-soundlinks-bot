@@ -99,7 +99,7 @@ def _build_link_keyboard(
         final_platforms = [*ordered_platforms, *remaining_platforms]
 
     # Song.link remains the complete hub. Callers can use a stricter limit for
-    # quick chat cards while Studio previews keep the selected services.
+    # quick chat cards while full deliveries keep the selected services.
     if max_visible_platforms is not None:
         final_platforms = final_platforms[:max(0, max_visible_platforms)]
     elif release_page_url and not has_explicit_selection:

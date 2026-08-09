@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from html import escape
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from music_links_bot.bot_runtime import encode_callback
 from music_links_bot.i18n import get_text
-from music_links_bot.publication_state import webapp_url
 
 
 def _crate_button(lang: str, crate_count: int) -> InlineKeyboardButton:
@@ -48,7 +47,6 @@ def build_start_keyboard(
     crate_count: int = 0,
     is_admin: bool = False,
     show_tour: bool = False,
-    include_studio: bool = True,
     active_draft_id: str | None = None,
 ) -> InlineKeyboardMarkup:
     del bot_username, is_admin
@@ -63,7 +61,6 @@ def build_start_keyboard(
                 )
             ]
         )
-    studio_url = webapp_url()
     if active_draft_id:
         create_button = InlineKeyboardButton(
             get_text(lang, "home_continue"),
@@ -86,15 +83,6 @@ def build_start_keyboard(
             ),
         ]
     )
-    if studio_url and include_studio:
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    get_text(lang, "open_studio"),
-                    web_app=WebAppInfo(url=studio_url),
-                )
-            ]
-        )
     return InlineKeyboardMarkup(rows)
 
 
@@ -103,28 +91,19 @@ def build_section_keyboard(
     *,
     lang: str,
     crate_count: int = 0,
-    include_studio: bool = True,
     active: str | None = None,
 ) -> InlineKeyboardMarkup:
     del bot_username
     rows: list[list[InlineKeyboardButton]] = []
-    studio_url = webapp_url()
-    primary_row: list[InlineKeyboardButton] = []
-    if studio_url and include_studio:
-        primary_row.append(
+    rows.append(
+        [
             InlineKeyboardButton(
-                get_text(lang, "open_studio"),
-                web_app=WebAppInfo(url=studio_url),
+                get_text(lang, "quick_search"),
+                switch_inline_query_current_chat="",
                 api_kwargs={"style": "primary"},
             )
-        )
-    primary_row.append(
-        InlineKeyboardButton(
-            get_text(lang, "quick_search"),
-            switch_inline_query_current_chat="",
-        )
+        ]
     )
-    rows.append(primary_row)
     rows.append(
         [
             _crate_button(lang, crate_count),
@@ -371,17 +350,6 @@ def editor_more_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButt
             ),
         ],
     ]
-    studio_url = webapp_url()
-    if studio_url:
-        rows.insert(
-            2,
-            [
-                InlineKeyboardButton(
-                    get_text(lang, "ed_studio_full"),
-                    web_app=WebAppInfo(url=f"{studio_url}?draft={draft_id}"),
-                )
-            ],
-        )
     return rows
 
 
@@ -595,17 +563,6 @@ def render_crate(
                 InlineKeyboardButton(
                     get_text(lang, "crate_find"),
                     switch_inline_query_current_chat="",
-                    api_kwargs={"style": "primary"},
-                )
-            ]
-        )
-    studio_url = webapp_url()
-    if studio_url:
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    get_text(lang, "crate_open_studio"),
-                    web_app=WebAppInfo(url=f"{studio_url}?view=crate"),
                     api_kwargs={"style": "primary"},
                 )
             ]

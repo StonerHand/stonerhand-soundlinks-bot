@@ -19,7 +19,11 @@ if str(SRC_PATH) not in sys.path:
 
 from telegram import Update
 
-from music_links_bot.bot import build_application, close_application_resources
+from music_links_bot.bot import (
+    build_application,
+    close_application_resources,
+    sync_application_commands,
+)
 from music_links_bot.config import Settings
 from music_links_bot.loop_runner import (
     run_on_loop,
@@ -287,6 +291,11 @@ def _ensure_application():
                 application = build_application(settings)
                 run_on_loop(
                     loop, application.initialize(), timeout=PROCESS_TIMEOUT_SECONDS
+                )
+                run_on_loop(
+                    loop,
+                    sync_application_commands(application),
+                    timeout=PROCESS_TIMEOUT_SECONDS,
                 )
             except Exception:
                 stop_background_loop(loop, thread)

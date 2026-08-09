@@ -16,7 +16,6 @@ from telegram import (
     InlineKeyboardMarkup,
     Message,
     Update,
-    WebAppInfo,
 )
 from telegram.constants import ChatAction, ParseMode
 from telegram.error import BadRequest, Forbidden, TelegramError
@@ -205,7 +204,6 @@ from music_links_bot.publication_state import (
     find_posted_record as _find_posted_record,
     mark_posted as _schedule_mark_posted,
     release_fingerprint as _release_fingerprint,
-    webapp_url as _webapp_url,
 )
 from music_links_bot.publication_service import (
     PublicationService,
@@ -219,7 +217,7 @@ from music_links_bot.sharing import (
     make_channel_safe_keyboard,
     track_share_url,
 )
-from music_links_bot.studio_storage import _record_history as _record_recent_item
+from music_links_bot.bot_history import record_history as _record_recent_item
 from music_links_bot.text_utils import normalize_hashtag
 from music_links_bot.url_utils import (
     cache_key_for_url,
@@ -234,7 +232,6 @@ __all__ = [
     "_build_inline_collection_result",
     "_build_inline_result",
     "_release_fingerprint",
-    "_webapp_url",
     "close_application_resources",
     "id_command",
     "inline_query_handler",
@@ -270,7 +267,7 @@ DRAFT_UNDO_SECONDS = 15
 DEFAULT_UI_MODE = "stonerhand"
 MAX_BUTTON_TEXT_LENGTH = 64
 STATS_KV_KEY = "stats:v1"
-# Public compatibility constants used by the Studio API and tests.
+# Public compatibility constants used by tests and queue storage.
 DRAFT_TTL_SECONDS = _DRAFT_TTL_SECONDS
 MAX_MEMORY_DRAFTS = _MAX_MEMORY_DRAFTS
 
@@ -370,7 +367,6 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         crate_count=crate_count,
         is_admin=is_admin,
         show_tour=not session.onboarding_seen,
-        include_studio=update.message.chat.type == "private",
         active_draft_id=session.active_draft_id or None,
     )
     sent = await update.message.reply_text(
@@ -455,7 +451,6 @@ async def guide_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             context.bot.username,
             lang=lang,
             crate_count=crate_count,
-            include_studio=message.chat.type == "private",
             active="guide",
         ),
     )
@@ -522,9 +517,6 @@ async def _home_view(query, context, *, lang: str) -> tuple[str, InlineKeyboardM
         lang=lang,
         crate_count=crate_count,
         is_admin=is_admin,
-        include_studio=(
-            query.message is not None and query.message.chat.type == "private"
-        ),
         active_draft_id=session.active_draft_id or None,
     )
     return text, keyboard
@@ -596,10 +588,6 @@ async def _dispatch_menu_action(query, context, action: CallbackAction) -> None:
                 context.bot.username,
                 lang=lang,
                 crate_count=crate_count,
-                include_studio=(
-                    query.message is not None
-                    and query.message.chat.type == "private"
-                ),
                 active=None,
             ),
         )
@@ -635,9 +623,6 @@ async def _dispatch_menu_action(query, context, action: CallbackAction) -> None:
             context.bot.username,
             lang=lang,
             crate_count=crate_count,
-            include_studio=(
-                query.message is not None and query.message.chat.type == "private"
-            ),
             active=action.action,
         ),
     )
@@ -688,9 +673,6 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             context.bot.username,
             lang=lang,
             crate_count=crate_count,
-            include_studio=(
-                query.message is not None and query.message.chat.type == "private"
-            ),
             active=menu_key.removeprefix("menu:"),
         )
     try:
@@ -1444,7 +1426,6 @@ async def _reply_with_menu(
         context.bot.username,
         lang=lang,
         crate_count=crate_count,
-        include_studio=message.chat.type == "private",
         active=menu_key.removeprefix("menu:"),
     )
     session = (
@@ -1864,14 +1845,6 @@ async def _send_track_matches(
                     )
                 ],
             ]
-            studio_url = _webapp_url()
-            if studio_url:
-                rows[1].append(
-                    InlineKeyboardButton(
-                        get_text(lang, "crate_style"),
-                        web_app=WebAppInfo(url=f"{studio_url}?view=crate"),
-                    )
-                )
             collection_keyboard = InlineKeyboardMarkup(rows)
         else:
             collection_keyboard = add_share_button(

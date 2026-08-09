@@ -14,11 +14,11 @@ Before changing code, read only what is needed:
 - `ARCHITECTURE.ru.md` for the system map
 - `README.md` and `README.ru.md` for public behavior
 - `src/music_links_bot/bot.py` for Telegram flow
-- `api/webapp.py` for the Studio API (resolve/draft/crate/queue/preview)
+- `api/telegram.py` and `api/queue_worker.py` for production transports
 - `src/music_links_bot/url_utils.py` and `constants.py` for link routing / supported hosts
 - `src/music_links_bot/formatter.py` and `branding.py` for UI / photo frame
 - `src/music_links_bot/songlink.py` for platform lookup
-- `webapp/index.html` for the Mini App; `tests/e2e/smoke.py` for the headless smoke
+- `src/music_links_bot/bot_ui.py` for Telegram navigation and editor controls
 
 ## Audit Workflow
 

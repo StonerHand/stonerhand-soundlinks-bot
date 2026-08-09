@@ -10,11 +10,9 @@ from music_links_bot.rich_publications import (
     MAX_FALLBACK_TEXT,
     MAX_LONGREAD_BLOCKS,
     MAX_RICH_HTML,
-    apply_publication_patch,
     build_fallback_html,
     build_rich_html,
     default_longread,
-    longread_view,
     rich_api_unavailable,
     sanitize_longread,
     save_prepared_rich_publication,
@@ -67,38 +65,6 @@ class RichPublicationModelTests(unittest.TestCase):
             22_000,
         )
         self.assertTrue(all(block["type"] == "paragraph" for block in result["blocks"]))
-
-    def test_patch_and_presenter_default_to_card_but_preserve_longread(self) -> None:
-        draft = {
-            "item": _track().__dict__ if hasattr(_track(), "__dict__") else {
-                "artist": "Sleep",
-                "title": "Dopesmoker",
-                "links": {"spotify": "https://open.spotify.com/track/x"},
-                "page_url": "https://song.link/x",
-                "release_year": "1999",
-                "kind": "song",
-                "release_format": "Single",
-                "thumbnail_url": "https://img.example/cover",
-                "genre": "Stoner Metal",
-            },
-            "lang": "ru",
-        }
-        apply_publication_patch(
-            draft,
-            {
-                "publication_mode": "longread",
-                "longread": {
-                    "title": "Большой материал",
-                    "lead": "Лид",
-                    "blocks": [{"id": "q", "type": "quote", "text": "Цитата"}],
-                },
-            },
-        )
-
-        view = longread_view(draft, _track())
-
-        self.assertEqual(view["mode"], "longread")
-        self.assertEqual(view["longread"]["blocks"][0]["type"], "quote")
 
     def test_rich_html_escapes_user_text_and_renders_telegram_blocks(self) -> None:
         draft = {

@@ -13,7 +13,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 def as_video_track(video: VideoMatch) -> TrackMatch:
-    """Represent a video in Studio's ordered collection model."""
+    """Represent a video in the ordered collection model."""
     return TrackMatch(
         title=video.title,
         artist=video.author,

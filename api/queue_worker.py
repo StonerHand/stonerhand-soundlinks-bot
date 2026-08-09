@@ -9,7 +9,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
 from types import SimpleNamespace
 
-from api.webapp import (
+from api.telegram import (
     QUEUE_TICK_TIMEOUT_SECONDS,
     _ensure_application,
 )
@@ -41,7 +41,7 @@ class handler(BaseHTTPRequestHandler):
             return
 
         try:
-            loop, application, _settings = _ensure_application()
+            loop, application = _ensure_application()
             context = SimpleNamespace(application=application, bot=application.bot)
             published = run_on_loop(
                 loop,
