@@ -1394,9 +1394,7 @@ async def _dispatch_crate_action(query, context, action: CallbackAction) -> None
             max_size=MAX_CRATE_UNDO_RECORDS,
         )
         items = []
-    elif action.action == "clear_cancel":
-        items = await load_crate(bot_data, user_id)
-    elif action.action == "open":
+    elif action.action in {"clear_cancel", "open"}:
         items = await load_crate(bot_data, user_id)
     else:
         await query.answer()

@@ -19,10 +19,9 @@ if str(SRC_PATH) not in sys.path:
 
 from telegram import Update
 
-from music_links_bot.bot import (
+from music_links_bot.bot_app import (
     build_application,
     close_application_resources,
-    sync_application_commands,
 )
 from music_links_bot.config import Settings
 from music_links_bot.loop_runner import (
@@ -60,8 +59,9 @@ _FAILURE_LOCK = threading.Lock()
 # Telegram re-sends an update if it doesn't get a prompt 200, so identical
 # update_ids are ignored to avoid double replies / double publishes.
 UPDATE_DEDUP_TTL_SECONDS = 600
-_SEEN_UPDATE_IDS: "OrderedDict[int, float]" = OrderedDict()
+_SEEN_UPDATE_IDS: OrderedDict[int, float] = OrderedDict()
 _SEEN_UPDATE_MAX = 1024
+_SEEN_UPDATE_LOCK = threading.Lock()
 
 
 class handler(BaseHTTPRequestHandler):
@@ -202,26 +202,28 @@ async def _claim_update(application, update_id: int) -> bool:
 
 def _claim_update_in_memory(update_id: int, *, now: float | None = None) -> bool:
     claimed_at = time.monotonic() if now is None else now
-    cutoff = claimed_at - UPDATE_DEDUP_TTL_SECONDS
-    while _SEEN_UPDATE_IDS:
-        _oldest_id, oldest_at = next(iter(_SEEN_UPDATE_IDS.items()))
-        if oldest_at > cutoff:
-            break
-        _SEEN_UPDATE_IDS.popitem(last=False)
+    with _SEEN_UPDATE_LOCK:
+        cutoff = claimed_at - UPDATE_DEDUP_TTL_SECONDS
+        while _SEEN_UPDATE_IDS:
+            _oldest_id, oldest_at = next(iter(_SEEN_UPDATE_IDS.items()))
+            if oldest_at > cutoff:
+                break
+            _SEEN_UPDATE_IDS.popitem(last=False)
 
-    if update_id in _SEEN_UPDATE_IDS:
-        return False
-    _SEEN_UPDATE_IDS[update_id] = claimed_at
-    while len(_SEEN_UPDATE_IDS) > _SEEN_UPDATE_MAX:
-        _SEEN_UPDATE_IDS.popitem(last=False)
-    return True
+        if update_id in _SEEN_UPDATE_IDS:
+            return False
+        _SEEN_UPDATE_IDS[update_id] = claimed_at
+        while len(_SEEN_UPDATE_IDS) > _SEEN_UPDATE_MAX:
+            _SEEN_UPDATE_IDS.popitem(last=False)
+        return True
 
 
 async def _release_update(application, update_id: int) -> None:
     kv = application.bot_data.get("kv_store")
     if kv is not None:
         await kv.delete(f"seen_update:{update_id}")
-    _SEEN_UPDATE_IDS.pop(update_id, None)
+    with _SEEN_UPDATE_LOCK:
+        _SEEN_UPDATE_IDS.pop(update_id, None)
 
 
 def _note_success_locked() -> None:
@@ -292,11 +294,9 @@ def _ensure_application():
                 run_on_loop(
                     loop, application.initialize(), timeout=PROCESS_TIMEOUT_SECONDS
                 )
-                run_on_loop(
-                    loop,
-                    sync_application_commands(application),
-                    timeout=PROCESS_TIMEOUT_SECONDS,
-                )
+                # Profile/command synchronization belongs to the protected
+                # set_webhook cron. Keeping it out of the request path avoids
+                # several Telegram API round trips on every cold start.
             except Exception:
                 stop_background_loop(loop, thread)
                 raise

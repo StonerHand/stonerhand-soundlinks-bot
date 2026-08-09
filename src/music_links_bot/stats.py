@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import tempfile
 from threading import Lock
 from typing import Any
 
@@ -21,7 +22,7 @@ def _default_stats_path() -> Path:
         return Path(configured_path)
 
     if os.getenv("VERCEL"):
-        return Path("/tmp/stonerhand_stats.json")
+        return Path(tempfile.gettempdir()) / "stonerhand_stats.json"
 
     return Path("data/stats.json")
 

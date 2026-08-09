@@ -61,9 +61,9 @@ webhook `/api/telegram`. Polling используется исключитель
 | Данные | Redis key | TTL / fallback |
 | --- | --- | --- |
 | lookup cache | типизированные cache keys | TTL по провайдеру / bounded memory |
-| пользовательская сессия | `session:<id>` | 30 дней / bounded memory |
+| пользовательская сессия | `session:v1:<id>` | 30 дней / bounded memory |
 | черновик | `draft:<id>` | 48 часов / bounded memory |
-| подборка | `bot:crate:<id>` | 14 дней / bounded memory |
+| подборка | `bot-crate:v1:<id>` | 14 дней / bounded memory |
 | история | `hist:<id>` | 90 дней / bounded memory |
 | очередь | `queue:v1` | постоянная / memory fallback |
 | антидубли публикаций | `posted:<hash>` | постоянная |
@@ -85,7 +85,9 @@ Worker не зависит от пользовательского интерф�
 ## Надёжность
 
 - один runtime получает updates: webhook в production, polling локально;
+- webhook создаёт приложение лениво и переиспользует соединения на тёплом instance;
 - update ID резервируется в Redis до обработки;
+- локальная дедупликация защищена от параллельных serverless-вызовов;
 - внешние запросы имеют timeout, cache и single-flight;
 - ошибки одного провайдера не отменяют найденные материалы;
 - webhook удаляет claim после ошибки, чтобы Telegram мог повторить update;

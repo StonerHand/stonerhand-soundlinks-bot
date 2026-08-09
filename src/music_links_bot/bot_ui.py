@@ -115,16 +115,16 @@ def build_section_keyboard(
     )
 
     if active == "more":
-        for action_row in (("help", "platforms"), ("guide", "demo")):
-            rows.append(
-                [
-                    InlineKeyboardButton(
-                        get_text(lang, f"tab_{action}"),
-                        callback_data=encode_callback("menu", action),
-                    )
-                    for action in action_row
-                ]
-            )
+        rows.extend(
+            [
+                InlineKeyboardButton(
+                    get_text(lang, f"tab_{action}"),
+                    callback_data=encode_callback("menu", action),
+                )
+                for action in action_row
+            ]
+            for action_row in (("help", "platforms"), ("guide", "demo"))
+        )
     rows.append(
         [
             InlineKeyboardButton(

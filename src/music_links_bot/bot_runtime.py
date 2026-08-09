@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import asdict, dataclass, field
 import hashlib
+import logging
 import secrets
 from time import monotonic, time
 from typing import Any
@@ -27,6 +28,7 @@ MAX_MEMORY_KEYS = 2_000
 CIRCUIT_FAILURE_THRESHOLD = 3
 CIRCUIT_COOLDOWN_SECONDS = 45
 METRICS_KV_KEY = "runtime:metrics:v1"
+LOGGER = logging.getLogger(__name__)
 
 
 def detect_action(text: str, source_urls: list[str], *, is_private: bool) -> str:
@@ -380,7 +382,7 @@ class BotRuntime:
             )
         except Exception:
             # Metrics must never add visible latency to a user request.
-            pass
+            LOGGER.debug("Could not persist runtime metrics", exc_info=True)
 
     @staticmethod
     def _drop_expired(items: dict[str, float], now: float) -> None:

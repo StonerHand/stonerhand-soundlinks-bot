@@ -32,9 +32,11 @@ def main() -> int:
         if status != 200 or not payload.get("ok"):
             failures.append(f"health status={status} ok={payload.get('ok')}")
         checks = payload.get("checks") or {}
-        for name in ("telegram", "webhook", "redis"):
-            if not (checks.get(name) or {}).get("ok"):
-                failures.append(f"{name} check is not healthy")
+        failures.extend(
+            f"{name} check is not healthy"
+            for name in ("telegram", "webhook", "redis")
+            if not (checks.get(name) or {}).get("ok")
+        )
         if "application/json" not in content_type:
             failures.append("health content-type is not JSON")
     except Exception as exc:

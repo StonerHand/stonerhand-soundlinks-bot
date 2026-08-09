@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from music_links_bot.bot import build_application
+from music_links_bot.bot_app import build_application
 from music_links_bot.config import Settings
 from music_links_bot.logging_config import quiet_transport_logs
 
