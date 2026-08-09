@@ -88,10 +88,7 @@ def overall_ok(checks: dict[str, dict]) -> bool:
         return False
 
     redis_check = checks.get("redis", {})
-    if redis_check.get("configured") and not redis_check.get("ok"):
-        return False
-
-    return True
+    return not redis_check.get("configured") or bool(redis_check.get("ok"))
 
 
 def describe_failures(checks: dict[str, dict]) -> list[str]:
@@ -135,7 +132,8 @@ def _telegram_api(method: str) -> dict | None:
 
     try:
         request = Request(f"https://api.telegram.org/bot{bot_token}/{method}")
-        with urlopen(request, timeout=TIMEOUT_SECONDS) as response:
+        # The URL is built from a fixed Telegram HTTPS origin, never user input.
+        with urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # nosec B310
             payload = json.loads(response.read().decode("utf-8"))
         return payload if isinstance(payload, dict) else None
     except Exception:
@@ -278,7 +276,8 @@ def _tick_queue(_request_host: str | None) -> int:
             f"https://{host}/api/queue_worker",
             headers={"Authorization": f"Bearer {secret}"},
         )
-        with urlopen(request, timeout=TIMEOUT_SECONDS) as response:
+        # The deployment hostname comes from Vercel environment and HTTPS is forced.
+        with urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # nosec B310
             payload = json.loads(response.read().decode("utf-8"))
         if isinstance(payload, dict):
             return int(payload.get("published") or 0)

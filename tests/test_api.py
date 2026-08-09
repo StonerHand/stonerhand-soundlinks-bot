@@ -153,10 +153,15 @@ class VercelWebhookTests(unittest.TestCase):
         class ApplicationStub:
             def __init__(self) -> None:
                 self.bot = object()
+                self.bot_data = {}
                 self.initialize_calls = 0
+                self.shutdown_calls = 0
 
             async def initialize(self) -> None:
                 self.initialize_calls += 1
+
+            async def shutdown(self) -> None:
+                self.shutdown_calls += 1
 
         build_calls = []
 
@@ -175,7 +180,7 @@ class VercelWebhookTests(unittest.TestCase):
                 patch.object(telegram_api, "build_application", fake_build_application),
                 patch.object(
                     telegram_api,
-                    "sync_application_commands",
+                    "close_application_resources",
                     new=AsyncMock(),
                 ),
                 patch.object(

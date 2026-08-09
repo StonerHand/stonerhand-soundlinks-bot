@@ -901,22 +901,26 @@ async def _lookup_tracks_detailed(
     # three-link collection cannot silently collapse into a one-track post.
     semaphore = asyncio.Semaphore(_BATCH_LOOKUP_CONCURRENCY)
 
-    async def lookup_one(index: int, source_url: str) -> TrackMatch | Exception:
-        for attempt in range(2):
-            try:
-                async with semaphore:
-                    return await client.lookup_track(source_url)
-            except SonglinkLookupError as exc:
+    async def lookup_one(
+        index: int,
+        source_url: str,
+        *,
+        attempt: int = 0,
+    ) -> TrackMatch | Exception:
+        # Each recursive retry reacquires the semaphore after backoff instead
+        # of occupying a batch slot while the provider recovers.
+        try:
+            async with semaphore:
+                return await client.lookup_track(source_url)
+        except SonglinkLookupError as exc:
+            return exc
+        except SonglinkError as exc:
+            if attempt == 1:
                 return exc
-            except SonglinkError as exc:
-                if attempt == 1:
-                    return exc
-                await asyncio.sleep(
-                    _BATCH_RETRY_DELAY_SECONDS + (index % 3) * 0.05
-                )
-            except Exception as exc:
-                return exc
-        return SonglinkError("Song.link is unavailable right now.")
+            await asyncio.sleep(_BATCH_RETRY_DELAY_SECONDS + (index % 3) * 0.05)
+            return await lookup_one(index, source_url, attempt=1)
+        except Exception as exc:
+            return exc
 
     results = await asyncio.gather(
         *(

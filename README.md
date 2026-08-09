@@ -49,7 +49,7 @@ confirmation and collection removals can be undone.
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e ".[dev]"
 cp .env.example .env
 PYTHONPATH=src python -m music_links_bot
 ```
@@ -71,6 +71,9 @@ Production also uses webhook secrets, a cron secret and Upstash Redis.
 PYTHONPATH=src python -m unittest discover -s tests -v
 python -m compileall -q src api tests
 python -m pyflakes src api tests
+python -m ruff check src api tests --select F,B,ASYNC,PERF
+python -m bandit -q -r src api -x tests
+python tests/check_dependency_pins.py
 python -m json.tool vercel.json >/dev/null
 ```
 

@@ -23,11 +23,6 @@ dist/
 coverage.xml
 htmlcov/
 
-# Browser and test artifacts
-test-results/
-playwright-report/
-blob-report/
-
 # Runtime and temporary files
 data/*.json
 *.log

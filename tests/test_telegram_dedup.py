@@ -1,4 +1,5 @@
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -12,7 +13,8 @@ from api import telegram as tg
 
 class UpdateDedupTests(unittest.TestCase):
     def setUp(self) -> None:
-        tg._SEEN_UPDATE_IDS.clear()
+        with tg._SEEN_UPDATE_LOCK:
+            tg._SEEN_UPDATE_IDS.clear()
 
     def _app(self) -> SimpleNamespace:
         return SimpleNamespace(bot_data={})
@@ -68,6 +70,18 @@ class UpdateDedupTests(unittest.TestCase):
                 now=1000 + tg.UPDATE_DEDUP_TTL_SECONDS + 1,
             )
         )
+
+    def test_concurrent_in_memory_claim_has_one_winner(self) -> None:
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            outcomes = list(
+                executor.map(
+                    lambda _index: tg._claim_update_in_memory(90005, now=1000),
+                    range(32),
+                )
+            )
+
+        self.assertEqual(outcomes.count(True), 1)
+        self.assertEqual(outcomes.count(False), 31)
 
 
 if __name__ == "__main__":

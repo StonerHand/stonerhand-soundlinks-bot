@@ -55,7 +55,8 @@ class handler(BaseHTTPRequestHandler):
                 webhook_url,
                 secret_token=_telegram_webhook_secret(),
             )
-            with urlopen(telegram_url, timeout=20) as response:
+            # `_telegram_set_webhook_url` always returns the Telegram HTTPS API.
+            with urlopen(telegram_url, timeout=20) as response:  # nosec B310
                 telegram_payload = json.loads(response.read().decode("utf-8"))
 
             commands_payload = _sync_commands(settings.bot_token)
@@ -122,7 +123,7 @@ def _telegram_set_commands_url(bot_token: str) -> str:
 def _sync_commands(bot_token: str) -> dict[str, object]:
     try:
         commands_url = _telegram_set_commands_url(bot_token)
-        with urlopen(commands_url, timeout=20) as response:
+        with urlopen(commands_url, timeout=20) as response:  # nosec B310
             payload = json.loads(response.read().decode("utf-8"))
 
         _sync_descriptions(bot_token)
@@ -137,7 +138,7 @@ def _sync_menu_button(bot_token: str) -> None:
     query = urlencode({"menu_button": menu_button})
     url = f"https://api.telegram.org/bot{bot_token}/setChatMenuButton?{query}"
     try:
-        with urlopen(url, timeout=20):
+        with urlopen(url, timeout=20):  # nosec B310
             pass
     except Exception as exc:
         LOGGER.error("Menu button sync failed: %s", type(exc).__name__)
@@ -157,7 +158,7 @@ def _sync_descriptions(bot_token: str) -> None:
             query = urlencode(params)
             url = f"https://api.telegram.org/bot{bot_token}/{method}?{query}"
             try:
-                with urlopen(url, timeout=20):
+                with urlopen(url, timeout=20):  # nosec B310
                     pass
             except Exception as exc:
                 LOGGER.error("%s sync failed: %s", method, type(exc).__name__)

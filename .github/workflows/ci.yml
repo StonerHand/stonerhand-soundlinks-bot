@@ -9,24 +9,31 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
 
-      - name: Repository hygiene
-        run: test -z "$(git ls-files -ci --exclude-standard)"
-
       - name: Install dependencies
-        run: pip install -r requirements.txt pyflakes
+        run: pip install -e ".[dev]"
 
       - name: Dependency consistency
-        run: python -m pip check
+        run: |
+          python -m pip check
+          python tests/check_dependency_pins.py
+
+      - name: Public repository safety
+        run: |
+          test -z "$(git ls-files -ci --exclude-standard)"
+          ! git grep -I -n -E 'ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|[0-9]{6,}:[A-Za-z0-9_-]{30,}' -- ':!tests/**'
 
       - name: Lint
-        run: python -m pyflakes src api tests
+        run: |
+          python -m pyflakes src api tests
+          python -m ruff check src api tests --select F,B,ASYNC,PERF
+          python -m bandit -q -r src api -x tests
 
       - name: Compile and deployment config
         run: |

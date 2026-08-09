@@ -49,6 +49,7 @@ Use these checks when available:
 ```bash
 PYTHONPATH=src python -m unittest discover -s tests -v
 python -m compileall -q src tests api
+python tests/check_dependency_pins.py
 git diff --check
 ```
 
