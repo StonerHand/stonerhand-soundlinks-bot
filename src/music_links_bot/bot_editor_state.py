@@ -59,3 +59,26 @@ def cycle_preset(draft: dict) -> str:
     index = PRESET_ORDER.index(current)
     preset = PRESET_ORDER[(index + 1) % len(PRESET_ORDER)]
     return apply_preset(draft, preset)
+
+
+def apply_setting_action(
+    draft: dict,
+    action: str,
+    *,
+    track: TrackMatch,
+    platform_order: tuple[str, ...],
+) -> bool:
+    """Apply one pure editor setting and report whether it was recognized."""
+    if action == "h":
+        draft["hashtags"] = not draft.get("hashtags")
+    elif action in {"q", "t"}:
+        draft["quote"] = not draft.get("quote")
+    elif action == "v":
+        draft["large_preview"] = not draft.get("large_preview")
+    elif action == "l":
+        toggle_platform_selection(draft, track, platform_order)
+    elif action == "z":
+        cycle_preset(draft)
+    else:
+        return False
+    return True

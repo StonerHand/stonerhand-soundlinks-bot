@@ -9,44 +9,13 @@ from telegram.error import TelegramError
 
 from music_links_bot.chat_access import PublishAccess, check_publish_access
 from music_links_bot.channel_templates import save_channel_template
-from music_links_bot.constants import PLATFORM_LABELS
 from music_links_bot.models import TrackMatch
-from music_links_bot.text_utils import normalize_hashtag
+from music_links_bot.publication_view import (
+    build_publication_view,
+    draft_message_overrides,
+)
 
 LOGGER = logging.getLogger(__name__)
-
-
-def draft_message_overrides(
-    draft: dict,
-    *,
-    include_hashtags: bool,
-) -> tuple[bool, dict]:
-    """Custom draft tags replace generated house tags."""
-    overrides: dict = {}
-    custom_tags = draft.get("custom_tags")
-    if isinstance(custom_tags, list):
-        tags = [
-            tag
-            for tag in (normalize_hashtag(value) for value in custom_tags)
-            if tag
-        ]
-        if tags:
-            overrides["hashtags"] = " ".join(tags)
-        else:
-            include_hashtags = False
-    return include_hashtags, overrides
-
-
-def draft_platform_selection(draft: dict) -> list[str] | None:
-    platforms = draft.get("platforms")
-    if not isinstance(platforms, list):
-        return None
-    selection = [
-        key
-        for key in platforms
-        if isinstance(key, str) and key in PLATFORM_LABELS
-    ]
-    return selection or None
 
 
 class PublicationService:
@@ -143,9 +112,8 @@ class PublicationService:
         target: int | str,
         channel_style: bool,
     ):
-        from music_links_bot.formatter import build_auto_hashtags, format_track_message
+        from music_links_bot.formatter import build_auto_hashtags
         from music_links_bot.keyboards import (
-            _build_link_keyboard,
             _build_link_preview_options,
             _select_preview_url,
         )
@@ -157,33 +125,25 @@ class PublicationService:
             send_rich_publication,
         )
 
-        prefix = draft.get("prefix") or ""
         include_hashtags, overrides = draft_message_overrides(
             draft,
             include_hashtags=(
                 True if channel_style else bool(draft.get("hashtags"))
             ),
         )
-        text = (
-            prefix if draft.get("quote") and prefix else ""
-        ) + format_track_message(
-            track,
-            include_hashtags=include_hashtags,
-            **overrides,
-        )
         include_channel_button = (
             str(target).lstrip("@").casefold()
             != self.channel_username.casefold()
         )
-        keyboard = _build_link_keyboard(
-            track.links,
+        view = build_publication_view(
+            draft,
+            track,
             context=self.context,
             include_channel_button=include_channel_button,
-            release_page_url=track.page_url,
-            release_kind=track.kind,
-            release_format=track.release_format,
-            platform_selection=draft_platform_selection(draft),
+            channel_style=channel_style,
         )
+        text = view.text
+        keyboard = view.keyboard
 
         if is_longread(draft):
             hashtags = overrides.get("hashtags")

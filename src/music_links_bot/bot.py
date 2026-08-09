@@ -137,11 +137,10 @@ from music_links_bot.bot_crate import (
     save_crate,
 )
 from music_links_bot.bot_editor_state import (
-    cycle_preset as _cycle_draft_preset,
+    apply_setting_action as _apply_editor_setting,
     draft_owned_by as _draft_owned_by,
     draft_status as _draft_status,
     remember_draft as _remember_session_draft,
-    toggle_platform_selection as _toggle_draft_platforms,
 )
 from music_links_bot.bot_runtime import (
     BotErrorCode,
@@ -170,6 +169,7 @@ from music_links_bot.bot_progress import (
     take_progress as _take_placeholder,
     update_progress as _update_loading_placeholder,
 )
+from music_links_bot.bot_pipeline import LookupRequest, delivery_kind
 from music_links_bot.bot_recent import render_recent_view
 from music_links_bot.bot_ui import (
     build_deleted_draft_keyboard as _deleted_draft_keyboard,
@@ -178,6 +178,7 @@ from music_links_bot.bot_ui import (
     build_error_keyboard as _build_error_keyboard_view,
     build_home_text as _build_home_text,
     build_onboarding_keyboard as _build_onboarding_keyboard,
+    build_publish_confirmation as _build_publish_confirmation,
     build_section_keyboard as _build_section_keyboard,
     build_start_keyboard as _build_start_keyboard,
     editor_more_rows as _editor_more_rows,
@@ -199,17 +200,22 @@ from music_links_bot.models import (
     TrackMatch,
     VideoMatch,
 )
+from music_links_bot.draft_model import new_track_draft
 from music_links_bot.mixed_post import send_track_video_album
 from music_links_bot.publication_state import (
     find_posted_record as _find_posted_record,
     mark_posted as _schedule_mark_posted,
     release_fingerprint as _release_fingerprint,
 )
-from music_links_bot.publication_service import (
-    PublicationService,
-    draft_message_overrides as _draft_message_overrides,
-    draft_platform_selection as _draft_platform_selection,
+from music_links_bot.publication_service import PublicationService
+from music_links_bot.publication_view import (
+    build_publication_view,
+    draft_message_overrides,
+    draft_platform_selection,
 )
+
+_draft_message_overrides = draft_message_overrides
+_draft_platform_selection = draft_platform_selection
 from music_links_bot.sharing import (
     add_share_button,
     build_share_query,
@@ -219,6 +225,11 @@ from music_links_bot.sharing import (
 )
 from music_links_bot.bot_history import record_history as _record_recent_item
 from music_links_bot.text_utils import normalize_hashtag
+from music_links_bot.telegram_buttons import (
+    ButtonTone,
+    callback_button,
+    current_chat_button,
+)
 from music_links_bot.url_utils import (
     cache_key_for_url,
     extract_supported_urls,
@@ -699,22 +710,16 @@ async def _send_track_draft(
 ) -> None:
     admin_chat_id = context.application.bot_data.get("admin_chat_id")
     draft_id = secrets.token_hex(8)
-    draft = {
-        "v": 1,
-        "type": "track",
-        "item": asdict(track),
-        "prefix": user_prefix,
-        "hashtags": True,
-        "quote": bool(user_prefix),
-        "large_preview": True,
-        "chat_id": message.chat_id,
-        "lang": lang,
-        "search_query": (search_query or "")[:120],
-        "can_publish": (
+    draft = new_track_draft(
+        track,
+        chat_id=message.chat_id,
+        lang=lang,
+        prefix=user_prefix,
+        search_query=search_query or "",
+        can_publish=(
             admin_chat_id is not None and user_id == admin_chat_id
         ),
-        "preset": "cover",
-    }
+    )
     await apply_channel_template(context, f"user:{user_id}", draft)
     if draft["can_publish"]:
         target = (
@@ -749,31 +754,19 @@ def _render_track_draft(
     show_status: bool = False,
 ) -> tuple[str, InlineKeyboardMarkup]:
     track = TrackMatch(**draft["item"])
-    prefix = draft.get("prefix") or ""
-    include_hashtags, overrides = _draft_message_overrides(
-        draft, include_hashtags=bool(draft.get("hashtags"))
-    )
-    text = (prefix if draft.get("quote") and prefix else "") + format_track_message(
+    view = build_publication_view(
+        draft,
         track,
-        include_hashtags=include_hashtags,
-        **overrides,
+        context=context,
+        include_channel_button=False,
+        max_visible_platforms=1 if draft_id is not None else None,
     )
+    text = view.text
     if show_status:
         lang = draft.get("lang") or "ru"
         status = _draft_status(draft, track, lang=lang)
         text = f"{text}\n\n<i>{escape(status)}</i>"
-    keyboard = _build_link_keyboard(
-        track.links,
-        context=context,
-        include_channel_button=False,
-        release_page_url=track.page_url,
-        release_kind=track.kind,
-        release_format=track.release_format,
-        platform_selection=_draft_platform_selection(draft),
-        # Two preferred services are enough for the quick surface. The hub and
-        # contextual editor remain available without a long button wall.
-        max_visible_platforms=1 if draft_id is not None else None,
-    )
+    keyboard = view.keyboard
     if draft_id is None:
         return text, add_share_button(
             keyboard,
@@ -880,6 +873,121 @@ async def _dispatch_editor_action(query, context, action: CallbackAction) -> Non
     await _handle_editor_action(query, context, action.action, action.payload)
 
 
+async def _handle_editor_navigation(
+    query,
+    context,
+    *,
+    action: str,
+    draft_id: str,
+    draft: dict,
+    lang: str,
+) -> bool:
+    if action == "a":
+        search_query = str(draft.get("search_query") or "").strip()
+        if not search_query or query.message is None:
+            await query.answer(get_text(lang, "ed_expired"), show_alert=True)
+            return True
+        await query.answer(get_text(lang, "progress_search"))
+        _adopt_progress_message(query.message)
+        token = _INPUT_OVERRIDE.set(search_query)
+        guard_token = _BYPASS_INTENT_GUARD.set(True)
+        try:
+            await track_lookup_message(Update(update_id=0, callback_query=query), context)
+        finally:
+            _BYPASS_INTENT_GUARD.reset(guard_token)
+            _INPUT_OVERRIDE.reset(token)
+        return True
+
+    if action == "m":
+        text, keyboard = _render_track_draft(
+            draft, context, draft_id=draft_id, settings=True, show_status=True
+        )
+    elif action == "o":
+        text, base_keyboard = _render_track_draft(
+            draft, context, draft_id=draft_id, show_status=True
+        )
+        overflow_rows = _editor_overflow_rows(draft_id, draft)
+        track = TrackMatch(**draft["item"])
+        share_query = build_share_query(
+            [url] if (url := track_share_url(track)) else []
+        )
+        if share_query:
+            overflow_rows.insert(
+                max(1, len(overflow_rows) - 2),
+                [
+                    InlineKeyboardButton(
+                        get_text(lang, "share_post"), switch_inline_query=share_query
+                    )
+                ],
+            )
+        keyboard = InlineKeyboardMarkup(
+            [*base_keyboard.inline_keyboard[:1], *overflow_rows]
+        )
+    elif action == "b":
+        text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
+    else:
+        return False
+    await query.answer()
+    await _edit_editor_message(query, context, draft, text, keyboard)
+    return True
+
+
+async def _handle_editor_lifecycle(
+    query,
+    context,
+    *,
+    action: str,
+    draft_id: str,
+    draft: dict,
+    lang: str,
+) -> bool:
+    if action == "d":
+        await query.answer()
+        await _edit_editor_message(
+            query,
+            context,
+            draft,
+            get_text(lang, "ed_delete_confirm"),
+            _delete_confirmation_keyboard(draft_id, lang=lang),
+        )
+        return True
+    if action == "dc":
+        await query.answer()
+        draft["deleted_at"] = int(time.time())
+        await _store_draft(context, draft_id, draft)
+        if query.from_user is not None:
+            session = await _runtime(context).get_session(query.from_user.id, lang=lang)
+            if session.active_draft_id == draft_id:
+                session.active_draft_id = ""
+                await _runtime(context).save_session(session)
+        await _edit_editor_message(
+            query,
+            context,
+            draft,
+            get_text(lang, "ed_deleted"),
+            _deleted_draft_keyboard(draft_id, lang=lang),
+        )
+        return True
+    if action != "du":
+        return False
+    deleted_at = int(draft.get("deleted_at") or 0)
+    if not deleted_at or time.time() - deleted_at > DRAFT_UNDO_SECONDS:
+        await query.answer(get_text(lang, "ed_undo_expired"), show_alert=True)
+        if query.message is not None:
+            await _try_delete_message(query.message)
+        return True
+    draft.pop("deleted_at", None)
+    await _store_draft(context, draft_id, draft)
+    if query.from_user is not None:
+        session = await _runtime(context).get_session(query.from_user.id, lang=lang)
+        _remember_session_draft(session, draft_id)
+        await _runtime(context).save_session(session)
+    await query.answer()
+    text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
+    await _edit_editor_message(query, context, draft, text, keyboard)
+    return True
+
+
 async def _handle_editor_action(query, context, action: str, draft_id: str) -> None:
     user_lang = resolve_lang(query.from_user.language_code if query.from_user else None)
     draft = await _load_draft(context, draft_id)
@@ -895,123 +1003,53 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
         await query.answer(get_text(lang, "ed_owner_only"), show_alert=True)
         return
 
-    if action == "a":
-        search_query = str(draft.get("search_query") or "").strip()
-        if not search_query or query.message is None:
-            await query.answer(get_text(lang, "ed_expired"), show_alert=True)
-            return
-        await query.answer(get_text(lang, "progress_search"))
-        _adopt_progress_message(query.message)
-        token = _INPUT_OVERRIDE.set(search_query)
-        guard_token = _BYPASS_INTENT_GUARD.set(True)
-        try:
-            await track_lookup_message(
-                Update(update_id=0, callback_query=query), context
-            )
-        finally:
-            _BYPASS_INTENT_GUARD.reset(guard_token)
-            _INPUT_OVERRIDE.reset(token)
+    if await _handle_editor_navigation(
+        query,
+        context,
+        action=action,
+        draft_id=draft_id,
+        draft=draft,
+        lang=lang,
+    ):
+        return
+    if await _handle_editor_lifecycle(
+        query,
+        context,
+        action=action,
+        draft_id=draft_id,
+        draft=draft,
+        lang=lang,
+    ):
         return
 
-    if action == "m":
-        await query.answer()
-        text, keyboard = _render_track_draft(
-            draft,
-            context,
-            draft_id=draft_id,
-            settings=True,
-            show_status=True,
-        )
-        await _edit_editor_message(query, context, draft, text, keyboard)
-        return
-    if action == "o":
-        await query.answer()
-        text, base_keyboard = _render_track_draft(
-            draft,
-            context,
-            draft_id=draft_id,
-            show_status=True,
-        )
-        overflow_rows = _editor_overflow_rows(draft_id, draft)
+    if action == "p":
+        user_id = query.from_user.id if query.from_user else 0
+        admin_chat_id = context.application.bot_data.get("admin_chat_id")
+        if (
+            not draft.get("can_publish")
+            or not user_id
+            or admin_chat_id is None
+            or user_id != admin_chat_id
+        ):
+            await query.answer(get_text(lang, "ed_admin_only"), show_alert=True)
+            return
         track = TrackMatch(**draft["item"])
-        share_query = build_share_query(
-            [url] if (url := track_share_url(track)) else []
+        target = str(
+            context.application.bot_data.get("publish_chat_id")
+            or f"@{CHANNEL_USERNAME}"
         )
-        if share_query:
-            overflow_rows.insert(
-                max(1, len(overflow_rows) - 2),
-                [
-                    InlineKeyboardButton(
-                        get_text(lang, "share_post"),
-                        switch_inline_query=share_query,
-                    )
-                ],
-            )
-        keyboard = InlineKeyboardMarkup(
-            [*base_keyboard.inline_keyboard[:1], *overflow_rows]
-        )
-        await _edit_editor_message(query, context, draft, text, keyboard)
-        return
-    if action == "b":
-        await query.answer()
-        text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
-        await _edit_editor_message(query, context, draft, text, keyboard)
-        return
-
-    if action == "d":
-        await query.answer()
-        await _edit_editor_message(
-            query,
-            context,
+        text, keyboard = _build_publish_confirmation(
+            draft_id,
             draft,
-            get_text(lang, "ed_delete_confirm"),
-            _delete_confirmation_keyboard(draft_id, lang=lang),
+            track,
+            target=target,
+            lang=lang,
         )
-        return
-
-    if action == "dc":
         await query.answer()
-        draft["deleted_at"] = int(time.time())
-        await _store_draft(context, draft_id, draft)
-        if query.from_user is not None:
-            session = await _runtime(context).get_session(
-                query.from_user.id,
-                lang=lang,
-            )
-            if session.active_draft_id == draft_id:
-                session.active_draft_id = ""
-                await _runtime(context).save_session(session)
-        await _edit_editor_message(
-            query,
-            context,
-            draft,
-            get_text(lang, "ed_deleted"),
-            _deleted_draft_keyboard(draft_id, lang=lang),
-        )
-        return
-
-    if action == "du":
-        deleted_at = int(draft.get("deleted_at") or 0)
-        if not deleted_at or time.time() - deleted_at > DRAFT_UNDO_SECONDS:
-            await query.answer(get_text(lang, "ed_undo_expired"), show_alert=True)
-            if query.message is not None:
-                await _try_delete_message(query.message)
-            return
-        draft.pop("deleted_at", None)
-        await _store_draft(context, draft_id, draft)
-        if query.from_user is not None:
-            session = await _runtime(context).get_session(
-                query.from_user.id,
-                lang=lang,
-            )
-            _remember_session_draft(session, draft_id)
-            await _runtime(context).save_session(session)
-        await query.answer()
-        text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
         await _edit_editor_message(query, context, draft, text, keyboard)
         return
 
-    if action in {"p", "r", "x", "s", "c"}:
+    if action in {"pc", "r", "x", "s", "c"}:
         user_id = query.from_user.id if query.from_user else 0
         runtime = _runtime(context)
         lock_key = f"{user_id}:{action}:{draft_id}"
@@ -1028,25 +1066,18 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
             await runtime.release_action(lock_key, token)
         return
 
-    if action == "h":
-        draft["hashtags"] = not draft.get("hashtags")
-    elif action in {"q", "t"}:
-        draft["quote"] = not draft.get("quote")
-    elif action == "v":
-        draft["large_preview"] = not draft.get("large_preview")
-    elif action == "l":
-        _toggle_draft_platforms(
-            draft,
-            TrackMatch(**draft["item"]),
-            _get_platform_order(context),
-        )
-    elif action == "z":
-        _cycle_draft_preset(draft)
-    elif action != "f":
+    if action != "f" and not _apply_editor_setting(
+        draft,
+        action,
+        track=TrackMatch(**draft["item"]),
+        platform_order=_get_platform_order(context),
+    ):
         await query.answer()
         return
 
-    await query.answer()
+    await query.answer(
+        get_text(lang, "settings_saved") if action != "f" else None
+    )
     await _store_draft(context, draft_id, draft)
     if query.from_user is not None:
         await save_channel_template(context, f"user:{query.from_user.id}", draft)
@@ -1105,7 +1136,7 @@ async def _run_primary_editor_action(
 
     track = TrackMatch(**draft["item"])
     record = await _find_posted_record(context, track)
-    if action == "p" and record:
+    if action == "pc" and record:
         draft["duplicate_record"] = record
         await _store_draft(context, draft_id, draft)
         await query.answer(
@@ -1176,15 +1207,7 @@ async def _run_primary_editor_action(
             if not isinstance(published, bool)
             else None
         )
-        success_rows = [
-            [
-                InlineKeyboardButton(
-                    get_text(lang, "ed_published"),
-                    callback_data=encode_callback("noop", "done"),
-                    api_kwargs={"style": "success"},
-                )
-            ]
-        ]
+        success_rows: list[list[InlineKeyboardButton]] = []
         if isinstance(published_link, str) and published_link.startswith("http"):
             success_rows.append(
                 [
@@ -1207,6 +1230,7 @@ async def _run_primary_editor_action(
         )
         success_keyboard = InlineKeyboardMarkup(success_rows)
         text, _ = _render_track_draft(draft, context, draft_id=None)
+        text = f"<b>{escape(get_text(lang, 'ed_published'))}</b>\n\n{text}"
         await _edit_editor_message(query, context, draft, text, success_keyboard)
     await query.answer(
         get_text(lang, "ed_published" if published else "ed_publish_failed"),
@@ -1577,7 +1601,6 @@ async def _resolve_search_sources(
             for index, candidate in enumerate(candidates[:3], start=1):
                 artist = escape(str(getattr(candidate, "artist", "") or "—"))
                 title = escape(str(getattr(candidate, "title", "") or "—"))
-                lines.append(f"<b>{index}.</b> {artist} — {title}")
                 meta = [
                     escape(str(value))
                     for value in (
@@ -1586,31 +1609,37 @@ async def _resolve_search_sources(
                     )
                     if value
                 ]
-                if meta:
-                    lines.append(f"<i>{' · '.join(meta)}</i>")
+                suffix = f" <i>· {' · '.join(meta)}</i>" if meta else ""
+                lines.append(f"<b>{index}.</b> {artist} — {title}{suffix}")
             text = "\n".join(lines)
             keyboard = InlineKeyboardMarkup(
                 [
                     [
-                        InlineKeyboardButton(
-                            f"{index + 1} · {candidate.title}"[:64],
-                            callback_data=encode_callback(
+                        callback_button(
+                            (
+                                f"{index + 1} · "
+                                f"{getattr(candidate, 'artist', '')} — {candidate.title}"
+                            )[:64],
+                            encode_callback(
                                 "select", "pick", f"{selection_id}:{index}"
                             ),
+                            tone=ButtonTone.PRIMARY if index == 0 else None,
                         )
                     ]
                     for index, candidate in enumerate(candidates[:3])
                 ]
                 + [
                     [
-                        InlineKeyboardButton(
-                            get_text(lang, "retry"),
-                            callback_data=encode_callback("retry", "last"),
-                        ),
-                        InlineKeyboardButton(
+                        current_chat_button(
                             get_text(lang, "search_change"),
-                            switch_inline_query_current_chat=search_query,
-                        ),
+                            search_query,
+                        )
+                    ],
+                    [
+                        callback_button(
+                            get_text(lang, "home_back"),
+                            encode_callback("menu", "start"),
+                        )
                     ]
                 ]
             )
@@ -1774,18 +1803,11 @@ async def _add_track_drafts_to_crate(
     for track in tracks:
         draft_id = secrets.token_hex(8)
         item = asdict(track)
-        draft = {
-            "v": 2,
-            "type": "track",
-            "item": item,
-            "prefix": "",
-            "hashtags": True,
-            "quote": False,
-            "large_preview": True,
-            "chat_id": message.chat_id,
-            "lang": lang,
-            "can_publish": False,
-        }
+        draft = new_track_draft(
+            track,
+            chat_id=message.chat_id,
+            lang=lang,
+        )
         crate_entries.append((draft_id, item))
         draft_writes.append(_store_draft(context, draft_id, draft))
 
@@ -1924,15 +1946,25 @@ async def _track_lookup_message_impl(
     if via_bot is not None and via_bot.id == getattr(context.bot, "id", None):
         return
 
-    message_text = _INPUT_OVERRIDE.get() or _message_text(message)
-    source_urls = extract_supported_urls(message_text)[:MAX_LINKS_PER_MESSAGE]
-    include_channel_button = _should_include_channel_button(message)
-    include_hashtags = _should_include_hashtags(message)
+    message_text = _INPUT_OVERRIDE.get() or _message_text(message) or ""
     is_private = message.chat.type == "private"
-    lang = _update_lang(update) if is_private else "ru"
-    user_id = update.effective_user.id if update.effective_user else message.chat_id
+    request = LookupRequest(
+        message_text=message_text,
+        source_urls=extract_supported_urls(message_text)[:MAX_LINKS_PER_MESSAGE],
+        is_private=is_private,
+        lang=_update_lang(update) if is_private else "ru",
+        user_id=(
+            update.effective_user.id if update.effective_user else message.chat_id
+        ),
+        include_channel_button=_should_include_channel_button(message),
+        include_hashtags=_should_include_hashtags(message),
+        search_query=(_SEARCH_QUERY_OVERRIDE.get() or "").strip() or None,
+    )
+    source_urls = request.source_urls
+    lang = request.lang
+    user_id = request.user_id
     runtime = _runtime(context)
-    search_query = (_SEARCH_QUERY_OVERRIDE.get() or "").strip() or None
+    search_query = request.search_query
     if is_private:
         action_kind = detect_action(message_text or "", source_urls, is_private=True)
         intent_value = (
@@ -1977,6 +2009,9 @@ async def _track_lookup_message_impl(
         if search_result is None:
             return
         source_urls, found_via_search, search_query = search_result
+        request.source_urls = source_urls
+        request.found_via_search = found_via_search
+        request.search_query = search_query
 
     if message.chat.type == "channel":
         access = await check_publish_access(context, message.chat_id)
@@ -2011,12 +2046,6 @@ async def _track_lookup_message_impl(
     )
     if is_private:
         await _update_loading_placeholder(lang, "progress_card")
-    tracks = bundle.tracks
-    videos = bundle.videos
-    radios = bundle.radios
-    playlists = bundle.playlists
-    artists = bundle.artists
-
     if await _handle_empty_lookup(
         message,
         context,
@@ -2026,118 +2055,82 @@ async def _track_lookup_message_impl(
     ):
         return
 
-    content_type_count = bundle.content_type_count
-    # A multi-item post is already self-explanatory. Quoting the source message
-    # adds visual noise and can expose the raw links above the collection.
-    result_user_prefix = "" if bundle.item_count > 1 else user_prefix
-    if content_type_count == 1 and tracks:
+    await _deliver_lookup_bundle(
+        message,
+        context,
+        bundle,
+        request=request,
+        user_prefix=user_prefix,
+    )
+
+
+async def _deliver_lookup_bundle(
+    message: Message,
+    context: ContextTypes.DEFAULT_TYPE,
+    bundle: _bot_lookup.LookupBundle,
+    *,
+    request: LookupRequest,
+    user_prefix: str,
+) -> None:
+    """Render an already resolved bundle; lookup orchestration stays separate."""
+    kind = delivery_kind(bundle)
+    prefix = "" if bundle.item_count > 1 else user_prefix
+    common = {
+        "user_prefix": prefix,
+        "include_channel_button": request.include_channel_button,
+        "include_hashtags": request.include_hashtags,
+        "lang": request.lang,
+    }
+    if kind == "tracks":
         await _send_track_matches(
             message,
             context,
-            tracks,
-            is_private=is_private,
-            user_id=user_id,
-            user_prefix=result_user_prefix,
-            lang=lang,
-            include_channel_button=include_channel_button,
-            include_hashtags=include_hashtags,
-            search_query=search_query,
-            requested_count=len(source_urls),
+            bundle.tracks,
+            is_private=request.is_private,
+            user_id=request.user_id,
+            search_query=request.search_query,
+            requested_count=len(request.source_urls),
+            **common,
         )
-        await _send_partial_lookup_status(
-            message, context, bundle, user_id=user_id, lang=lang
-        )
-        return
-
-    if content_type_count == 1 and videos:
-        await _send_youtube_result(
+    elif kind == "videos":
+        await _send_youtube_result(context.bot, message, bundle.videos, **common)
+        _record_videos_safely(bundle.videos, message, context=context)
+    elif kind == "radios":
+        await _send_nts_result(context.bot, message, bundle.radios, **common)
+        _record_radios_safely(bundle.radios, message, context=context)
+    elif kind == "playlists":
+        await _send_playlist_result(context.bot, message, bundle.playlists, **common)
+        _record_playlists_safely(bundle.playlists, message, context=context)
+    elif kind == "artists":
+        await _send_artist_result(context.bot, message, bundle.artists, **common)
+        _record_artists_safely(bundle.artists, message, context=context)
+    elif kind == "mixed":
+        await _send_mixed_result(
             context.bot,
             message,
-            videos,
-            user_prefix=result_user_prefix,
-            include_channel_button=include_channel_button,
-            include_hashtags=include_hashtags,
-            lang=lang,
+            bundle.tracks,
+            bundle.videos,
+            bundle.radios,
+            bundle.playlists,
+            bundle.artists,
+            context=context,
+            **common,
         )
-        _record_videos_safely(videos, message, context=context)
-        await _send_partial_lookup_status(
-            message, context, bundle, user_id=user_id, lang=lang
-        )
-        return
-
-    if content_type_count == 1 and radios:
-        await _send_nts_result(
-            context.bot,
+        _record_mixed_safely(
+            bundle.tracks,
+            bundle.videos,
+            bundle.radios,
+            bundle.playlists,
+            bundle.artists,
             message,
-            radios,
-            user_prefix=result_user_prefix,
-            include_channel_button=include_channel_button,
-            include_hashtags=include_hashtags,
-            lang=lang,
+            context=context,
         )
-        _record_radios_safely(radios, message, context=context)
-        await _send_partial_lookup_status(
-            message, context, bundle, user_id=user_id, lang=lang
-        )
-        return
-
-    if content_type_count == 1 and playlists:
-        await _send_playlist_result(
-            context.bot,
-            message,
-            playlists,
-            user_prefix=result_user_prefix,
-            include_channel_button=include_channel_button,
-            include_hashtags=include_hashtags,
-            lang=lang,
-        )
-        _record_playlists_safely(playlists, message, context=context)
-        await _send_partial_lookup_status(
-            message, context, bundle, user_id=user_id, lang=lang
-        )
-        return
-
-    if content_type_count == 1 and artists:
-        await _send_artist_result(
-            context.bot,
-            message,
-            artists,
-            user_prefix=result_user_prefix,
-            include_channel_button=include_channel_button,
-            include_hashtags=include_hashtags,
-            lang=lang,
-        )
-        _record_artists_safely(artists, message, context=context)
-        await _send_partial_lookup_status(
-            message, context, bundle, user_id=user_id, lang=lang
-        )
-        return
-
-    await _send_mixed_result(
-        context.bot,
-        message,
-        tracks,
-        videos,
-        radios,
-        playlists,
-        artists,
-        user_prefix=result_user_prefix,
-        include_channel_button=include_channel_button,
-        include_hashtags=include_hashtags,
-        context=context,
-        lang=lang,
-    )
-    _record_mixed_safely(
-        tracks,
-        videos,
-        radios,
-        playlists,
-        artists,
-        message,
-        context=context,
-    )
     await _send_partial_lookup_status(
-        message, context, bundle, user_id=user_id, lang=lang
+        message,
+        context,
+        bundle,
+        user_id=request.user_id,
+        lang=request.lang,
     )
 
 

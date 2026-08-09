@@ -23,6 +23,7 @@ CALLBACK_TTL_SECONDS = 15 * 60
 ACTION_LOCK_SECONDS = 45
 INTENT_TTL_SECONDS = 4
 SESSION_TTL_SECONDS = 30 * 24 * 3600
+SESSION_SCHEMA_VERSION = 2
 MAX_MEMORY_SESSIONS = 500
 MAX_MEMORY_KEYS = 2_000
 CIRCUIT_FAILURE_THRESHOLD = 3
@@ -173,7 +174,13 @@ class BotRuntime:
                 cached.lang = lang
             return cached
 
-        payload = await self.kv.get_json(f"session:v1:{user_id}") if self.kv else None
+        payload = await self.kv.get_json(f"session:v2:{user_id}") if self.kv else None
+        if isinstance(payload, dict) and isinstance(payload.get("session"), dict):
+            payload = payload["session"]
+        migrated = False
+        if payload is None and self.kv is not None:
+            payload = await self.kv.get_json(f"session:v1:{user_id}")
+            migrated = isinstance(payload, dict)
         session = UserSession.from_dict(payload) if isinstance(payload, dict) else None
         if session is None:
             session = UserSession(user_id=user_id, lang=lang)
@@ -181,6 +188,8 @@ class BotRuntime:
             session.lang = lang
         self._cap(self.sessions, MAX_MEMORY_SESSIONS)
         self.sessions[user_id] = session
+        if migrated:
+            await self.save_session(session)
         return session
 
     async def save_session(self, session: UserSession) -> None:
@@ -188,8 +197,8 @@ class BotRuntime:
         self.sessions[session.user_id] = session
         if self.kv is not None:
             await self.kv.set_json(
-                f"session:v1:{session.user_id}",
-                asdict(session),
+                f"session:v2:{session.user_id}",
+                {"v": SESSION_SCHEMA_VERSION, "session": asdict(session)},
                 ttl_seconds=SESSION_TTL_SECONDS,
             )
 

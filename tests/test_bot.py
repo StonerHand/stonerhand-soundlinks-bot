@@ -984,7 +984,7 @@ class BotKeyboardTests(unittest.TestCase):
 
         rows = keyboard.inline_keyboard
         self.assertEqual(rows[0][0].text, "▶ Как всё работает")
-        self.assertEqual(rows[0][0].api_kwargs, {"style": "primary"})
+        self.assertEqual(rows[0][0].api_kwargs, {})
         self.assertEqual(rows[1][0].text, "＋ Создать пост")
         self.assertEqual(rows[1][0].api_kwargs, {"style": "primary"})
         self.assertEqual(rows[2][0].text, "🧺 Подборка · 3")
@@ -1695,10 +1695,10 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("<code>артист — название</code>", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "Повторить")
-        self.assertEqual(keyboard[0][1].text, "Изменить запрос")
-        self.assertEqual(keyboard[0][1].switch_inline_query_current_chat, "привет")
-        self.assertEqual(keyboard[1][0].text, "← Главное меню")
-        self.assertEqual(len(keyboard), 2)
+        self.assertEqual(keyboard[1][0].text, "Изменить запрос")
+        self.assertEqual(keyboard[-1][0].text, "← Главное меню")
+        self.assertEqual(keyboard[1][0].switch_inline_query_current_chat, "привет")
+        self.assertEqual(len(keyboard), 3)
         self.assertEqual(context.bot.sent_messages, [])
         self.assertEqual(context.bot.chat_actions, [])
         self.assertEqual(context.application.bot_data["runtime"].active_tasks, {})

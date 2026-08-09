@@ -395,6 +395,22 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "ed_sent": {RU: "Готово — пост отправлен ниже", EN: "Done — the post is below"},
     "ed_publish": {RU: "📤 В канал", EN: "📤 To channel"},
+    "publish_confirm": {
+        RU: (
+            "<b>Готово к публикации</b>\n\n"
+            "<blockquote><b>{artist}</b> — {title}\n"
+            "Куда: {target} · сейчас</blockquote>\n"
+            "Проверь карточку и подтверди отправку."
+        ),
+        EN: (
+            "<b>Ready to publish</b>\n\n"
+            "<blockquote><b>{artist}</b> — {title}\n"
+            "Target: {target} · now</blockquote>\n"
+            "Check the card and confirm delivery."
+        ),
+    },
+    "publish_confirm_button": {RU: "Опубликовать", EN: "Publish"},
+    "settings_saved": {RU: "Настройки сохранены", EN: "Settings saved"},
     "ed_expired": {
         RU: "Черновик устарел — пришли ссылку заново",
         EN: "This draft has expired — send the link again",
@@ -519,8 +535,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "crate_remove": {RU: "✕ Удалить", EN: "✕ Remove"},
     "crate_clear": {RU: "Очистить", EN: "Clear"},
     "crate_clear_confirm": {
-        RU: "<b>Очистить всю подборку?</b>\n\nВсе треки будут удалены. Отменить это действие нельзя.",
-        EN: "<b>Clear the whole crate?</b>\n\nAll tracks will be removed. This cannot be undone.",
+        RU: "<b>Очистить всю подборку?</b>\n\nВсе треки будут удалены. После очистки их можно вернуть кнопкой «Отменить».",
+        EN: "<b>Clear the whole crate?</b>\n\nAll tracks will be removed. You can restore them with Undo.",
     },
     "crate_clear_confirm_button": {RU: "Очистить подборку", EN: "Clear crate"},
     "crate_undo": {RU: "Вернуть удалённый", EN: "Undo removal"},

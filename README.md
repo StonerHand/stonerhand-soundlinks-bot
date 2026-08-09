@@ -21,7 +21,9 @@
 - combines several links into one numbered collection;
 - pairs a song and YouTube clip in one media post;
 - includes an in-chat editor, drafts and recent posts;
+- remembers card style, hashtags and platform preferences;
 - sends to the user, another chat or a configured channel;
+- shows a compact final check before channel publication;
 - supports a durable scheduled-publishing queue;
 - works inline: `@StonerHandBot artist — track`.
 
@@ -40,9 +42,13 @@ flowchart LR
 ```
 
 Cards keep only useful information: artwork, artist, title, a small set of
-hashtags and platform actions. Multi-link inputs are not quoted back into the
-result. The editor updates one Telegram message; destructive actions require
-confirmation and collection removals can be undone.
+hashtags, one preferred service and the complete release hub. Secondary
+actions appear only in context. Multi-link inputs are not quoted back into the
+result. The editor updates one Telegram message, reports saved settings with a
+short toast and supports undo for deletions.
+
+Lookup uses visible `1/3 → 3/3` progress. When one source fails, resolved items
+are still delivered and retry targets only the failed links.
 
 ## Local setup
 
@@ -88,6 +94,7 @@ vercel.json             production routes and cron jobs
 
 Production runs on Vercel using a Telegram webhook. Redis stores caches,
 sessions, drafts, collections, history, the publishing queue and deduplication
-claims. Non-critical flows have a bounded in-memory fallback.
+claims. Stored state is versioned and automatically migrates legacy records.
+Non-critical flows have a bounded in-memory fallback.
 
 License: [MIT](LICENSE).

@@ -18,6 +18,7 @@ class ChannelTemplateTests(unittest.IsolatedAsyncioTestCase):
             "@stonerhand",
             {
                 "hashtags": False,
+                "quote": False,
                 "large_preview": False,
                 "as_photo": True,
                 "platforms": ["spotify", "tidal", "unknown"],
@@ -31,6 +32,7 @@ class ChannelTemplateTests(unittest.IsolatedAsyncioTestCase):
         await apply_channel_template(context, "@StonerHand", draft)
 
         self.assertFalse(draft["hashtags"])
+        self.assertFalse(draft["quote"])
         self.assertFalse(draft["large_preview"])
         self.assertTrue(draft["as_photo"])
         self.assertEqual(draft["platforms"], ["spotify", "tidal"])
