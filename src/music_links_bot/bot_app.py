@@ -34,10 +34,11 @@ BOT_DESCRIPTIONS = {
         "Музыкальный редактор для Telegram.\n\n"
         "• Ссылка или название → точный релиз и готовая карточка\n"
         "• Несколько ссылок → одна редактируемая подборка\n"
-        "• Обложка, чистый заголовок и компактные кнопки площадок\n"
+        "• Стиль, подводка, хэштеги и площадки — в понятном конструкторе\n"
+        "• Чистое превью, история и именованные подборки без дублей\n"
         "• Нативная отправка поста с кнопками в любой чат\n"
         "• Inline: @StonerHandBot + запрос прямо в переписке\n"
-        "• Редактор, подборки, очередь и публикация прямо в боте\n\n"
+        "• Отправка, очередь и публикация прямо в боте\n\n"
         "Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
         "Yandex Music, NTS Radio."
     ),
@@ -45,10 +46,11 @@ BOT_DESCRIPTIONS = {
         "A music post editor for Telegram.\n\n"
         "• A link or title → the exact release and a finished card\n"
         "• Several links → one editable crate\n"
-        "• Artwork, a clean heading and compact platform actions\n"
+        "• Explicit style, intro, hashtag and platform controls\n"
+        "• Clean preview, history and named duplicate-free crates\n"
         "• Native sharing that preserves buttons in any chat\n"
         "• Inline: @StonerHandBot + a query inside any conversation\n"
-        "• Editing, crates, queueing and publishing inside the bot\n\n"
+        "• Sending, queueing and publishing inside the bot\n\n"
         "Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
         "Yandex Music and NTS Radio."
     ),
@@ -113,9 +115,7 @@ def build_application(settings: Settings) -> Application:
             "drafts": {},
             "publish_chat_id": settings.publish_chat_id,
             "admin_chat_id": settings.admin_chat_id,
-            "platform_order": handlers._build_platform_order(
-                settings.primary_platform
-            ),
+            "platform_order": handlers._build_platform_order(settings.primary_platform),
             "ui_mode": settings.ui_mode,
             "runtime": BotRuntime(kv_store),
             "search_selections": {},
@@ -128,9 +128,7 @@ def build_application(settings: Settings) -> Application:
     application.add_handler(CommandHandler("start", handlers.start_command))
     application.add_handler(CommandHandler("help", handlers.help_command))
     application.add_handler(CommandHandler("guide", handlers.guide_command))
-    application.add_handler(
-        CommandHandler("platforms", handlers.platforms_command)
-    )
+    application.add_handler(CommandHandler("platforms", handlers.platforms_command))
     application.add_handler(CommandHandler("channel", handlers.channel_command))
     application.add_handler(CommandHandler("id", handlers.id_command))
     application.add_handler(CommandHandler("stats", handlers.stats_command))

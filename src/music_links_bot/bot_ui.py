@@ -3,9 +3,12 @@ from __future__ import annotations
 from html import escape
 from telegram import InlineKeyboardMarkup
 
+from music_links_bot.bot_builder import available_platforms, selected_platforms
 from music_links_bot.bot_runtime import encode_callback
+from music_links_bot.constants import PLATFORM_LABELS
 from music_links_bot.i18n import get_text
 from music_links_bot.models import TrackMatch
+from music_links_bot.release_presentation import PRESET_ORDER, normalize_preset
 from music_links_bot.telegram_buttons import (
     ButtonTone,
     button as InlineKeyboardButton,
@@ -55,20 +58,26 @@ def build_start_keyboard(
     is_admin: bool = False,
     show_tour: bool = False,
     active_draft_id: str | None = None,
+    active_draft_label: str | None = None,
 ) -> InlineKeyboardMarkup:
     del bot_username, is_admin
     rows: list[list[InlineKeyboardButton]] = []
     create_button = InlineKeyboardButton(
         get_text(lang, "home_create"),
-        switch_inline_query_current_chat="",
+        callback_data=encode_callback("menu", "create"),
         api_kwargs={"style": "primary"},
     )
     rows.append([create_button])
     if active_draft_id:
+        continue_text = (
+            get_text(lang, "home_continue_named").format(release=active_draft_label)
+            if active_draft_label
+            else get_text(lang, "home_continue")
+        )
         rows.append(
             [
                 InlineKeyboardButton(
-                    get_text(lang, "home_continue"),
+                    continue_text,
                     callback_data=encode_callback("editor", "b", active_draft_id),
                 )
             ]
@@ -107,7 +116,7 @@ def build_section_keyboard(
         [
             InlineKeyboardButton(
                 get_text(lang, "quick_search"),
-                switch_inline_query_current_chat="",
+                callback_data=encode_callback("menu", "create"),
                 api_kwargs={"style": "primary"},
             )
         ]
@@ -144,6 +153,25 @@ def build_section_keyboard(
     return InlineKeyboardMarkup(rows)
 
 
+def build_create_keyboard(*, lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "error_platforms_button"),
+                    callback_data=encode_callback("menu", "platforms"),
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "home_back"),
+                    callback_data=encode_callback("menu", "start"),
+                )
+            ],
+        ]
+    )
+
+
 def build_error_keyboard(
     bot_username: str | None,
     *,
@@ -162,7 +190,7 @@ def build_error_keyboard(
     else:
         primary = InlineKeyboardButton(
             get_text(lang, "quick_search"),
-            switch_inline_query_current_chat="",
+            callback_data=encode_callback("menu", "create"),
             api_kwargs={"style": "primary"},
         )
     rows = [[primary]]
@@ -192,9 +220,7 @@ def build_error_keyboard(
             )
         ]
     )
-    return InlineKeyboardMarkup(
-        rows
-    )
+    return InlineKeyboardMarkup(rows)
 
 
 def build_publish_confirmation(
@@ -307,7 +333,7 @@ def build_onboarding_keyboard(step: int, lang: str) -> InlineKeyboardMarkup:
                     get_text(lang, "start_using"),
                     callback_data=encode_callback("menu", "onboarddone"),
                     api_kwargs={"style": "success"},
-                )
+                ),
             ]
         )
     return InlineKeyboardMarkup(rows)
@@ -349,63 +375,244 @@ def editor_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
 
 
 def editor_more_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
-    """Four quick controls; destructive and delivery actions stay in overflow."""
+    """Main builder screen: explicit destinations instead of hidden cycles."""
     lang = draft.get("lang") or "ru"
-
-    def state(flag: str) -> str:
-        return get_text(lang, "ed_on" if draft.get(flag) else "ed_off")
-
-    from music_links_bot.release_presentation import normalize_preset
-
     preset = normalize_preset(draft.get("preset"), draft)
-    toggle_rows = [
+    custom_tags = draft.get("custom_tags")
+    if isinstance(custom_tags, list) and custom_tags and draft.get("hashtags"):
+        tags_label = get_text(lang, "ed_hashtags_custom").format(count=len(custom_tags))
+    else:
+        tags_label = get_text(
+            lang,
+            "ed_hashtags_auto" if draft.get("hashtags", True) else "ed_hashtags_none",
+        )
+    stored_platforms = draft.get("platforms")
+    platform_count: int | str = (
+        len(stored_platforms)
+        if isinstance(stored_platforms, list)
+        else get_text(lang, "ed_platforms_all_short")
+    )
+    platform_label = get_text(lang, "ed_platforms_selected").format(
+        count=platform_count
+    )
+    return [
         [
             InlineKeyboardButton(
                 get_text(lang, f"ed_preset_{preset}"),
-                callback_data=encode_callback("editor", "z", draft_id),
+                callback_data=encode_callback("editor", "zs", draft_id),
             ),
             InlineKeyboardButton(
-                get_text(
-                    lang,
-                    "ed_text_on" if draft.get("quote") else "ed_text_off",
-                ),
-                callback_data=encode_callback("editor", "t", draft_id),
+                get_text(lang, "ed_text_on" if draft.get("quote") else "ed_text_off"),
+                callback_data=encode_callback("editor", "ts", draft_id),
             ),
         ],
         [
             InlineKeyboardButton(
-                f"{get_text(lang, 'ed_hashtags')} {state('hashtags')}",
-                callback_data=encode_callback("editor", "h", draft_id),
+                tags_label,
+                callback_data=encode_callback("editor", "hs", draft_id),
             ),
             InlineKeyboardButton(
-                get_text(
-                    lang,
-                    "ed_platforms_all"
-                    if draft.get("platforms")
-                    else "ed_platforms_compact",
-                ),
-                callback_data=encode_callback("editor", "l", draft_id),
+                platform_label,
+                callback_data=encode_callback("editor", "ls", draft_id),
             ),
-        ]
-    ]
-    rows = [
-        *toggle_rows,
+        ],
         [
             InlineKeyboardButton(
-                get_text(lang, "ed_done"),
-                callback_data=encode_callback("editor", "f", draft_id),
-                api_kwargs={"style": "success"},
+                get_text(lang, "ed_clean_preview"),
+                callback_data=encode_callback("editor", "pv", draft_id),
             ),
             InlineKeyboardButton(
                 get_text(lang, "ed_more"),
                 callback_data=encode_callback("editor", "o", draft_id),
             ),
         ],
+        [
+            InlineKeyboardButton(
+                get_text(lang, "ed_done"),
+                callback_data=encode_callback("editor", "f", draft_id),
+                api_kwargs={"style": "success"},
+            )
+        ],
+    ]
+
+
+def editor_style_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
+    lang = draft.get("lang") or "ru"
+    selected = normalize_preset(draft.get("preset"), draft)
+    rows = [
+        [
+            InlineKeyboardButton(
+                ("✓ " if preset == selected else "")
+                + get_text(lang, f"ed_preset_name_{preset}"),
+                callback_data=encode_callback("editor", f"z{index}", draft_id),
+                **({"api_kwargs": {"style": "primary"}} if preset == selected else {}),
+            )
+        ]
+        for index, preset in enumerate(PRESET_ORDER)
+    ]
+    rows.append(
+        [
+            InlineKeyboardButton(
+                get_text(lang, "back"),
+                callback_data=encode_callback("editor", "m", draft_id),
+            )
+        ]
+    )
+    return rows
+
+
+def editor_platform_rows(
+    draft_id: str,
+    draft: dict,
+    track: TrackMatch,
+    platform_order: list[str],
+) -> list[list[InlineKeyboardButton]]:
+    lang = draft.get("lang") or "ru"
+    available = available_platforms(track, platform_order)
+    selected = selected_platforms(draft, track, platform_order)
+    buttons = [
+        InlineKeyboardButton(
+            ("✓ " if key in selected else "") + PLATFORM_LABELS[key],
+            callback_data=encode_callback("editor", f"l{index}", draft_id),
+            **({"api_kwargs": {"style": "primary"}} if key in selected else {}),
+        )
+        for index, key in enumerate(available)
+    ]
+    rows = [buttons[index : index + 2] for index in range(0, len(buttons), 2)]
+    rows.append(
+        [
+            InlineKeyboardButton(
+                get_text(lang, "ed_platforms_select_all"),
+                callback_data=encode_callback("editor", "la", draft_id),
+            )
+        ]
+    )
+    rows.append(
+        [
+            InlineKeyboardButton(
+                get_text(lang, "back"),
+                callback_data=encode_callback("editor", "m", draft_id),
+            )
+        ]
+    )
+    return rows
+
+
+def editor_intro_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
+    lang = draft.get("lang") or "ru"
+    rows = [
+        [
+            InlineKeyboardButton(
+                get_text(
+                    lang, "ed_intro_change" if draft.get("quote") else "ed_intro_add"
+                ),
+                callback_data=encode_callback("editor", "ti", draft_id),
+                api_kwargs={"style": "primary"},
+            )
+        ]
+    ]
+    if draft.get("quote"):
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "ed_intro_remove"),
+                    callback_data=encode_callback("editor", "t0", draft_id),
+                    api_kwargs={"style": "danger"},
+                )
+            ]
+        )
+    rows.append(
+        [
+            InlineKeyboardButton(
+                get_text(lang, "back"),
+                callback_data=encode_callback("editor", "m", draft_id),
+            )
+        ]
+    )
+    return rows
+
+
+def editor_hashtag_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
+    lang = draft.get("lang") or "ru"
+    custom = bool(draft.get("hashtags")) and bool(draft.get("custom_tags"))
+    auto = bool(draft.get("hashtags", True)) and not custom
+    none = not draft.get("hashtags")
+    rows = [
+        [
+            InlineKeyboardButton(
+                ("✓ " if auto else "") + get_text(lang, "ed_tags_auto"),
+                callback_data=encode_callback("editor", "ha", draft_id),
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                ("✓ " if custom else "") + get_text(lang, "ed_tags_custom"),
+                callback_data=encode_callback("editor", "hi", draft_id),
+                api_kwargs={"style": "primary"},
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                ("✓ " if none else "") + get_text(lang, "ed_tags_none"),
+                callback_data=encode_callback("editor", "hn", draft_id),
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                get_text(lang, "back"),
+                callback_data=encode_callback("editor", "m", draft_id),
+            )
+        ],
     ]
     return rows
 
 
-def editor_overflow_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
+def editor_preview_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
+    lang = draft.get("lang") or "ru"
+    return [
+        [
+            InlineKeyboardButton(
+                get_text(lang, "back_to_editor"),
+                callback_data=encode_callback("editor", "m", draft_id),
+                api_kwargs={"style": "primary"},
+            )
+        ]
+    ]
+
+
+def editor_schedule_rows(
+    draft_id: str, draft: dict
+) -> list[list[InlineKeyboardButton]]:
+    lang = draft.get("lang") or "ru"
+    return [
+        [
+            InlineKeyboardButton(
+                get_text(lang, "schedule_1h"),
+                callback_data=encode_callback("editor", "q1", draft_id),
+            ),
+            InlineKeyboardButton(
+                get_text(lang, "schedule_3h"),
+                callback_data=encode_callback("editor", "q3", draft_id),
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                get_text(lang, "schedule_1d"),
+                callback_data=encode_callback("editor", "qd", draft_id),
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                get_text(lang, "back"),
+                callback_data=encode_callback("editor", "o", draft_id),
+            )
+        ],
+    ]
+
+
+def editor_overflow_rows(
+    draft_id: str, draft: dict
+) -> list[list[InlineKeyboardButton]]:
     lang = draft.get("lang") or "ru"
     rows = [
         [
@@ -423,6 +630,14 @@ def editor_overflow_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboard
                     get_text(lang, "ed_publish"),
                     callback_data=encode_callback("editor", "p", draft_id),
                     api_kwargs={"style": "success"},
+                )
+            ]
+        )
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "ed_schedule"),
+                    callback_data=encode_callback("editor", "qs", draft_id),
                 )
             ]
         )
@@ -511,6 +726,7 @@ def render_crate(
     selected_index: int | None = None,
     can_undo: bool = False,
     confirm_clear: bool = False,
+    title: str = "",
 ) -> tuple[str, InlineKeyboardMarkup]:
     if confirm_clear:
         return get_text(lang, "crate_clear_confirm"), InlineKeyboardMarkup(
@@ -534,7 +750,11 @@ def render_crate(
     if not items:
         text = get_text(lang, "crate_empty")
     else:
-        heading = get_text(lang, "crate_title").replace("{count}", str(len(items)))
+        heading = (
+            f"🧺 <b>{escape(title)} · {len(items)}/10</b>"
+            if title
+            else get_text(lang, "crate_title").replace("{count}", str(len(items)))
+        )
         lines = [heading, ""]
         for index, entry in enumerate(items, 1):
             item = entry.get("item") or {}
@@ -607,6 +827,19 @@ def render_crate(
             )
         )
         rows.append(footer)
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "crate_rename"),
+                    callback_data=encode_callback("crate", "rename"),
+                ),
+                InlineKeyboardButton(
+                    get_text(lang, "crate_preview"),
+                    callback_data=encode_callback("crate", "preview"),
+                    api_kwargs={"style": "primary"},
+                ),
+            ]
+        )
     else:
         if can_undo:
             rows.append(
@@ -622,7 +855,7 @@ def render_crate(
             [
                 InlineKeyboardButton(
                     get_text(lang, "crate_find"),
-                    switch_inline_query_current_chat="",
+                    callback_data=encode_callback("menu", "create"),
                     api_kwargs={"style": "primary"},
                 )
             ]

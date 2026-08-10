@@ -5,9 +5,11 @@ from music_links_bot.bot_crate import (
     add_many_to_crate,
     add_to_crate,
     load_crate,
+    load_crate_title,
     move_crate_item,
     remove_crate_item,
     restore_crate_item,
+    save_crate_title,
 )
 from music_links_bot.bot_runtime import (
     BotRuntime,
@@ -31,13 +33,18 @@ class CallbackContractTests(unittest.TestCase):
         self.assertEqual(encoded, "v2|editor|publish|draft123")
         self.assertIsNotNone(decoded)
         assert decoded is not None
-        self.assertEqual((decoded.scope, decoded.action, decoded.payload), ("editor", "publish", "draft123"))
+        self.assertEqual(
+            (decoded.scope, decoded.action, decoded.payload),
+            ("editor", "publish", "draft123"),
+        )
 
     def test_legacy_callbacks_remain_readable(self) -> None:
         editor = decode_callback("ed|h|draft123")
         menu = decode_callback("menu:platforms")
 
-        self.assertEqual((editor.scope, editor.action, editor.payload), ("editor", "h", "draft123"))
+        self.assertEqual(
+            (editor.scope, editor.action, editor.payload), ("editor", "h", "draft123")
+        )
         self.assertEqual((menu.scope, menu.action), ("menu", "platforms"))
 
     def test_callback_limit_is_enforced(self) -> None:
@@ -137,7 +144,9 @@ class RuntimeSafetyTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_provider_diagnostics_expose_latest_state(self) -> None:
         runtime = BotRuntime()
-        runtime.record_provider("songlink", ok=False, latency_ms=250, error=TimeoutError())
+        runtime.record_provider(
+            "songlink", ok=False, latency_ms=250, error=TimeoutError()
+        )
 
         snapshot = runtime.provider_snapshot()
         self.assertEqual(snapshot[0]["provider"], "songlink")
@@ -146,10 +155,24 @@ class RuntimeSafetyTests(unittest.IsolatedAsyncioTestCase):
 
 
 class BotCrateTests(unittest.IsolatedAsyncioTestCase):
+    async def test_crate_title_round_trips_in_memory(self) -> None:
+        bot_data = {}
+        await save_crate_title(bot_data, 7, "Ночной сет")
+
+        self.assertEqual(await load_crate_title(bot_data, 7), "Ночной сет")
+
     async def test_crate_dedupes_reorders_and_removes(self) -> None:
         bot_data = {}
-        first = {"artist": "Sleep", "title": "Dopesmoker", "links": {"spotify": "https://s/1"}}
-        second = {"artist": "Boris", "title": "Flood", "links": {"spotify": "https://s/2"}}
+        first = {
+            "artist": "Sleep",
+            "title": "Dopesmoker",
+            "links": {"spotify": "https://s/1"},
+        }
+        second = {
+            "artist": "Boris",
+            "title": "Flood",
+            "links": {"spotify": "https://s/2"},
+        }
 
         items, added = await add_to_crate(bot_data, 7, draft_id="d1", item=first)
         self.assertTrue(added)
@@ -188,9 +211,17 @@ class BotCrateTests(unittest.IsolatedAsyncioTestCase):
                 return True
 
         kv = KVStub()
-        first = {"artist": "Sleep", "title": "Dopesmoker", "links": {"spotify": "https://s/1"}}
+        first = {
+            "artist": "Sleep",
+            "title": "Dopesmoker",
+            "links": {"spotify": "https://s/1"},
+        }
         duplicate = dict(first)
-        second = {"artist": "Boris", "title": "Flood", "links": {"spotify": "https://s/2"}}
+        second = {
+            "artist": "Boris",
+            "title": "Flood",
+            "links": {"spotify": "https://s/2"},
+        }
 
         items, added_count = await add_many_to_crate(
             {"kv_store": kv},

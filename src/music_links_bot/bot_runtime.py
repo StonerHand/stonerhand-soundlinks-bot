@@ -87,6 +87,7 @@ class UserSession:
     onboarding_seen: bool = False
     last_query: str = ""
     last_action: dict[str, Any] = field(default_factory=dict)
+    pending_input: dict[str, Any] = field(default_factory=dict)
     active_draft_id: str = ""
     recent_draft_ids: list[str] = field(default_factory=list)
     home_chat_id: int | None = None
@@ -106,6 +107,7 @@ class UserSession:
                     if isinstance(payload.get("last_action"), dict)
                     else {}
                 ),
+                pending_input=_normalize_pending_input(payload.get("pending_input")),
                 active_draft_id=str(payload.get("active_draft_id") or "")[:32],
                 recent_draft_ids=[
                     str(value)[:32]
@@ -129,6 +131,28 @@ def _optional_int(value: object) -> int | None:
         return None
     parsed = int(value)
     return parsed if parsed > 0 else None
+
+
+def _normalize_pending_input(value: object) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    kind = str(value.get("kind") or "")
+    if kind not in {"intro", "hashtags", "crate_title"}:
+        return {}
+    result: dict[str, Any] = {"kind": kind}
+    draft_id = str(value.get("draft_id") or "")[:32]
+    if draft_id:
+        result["draft_id"] = draft_id
+    for key in (
+        "editor_chat_id",
+        "editor_message_id",
+        "prompt_message_id",
+        "created_at",
+    ):
+        parsed = _optional_int(value.get(key))
+        if parsed is not None:
+            result[key] = parsed
+    return result
 
 
 @dataclass(slots=True)

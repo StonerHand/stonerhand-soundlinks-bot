@@ -1,10 +1,21 @@
 from __future__ import annotations
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, LinkPreviewOptions, Message
+from telegram import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    LinkPreviewOptions,
+    Message,
+)
 from telegram.ext import ContextTypes
 
 from music_links_bot.constants import PLATFORM_LABELS
-from music_links_bot.models import ArtistMatch, PlaylistMatch, RadioMatch, TrackMatch, VideoMatch
+from music_links_bot.models import (
+    ArtistMatch,
+    PlaylistMatch,
+    RadioMatch,
+    TrackMatch,
+    VideoMatch,
+)
 from music_links_bot.telegram_buttons import ButtonTone, url_button
 
 CHANNEL_USERNAME = "stonerhand"
@@ -15,16 +26,34 @@ MAX_BUTTON_TEXT_LENGTH = 64
 MAX_VISIBLE_PLATFORM_BUTTONS = 1
 SPOTIFY_SEARCH_URL = "https://open.spotify.com/search/"
 DEFAULT_PLATFORM_ORDER = (
-    "spotify", "appleMusic", "applePodcasts", "youtubeMusic",
-    "soundcloud", "deezer", "tidal", "yandexMusic",
+    "spotify",
+    "appleMusic",
+    "applePodcasts",
+    "youtubeMusic",
+    "soundcloud",
+    "deezer",
+    "tidal",
+    "yandexMusic",
 )
 PRIMARY_PLATFORM_ALIASES = {
-    "spotify": "spotify", "apple": "appleMusic", "applemusic": "appleMusic",
-    "itunes": "appleMusic", "applepodcasts": "applePodcasts", "podcasts": "applePodcasts",
-    "youtube": "youtubeMusic", "youtubemusic": "youtubeMusic", "ytmusic": "youtubeMusic",
-    "soundcloud": "soundcloud", "sc": "soundcloud", "deezer": "deezer", "tidal": "tidal",
-    "yandex": "yandexMusic", "yandexmusic": "yandexMusic", "yamusic": "yandexMusic",
+    "spotify": "spotify",
+    "apple": "appleMusic",
+    "applemusic": "appleMusic",
+    "itunes": "appleMusic",
+    "applepodcasts": "applePodcasts",
+    "podcasts": "applePodcasts",
+    "youtube": "youtubeMusic",
+    "youtubemusic": "youtubeMusic",
+    "ytmusic": "youtubeMusic",
+    "soundcloud": "soundcloud",
+    "sc": "soundcloud",
+    "deezer": "deezer",
+    "tidal": "tidal",
+    "yandex": "yandexMusic",
+    "yandexmusic": "yandexMusic",
+    "yamusic": "yandexMusic",
 }
+
 
 def _select_preview_url(
     links: dict[str, str],
@@ -37,7 +66,6 @@ def _select_preview_url(
             return url
 
     return None
-
 
 
 def _build_link_preview_options(
@@ -82,8 +110,8 @@ def _build_link_keyboard(
     else:
         selected_platforms = []
 
-    has_explicit_selection = bool(selected_platforms)
-    if selected_platforms:
+    has_explicit_selection = platform_selection is not None
+    if has_explicit_selection:
         final_platforms = selected_platforms
     else:
         platform_order = _get_platform_order(context)
@@ -102,7 +130,7 @@ def _build_link_keyboard(
     # Song.link remains the complete hub. Callers can use a stricter limit for
     # quick chat cards while full deliveries keep the selected services.
     if max_visible_platforms is not None:
-        final_platforms = final_platforms[:max(0, max_visible_platforms)]
+        final_platforms = final_platforms[: max(0, max_visible_platforms)]
     elif release_page_url and not has_explicit_selection:
         final_platforms = final_platforms[:MAX_VISIBLE_PLATFORM_BUTTONS]
 
@@ -146,9 +174,10 @@ def _build_collection_keyboard(
     *,
     include_channel_button: bool = False,
 ) -> InlineKeyboardMarkup:
-    is_track_video_pair = (
-        len(tracks) == 2 and {track.kind for track in tracks} == {"song", "video"}
-    )
+    is_track_video_pair = len(tracks) == 2 and {track.kind for track in tracks} == {
+        "song",
+        "video",
+    }
     buttons: list[InlineKeyboardButton] = []
 
     for index, track in enumerate(tracks, start=1):
@@ -159,16 +188,22 @@ def _build_collection_keyboard(
         if is_track_video_pair:
             text = "📺 Смотреть клип" if track.kind == "video" else "🎧 Слушать песню"
         else:
-            text = f"{_track_button_icon(track)} {index}. {track.artist} - {track.title}"
+            text = (
+                f"{_track_button_icon(track)} {index}. {track.artist} - {track.title}"
+            )
         buttons.append(
             _url_button(
                 text=_shorten_button_text(text),
                 url=destination,
-                style="primary" if is_track_video_pair and track.kind == "song" else None,
+                style="primary"
+                if is_track_video_pair and track.kind == "song"
+                else None,
             )
         )
 
-    return _keyboard_with_optional_channel(_button_rows(buttons), include_channel_button)
+    return _keyboard_with_optional_channel(
+        _button_rows(buttons), include_channel_button
+    )
 
 
 def _build_youtube_keyboard(
@@ -238,7 +273,9 @@ def _build_youtube_collection_keyboard(
             )
         )
 
-    return _keyboard_with_optional_channel(_button_rows(buttons), include_channel_button)
+    return _keyboard_with_optional_channel(
+        _button_rows(buttons), include_channel_button
+    )
 
 
 def _build_nts_collection_keyboard(
@@ -256,7 +293,9 @@ def _build_nts_collection_keyboard(
             )
         )
 
-    return _keyboard_with_optional_channel(_button_rows(buttons), include_channel_button)
+    return _keyboard_with_optional_channel(
+        _button_rows(buttons), include_channel_button
+    )
 
 
 def _build_playlist_collection_keyboard(
@@ -274,7 +313,9 @@ def _build_playlist_collection_keyboard(
             )
         )
 
-    return _keyboard_with_optional_channel(_button_rows(buttons), include_channel_button)
+    return _keyboard_with_optional_channel(
+        _button_rows(buttons), include_channel_button
+    )
 
 
 def _build_artist_collection_keyboard(
@@ -292,7 +333,9 @@ def _build_artist_collection_keyboard(
             )
         )
 
-    return _keyboard_with_optional_channel(_button_rows(buttons), include_channel_button)
+    return _keyboard_with_optional_channel(
+        _button_rows(buttons), include_channel_button
+    )
 
 
 def _build_mixed_collection_keyboard(
@@ -381,7 +424,9 @@ def _build_mixed_collection_keyboard(
         )
         index += 1
 
-    return _keyboard_with_optional_channel(_button_rows(buttons), include_channel_button)
+    return _keyboard_with_optional_channel(
+        _button_rows(buttons), include_channel_button
+    )
 
 
 def _should_include_channel_button(message: Message) -> bool:
@@ -402,7 +447,10 @@ def _build_platform_order(primary_platform: str | None) -> tuple[str, ...]:
     if normalized is None:
         return DEFAULT_PLATFORM_ORDER
 
-    return (normalized, *(item for item in DEFAULT_PLATFORM_ORDER if item != normalized))
+    return (
+        normalized,
+        *(item for item in DEFAULT_PLATFORM_ORDER if item != normalized),
+    )
 
 
 def _normalize_platform_key(platform: str) -> str | None:
@@ -411,10 +459,7 @@ def _normalize_platform_key(platform: str) -> str | None:
         return raw_value
 
     compact_value = (
-        raw_value.replace("-", "")
-        .replace("_", "")
-        .replace(" ", "")
-        .casefold()
+        raw_value.replace("-", "").replace("_", "").replace(" ", "").casefold()
     )
     return PRIMARY_PLATFORM_ALIASES.get(compact_value)
 
@@ -484,7 +529,9 @@ def _get_ui_mode(context: ContextTypes.DEFAULT_TYPE | None = None) -> str:
     return value if value in {"stonerhand", "minimal", "editorial"} else DEFAULT_UI_MODE
 
 
-def _button_rows(buttons: list[InlineKeyboardButton]) -> list[list[InlineKeyboardButton]]:
+def _button_rows(
+    buttons: list[InlineKeyboardButton],
+) -> list[list[InlineKeyboardButton]]:
     return [buttons[index : index + 2] for index in range(0, len(buttons), 2)]
 
 

@@ -8,6 +8,7 @@ from telegram.constants import ParseMode
 from telegram.error import TelegramError
 
 from music_links_bot.models import TrackMatch, VideoMatch
+from music_links_bot.bot_builder import PHOTO_CAPTION_LIMIT, fit_telegram_html
 
 LOGGER = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ async def send_track_video_album(
             media=[
                 InputMediaPhoto(
                     media=track.thumbnail_url,
-                    caption=caption,
+                    caption=fit_telegram_html(caption, PHOTO_CAPTION_LIMIT),
                     parse_mode=ParseMode.HTML,
                 ),
                 InputMediaPhoto(
@@ -75,7 +76,9 @@ async def send_track_video_album(
             ],
         )
     except TelegramError:
-        LOGGER.info("Could not send track/video album; using card fallback", exc_info=True)
+        LOGGER.info(
+            "Could not send track/video album; using card fallback", exc_info=True
+        )
         return None
 
     try:

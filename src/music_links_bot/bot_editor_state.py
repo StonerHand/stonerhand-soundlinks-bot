@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from music_links_bot.i18n import get_text
+from music_links_bot.constants import PLATFORM_LABELS
 from music_links_bot.models import TrackMatch
 from music_links_bot.release_presentation import (
     PRESET_ORDER,
@@ -32,8 +33,11 @@ def draft_status(draft: dict, track: TrackMatch, *, lang: str) -> str:
     selected = draft.get("platforms")
     service_count = (
         len(selected)
-        if isinstance(selected, list) and selected
-        else min(1, sum(bool(value) for value in track.links.values()))
+        if isinstance(selected, list)
+        else min(
+            6,
+            sum(bool(track.links.get(platform)) for platform in PLATFORM_LABELS),
+        )
     )
     return get_text(lang, "ed_status").format(
         preset=preset_name,
@@ -49,9 +53,7 @@ def toggle_platform_selection(
     if draft.get("platforms"):
         draft.pop("platforms", None)
         return
-    draft["platforms"] = [
-        key for key in platform_order if track.links.get(key)
-    ][:6]
+    draft["platforms"] = [key for key in platform_order if track.links.get(key)][:6]
 
 
 def cycle_preset(draft: dict) -> str:

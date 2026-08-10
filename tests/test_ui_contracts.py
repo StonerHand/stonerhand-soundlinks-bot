@@ -1,7 +1,16 @@
 from types import SimpleNamespace
+import time
 import unittest
+from unittest.mock import AsyncMock
 
-from music_links_bot.bot import _handle_editor_action, _render_track_draft
+from music_links_bot.bot import (
+    _dispatch_menu_action,
+    _handle_editor_action,
+    _consume_pending_input,
+    _render_track_draft,
+)
+from music_links_bot.bot_runtime import CallbackAction
+from music_links_bot.bot_runtime import BotRuntime
 from music_links_bot.bot_pipeline import delivery_kind
 from music_links_bot.bot_ui import (
     build_error_keyboard,
@@ -30,9 +39,7 @@ class PublicationGoldenTests(unittest.TestCase):
         draft = new_track_draft(_track(), chat_id=7, lang="ru")
         context = SimpleNamespace(application=SimpleNamespace(bot_data={}))
 
-        text, keyboard = _render_track_draft(
-            draft, context, draft_id="draft123"
-        )
+        text, keyboard = _render_track_draft(draft, context, draft_id="draft123")
 
         self.assertEqual(
             text,
@@ -60,6 +67,92 @@ class PublicationGoldenTests(unittest.TestCase):
 
 
 class EditorFlowContractTests(unittest.IsolatedAsyncioTestCase):
+    async def test_native_hashtag_reply_updates_the_active_card(self) -> None:
+        draft = new_track_draft(_track(), chat_id=7, lang="ru")
+        runtime = BotRuntime()
+        session = await runtime.get_session(7)
+        session.pending_input = {
+            "kind": "hashtags",
+            "draft_id": "draft123",
+            "editor_chat_id": 7,
+            "editor_message_id": 10,
+            "prompt_message_id": 11,
+            "created_at": int(time.time()),
+        }
+        await runtime.save_session(session)
+        message = SimpleNamespace(
+            chat=SimpleNamespace(type="private"),
+            chat_id=7,
+            text="#doom #stonerrock",
+            caption=None,
+            reply_text=AsyncMock(),
+        )
+        update = SimpleNamespace(
+            effective_message=message,
+            effective_user=SimpleNamespace(id=7, language_code="ru"),
+        )
+        context = SimpleNamespace(
+            bot=SimpleNamespace(delete_message=AsyncMock()),
+            application=SimpleNamespace(
+                bot_data={
+                    "drafts": {"draft123": draft},
+                    "runtime": runtime,
+                    "platform_order": ("spotify", "deezer"),
+                }
+            ),
+        )
+
+        self.assertTrue(await _consume_pending_input(update, context))
+        stored = context.application.bot_data["drafts"]["draft123"]
+        self.assertEqual(stored["custom_tags"], ["#doom", "#stonerrock"])
+        self.assertEqual((await runtime.get_session(7)).pending_input, {})
+        message.reply_text.assert_awaited_once()
+
+    async def test_native_create_and_explicit_style_are_one_tap_flows(self) -> None:
+        class Query:
+            from_user = SimpleNamespace(id=7, language_code="ru")
+            message = SimpleNamespace(chat_id=7)
+
+            def __init__(self) -> None:
+                self.edits: list[dict] = []
+
+            async def answer(self, *args, **kwargs) -> None:
+                del args, kwargs
+
+            async def edit_message_text(self, **kwargs) -> None:
+                self.edits.append(kwargs)
+
+        query = Query()
+        context = SimpleNamespace(
+            bot=SimpleNamespace(username="StonerHandBot"),
+            application=SimpleNamespace(
+                bot_data={
+                    "drafts": {},
+                    "platform_order": ("spotify", "deezer"),
+                }
+            ),
+        )
+        await _dispatch_menu_action(query, context, CallbackAction("menu", "create"))
+        self.assertIn("Новая карточка", query.edits[-1]["text"])
+        self.assertEqual(
+            query.edits[-1]["reply_markup"].inline_keyboard[-1][0].callback_data,
+            "v2|menu|start",
+        )
+
+        draft = new_track_draft(_track(), chat_id=7, lang="ru")
+        context.application.bot_data["drafts"]["draft123"] = draft
+        await _handle_editor_action(query, context, "z0", "draft123")
+        self.assertEqual(
+            context.application.bot_data["drafts"]["draft123"]["preset"],
+            "minimal",
+        )
+        callbacks = [
+            button.callback_data
+            for row in query.edits[-1]["reply_markup"].inline_keyboard
+            for button in row
+        ]
+        self.assertIn("v2|editor|z0|draft123", callbacks)
+
     async def test_publish_opens_confirmation_in_the_same_message(self) -> None:
         draft = new_track_draft(_track(), chat_id=7, lang="ru", can_publish=True)
 
