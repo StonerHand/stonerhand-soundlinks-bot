@@ -570,6 +570,26 @@ class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 2)
         self.assertEqual(session.home_message_id, 1001)
 
+    async def test_start_forgets_an_expired_active_card(self) -> None:
+        message = PrivateMessageStub()
+        update = StartUpdateStub(message)
+        context = ContextStub()
+
+        await start_command(update, context)
+        runtime = context.application.bot_data["runtime"]
+        session = await runtime.get_session(message.chat_id)
+        session.active_draft_id = "missing-card"
+        await runtime.save_session(session)
+
+        with patch.object(runtime, "claim_intent", return_value=True):
+            await start_command(update, context)
+
+        session = await runtime.get_session(message.chat_id)
+        self.assertEqual(session.active_draft_id, "")
+        keyboard = message.reply_kwargs[-1]["reply_markup"]
+        labels = [button.text for row in keyboard.inline_keyboard for button in row]
+        self.assertNotIn("↩ Вернуться к карточке", labels)
+
 
 class BotKeyboardTests(unittest.TestCase):
     def test_every_supported_command_is_registered(self) -> None:
@@ -983,14 +1003,27 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(rows[0][0].text, "▶ Как всё работает")
-        self.assertEqual(rows[0][0].api_kwargs, {})
-        self.assertEqual(rows[1][0].text, "＋ Создать пост")
-        self.assertEqual(rows[1][0].api_kwargs, {"style": "primary"})
-        self.assertEqual(rows[2][0].text, "🧺 Подборка · 3")
-        self.assertEqual(rows[2][0].api_kwargs, {"style": "success"})
-        self.assertEqual(rows[2][1].text, "Недавние")
+        self.assertEqual(rows[0][0].text, "🔎 Найти по названию")
+        self.assertEqual(rows[0][0].api_kwargs, {"style": "primary"})
+        self.assertEqual(rows[1][0].text, "🧺 Подборка · 3")
+        self.assertEqual(rows[1][0].api_kwargs, {"style": "success"})
+        self.assertEqual(rows[1][1].text, "История")
+        self.assertEqual(rows[2][0].text, "Как это работает?")
+        self.assertEqual(rows[2][0].api_kwargs, {})
         self.assertEqual(len(rows), 3)
+
+    def test_home_keeps_new_search_primary_when_a_card_can_be_restored(self) -> None:
+        keyboard = _build_start_keyboard(
+            "StonerHandBot",
+            lang="ru",
+            active_draft_id="abc123",
+        )
+
+        rows = keyboard.inline_keyboard
+        self.assertEqual(rows[0][0].text, "🔎 Найти по названию")
+        self.assertEqual(rows[0][0].api_kwargs, {"style": "primary"})
+        self.assertEqual(rows[1][0].text, "↩ Вернуться к карточке")
+        self.assertEqual(rows[1][0].api_kwargs, {})
 
     def test_home_text_is_personal_and_escapes_telegram_html(self) -> None:
         text = _build_home_text(
@@ -1002,8 +1035,22 @@ class BotKeyboardTests(unittest.TestCase):
 
         self.assertIn("Музыкальный редактор, &lt;Артём&gt;", text)
         self.assertNotIn("Подборка · 4/10", text)
-        self.assertIn("Редактор, очередь и публикация доступны прямо в боте", text)
-        self.assertIn("<code>артист — трек</code>", text)
+        self.assertIn("ссылку на трек, альбом, плейлист или артиста", text)
+        self.assertIn("<code>артист — название</code>", text)
+        self.assertIn("Обложку, хэштеги и кнопки площадок", text)
+
+    def test_first_visit_home_explains_every_supported_input_shape(self) -> None:
+        text = _build_home_text(
+            lang="ru",
+            first_visit=True,
+            is_admin=True,
+        )
+
+        self.assertIn("Музыкальный конструктор постов", text)
+        self.assertIn("ссылку на трек, альбом, плейлист или артиста", text)
+        self.assertIn("<code>Deftones — Rickets</code>", text)
+        self.assertIn("несколько ссылок одним сообщением", text)
+        self.assertIn("станет подводкой к посту", text)
 
     def test_menu_text_uses_compact_html_headings(self) -> None:
         self.assertTrue(_menu_text("menu:start").startswith("🎧 <b>"))
@@ -1023,6 +1070,7 @@ class BotKeyboardTests(unittest.TestCase):
     def test_menu_html_tags_are_balanced_in_both_languages(self) -> None:
         keys = (
             "home_body",
+            "home_body_new",
             "onboarding_1",
             "onboarding_2",
             "onboarding_3",
@@ -1452,7 +1500,7 @@ class PostEditorTests(unittest.TestCase):
     def test_editor_rows_show_toggle_states_and_actions(self) -> None:
         rows = _editor_rows("abc123", self._draft(hashtags=True))
 
-        self.assertEqual(rows[0][0].text, "Изменить")
+        self.assertEqual(rows[0][0].text, "🎛 Настроить")
         self.assertEqual(rows[0][0].callback_data, "v2|editor|m|abc123")
         self.assertEqual(rows[0][1].text, "+ В подборку")
         self.assertEqual(rows[0][1].callback_data, "v2|editor|c|abc123")
@@ -1460,11 +1508,12 @@ class PostEditorTests(unittest.TestCase):
         self.assertEqual(more[1][0].text, "# Хэштеги вкл.")
         self.assertEqual(more[1][0].callback_data, "v2|editor|h|abc123")
 
-    def test_editor_rows_keep_admin_actions_in_overflow(self) -> None:
+    def test_editor_rows_make_admin_publication_immediately_visible(self) -> None:
         rows = _editor_rows("abc123", self._draft(can_publish=True))
 
         labels = [button.text for row in rows for button in row]
-        self.assertNotIn("📤 В канал", labels)
+        self.assertEqual(labels, ["🎛 Настроить", "📤 В канал"])
+        self.assertEqual(rows[0][1].api_kwargs, {"style": "success"})
 
     def test_editor_rows_turn_added_item_into_crate_shortcut(self) -> None:
         rows = _editor_rows(
@@ -1483,8 +1532,8 @@ class PostEditorTests(unittest.TestCase):
             self._draft(prefix="<blockquote>интро</blockquote>\n", quote=True),
         )
 
-        self.assertEqual(rows_without_quote[0][1].text, "Текст · без текста")
-        self.assertEqual(rows_with_quote[0][1].text, "Текст · есть")
+        self.assertEqual(rows_without_quote[0][1].text, "Подводка · нет")
+        self.assertEqual(rows_with_quote[0][1].text, "Подводка · есть")
         self.assertFalse(
             any(
                 button.callback_data == "v2|editor|v|abc123"
@@ -1513,7 +1562,7 @@ class PostEditorTests(unittest.TestCase):
         rows = _editor_rows("abc123", self._draft())
 
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0][0].text, "Изменить")
+        self.assertEqual(rows[0][0].text, "🎛 Настроить")
 
     def test_render_track_draft_respects_toggles(self) -> None:
         draft = self._draft(
@@ -1548,6 +1597,21 @@ class PostEditorTests(unittest.TestCase):
         ]
         self.assertEqual(editor_buttons, [])
 
+    def test_card_builder_explains_that_settings_update_the_preview(self) -> None:
+        text, keyboard = _render_track_draft(
+            self._draft(),
+            None,
+            draft_id="abc123",
+            settings=True,
+            show_status=True,
+        )
+
+        self.assertTrue(text.startswith("🎛 <b>Конструктор карточки</b>"))
+        self.assertIn("превью обновится сразу", text)
+        labels = [button.text for row in keyboard.inline_keyboard for button in row]
+        self.assertIn("✓ Готово", labels)
+        self.assertIn("Действия", labels)
+
     def test_quick_card_is_capped_at_four_actions(self) -> None:
         draft = self._draft()
         draft["item"]["links"]["tidal"] = "https://tidal.com/track/1"
@@ -1558,7 +1622,7 @@ class PostEditorTests(unittest.TestCase):
         self.assertEqual(len(buttons), 4)
         self.assertEqual(buttons[0].text, "🟢 Spotify")
         self.assertEqual(buttons[1].text, "🪩 Все платформы")
-        self.assertEqual(buttons[2].text, "Изменить")
+        self.assertEqual(buttons[2].text, "🎛 Настроить")
         self.assertEqual(buttons[3].text, "+ В подборку")
 
 
@@ -1971,7 +2035,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(keyboard[0][0].text, "🟢 Spotify")
         self.assertEqual(keyboard[0][1].text, "🪩 Все платформы")
         self.assertEqual(keyboard[0][1].url, "https://song.link/transitions")
-        self.assertEqual(keyboard[1][0].text, "Изменить")
+        self.assertEqual(keyboard[1][0].text, "🎛 Настроить")
         self.assertEqual(keyboard[1][1].text, "+ В подборку")
         preview_options = message.reply_kwargs[0]["link_preview_options"]
         self.assertTrue(preview_options.prefer_large_media)

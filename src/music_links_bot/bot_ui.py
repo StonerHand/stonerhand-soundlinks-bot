@@ -39,7 +39,8 @@ def build_home_text(
     else:
         greeting = greeting.replace("{name}", "")
     mode = get_text(lang, "home_mode_admin" if is_admin else "home_mode_user")
-    return get_text(lang, "home_body").format(
+    body_key = "home_body_new" if first_visit else "home_body"
+    return get_text(lang, body_key).format(
         greeting=greeting,
         crate_count=max(0, min(10, crate_count)),
         mode=mode,
@@ -57,28 +58,21 @@ def build_start_keyboard(
 ) -> InlineKeyboardMarkup:
     del bot_username, is_admin
     rows: list[list[InlineKeyboardButton]] = []
-    if show_tour:
+    create_button = InlineKeyboardButton(
+        get_text(lang, "home_create"),
+        switch_inline_query_current_chat="",
+        api_kwargs={"style": "primary"},
+    )
+    rows.append([create_button])
+    if active_draft_id:
         rows.append(
             [
                 InlineKeyboardButton(
-                    get_text(lang, "quick_tour"),
-                    callback_data=encode_callback("menu", "onboard1"),
+                    get_text(lang, "home_continue"),
+                    callback_data=encode_callback("editor", "b", active_draft_id),
                 )
             ]
         )
-    if active_draft_id:
-        create_button = InlineKeyboardButton(
-            get_text(lang, "home_continue"),
-            callback_data=encode_callback("editor", "b", active_draft_id),
-            api_kwargs={"style": "primary"},
-        )
-    else:
-        create_button = InlineKeyboardButton(
-            get_text(lang, "home_create"),
-            switch_inline_query_current_chat="",
-            api_kwargs={"style": "primary"},
-        )
-    rows.append([create_button])
     rows.append(
         [
             _crate_button(lang, crate_count),
@@ -88,6 +82,15 @@ def build_start_keyboard(
             ),
         ]
     )
+    if show_tour:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "quick_tour"),
+                    callback_data=encode_callback("menu", "onboard1"),
+                )
+            ]
+        )
     return InlineKeyboardMarkup(rows)
 
 
@@ -326,13 +329,21 @@ def editor_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
             get_text(lang, "ed_add_crate"),
             callback_data=encode_callback("editor", "c", draft_id),
         )
+    if draft.get("can_publish"):
+        secondary = InlineKeyboardButton(
+            get_text(lang, "ed_publish"),
+            callback_data=encode_callback("editor", "p", draft_id),
+            api_kwargs={"style": "success"},
+        )
+    else:
+        secondary = button
     return [
         [
             InlineKeyboardButton(
                 get_text(lang, "ed_edit"),
                 callback_data=encode_callback("editor", "m", draft_id),
             ),
-            button,
+            secondary,
         ]
     ]
 
@@ -415,6 +426,14 @@ def editor_overflow_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboard
                 )
             ]
         )
+        if draft.get("in_crate"):
+            crate_action = _crate_button(lang, int(draft.get("crate_count") or 0))
+        else:
+            crate_action = InlineKeyboardButton(
+                get_text(lang, "ed_add_crate"),
+                callback_data=encode_callback("editor", "c", draft_id),
+            )
+        rows.append([crate_action])
     search_query = str(draft.get("search_query") or "").strip()
     if search_query:
         rows.append(

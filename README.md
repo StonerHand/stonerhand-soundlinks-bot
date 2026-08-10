@@ -20,7 +20,7 @@
 - builds a clean Telegram card with compact buttons;
 - combines several links into one numbered collection;
 - pairs a song and YouTube clip in one media post;
-- includes an in-chat editor, drafts and recent posts;
+- includes a clear card builder, last-card recovery and history;
 - remembers card style, hashtags and platform preferences;
 - sends to the user, another chat or a configured channel;
 - shows a compact final check before channel publication;
@@ -46,6 +46,11 @@ hashtags, one preferred service and the complete release hub. Secondary
 actions appear only in context. Multi-link inputs are not quoted back into the
 result. The editor updates one Telegram message, reports saved settings with a
 short toast and supports undo for deletions.
+
+The home screen explains all three input shapes immediately: a release or
+artist link, an `artist — title` query, or several links for a collection. New
+search always remains the primary action; restoring an unfinished card is a
+separate secondary action and never replaces the main flow.
 
 Lookup uses visible `1/3 → 3/3` progress. When one source fails, resolved items
 are still delivered and retry targets only the failed links.
