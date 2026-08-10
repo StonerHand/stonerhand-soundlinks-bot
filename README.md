@@ -20,8 +20,10 @@
 - builds a clean Telegram card with compact buttons;
 - combines several links into one numbered collection;
 - pairs a song and YouTube clip in one media post;
-- includes a clear card builder, last-card recovery and history;
-- remembers card style, hashtags and platform preferences;
+- includes a native card builder with separate style, intro, hashtag and platform screens;
+- offers a clean final preview and returns to the active card by release name;
+- remembers card preferences and keeps timestamped recent posts;
+- names, previews, reorders and deduplicates collections;
 - sends to the user, another chat or a configured channel;
 - shows a compact final check before channel publication;
 - supports a durable scheduled-publishing queue;
@@ -41,19 +43,21 @@ flowchart LR
     D --> E["Self · chat · channel · queue"]
 ```
 
-Cards keep only useful information: artwork, artist, title, a small set of
-hashtags, one preferred service and the complete release hub. Secondary
-actions appear only in context. Multi-link inputs are not quoted back into the
-result. The editor updates one Telegram message, reports saved settings with a
-short toast and supports undo for deletions.
+Cards keep only useful information: artwork, artist, title, hashtags selected
+by the user, chosen services and the complete release hub. Secondary actions
+appear only in context. Multi-link inputs are not quoted back into the result.
+Style, intro, hashtags, platforms, preview and delivery have explicit screens;
+free-form intro and tags are entered through native Telegram replies.
 
-The home screen explains all three input shapes immediately: a release or
-artist link, an `artist — title` query, or several links for a collection. New
-search always remains the primary action; restoring an unfinished card is a
-separate secondary action and never replaces the main flow.
+The primary **Create post** action opens a native input guide for all three
+input shapes: a release or artist link, an `artist — title` query, or several
+links for a collection. Restoring an unfinished card is a separate named
+secondary action and never replaces the main flow.
 
 Lookup uses visible `1/3 → 3/3` progress. When one source fails, resolved items
 are still delivered and retry targets only the failed links.
+All output is checked against Telegram message and caption limits before
+delivery, with a safe fallback for oversized formatted text.
 
 ## Local setup
 

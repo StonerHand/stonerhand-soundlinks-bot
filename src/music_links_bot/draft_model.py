@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+import time
 from typing import Any, TypedDict
 
 from music_links_bot.constants import PLATFORM_LABELS
@@ -34,6 +35,7 @@ class TrackDraft(TypedDict, total=False):
     crate_count: int
     deleted_at: int
     duplicate_record: dict[str, Any]
+    created_at: int
 
 
 def new_track_draft(
@@ -60,6 +62,7 @@ def new_track_draft(
         "can_publish": bool(can_publish),
         "preset": "cover",
         "publication_mode": "card",
+        "created_at": int(time.time()),
     }
 
 
@@ -71,7 +74,9 @@ def normalize_track_draft(value: object) -> TrackDraft | None:
     if not isinstance(item, dict):
         return None
     required = ("title", "artist", "links")
-    if any(key not in item for key in required) or not isinstance(item.get("links"), dict):
+    if any(key not in item for key in required) or not isinstance(
+        item.get("links"), dict
+    ):
         return None
 
     draft: TrackDraft = dict(value)
@@ -89,6 +94,7 @@ def normalize_track_draft(value: object) -> TrackDraft | None:
     draft["publication_mode"] = (
         "longread" if value.get("publication_mode") == "longread" else "card"
     )
+    draft["created_at"] = int(value.get("created_at") or time.time())
     platforms = value.get("platforms")
     if isinstance(platforms, list):
         selected = [
@@ -96,8 +102,5 @@ def normalize_track_draft(value: object) -> TrackDraft | None:
             for key in platforms[:6]
             if isinstance(key, str) and key in PLATFORM_LABELS
         ]
-        if selected:
-            draft["platforms"] = selected
-        else:
-            draft.pop("platforms", None)
+        draft["platforms"] = selected
     return draft

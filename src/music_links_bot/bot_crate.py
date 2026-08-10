@@ -9,10 +9,43 @@ CRATE_TTL_SECONDS = 14 * 24 * 3600
 MAX_CRATE_ITEMS = 10
 MAX_MEMORY_CRATES = 500
 CRATE_SCHEMA_VERSION = 2
+CRATE_TITLE_TTL_SECONDS = CRATE_TTL_SECONDS
 
 
 def _memory_crates(bot_data: dict) -> dict[int, list[dict[str, Any]]]:
     return bot_data.setdefault("bot_crates", {})
+
+
+def _memory_titles(bot_data: dict) -> dict[int, str]:
+    return bot_data.setdefault("bot_crate_titles", {})
+
+
+async def load_crate_title(bot_data: dict, user_id: int) -> str:
+    memory = _memory_titles(bot_data)
+    if user_id in memory:
+        return memory[user_id]
+    kv: KVStore | None = bot_data.get("kv_store")
+    value = await kv.get(f"bot-crate-title:v1:{user_id}") if kv else None
+    title = str(value or "")[:72]
+    remember_bounded(memory, user_id, title, max_size=MAX_MEMORY_CRATES)
+    return title
+
+
+async def save_crate_title(bot_data: dict, user_id: int, title: str) -> None:
+    value = str(title or "")[:72]
+    remember_bounded(
+        _memory_titles(bot_data), user_id, value, max_size=MAX_MEMORY_CRATES
+    )
+    kv: KVStore | None = bot_data.get("kv_store")
+    if kv is not None:
+        if value:
+            await kv.set(
+                f"bot-crate-title:v1:{user_id}",
+                value,
+                ttl_seconds=CRATE_TITLE_TTL_SECONDS,
+            )
+        else:
+            await kv.delete(f"bot-crate-title:v1:{user_id}")
 
 
 async def load_crate(bot_data: dict, user_id: int) -> list[dict[str, Any]]:
@@ -28,7 +61,11 @@ async def load_crate(bot_data: dict, user_id: int) -> list[dict[str, Any]]:
     if payload is None and kv is not None:
         payload = await kv.get_json(f"bot-crate:v1:{user_id}")
         migrated = isinstance(payload, list)
-    items = [item for item in payload if isinstance(item, dict)] if isinstance(payload, list) else []
+    items = (
+        [item for item in payload if isinstance(item, dict)]
+        if isinstance(payload, list)
+        else []
+    )
     remember_bounded(
         memory,
         user_id,
@@ -69,6 +106,13 @@ async def add_to_crate(
     return items, added_count == 1
 
 
+def crate_contains_item(items: list[dict[str, Any]], item: dict[str, Any]) -> bool:
+    fingerprint = _fingerprint(item)
+    return any(
+        _fingerprint(existing.get("item") or {}) == fingerprint for existing in items
+    )
+
+
 async def add_many_to_crate(
     bot_data: dict,
     user_id: int,
@@ -77,9 +121,7 @@ async def add_many_to_crate(
 ) -> tuple[list[dict[str, Any]], int]:
     """Add several releases with one crate load and at most one Redis write."""
     items = await load_crate(bot_data, user_id)
-    fingerprints = {
-        _fingerprint(existing.get("item") or {}) for existing in items
-    }
+    fingerprints = {_fingerprint(existing.get("item") or {}) for existing in items}
     added_count = 0
     for draft_id, item in entries:
         if len(items) >= MAX_CRATE_ITEMS:
@@ -130,7 +172,9 @@ async def restore_crate_item(
     if not isinstance(item, dict) or len(items) >= MAX_CRATE_ITEMS:
         return items, False
     fingerprint = _fingerprint(item)
-    if any(_fingerprint(existing.get("item") or {}) == fingerprint for existing in items):
+    if any(
+        _fingerprint(existing.get("item") or {}) == fingerprint for existing in items
+    ):
         return items, False
     items.insert(max(0, min(index, len(items))), entry)
     await save_crate(bot_data, user_id, items)

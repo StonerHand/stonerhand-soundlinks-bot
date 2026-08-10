@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from html import escape
+from datetime import datetime
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -27,7 +28,9 @@ async def render_recent_view(
     lines = [get_text(lang, "recent_title")]
     rows: list[list[InlineKeyboardButton]] = []
     for index, (draft_id, draft) in enumerate(drafts, start=1):
-        _append_recent_line(lines, index, draft["item"])
+        item = dict(draft["item"])
+        item.setdefault("ts", draft.get("created_at"))
+        _append_recent_line(lines, index, item, lang=lang)
         rows.append(
             [
                 InlineKeyboardButton(
@@ -47,7 +50,7 @@ async def render_recent_view(
         if not history:
             return _empty_recent_view(lang)
         for index, item in enumerate(history[:5], start=1):
-            _append_recent_line(lines, index, item)
+            _append_recent_line(lines, index, item, lang=lang)
             rows.append(
                 [
                     InlineKeyboardButton(
@@ -64,10 +67,22 @@ async def render_recent_view(
     return "\n".join(lines), InlineKeyboardMarkup(rows)
 
 
-def _append_recent_line(lines: list[str], index: int, item: dict) -> None:
+def _append_recent_line(lines: list[str], index: int, item: dict, *, lang: str) -> None:
+    emoji = escape(str(item.get("emoji") or "🎧"))
+    timestamp = item.get("ts")
+    when = ""
+    if isinstance(timestamp, (int, float)) and timestamp > 0:
+        moment = datetime.fromtimestamp(timestamp)
+        today = datetime.now().date()
+        when = (
+            moment.strftime(("today" if lang == "en" else "сегодня") + " · %H:%M")
+            if moment.date() == today
+            else moment.strftime("%d.%m · %H:%M")
+        )
     lines.append(
-        f"\n<b>{index}.</b> {escape(str(item.get('artist') or '—'))} — "
+        f"\n<b>{index}.</b> {emoji} {escape(str(item.get('artist') or '—'))} — "
         f"{escape(str(item.get('title') or '—'))}"
+        + (f"\n<i>{escape(when)}</i>" if when else "")
     )
 
 
@@ -77,7 +92,7 @@ def _empty_recent_view(lang: str) -> tuple[str, InlineKeyboardMarkup]:
             [
                 InlineKeyboardButton(
                     get_text(lang, "home_create"),
-                    switch_inline_query_current_chat="",
+                    callback_data=encode_callback("menu", "create"),
                     api_kwargs={"style": "primary"},
                 )
             ],

@@ -27,9 +27,7 @@ def draft_message_overrides(
     custom_tags = draft.get("custom_tags")
     if isinstance(custom_tags, list):
         tags = [
-            tag
-            for tag in (normalize_hashtag(value) for value in custom_tags)
-            if tag
+            tag for tag in (normalize_hashtag(value) for value in custom_tags) if tag
         ]
         if tags:
             overrides["hashtags"] = " ".join(tags)
@@ -43,11 +41,11 @@ def draft_platform_selection(draft: dict) -> list[str] | None:
     if not isinstance(platforms, list):
         return None
     selection = [
-        key
-        for key in platforms
-        if isinstance(key, str) and key in PLATFORM_LABELS
+        key for key in platforms if isinstance(key, str) and key in PLATFORM_LABELS
     ]
-    return selection or None
+    if selection:
+        return selection
+    return [] if not platforms else None
 
 
 def build_publication_view(
@@ -61,9 +59,7 @@ def build_publication_view(
 ) -> PublicationView:
     include_hashtags, overrides = draft_message_overrides(
         draft,
-        include_hashtags=(
-            True if channel_style else bool(draft.get("hashtags", True))
-        ),
+        include_hashtags=(True if channel_style else bool(draft.get("hashtags", True))),
     )
     prefix = str(draft.get("prefix") or "")
     text = (prefix if draft.get("quote") and prefix else "") + format_track_message(

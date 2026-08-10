@@ -19,43 +19,7 @@ def get_text(lang: str, key: str) -> str:
     return entry.get(lang) or entry[RU]
 
 
-def get_texts(lang: str, key: str) -> tuple[str, ...]:
-    entry = TEXT_TUPLES[key]
-    return entry.get(lang) or entry[RU]
-
-
-TEXT_TUPLES: dict[str, dict[str, tuple[str, ...]]] = {
-    "loading": {
-        RU: (
-            "⏳ Собираю пост…",
-            "🔍 Ищу площадки…",
-            "🎧 Ловлю релиз…",
-            "📀 Раскладываю по сервисам…",
-        ),
-        EN: (
-            "⏳ Building the post…",
-            "🔍 Hunting for platforms…",
-            "🎧 Catching the release…",
-            "📀 Sorting the services…",
-        ),
-    },
-}
-
 STRINGS: dict[str, dict[str, str]] = {
-    "start_new": {
-        RU: (
-            "🎧 <b>Соберём музыкальный пост за минуту</b>\n\n"
-            "Пришли ссылку или напиши <i>артист — трек</i>. Я найду релиз, "
-            "соберу площадки и дам настроить готовую карточку.\n\n"
-            "Начать можно с короткого знакомства или сразу с поиска 👇"
-        ),
-        EN: (
-            "🎧 <b>Build a music post in a minute</b>\n\n"
-            "Send a link or type <i>artist — track</i>. I will find the release, "
-            "collect its platforms and let you tune the finished card.\n\n"
-            "Take the quick tour or jump straight into search 👇"
-        ),
-    },
     "home_title_new": {
         RU: "🎧 <b>StonerHandBot</b>\n<i>Музыкальный конструктор постов</i>",
         EN: "🎧 <b>StonerHandBot</b>\n<i>Music post builder</i>",
@@ -114,10 +78,6 @@ STRINGS: dict[str, dict[str, str]] = {
         RU: "Карточку можно изменить и отправить прямо в этом чате",
         EN: "Edit and send the card directly in this chat",
     },
-    "start_returning": {
-        RU: "🎧 <b>Что собираем сегодня?</b>\n\nПришли ссылку или название релиза.",
-        EN: "🎧 <b>What are we building today?</b>\n\nSend a link or a release name.",
-    },
     "onboarding_1": {
         RU: (
             "🔎 <b>Шаг 1 из 3 · Найди релиз</b>\n\n"
@@ -160,9 +120,27 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "quick_tour": {RU: "Как это работает?", EN: "How does it work?"},
     "quick_search": {RU: "🔎 Найти", EN: "🔎 Find"},
-    "quick_mode": {RU: "⚡ Быстро", EN: "⚡ Quick"},
-    "home_create": {RU: "🔎 Найти по названию", EN: "🔎 Search by title"},
+    "home_create": {RU: "＋ Создать пост", EN: "＋ Create post"},
     "home_continue": {RU: "↩ Вернуться к карточке", EN: "↩ Return to card"},
+    "home_continue_named": {RU: "↩ {release}", EN: "↩ {release}"},
+    "create_prompt": {
+        RU: (
+            "🔎 <b>Новая карточка</b>\n\n"
+            "Отправь следующим сообщением:\n"
+            "• ссылку на трек, альбом, плейлист или артиста\n"
+            "• название в формате <code>артист — трек</code>\n"
+            "• несколько ссылок, каждую с новой строки — для подборки\n\n"
+            "<blockquote><code>Deftones — Rickets</code></blockquote>"
+        ),
+        EN: (
+            "🔎 <b>New card</b>\n\n"
+            "Send your next message with:\n"
+            "• a track, album, playlist or artist link\n"
+            "• a title as <code>artist — track</code>\n"
+            "• several links, one per line, for a collection\n\n"
+            "<blockquote><code>Deftones — Rickets</code></blockquote>"
+        ),
+    },
     "home_recent": {RU: "История", EN: "History"},
     "recent_title": {RU: "<b>Недавние посты</b>", EN: "<b>Recent posts</b>"},
     "recent_empty": {
@@ -175,9 +153,6 @@ STRINGS: dict[str, dict[str, str]] = {
     "crate_reorder": {RU: "Порядок", EN: "Reorder"},
     "home_crate": {RU: "🧺 Подборка · {count}", EN: "🧺 Crate · {count}"},
     "home_more": {RU: "••• Ещё", EN: "••• More"},
-    "home_stats": {RU: "📊 Статистика канала", EN: "📊 Channel stats"},
-    "home_queue": {RU: "🗓 Очередь", EN: "🗓 Queue"},
-    "home_result": {RU: "✨ Пример поста", EN: "✨ Example post"},
     "home_back": {RU: "← Главное меню", EN: "← Main menu"},
     "next": {RU: "Дальше →", EN: "Next →"},
     "back": {RU: "← Назад", EN: "← Back"},
@@ -187,7 +162,6 @@ STRINGS: dict[str, dict[str, str]] = {
     "tab_platforms": {RU: "🎛 Сервисы", EN: "🎛 Services"},
     "tab_guide": {RU: "📣 Для каналов", EN: "📣 For channels"},
     "tab_demo": {RU: "🧪 Пример поста", EN: "🧪 Example post"},
-    "share_button": {RU: "↗ Поделиться ботом", EN: "↗ Share the bot"},
     "share_post": {
         RU: "↗ Поделиться",
         EN: "↗ Share",
@@ -384,18 +358,30 @@ STRINGS: dict[str, dict[str, str]] = {
         RU: "Ничего не найдено — измени запрос",
         EN: "Nothing found — refine your query",
     },
-    "ed_hashtags": {RU: "# Хэштеги", EN: "# Hashtags"},
+    "ed_hashtags_auto": {RU: "# Хэштеги · авто", EN: "# Hashtags · auto"},
+    "ed_hashtags_custom": {RU: "# Свои · {count}", EN: "# Custom · {count}"},
+    "ed_hashtags_none": {RU: "# Без хэштегов", EN: "# No hashtags"},
     "ed_edit": {RU: "🎛 Настроить", EN: "🎛 Customize"},
     "ed_text_on": {RU: "Подводка · есть", EN: "Intro · on"},
     "ed_text_off": {RU: "Подводка · нет", EN: "Intro · none"},
-    "ed_platforms_compact": {RU: "Площадки · кратко", EN: "Platforms · compact"},
-    "ed_platforms_all": {RU: "Площадки · все", EN: "Platforms · all"},
-    "ed_preset_clean": {RU: "Стиль · Чисто", EN: "Style · Clean"},
-    "ed_preset_editorial": {RU: "Стиль · Редакция", EN: "Style · Editorial"},
-    "ed_preset_poster": {RU: "Стиль · Постер", EN: "Style · Poster"},
+    "ed_platforms_all_short": {RU: "все", EN: "all"},
+    "ed_platforms_selected": {RU: "Площадки · {count}", EN: "Platforms · {count}"},
+    "ed_platforms_select_all": {RU: "Выбрать все", EN: "Select all"},
     "ed_preset_minimal": {RU: "Стиль · Минимал", EN: "Style · Minimal"},
     "ed_preset_cover": {RU: "Стиль · Обложка", EN: "Style · Cover"},
     "ed_preset_longread": {RU: "Стиль · Лонгрид", EN: "Style · Longread"},
+    "ed_preset_name_minimal": {
+        RU: "Минимал — компактное превью",
+        EN: "Minimal — compact preview",
+    },
+    "ed_preset_name_cover": {
+        RU: "Обложка — крупное превью",
+        EN: "Cover — large preview",
+    },
+    "ed_preset_name_longread": {
+        RU: "Лонгрид — текстовая публикация",
+        EN: "Longread — editorial post",
+    },
     "ed_status": {
         RU: "{preset} · площадок: {services} · сохранено",
         EN: "{preset} · platforms: {services} · saved",
@@ -405,18 +391,50 @@ STRINGS: dict[str, dict[str, str]] = {
         RU: "Нажимай параметры — превью обновится сразу",
         EN: "Tap a setting to update the preview instantly",
     },
+    "ed_style_title": {
+        RU: "🎨 <b>Стиль карточки</b>\n<i>Выбери один понятный формат.</i>",
+        EN: "🎨 <b>Card style</b>\n<i>Choose one clear format.</i>",
+    },
+    "ed_platforms_title": {
+        RU: "🎛 <b>Площадки</b>\n<i>Отметь кнопки, которые нужны в посте.</i>",
+        EN: "🎛 <b>Platforms</b>\n<i>Select the buttons to keep in the post.</i>",
+    },
+    "ed_intro_title": {
+        RU: "✍️ <b>Подводка</b>\n<i>Короткий авторский текст перед релизом.</i>",
+        EN: "✍️ <b>Intro</b>\n<i>A short personal note before the release.</i>",
+    },
+    "ed_hashtags_title": {
+        RU: "#️⃣ <b>Хэштеги</b>\n<i>Автоматические, свои или без них.</i>",
+        EN: "#️⃣ <b>Hashtags</b>\n<i>Automatic, custom or none.</i>",
+    },
+    "ed_actions_title": {
+        RU: "🚀 <b>Что сделать с постом?</b>\n<i>Отправить себе, запланировать или опубликовать.</i>",
+        EN: "🚀 <b>What next?</b>\n<i>Send, schedule or publish.</i>",
+    },
+    "ed_clean_preview": {RU: "👁 Превью", EN: "👁 Preview"},
+    "back_to_editor": {RU: "← К настройкам", EN: "← Back to settings"},
+    "ed_intro_add": {RU: "+ Добавить подводку", EN: "+ Add intro"},
+    "ed_intro_change": {RU: "Изменить подводку", EN: "Edit intro"},
+    "ed_intro_remove": {RU: "Убрать подводку", EN: "Remove intro"},
+    "ed_intro_prompt": {
+        RU: "Напиши подводку одним сообщением (до 900 символов).",
+        EN: "Send the intro in one message (up to 900 characters).",
+    },
+    "ed_intro_saved": {RU: "Подводка сохранена", EN: "Intro saved"},
+    "ed_tags_auto": {RU: "Автоматические", EN: "Automatic"},
+    "ed_tags_custom": {RU: "Свои хэштеги", EN: "Custom hashtags"},
+    "ed_tags_none": {RU: "Без хэштегов", EN: "No hashtags"},
+    "ed_tags_prompt": {
+        RU: "Пришли до пяти хэштегов через пробел. Например: <code>#stonerrock #newmusic</code>",
+        EN: "Send up to five hashtags separated by spaces. Example: <code>#stonerrock #newmusic</code>",
+    },
+    "ed_tags_saved": {RU: "Хэштеги сохранены", EN: "Hashtags saved"},
     "ed_deleted": {
         RU: "<b>Карточка удалена</b>\n\nОтменить можно в течение 15 секунд.",
         EN: "<b>Card deleted</b>\n\nYou can undo this for 15 seconds.",
     },
     "ed_undo_delete": {RU: "Вернуть карточку", EN: "Restore card"},
     "ed_undo_expired": {RU: "Время для отмены истекло", EN: "Undo time has expired"},
-    "ed_quote": {RU: "💬 Цитата", EN: "💬 Quote"},
-    "ed_on": {RU: "вкл.", EN: "on"},
-    "ed_off": {RU: "выкл.", EN: "off"},
-    "ed_preview": {RU: "🖼 Обложка", EN: "🖼 Cover"},
-    "ed_preview_small": {RU: "компактная", EN: "compact"},
-    "ed_preview_large": {RU: "крупная", EN: "large"},
     "ed_done": {RU: "✓ Готово", EN: "✓ Done"},
     "ed_delete": {RU: "🗑 Удалить", EN: "🗑 Delete"},
     "ed_more": {RU: "Действия", EN: "Actions"},
@@ -430,6 +448,15 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "ed_sent": {RU: "Готово — пост отправлен ниже", EN: "Done — the post is below"},
     "ed_publish": {RU: "📤 В канал", EN: "📤 To channel"},
+    "ed_schedule": {RU: "🕒 Запланировать", EN: "🕒 Schedule"},
+    "schedule_title": {
+        RU: "🕒 <b>Когда опубликовать?</b>\n<i>Время считается от текущего момента.</i>",
+        EN: "🕒 <b>When to publish?</b>\n<i>Time is relative to now.</i>",
+    },
+    "schedule_1h": {RU: "Через 1 час", EN: "In 1 hour"},
+    "schedule_3h": {RU: "Через 3 часа", EN: "In 3 hours"},
+    "schedule_1d": {RU: "Завтра", EN: "Tomorrow"},
+    "schedule_done": {RU: "Запланировано: {date}", EN: "Scheduled: {date}"},
     "publish_confirm": {
         RU: (
             "<b>Готово к публикации</b>\n\n"
@@ -491,6 +518,10 @@ STRINGS: dict[str, dict[str, str]] = {
         RU: "<b>Готово не всё</b>\n{ok} из {total} ссылок обработано. Остальные можно повторить отдельно.",
         EN: "<b>Some links need another try</b>\n{ok} of {total} links were processed. Retry only the failed ones.",
     },
+    "collection_duplicates": {
+        RU: "<i>Не добавлено повторов или сверх лимита: {count}</i>",
+        EN: "<i>Duplicates or over-limit items skipped: {count}</i>",
+    },
     "duplicate_repeat": {
         RU: "Опубликовать снова",
         EN: "Publish again",
@@ -542,8 +573,15 @@ STRINGS: dict[str, dict[str, str]] = {
     "search_change": {RU: "Изменить запрос", EN: "Change query"},
     "search_other": {RU: "Другой релиз", EN: "Another release"},
     "progress_search": {RU: "1/3 · Ищу релиз…", EN: "1/3 · Finding the release…"},
-    "progress_links": {RU: "2/3 · Собираю площадки…", EN: "2/3 · Collecting platforms…"},
+    "progress_links": {
+        RU: "2/3 · Собираю площадки…",
+        EN: "2/3 · Collecting platforms…",
+    },
     "progress_card": {RU: "3/3 · Собираю карточку…", EN: "3/3 · Building the card…"},
+    "progress_batch": {
+        RU: "3/3 · Собираю подборку · {done}/{total}",
+        EN: "3/3 · Building collection · {done}/{total}",
+    },
     "progress_cancelled": {
         RU: "Поиск отменён — обрабатываю новый запрос.",
         EN: "Search cancelled — processing the new request.",
@@ -560,7 +598,10 @@ STRINGS: dict[str, dict[str, str]] = {
             "<blockquote>Add tracks with the “+ Add to crate” button under a finished card.</blockquote>"
         ),
     },
-    "crate_title": {RU: "🧺 <b>Моя подборка · {count}/10</b>", EN: "🧺 <b>My crate · {count}/10</b>"},
+    "crate_title": {
+        RU: "🧺 <b>Моя подборка · {count}/10</b>",
+        EN: "🧺 <b>My crate · {count}/10</b>",
+    },
     "crate_hint": {
         RU: "<blockquote>Выбери номер трека, чтобы изменить порядок или удалить его.</blockquote>",
         EN: "<blockquote>Select a track number to reorder or remove it.</blockquote>",
@@ -578,4 +619,12 @@ STRINGS: dict[str, dict[str, str]] = {
     "crate_removed": {RU: "Трек удалён", EN: "Track removed"},
     "crate_restored": {RU: "Трек возвращён", EN: "Track restored"},
     "crate_find": {RU: "+ Найти первый трек", EN: "+ Find the first track"},
+    "crate_rename": {RU: "✏️ Название", EN: "✏️ Name"},
+    "crate_preview": {RU: "👁 Превью", EN: "👁 Preview"},
+    "crate_name_prompt": {
+        RU: "Напиши название подборки одним сообщением.",
+        EN: "Send the collection name in one message.",
+    },
+    "crate_name_saved": {RU: "Название сохранено", EN: "Name saved"},
+    "crate_preview_title": {RU: "Подборка", EN: "Collection"},
 }

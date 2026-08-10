@@ -10,6 +10,8 @@ from telegram.error import TelegramError
 from music_links_bot.i18n import get_text
 
 LOGGER = logging.getLogger(__name__)
+
+
 @dataclass(slots=True)
 class ProgressState:
     message: Message
@@ -56,6 +58,17 @@ async def update_progress(lang: str, key: str) -> None:
         state.stage = next_stage
     except TelegramError:
         LOGGER.debug("Could not update progress message", exc_info=True)
+
+
+async def update_progress_text(text: str, *, stage: int = 3) -> None:
+    state = _PLACEHOLDER.get()
+    if state is None or stage <= state.stage:
+        return
+    try:
+        await state.message.edit_text(text)
+        state.stage = stage
+    except TelegramError:
+        LOGGER.debug("Could not update custom progress message", exc_info=True)
 
 
 def take_progress(chat_id: int) -> Message | None:

@@ -8,6 +8,11 @@ from telegram.constants import ParseMode
 from telegram.error import TelegramError
 
 from music_links_bot.chat_access import PublishAccess, check_publish_access
+from music_links_bot.bot_builder import (
+    MESSAGE_TEXT_LIMIT,
+    PHOTO_CAPTION_LIMIT,
+    fit_telegram_html,
+)
 from music_links_bot.channel_templates import save_channel_template
 from music_links_bot.models import TrackMatch
 from music_links_bot.publication_view import (
@@ -127,13 +132,10 @@ class PublicationService:
 
         include_hashtags, overrides = draft_message_overrides(
             draft,
-            include_hashtags=(
-                True if channel_style else bool(draft.get("hashtags"))
-            ),
+            include_hashtags=(True if channel_style else bool(draft.get("hashtags"))),
         )
         include_channel_button = (
-            str(target).lstrip("@").casefold()
-            != self.channel_username.casefold()
+            str(target).lstrip("@").casefold() != self.channel_username.casefold()
         )
         view = build_publication_view(
             draft,
@@ -170,10 +172,13 @@ class PublicationService:
                 )
                 return await self.context.bot.send_message(
                     chat_id=target,
-                    text=build_fallback_html(
-                        draft,
-                        track,
-                        hashtags=hashtags if include_hashtags else None,
+                    text=fit_telegram_html(
+                        build_fallback_html(
+                            draft,
+                            track,
+                            hashtags=hashtags if include_hashtags else None,
+                        ),
+                        MESSAGE_TEXT_LIMIT,
                     ),
                     parse_mode=ParseMode.HTML,
                     link_preview_options=_build_link_preview_options(
@@ -214,18 +219,17 @@ class PublicationService:
             return await self.context.bot.send_photo(
                 chat_id=target,
                 photo=photo,
-                caption=text,
+                caption=fit_telegram_html(text, PHOTO_CAPTION_LIMIT),
                 parse_mode=ParseMode.HTML,
                 reply_markup=keyboard,
             )
 
         return await self.context.bot.send_message(
             chat_id=target,
-            text=text,
+            text=fit_telegram_html(text, MESSAGE_TEXT_LIMIT),
             parse_mode=ParseMode.HTML,
             link_preview_options=_build_link_preview_options(
-                _select_preview_url(track.links, self.context)
-                or track.thumbnail_url,
+                _select_preview_url(track.links, self.context) or track.thumbnail_url,
                 prefer_large_media=bool(draft.get("large_preview")),
             ),
             reply_markup=keyboard,

@@ -791,8 +791,8 @@ class BotKeyboardTests(unittest.TestCase):
 
         self.assertEqual(keyboard.inline_keyboard[0][0].text, "🔎 Найти")
         self.assertEqual(
-            keyboard.inline_keyboard[0][0].switch_inline_query_current_chat,
-            "",
+            keyboard.inline_keyboard[0][0].callback_data,
+            "v2|menu|create",
         )
         self.assertEqual(keyboard.inline_keyboard[1][0].text, "← Главное меню")
         self.assertEqual(keyboard.inline_keyboard[1][0].callback_data, "v2|menu|start")
@@ -1003,7 +1003,7 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(rows[0][0].text, "🔎 Найти по названию")
+        self.assertEqual(rows[0][0].text, "＋ Создать пост")
         self.assertEqual(rows[0][0].api_kwargs, {"style": "primary"})
         self.assertEqual(rows[1][0].text, "🧺 Подборка · 3")
         self.assertEqual(rows[1][0].api_kwargs, {"style": "success"})
@@ -1020,7 +1020,7 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(rows[0][0].text, "🔎 Найти по названию")
+        self.assertEqual(rows[0][0].text, "＋ Создать пост")
         self.assertEqual(rows[0][0].api_kwargs, {"style": "primary"})
         self.assertEqual(rows[1][0].text, "↩ Вернуться к карточке")
         self.assertEqual(rows[1][0].api_kwargs, {})
@@ -1505,8 +1505,8 @@ class PostEditorTests(unittest.TestCase):
         self.assertEqual(rows[0][1].text, "+ В подборку")
         self.assertEqual(rows[0][1].callback_data, "v2|editor|c|abc123")
         more = _editor_more_rows("abc123", self._draft(hashtags=True))
-        self.assertEqual(more[1][0].text, "# Хэштеги вкл.")
-        self.assertEqual(more[1][0].callback_data, "v2|editor|h|abc123")
+        self.assertEqual(more[1][0].text, "# Хэштеги · авто")
+        self.assertEqual(more[1][0].callback_data, "v2|editor|hs|abc123")
 
     def test_editor_rows_make_admin_publication_immediately_visible(self) -> None:
         rows = _editor_rows("abc123", self._draft(can_publish=True))
