@@ -52,7 +52,7 @@ class BotEditorStateTests(unittest.TestCase):
         self.assertEqual(session.recent_draft_ids, ["6", "5", "4", "3", "2"])
         self.assertEqual(
             draft_status({"preset": "cover"}, self.track, lang="ru"),
-            "Черновик · Обложка · 1 серв. · сохранено",
+            "Обложка · площадок: 1 · сохранено",
         )
 
     def test_private_draft_rejects_another_user(self) -> None:

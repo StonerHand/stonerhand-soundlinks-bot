@@ -364,6 +364,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if not await runtime.claim_intent(user_id, kind="command", value="start"):
         return
     session = await runtime.get_session(user_id, lang=lang)
+    active_draft_id = await _active_home_draft_id(context, runtime, session)
     crate_count, is_admin = await _home_state(context, user_id)
     text = _build_home_text(
         lang=lang,
@@ -378,7 +379,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         crate_count=crate_count,
         is_admin=is_admin,
         show_tour=not session.onboarding_seen,
-        active_draft_id=session.active_draft_id or None,
+        active_draft_id=active_draft_id,
     )
     sent = await update.message.reply_text(
         text,
@@ -512,11 +513,30 @@ async def _home_state(
     return len(items), admin_chat_id is not None and user_id == admin_chat_id
 
 
+async def _active_home_draft_id(
+    context: ContextTypes.DEFAULT_TYPE,
+    runtime: BotRuntime,
+    session: UserSession,
+) -> str | None:
+    """Return only a live, restorable card and forget stale home pointers."""
+    draft_id = session.active_draft_id
+    if not draft_id:
+        return None
+    draft = await _load_draft(context, draft_id)
+    if draft is not None and not draft.get("deleted_at"):
+        return draft_id
+    session.active_draft_id = ""
+    await runtime.save_session(session)
+    return None
+
+
 async def _home_view(query, context, *, lang: str) -> tuple[str, InlineKeyboardMarkup]:
     user = query.from_user
     user_id = user.id if user else 0
     crate_count, is_admin = await _home_state(context, user_id)
-    session = await _runtime(context).get_session(user_id, lang=lang)
+    runtime = _runtime(context)
+    session = await runtime.get_session(user_id, lang=lang)
+    active_draft_id = await _active_home_draft_id(context, runtime, session)
     text = _build_home_text(
         lang=lang,
         first_name=user.first_name if user else "",
@@ -528,7 +548,7 @@ async def _home_view(query, context, *, lang: str) -> tuple[str, InlineKeyboardM
         lang=lang,
         crate_count=crate_count,
         is_admin=is_admin,
-        active_draft_id=session.active_draft_id or None,
+        active_draft_id=active_draft_id,
     )
     return text, keyboard
 
@@ -762,7 +782,15 @@ def _render_track_draft(
         max_visible_platforms=1 if draft_id is not None else None,
     )
     text = view.text
-    if show_status:
+    if settings:
+        lang = draft.get("lang") or "ru"
+        status = _draft_status(draft, track, lang=lang)
+        text = (
+            f"🎛 <b>{escape(get_text(lang, 'ed_constructor_title'))}</b>\n"
+            f"<i>{escape(get_text(lang, 'ed_constructor_hint'))}</i>\n"
+            f"<i>{escape(status)}</i>\n\n{text}"
+        )
+    elif show_status:
         lang = draft.get("lang") or "ru"
         status = _draft_status(draft, track, lang=lang)
         text = f"{text}\n\n<i>{escape(status)}</i>"
@@ -1232,6 +1260,14 @@ async def _run_primary_editor_action(
         text, _ = _render_track_draft(draft, context, draft_id=None)
         text = f"<b>{escape(get_text(lang, 'ed_published'))}</b>\n\n{text}"
         await _edit_editor_message(query, context, draft, text, success_keyboard)
+        if query.from_user is not None:
+            session = await _runtime(context).get_session(
+                query.from_user.id,
+                lang=lang,
+            )
+            if session.active_draft_id == draft_id:
+                session.active_draft_id = ""
+                await _runtime(context).save_session(session)
     await query.answer(
         get_text(lang, "ed_published" if published else "ed_publish_failed"),
         show_alert=not bool(published),

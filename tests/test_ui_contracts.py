@@ -41,7 +41,7 @@ class PublicationGoldenTests(unittest.TestCase):
         self.assertEqual(draft["v"], CURRENT_DRAFT_VERSION)
         labels = [button.text for row in keyboard.inline_keyboard for button in row]
         self.assertEqual(labels[:2], ["🟢 Spotify", "🪩 Все платформы"])
-        self.assertIn("Изменить", labels)
+        self.assertIn("🎛 Настроить", labels)
 
     def test_publish_confirmation_is_one_clear_primary_action(self) -> None:
         draft = new_track_draft(_track(), chat_id=7, lang="ru", can_publish=True)

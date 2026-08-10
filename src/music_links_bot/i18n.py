@@ -57,8 +57,8 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
     },
     "home_title_new": {
-        RU: "🎧 <b>StonerHandBot</b>",
-        EN: "🎧 <b>StonerHandBot</b>",
+        RU: "🎧 <b>StonerHandBot</b>\n<i>Музыкальный конструктор постов</i>",
+        EN: "🎧 <b>StonerHandBot</b>\n<i>Music post builder</i>",
     },
     "home_title": {
         RU: "🎧 <b>Музыкальный редактор{name}</b>",
@@ -67,12 +67,42 @@ STRINGS: dict[str, dict[str, str]] = {
     "home_body": {
         RU: (
             "{greeting}\n\n"
-            "Пришли ссылку или <code>артист — трек</code> — я соберу готовую карточку.\n"
+            "<b>Просто отправь сообщением:</b>\n"
+            "• ссылку на трек, альбом, плейлист или артиста\n"
+            "• <code>артист — название</code>\n"
+            "• несколько ссылок — для подборки\n\n"
+            "<i>Обложку, хэштеги и кнопки площадок соберу автоматически.</i>"
+        ),
+        EN: (
+            "{greeting}\n\n"
+            "<b>Just send a message with:</b>\n"
+            "• a track, album, playlist or artist link\n"
+            "• <code>artist — title</code>\n"
+            "• several links for a collection\n\n"
+            "<i>I will add artwork, hashtags and platform buttons automatically.</i>"
+        ),
+    },
+    "home_body_new": {
+        RU: (
+            "{greeting}\n\n"
+            "Я найду релиз и подготовлю готовый Telegram-пост: "
+            "<b>обложку, название, хэштеги и кнопки площадок.</b>\n\n"
+            "<b>Что можно прислать</b>\n"
+            "• ссылку на трек, альбом, плейлист или артиста\n"
+            "• <code>Deftones — Rickets</code>\n"
+            "• несколько ссылок одним сообщением — получится подборка\n\n"
+            "<blockquote>Свой текст можно написать над ссылкой — он станет подводкой к посту.</blockquote>\n"
             "<i>{mode}</i>"
         ),
         EN: (
             "{greeting}\n\n"
-            "Send a link or type <code>artist — track</code> and I will build the card.\n"
+            "I will find the release and prepare a finished Telegram post with "
+            "<b>artwork, title, hashtags and platform buttons.</b>\n\n"
+            "<b>What you can send</b>\n"
+            "• a track, album, playlist or artist link\n"
+            "• <code>Deftones — Rickets</code>\n"
+            "• several links in one message for a collection\n\n"
+            "<blockquote>Write your own text above a link to use it as the post intro.</blockquote>\n"
             "<i>{mode}</i>"
         ),
     },
@@ -128,12 +158,12 @@ STRINGS: dict[str, dict[str, str]] = {
             "<code>@StonerHandBot artist — track</code>"
         ),
     },
-    "quick_tour": {RU: "▶ Как всё работает", EN: "▶ How it works"},
+    "quick_tour": {RU: "Как это работает?", EN: "How does it work?"},
     "quick_search": {RU: "🔎 Найти", EN: "🔎 Find"},
     "quick_mode": {RU: "⚡ Быстро", EN: "⚡ Quick"},
-    "home_create": {RU: "＋ Создать пост", EN: "＋ Create post"},
-    "home_continue": {RU: "Продолжить черновик", EN: "Continue draft"},
-    "home_recent": {RU: "Недавние", EN: "Recent"},
+    "home_create": {RU: "🔎 Найти по названию", EN: "🔎 Search by title"},
+    "home_continue": {RU: "↩ Вернуться к карточке", EN: "↩ Return to card"},
+    "home_recent": {RU: "История", EN: "History"},
     "recent_title": {RU: "<b>Недавние посты</b>", EN: "<b>Recent posts</b>"},
     "recent_empty": {
         RU: "<b>Недавних постов пока нет</b>\n\nСоздай первую карточку — она появится здесь.",
@@ -355,9 +385,9 @@ STRINGS: dict[str, dict[str, str]] = {
         EN: "Nothing found — refine your query",
     },
     "ed_hashtags": {RU: "# Хэштеги", EN: "# Hashtags"},
-    "ed_edit": {RU: "Изменить", EN: "Edit"},
-    "ed_text_on": {RU: "Текст · есть", EN: "Text · on"},
-    "ed_text_off": {RU: "Текст · без текста", EN: "Text · none"},
+    "ed_edit": {RU: "🎛 Настроить", EN: "🎛 Customize"},
+    "ed_text_on": {RU: "Подводка · есть", EN: "Intro · on"},
+    "ed_text_off": {RU: "Подводка · нет", EN: "Intro · none"},
     "ed_platforms_compact": {RU: "Площадки · кратко", EN: "Platforms · compact"},
     "ed_platforms_all": {RU: "Площадки · все", EN: "Platforms · all"},
     "ed_preset_clean": {RU: "Стиль · Чисто", EN: "Style · Clean"},
@@ -367,8 +397,13 @@ STRINGS: dict[str, dict[str, str]] = {
     "ed_preset_cover": {RU: "Стиль · Обложка", EN: "Style · Cover"},
     "ed_preset_longread": {RU: "Стиль · Лонгрид", EN: "Style · Longread"},
     "ed_status": {
-        RU: "Черновик · {preset} · {services} серв. · сохранено",
-        EN: "Draft · {preset} · {services} services · saved",
+        RU: "{preset} · площадок: {services} · сохранено",
+        EN: "{preset} · platforms: {services} · saved",
+    },
+    "ed_constructor_title": {RU: "Конструктор карточки", EN: "Card builder"},
+    "ed_constructor_hint": {
+        RU: "Нажимай параметры — превью обновится сразу",
+        EN: "Tap a setting to update the preview instantly",
     },
     "ed_deleted": {
         RU: "<b>Карточка удалена</b>\n\nОтменить можно в течение 15 секунд.",
@@ -382,10 +417,10 @@ STRINGS: dict[str, dict[str, str]] = {
     "ed_preview": {RU: "🖼 Обложка", EN: "🖼 Cover"},
     "ed_preview_small": {RU: "компактная", EN: "compact"},
     "ed_preview_large": {RU: "крупная", EN: "large"},
-    "ed_done": {RU: "Готово", EN: "Done"},
+    "ed_done": {RU: "✓ Готово", EN: "✓ Done"},
     "ed_delete": {RU: "🗑 Удалить", EN: "🗑 Delete"},
-    "ed_more": {RU: "••• Ещё", EN: "••• More"},
-    "ed_send_self": {RU: "Отправить себе", EN: "Send to me"},
+    "ed_more": {RU: "Действия", EN: "Actions"},
+    "ed_send_self": {RU: "✓ Получить готовый пост", EN: "✓ Get finished post"},
     "ed_add_crate": {RU: "+ В подборку", EN: "+ Add to crate"},
     "ed_crate_count": {RU: "В подборке · {count}/10", EN: "In crate · {count}/10"},
     "ed_crate_added": {RU: "Добавлено · {count}/10", EN: "Added · {count}/10"},
@@ -412,12 +447,12 @@ STRINGS: dict[str, dict[str, str]] = {
     "publish_confirm_button": {RU: "Опубликовать", EN: "Publish"},
     "settings_saved": {RU: "Настройки сохранены", EN: "Settings saved"},
     "ed_expired": {
-        RU: "Черновик устарел — пришли ссылку заново",
-        EN: "This draft has expired — send the link again",
+        RU: "Карточка устарела — пришли ссылку заново",
+        EN: "This card has expired — send the link again",
     },
     "ed_owner_only": {
-        RU: "Этот черновик принадлежит другому пользователю",
-        EN: "This draft belongs to another user",
+        RU: "Эта карточка принадлежит другому пользователю",
+        EN: "This card belongs to another user",
     },
     "ed_admin_only": {
         RU: "Публиковать в канал может только владелец бота",
