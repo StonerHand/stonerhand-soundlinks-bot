@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.3 — 2026-08-12
+
+- Recovered Spotify releases that Song.link misses in its primary region by
+  checking bounded secondary regions and stable public Spotify page metadata.
+- Retried false Spotify `not found` results once and made the failed source
+  individually retryable in private chats.
+- Prevented incomplete inline collections from being cached or reshared as a
+  finished post; partial cards now offer an explicit recheck action.
+- Replaced raw failed-source URLs in lookup logs with anonymous diagnostic IDs.
+- Extended the release suite to 442 automated tests.
+
 ## 1.1.2 — 2026-08-12
 
 - Protected health-to-worker calls with a stable purpose-specific secret when

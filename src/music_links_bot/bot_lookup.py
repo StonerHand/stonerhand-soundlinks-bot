@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 from urllib.parse import quote
 from collections.abc import Awaitable, Callable
@@ -936,6 +937,11 @@ async def _lookup_tracks_detailed(
             async with semaphore:
                 return await client.lookup_track(source_url)
         except SonglinkLookupError as exc:
+            if attempt == 0 and spotify_url_type(source_url) in {"track", "album"}:
+                await asyncio.sleep(
+                    _BATCH_RETRY_DELAY_SECONDS + (index % 3) * 0.05
+                )
+                return await lookup_one(index, source_url, attempt=1)
             return exc
         except SonglinkError as exc:
             if attempt == 1:
@@ -987,12 +993,18 @@ async def _lookup_tracks_detailed(
                 continue
 
             if isinstance(result, SonglinkLookupError):
-                LOGGER.info("Song.link could not resolve %s", source_url)
+                retryable = spotify_url_type(source_url) in {"track", "album"}
+                LOGGER.info(
+                    "Song.link could not resolve source=%s retryable=%s",
+                    _source_log_id(source_url),
+                    retryable,
+                )
                 statuses.append(
                     SourceStatus(
                         source_url=source_url,
                         provider="songlink",
                         state="not_found",
+                        retryable=retryable,
                     )
                 )
                 continue
@@ -1043,6 +1055,12 @@ async def _lookup_tracks_detailed(
             LOGGER.debug("Genre enrichment timed out and was cancelled")
 
     return tracks, unavailable_urls, statuses
+
+
+def _source_log_id(source_url: str) -> str:
+    """Return a diagnostic token without writing a user's raw URL to logs."""
+    canonical = cache_key_for_url(source_url)
+    return hashlib.sha256(canonical.encode()).hexdigest()[:12]
 
 
 async def _fill_genres(search_client: SearchClient, tracks: list[TrackMatch]) -> None:

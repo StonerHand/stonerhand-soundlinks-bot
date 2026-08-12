@@ -243,6 +243,47 @@ class PartialBatchJourneyTests(unittest.IsolatedAsyncioTestCase):
             ["https://open.spotify.com/track/b"],
         )
 
+    async def test_retryable_not_found_is_labeled_as_unrecognized(self) -> None:
+        class Message:
+            chat = SimpleNamespace(type="private")
+
+            def __init__(self) -> None:
+                self.sent = []
+
+            async def reply_text(self, text, **kwargs):
+                self.sent.append((text, kwargs))
+
+        message = Message()
+        context = SimpleNamespace(application=SimpleNamespace(bot_data={}))
+        bundle = LookupBundle(
+            tracks=[],
+            unavailable_urls=[],
+            videos=[],
+            radios=[],
+            playlists=[],
+            artists=[],
+            statuses=[
+                SourceStatus(
+                    "https://open.spotify.com/track/a",
+                    "songlink",
+                    "not_found",
+                    retryable=True,
+                )
+            ],
+        )
+
+        await _send_partial_lookup_status(
+            message,
+            context,
+            bundle,
+            user_id=7,
+            lang="ru",
+        )
+
+        self.assertIn("не удалось распознать", message.sent[0][0])
+        self.assertNotIn("сервис временно недоступен", message.sent[0][0])
+        self.assertIsNotNone(message.sent[0][1]["reply_markup"])
+
 
 class PermissionPreflightTests(unittest.IsolatedAsyncioTestCase):
     async def test_corrupt_warm_permission_cache_is_ignored(self) -> None:

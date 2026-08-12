@@ -68,8 +68,11 @@ are still delivered and retry targets only the failed links.
 All output is checked against Telegram message and caption limits before
 delivery, with a safe fallback for oversized formatted text.
 Transient Song.link failures fall back to Spotify metadata for Spotify URLs;
-the short fallback cache is automatically replaced by the complete platform
-result after the provider recovers.
+regional misses are checked against bounded secondary regions and stable
+public Spotify page metadata. The short fallback cache is automatically
+replaced by the complete platform result after the provider recovers.
+Incomplete inline collections are never cached or offered as finished shares;
+their action rechecks every original source instead.
 
 ## Local setup
 

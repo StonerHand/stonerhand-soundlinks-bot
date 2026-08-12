@@ -18,6 +18,7 @@ HTTP_HEADERS = {"User-Agent": HTTP_USER_AGENT}
 KV_TTL_SECONDS = 7 * 24 * 3600
 FALLBACK_TTL_SECONDS = 15 * 60
 MIN_COMPLETE_PLATFORM_COUNT = 4
+DEFAULT_LOOKUP_COUNTRIES = ("US", "GB", "DE")
 _TRACK_FIELDS = {field.name for field in fields(TrackMatch)}
 
 
@@ -112,10 +113,20 @@ class SonglinkClient:
         results: list[TrackMatch | BaseException] = list(primary_result)
 
         primary_match = primary_result[0]
-        if len(countries) > 1 and (
-            not isinstance(primary_match, TrackMatch)
-            or len(primary_match.links) < MIN_COMPLETE_PLATFORM_COUNT
-        ):
+        if not isinstance(primary_match, TrackMatch):
+            secondary_countries = tuple(
+                country
+                for country in dict.fromkeys(
+                    (*countries[1:], *DEFAULT_LOOKUP_COUNTRIES)
+                )
+                if country != countries[0]
+            )
+        elif len(primary_match.links) < MIN_COMPLETE_PLATFORM_COUNT:
+            secondary_countries = countries[1:]
+        else:
+            secondary_countries = ()
+
+        if secondary_countries:
             # Most Song.link responses already contain every major platform.
             # Only fan out to extra regions when the primary response is sparse
             # or failed; this avoids multiplying upstream calls on cache misses.
@@ -123,7 +134,7 @@ class SonglinkClient:
                 await asyncio.gather(
                     *(
                         self._lookup_track_for_country(source_url, country)
-                        for country in countries[1:]
+                        for country in secondary_countries
                     ),
                     return_exceptions=True,
                 )
