@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.2 — 2026-08-12
+
+- Protected health-to-worker calls with a stable purpose-specific secret when
+  the Vercel `CRON_SECRET` variable exists but has an empty value.
+- Kept an explicit `CRON_SECRET` authoritative and isolated the derived worker
+  credential from Telegram's webhook credential.
+- Extended the release suite to 432 automated tests.
+
 ## 1.1.1 — 2026-08-12
 
 - Derived the protected queue-worker origin from Telegram's registered HTTPS

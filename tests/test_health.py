@@ -237,6 +237,33 @@ class OverallHealthTests(unittest.TestCase):
         request = open_mock.call_args.args[0]
         self.assertEqual(request.full_url, "https://bot.example/api/queue_worker")
 
+    def test_queue_tick_uses_derived_worker_secret_when_cron_value_is_empty(self) -> None:
+        import os
+        from unittest.mock import MagicMock, patch
+
+        from api.health import _tick_queue
+        from music_links_bot.webhook_secret import queue_worker_secret
+
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = b'{"ok":true}'
+        with (
+            patch.dict(
+                os.environ,
+                {"BOT_TOKEN": "123456:test", "CRON_SECRET": ""},
+                clear=True,
+            ),
+            patch("api.health.urlopen", return_value=response) as open_mock,
+        ):
+            expected_secret = queue_worker_secret()
+            result = _tick_queue("https://bot.example/api/telegram")
+
+        self.assertTrue(result["ok"])
+        request = open_mock.call_args.args[0]
+        self.assertEqual(
+            request.get_header("Authorization"),
+            f"Bearer {expected_secret}",
+        )
+
     def test_queue_tick_rejects_untrusted_webhook_origin(self) -> None:
         import os
         from unittest.mock import patch

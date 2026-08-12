@@ -135,5 +135,7 @@ Webhook worker не запускает: пользовательский update 
 - health endpoint параллельно проверяет Telegram, webhook и queue worker,
   считает недоступный worker ошибкой, одним Redis-снимком читает
   очередь/метрики и возвращает version/commit;
+- внутренний health-to-worker вызов использует отдельный производный ключ,
+  если `CRON_SECRET` сохранён пустым; явный секрет всегда имеет приоритет;
 - production canary проверяет реальные API, commit deploy и просроченную очередь;
 - CI выполняет lint, compile, проверку `vercel.json` и полный набор тестов.
