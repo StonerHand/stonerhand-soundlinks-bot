@@ -28,7 +28,8 @@ from music_links_bot.keyboards import (
 from music_links_bot.models import TrackMatch
 from music_links_bot.url_utils import cache_key_for_url, is_supported_music_url
 
-SHARE_QUERY_PREFIX = "sh|"
+SHARE_QUERY_PREFIX = "sh2|"
+LEGACY_SHARE_QUERY_PREFIX = "sh|"
 MAX_SHARE_QUERY_LENGTH = 256
 MAX_SHARE_ITEMS = 12
 _SPOTIFY_KINDS = {
@@ -82,10 +83,18 @@ def build_share_query(urls: list[str]) -> str | None:
 
 
 def parse_share_query(query: str) -> list[str] | None:
-    if not query.startswith(SHARE_QUERY_PREFIX):
+    prefix = next(
+        (
+            candidate
+            for candidate in (SHARE_QUERY_PREFIX, LEGACY_SHARE_QUERY_PREFIX)
+            if query.startswith(candidate)
+        ),
+        None,
+    )
+    if prefix is None:
         return None
 
-    raw_tokens = query[len(SHARE_QUERY_PREFIX) :].split("|")
+    raw_tokens = query[len(prefix) :].split("|")
     if not raw_tokens or len(raw_tokens) > MAX_SHARE_ITEMS:
         return []
 

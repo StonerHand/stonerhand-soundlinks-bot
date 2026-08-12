@@ -85,8 +85,14 @@ class SharingTests(unittest.TestCase):
     def test_youtube_url_round_trips(self) -> None:
         query = build_share_query(["https://www.youtube.com/watch?v=abc123&feature=share"])
 
-        self.assertEqual(query, "sh|yabc123")
+        self.assertEqual(query, "sh2|yabc123")
         self.assertEqual(parse_share_query(query), ["https://youtu.be/abc123"])
+
+    def test_legacy_share_query_still_opens_existing_posts(self) -> None:
+        self.assertEqual(
+            parse_share_query("sh|tabc123"),
+            ["https://open.spotify.com/track/abc123"],
+        )
 
     def test_ten_spotify_tracks_fit_telegram_query_limit(self) -> None:
         query = build_share_query(
@@ -122,19 +128,19 @@ class SharingTests(unittest.TestCase):
 
         result = add_share_button(
             keyboard,
-            share_query="sh|tabc",
+            share_query="sh2|tabc",
             label="↗️ Поделиться с кнопками",
         )
 
         self.assertEqual(result.inline_keyboard[0][0].text, "Spotify")
-        self.assertEqual(result.inline_keyboard[1][0].switch_inline_query, "sh|tabc")
+        self.assertEqual(result.inline_keyboard[1][0].switch_inline_query, "sh2|tabc")
 
     def test_channel_keyboard_keeps_urls_and_removes_inline_switches(self) -> None:
         keyboard = add_share_button(
             InlineKeyboardMarkup(
                 [[InlineKeyboardButton("Spotify", url="https://open.spotify.com/track/abc")]]
             ),
-            share_query="sh|tabc",
+            share_query="sh2|tabc",
             label="↗️ Поделиться с кнопками",
         )
 

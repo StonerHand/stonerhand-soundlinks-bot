@@ -58,6 +58,7 @@ from music_links_bot.url_utils import (
 
 LOGGER = logging.getLogger(__name__)
 INLINE_CACHE_SECONDS = 1800
+INLINE_COLLECTION_RESULT_VERSION = "v2"
 
 
 async def inline_query_handler(
@@ -479,7 +480,7 @@ async def _build_inline_collection_result(
         requested_count=len(source_urls),
     )
     return _inline_article(
-        "|".join(source_urls),
+        INLINE_COLLECTION_RESULT_VERSION + "|" + "|".join(source_urls),
         title=card.title,
         description=card.description,
         text=card.text,
