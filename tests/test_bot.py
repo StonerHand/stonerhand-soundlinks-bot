@@ -80,7 +80,7 @@ from music_links_bot.models import (
 from music_links_bot.nts import NTSLookupError
 from music_links_bot.playlist import PlaylistLookupError
 from music_links_bot.search import SearchCandidate, SearchLookupError
-from music_links_bot.songlink import SonglinkError
+from music_links_bot.songlink import SonglinkError, SonglinkLookupError
 from music_links_bot.sharing import (
     add_share_button,
     build_share_query,
@@ -1373,6 +1373,32 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(inline_query.answer_kwargs[0]["cache_time"], 1800)
         self.assertFalse(inline_query.answer_kwargs[0]["is_personal"])
 
+    async def test_partial_inline_collection_is_never_cached(self) -> None:
+        from music_links_bot.bot import inline_query_handler
+
+        class InlineQueryStub:
+            query = "sh|tabc|tdef"
+            from_user = None
+
+            def __init__(self) -> None:
+                self.answer_kwargs: list[dict] = []
+
+            async def answer(self, _results, **kwargs) -> None:
+                self.answer_kwargs.append(dict(kwargs))
+
+        inline_query = InlineQueryStub()
+        update = type("InlineUpdateStub", (), {"inline_query": inline_query})()
+        partial = type("InlineResult", (), {"title": "⚠️ Подборка · 1 из 2"})()
+
+        with patch(
+            "music_links_bot.bot_inline._build_inline_collection_result",
+            AsyncMock(return_value=partial),
+        ):
+            await inline_query_handler(update, ContextStub())
+
+        self.assertEqual(inline_query.answer_kwargs[0]["cache_time"], 0)
+        self.assertTrue(inline_query.answer_kwargs[0]["is_personal"])
+
     async def test_inline_direct_urls_return_one_collection_card(self) -> None:
         from music_links_bot.bot import inline_query_handler
 
@@ -2358,6 +2384,31 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             ["Track abc", "Track def", "Track ghi"],
         )
         self.assertEqual(client.calls, dict.fromkeys(urls, 2))
+
+    async def test_lookup_tracks_retries_spotify_false_not_found_once(self) -> None:
+        class FlakySpotifyLookupClient:
+            def __init__(self) -> None:
+                self.calls = 0
+
+            async def lookup_track(self, source_url: str) -> TrackMatch:
+                self.calls += 1
+                if self.calls == 1:
+                    raise SonglinkLookupError("temporary metadata miss")
+                return TrackMatch(
+                    title="Dove",
+                    artist="Karmanjakah",
+                    links={"spotify": source_url},
+                )
+
+        client = FlakySpotifyLookupClient()
+        tracks, unavailable_urls = await _lookup_tracks(
+            client,
+            ["https://open.spotify.com/track/dove"],
+        )
+
+        self.assertEqual([track.title for track in tracks], ["Dove"])
+        self.assertEqual(unavailable_urls, [])
+        self.assertEqual(client.calls, 2)
 
     async def test_lookup_tracks_guarantees_spotify_button_first(self) -> None:
         class NoSpotifyLookupClient:

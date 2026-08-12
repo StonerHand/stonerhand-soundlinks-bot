@@ -43,6 +43,31 @@ class _NextDataParser(HTMLParser):
             self.parts.append(data)
 
 
+class _PageMetadataParser(HTMLParser):
+    """Collect stable public metadata without depending on Spotify's JS state."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.values: dict[str, list[str]] = {}
+
+    def handle_starttag(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
+        if tag.casefold() != "meta":
+            return
+
+        attributes = dict(attrs)
+        key = str(attributes.get("property") or attributes.get("name") or "")
+        value = str(attributes.get("content") or "").strip()
+        if key and value:
+            self.values.setdefault(key.casefold(), []).append(value)
+
+    def first(self, key: str) -> str:
+        return next(iter(self.values.get(key.casefold(), ())), "")
+
+
 class SpotifyClient:
     """Best-effort metadata fallback for Spotify URLs.
 
@@ -53,6 +78,7 @@ class SpotifyClient:
 
     def __init__(self, *, timeout: float = 6.0) -> None:
         self._client = httpx.AsyncClient(
+            follow_redirects=True,
             headers={"User-Agent": HTTP_USER_AGENT},
             limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
             timeout=httpx.Timeout(timeout, connect=3.0),
@@ -72,16 +98,80 @@ class SpotifyClient:
         if cached is not None:
             return cached
 
-        embed_url = _spotify_embed_url(source_url, kind)
+        clean_url = cache_key_for_url(source_url)
+        page_error: SpotifyLookupError | None = None
         try:
-            response = await self._client.get(embed_url)
+            response = await self._client.get(clean_url)
             response.raise_for_status()
-        except httpx.HTTPError as exc:
-            raise SpotifyLookupError("Spotify metadata is unavailable.") from exc
+            match = parse_spotify_page(source_url, response.text)
+        except (httpx.HTTPError, SpotifyLookupError) as exc:
+            page_error = (
+                exc
+                if isinstance(exc, SpotifyLookupError)
+                else SpotifyLookupError("Spotify public metadata is unavailable.")
+            )
+        else:
+            self._cache.set(cache_key, match)
+            return match
 
-        match = parse_spotify_embed(source_url, response.text)
+        # Keep the legacy embed parser as a second independent source. Spotify
+        # changes its rendered pages and embed state on different schedules.
+        try:
+            response = await self._client.get(_spotify_embed_url(source_url, kind))
+            response.raise_for_status()
+            match = parse_spotify_embed(source_url, response.text)
+        except (httpx.HTTPError, SpotifyLookupError) as exc:
+            raise SpotifyLookupError("Spotify metadata is unavailable.") from (
+                page_error or exc
+            )
         self._cache.set(cache_key, match)
         return match
+
+
+def parse_spotify_page(source_url: str, html: str) -> TrackMatch:
+    parser = _PageMetadataParser()
+    try:
+        parser.feed(html)
+    except (TypeError, ValueError) as exc:
+        raise SpotifyLookupError("Spotify returned invalid public metadata.") from exc
+
+    title = parser.first("og:title").strip()
+    artists = [
+        value.strip()
+        for value in parser.values.get("music:musician_description", ())
+        if value.strip()
+    ]
+    artist = ", ".join(dict.fromkeys(artists))
+    if not artist:
+        description_parts = [
+            part.strip()
+            for part in parser.first("og:description").split("·")
+            if part.strip()
+        ]
+        if description_parts:
+            artist = description_parts[0]
+
+    if not title or not artist:
+        raise SpotifyLookupError("Spotify title or artist is missing.")
+
+    kind = spotify_url_type(source_url) or "track"
+    page_type = parser.first("og:type").casefold()
+    normalized_kind = "album" if kind == "album" or page_type == "music.album" else "song"
+    release_year = parser.first("music:release_date")[:4]
+    if not release_year.isdigit():
+        release_year = None
+    thumbnail_url = parser.first("og:image") or None
+    clean_url = cache_key_for_url(source_url)
+    return TrackMatch(
+        title=title,
+        artist=artist,
+        links={"spotify": clean_url},
+        page_url=clean_url,
+        release_year=release_year,
+        kind=normalized_kind,
+        release_format="album" if normalized_kind == "album" else None,
+        thumbnail_url=thumbnail_url,
+    )
 
 
 def parse_spotify_embed(source_url: str, html: str) -> TrackMatch:

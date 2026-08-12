@@ -47,7 +47,7 @@ async def send_partial_lookup_status(
         if item.state == "success":
             marker = "✅"
             label = item.label or item.provider
-        elif item.retryable:
+        elif item.state == "unavailable":
             marker = "⚠️"
             label = (
                 "сервис временно недоступен"

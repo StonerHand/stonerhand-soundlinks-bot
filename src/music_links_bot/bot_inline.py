@@ -215,11 +215,14 @@ async def _answer_inline_collection(
         )
         return
 
+    partial = result.title.startswith("⚠️")
     try:
         await inline_query.answer(
             [result],
-            cache_time=0 if (is_direct or channel_safe) else INLINE_CACHE_SECONDS,
-            is_personal=is_direct or channel_safe,
+            cache_time=(
+                0 if (is_direct or channel_safe or partial) else INLINE_CACHE_SECONDS
+            ),
+            is_personal=is_direct or channel_safe or partial,
         )
     except TelegramError:
         LOGGER.debug("Could not answer inline collection query", exc_info=True)

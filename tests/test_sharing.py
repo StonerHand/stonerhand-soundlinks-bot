@@ -55,13 +55,51 @@ class SharingTests(unittest.TestCase):
             bundle,
             context=None,
             lang="ru",
-            share_query=None,
+            share_query="retry",
             share_label="Поделиться",
             requested_count=6,
         )
 
         self.assertEqual(card.title, "⚠️ Подборка · 3 из 6")
         self.assertIn("<b>⚠️ Подборка · 3 из 6</b>", card.text)
+        retry_button = card.keyboard.inline_keyboard[-1][0]
+        self.assertEqual(retry_button.text, "🔁 Проверить все ссылки")
+        self.assertEqual(retry_button.switch_inline_query_current_chat, "retry")
+        self.assertIsNone(retry_button.switch_inline_query)
+
+    def test_partial_inline_collection_does_not_offer_incomplete_share(self) -> None:
+        tracks = [
+            TrackMatch(
+                title="Dove",
+                artist="Karmanjakah",
+                links={"spotify": "https://open.spotify.com/track/dove"},
+            )
+        ]
+        bundle = LookupBundle(
+            tracks=tracks,
+            unavailable_urls=[],
+            videos=[],
+            radios=[],
+            playlists=[],
+            artists=[],
+        )
+
+        card = render_inline_share_card(
+            bundle,
+            context=None,
+            lang="ru",
+            share_query="retry",
+            share_label="Поделиться",
+            requested_count=2,
+        )
+
+        self.assertFalse(
+            any(
+                button.switch_inline_query
+                for row in card.keyboard.inline_keyboard
+                for button in row
+            )
+        )
 
     def test_spotify_collection_is_compact_and_round_trips(self) -> None:
         urls = [

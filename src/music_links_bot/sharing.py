@@ -178,12 +178,14 @@ def render_inline_share_card(
     requested_count: int | None = None,
 ) -> InlineShareCard:
     preview_url = _bundle_preview_url(bundle, context)
+    found_count = bundle.item_count
+    total_count = max(found_count, int(requested_count or found_count))
 
     if bundle.content_type_count == 1 and bundle.tracks:
         title = collection_result_title(
             lang,
             found=len(bundle.tracks),
-            total=max(len(bundle.tracks), int(requested_count or len(bundle.tracks))),
+            total=total_count,
         )
         text = format_collection_message(
             bundle.tracks,
@@ -197,7 +199,7 @@ def render_inline_share_card(
         title = collection_result_title(
             lang,
             found=len(bundle.videos),
-            total=max(len(bundle.videos), int(requested_count or len(bundle.videos))),
+            total=total_count,
             item_kind="video",
         )
     elif bundle.content_type_count == 1 and bundle.radios:
@@ -206,7 +208,7 @@ def render_inline_share_card(
         title = collection_result_title(
             lang,
             found=len(bundle.radios),
-            total=max(len(bundle.radios), int(requested_count or len(bundle.radios))),
+            total=total_count,
             item_kind="radio",
         )
     elif bundle.content_type_count == 1 and bundle.playlists:
@@ -217,9 +219,7 @@ def render_inline_share_card(
         title = collection_result_title(
             lang,
             found=len(bundle.playlists),
-            total=max(
-                len(bundle.playlists), int(requested_count or len(bundle.playlists))
-            ),
+            total=total_count,
             item_kind="playlist",
         )
     elif bundle.content_type_count == 1 and bundle.artists:
@@ -228,7 +228,7 @@ def render_inline_share_card(
         title = collection_result_title(
             lang,
             found=len(bundle.artists),
-            total=max(len(bundle.artists), int(requested_count or len(bundle.artists))),
+            total=total_count,
             item_kind="artist",
         )
     else:
@@ -250,7 +250,7 @@ def render_inline_share_card(
         title = collection_result_title(
             lang,
             found=bundle.item_count,
-            total=max(bundle.item_count, int(requested_count or bundle.item_count)),
+            total=total_count,
             item_kind="item",
         )
 
@@ -262,12 +262,39 @@ def render_inline_share_card(
             else "Готовый пост со всеми кнопками"
         ),
         text=text,
-        keyboard=add_share_button(
-            keyboard,
-            share_query=share_query,
-            label=share_label,
+        keyboard=(
+            _add_inline_retry_button(keyboard, share_query=share_query, lang=lang)
+            if found_count < total_count
+            else add_share_button(
+                keyboard,
+                share_query=share_query,
+                label=share_label,
+            )
         ),
         preview_url=preview_url,
+    )
+
+
+def _add_inline_retry_button(
+    keyboard: InlineKeyboardMarkup,
+    *,
+    share_query: str | None,
+    lang: str,
+) -> InlineKeyboardMarkup:
+    if not share_query:
+        return keyboard
+    label = "🔁 Check all links again" if lang == "en" else "🔁 Проверить все ссылки"
+    return InlineKeyboardMarkup(
+        [
+            *keyboard.inline_keyboard,
+            [
+                InlineKeyboardButton(
+                    label,
+                    switch_inline_query_current_chat=share_query,
+                    api_kwargs={"style": "primary"},
+                )
+            ],
+        ]
     )
 
 

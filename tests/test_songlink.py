@@ -6,6 +6,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from music_links_bot.models import TrackMatch
+from music_links_bot.spotify import SpotifyLookupError
 from music_links_bot.songlink import (
     SonglinkClient,
     SonglinkError,
@@ -198,6 +199,34 @@ class SonglinkClientTests(unittest.TestCase):
 
 
 class SonglinkClientAsyncTests(unittest.IsolatedAsyncioTestCase):
+    async def test_default_region_fallback_recovers_release_missing_in_primary_region(self) -> None:
+        class MissingSpotifyClient:
+            async def lookup_release(self, _source_url: str) -> TrackMatch:
+                raise SpotifyLookupError("not needed")
+
+        client = FakeSonglinkClient(
+            {
+                "TR": SonglinkLookupError("not found in TR"),
+                "US": TrackMatch(
+                    title="Dove",
+                    artist="Karmanjakah",
+                    links={"spotify": "https://open.spotify.com/track/dove"},
+                ),
+                "GB": SonglinkLookupError("not found in GB"),
+                "DE": SonglinkLookupError("not found in DE"),
+            },
+            spotify_client=MissingSpotifyClient(),
+        )
+        try:
+            track = await client.lookup_track(
+                "https://open.spotify.com/track/dove"
+            )
+        finally:
+            await client.aclose()
+
+        self.assertEqual(track.title, "Dove")
+        self.assertEqual(client.calls, 4)
+
     async def test_cancelled_waiter_does_not_leak_completed_inflight_task(self) -> None:
         client = SonglinkClient(user_countries=("US",))
         started = asyncio.Event()
