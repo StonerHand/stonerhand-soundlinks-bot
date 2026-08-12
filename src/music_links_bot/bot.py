@@ -1655,16 +1655,14 @@ async def _send_track_matches(
             found=len(tracks),
             total=total,
         )
-        duplicate_count = 0
         if is_private:
-            _crate_items, added_count = await _add_track_drafts_to_crate(
+            await _add_track_drafts_to_crate(
                 message,
                 context,
                 tracks,
                 user_id=user_id,
                 lang=lang,
             )
-            duplicate_count = max(0, len(tracks) - added_count)
             rows = [
                 [
                     InlineKeyboardButton(
@@ -1697,10 +1695,6 @@ async def _send_track_matches(
             include_hashtags=include_hashtags,
             title=title,
         )
-        if duplicate_count:
-            collection_text += "\n\n" + get_text(lang, "collection_duplicates").format(
-                count=duplicate_count
-            )
         await _send_track_result(
             context.bot,
             message,
