@@ -74,6 +74,26 @@ class ProviderRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(result["slow"], "fallback")
 
+    async def test_task_specific_timeout_can_preserve_longer_batch_work(self) -> None:
+        async def slightly_slow():
+            await asyncio.sleep(0.01)
+            return "complete"
+
+        result = await run_provider_tasks(
+            {},
+            [
+                ProviderTask(
+                    "batch",
+                    slightly_slow(),
+                    "fallback",
+                    timeout_seconds=0.05,
+                )
+            ],
+            timeout_seconds=0.001,
+        )
+
+        self.assertEqual(result["batch"], "complete")
+
     async def test_lookup_cache_preserves_source_order(self) -> None:
         urls = ["https://example.test/b", "https://example.test/a"]
         payload = {"tracks": [{"title": "Dragonaut"}]}

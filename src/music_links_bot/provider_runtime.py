@@ -33,6 +33,8 @@ class ProviderTask:
     name: str
     awaitable: Awaitable[Any]
     fallback: Any
+    timeout_seconds: float | None = None
+    respect_circuit: bool = True
 
 
 @dataclass(slots=True)
@@ -95,6 +97,7 @@ async def run_provider_tasks_detailed(
         if (
             runtime is not None
             and hasattr(runtime, "provider_available")
+            and task.respect_circuit
             and not runtime.provider_available(task.name)
         ):
             _close_awaitable(task.awaitable)
@@ -112,9 +115,10 @@ async def run_provider_tasks_detailed(
             remaining = budget.remaining()
             if remaining <= 0:
                 raise TimeoutError("request budget exhausted")
+            task_timeout = task.timeout_seconds or timeout_seconds
             value = await asyncio.wait_for(
                 task.awaitable,
-                timeout=min(timeout_seconds, remaining),
+                timeout=min(task_timeout, remaining),
             )
         except (Exception, asyncio.CancelledError) as exc:
             if isinstance(exc, asyncio.CancelledError):
@@ -161,7 +165,7 @@ def lookup_cache_key(source_urls: list[str]) -> str:
     )
     # Version the aggregate key whenever completeness semantics change so an
     # old partial result cannot look like a complete collection after deploy.
-    return "lookup:v4:" + hashlib.sha256(canonical.encode()).hexdigest()
+    return "lookup:v5:" + hashlib.sha256(canonical.encode()).hexdigest()
 
 
 async def get_cached_lookup(bot_data: dict, source_urls: list[str]) -> dict | None:

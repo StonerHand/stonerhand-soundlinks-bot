@@ -113,7 +113,7 @@ class SonglinkClient:
         results: list[TrackMatch | BaseException] = list(primary_result)
 
         primary_match = primary_result[0]
-        if not isinstance(primary_match, TrackMatch):
+        if isinstance(primary_match, SonglinkLookupError):
             secondary_countries = tuple(
                 country
                 for country in dict.fromkeys(
@@ -121,9 +121,11 @@ class SonglinkClient:
                 )
                 if country != countries[0]
             )
-        elif len(primary_match.links) < MIN_COMPLETE_PLATFORM_COUNT:
+        elif isinstance(primary_match, TrackMatch) and len(primary_match.links) < MIN_COMPLETE_PLATFORM_COUNT:
             secondary_countries = countries[1:]
         else:
+            # A 429/5xx is service-wide, not regional. Fan-out would multiply
+            # rate-limit pressure and delay the independent Spotify fallback.
             secondary_countries = ()
 
         if secondary_countries:

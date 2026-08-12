@@ -28,6 +28,12 @@ from music_links_bot.stats import (
     record_videos,
 )
 from music_links_bot.telegram_text import format_user_note_html
+from music_links_bot.url_utils import (
+    URL_RE,
+    cache_key_for_url,
+    clean_url_token,
+    is_supported_music_url,
+)
 
 LOGGER = logging.getLogger(__name__)
 STATS_KV_KEY = "stats:v1"
@@ -42,6 +48,37 @@ def message_entities(message: Message) -> tuple[MessageEntity, ...]:
     if message.text is not None:
         return tuple(getattr(message, "entities", None) or ())
     return tuple(getattr(message, "caption_entities", None) or ())
+
+
+def message_source_urls(message: Message, *, text: str | None = None) -> list[str]:
+    """Return every visible or entity-backed music URL in message order.
+
+    Telegram can hide a URL behind linked text. Looking only at ``text`` or
+    ``caption`` silently misses those sources, so merge explicit text links
+    with URLs visible in the message and deduplicate tracking variants.
+    """
+    source_text = text if text is not None else (message_text(message) or "")
+    candidates: list[tuple[int, str]] = [
+        (
+            len(source_text[: match.start()].encode("utf-16-le")) // 2,
+            clean_url_token(match.group(0)),
+        )
+        for match in URL_RE.finditer(source_text)
+    ]
+    for entity in message_entities(message):
+        if entity.type != MessageEntity.TEXT_LINK or not entity.url:
+            continue
+        candidates.append((entity.offset, str(entity.url).strip()))
+
+    urls: list[str] = []
+    seen: set[str] = set()
+    for _offset, candidate in sorted(candidates, key=lambda item: item[0]):
+        key = cache_key_for_url(candidate)
+        if key in seen or not is_supported_music_url(candidate):
+            continue
+        urls.append(candidate)
+        seen.add(key)
+    return urls
 
 
 def build_user_prefix(message: Message, *, bot_username: str | None = None) -> str:

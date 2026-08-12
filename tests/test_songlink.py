@@ -405,6 +405,29 @@ class SonglinkClientAsyncTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertNotIsInstance(context.exception, SonglinkLookupError)
 
+    async def test_transient_primary_failure_does_not_fan_out_to_every_region(self) -> None:
+        class FailingSpotifyClient:
+            async def lookup_release(self, _source_url: str) -> TrackMatch:
+                raise SpotifyLookupError("spotify down")
+
+        client = FakeSonglinkClient(
+            {
+                "TR": SonglinkError("rate limited"),
+                "US": SonglinkError("must not be called"),
+                "GB": SonglinkError("must not be called"),
+                "DE": SonglinkError("must not be called"),
+            },
+            spotify_client=FailingSpotifyClient(),
+        )
+
+        try:
+            with self.assertRaises(SonglinkError):
+                await client.lookup_track("https://open.spotify.com/track/rate-limit")
+        finally:
+            await client.aclose()
+
+        self.assertEqual(client.calls, 1)
+
     async def test_spotify_fallback_survives_songlink_outage_and_is_shared_cached(self) -> None:
         class SpotifyFallback:
             calls = 0
