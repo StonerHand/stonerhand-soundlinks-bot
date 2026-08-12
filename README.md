@@ -90,7 +90,9 @@ LOG_LEVEL=INFO
 PRIMARY_PLATFORM=spotify
 ```
 
-Production also uses webhook secrets, a cron secret and Upstash Redis. Fixed
+Production also uses webhook secrets and Upstash Redis. `CRON_SECRET` is
+recommended for direct Vercel Cron calls; when it is blank, protected internal
+worker calls derive an isolated credential from `BOT_TOKEN`. Fixed
 schedule choices use `BOT_TIMEZONE` (`Europe/Moscow` by default); custom dates
 can be scheduled up to 90 days ahead.
 

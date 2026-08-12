@@ -4,6 +4,15 @@ import hashlib
 import os
 
 
+def _derived_secret(purpose: str) -> str:
+    bot_token = os.getenv("BOT_TOKEN", "").strip()
+    if not bot_token:
+        return ""
+
+    digest = hashlib.sha256(f"stonerhand-{purpose}:{bot_token}".encode())
+    return digest.hexdigest()[:48]
+
+
 def telegram_webhook_secret() -> str:
     """The secret Telegram must echo back on every webhook delivery.
 
@@ -17,9 +26,18 @@ def telegram_webhook_secret() -> str:
     if configured:
         return configured
 
-    bot_token = os.getenv("BOT_TOKEN", "").strip()
-    if not bot_token:
-        return ""
+    return _derived_secret("webhook")
 
-    digest = hashlib.sha256(f"stonerhand-webhook:{bot_token}".encode())
-    return digest.hexdigest()[:48]
+
+def queue_worker_secret() -> str:
+    """Protect the queue worker even when CRON_SECRET was saved empty.
+
+    An explicit production secret still wins. The stable fallback uses a
+    separate purpose from Telegram's webhook secret and never exposes the bot
+    token itself.
+    """
+    configured = os.getenv("CRON_SECRET", "").strip()
+    if configured:
+        return configured
+
+    return _derived_secret("queue-worker")

@@ -92,7 +92,9 @@ PRIMARY_PLATFORM=spotify
 ```
 
 Для production также используются `SET_WEBHOOK_SECRET`,
-`TELEGRAM_WEBHOOK_SECRET`, `CRON_SECRET` и Upstash Redis. Фиксированное время
+`TELEGRAM_WEBHOOK_SECRET` и Upstash Redis. `CRON_SECRET` рекомендуется для
+прямого Vercel Cron; при пустом значении внутренний вызов worker защищается
+отдельным ключом, производным от `BOT_TOKEN`. Фиксированное время
 публикации берётся из `BOT_TIMEZONE` (по умолчанию `Europe/Moscow`), а свою дату
 можно выбрать в пределах 90 дней.
 

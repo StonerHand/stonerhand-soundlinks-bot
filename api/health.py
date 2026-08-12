@@ -41,15 +41,15 @@ class handler(BaseHTTPRequestHandler):
         # Telegram diagnostics and the independent queue worker are network
         # calls, so run them together. Read Redis afterwards to report the
         # queue state produced by this exact tick, including retries.
-        with ThreadPoolExecutor(max_workers=3) as executor:
+        with ThreadPoolExecutor(max_workers=2) as executor:
             telegram_check = executor.submit(_check_telegram)
             webhook_check = executor.submit(_check_webhook)
-            telegram = telegram_check.result()
             webhook = webhook_check.result()
             # The registered Telegram webhook is the authoritative public
             # production origin even when optional Vercel hostname variables
             # are not exposed to the Python runtime.
             queue_tick = executor.submit(_tick_queue, webhook.get("detail"))
+            telegram = telegram_check.result()
             queue_worker = queue_tick.result()
         redis, queue, metrics = _storage_snapshot()
         checks: dict[str, dict] = {
@@ -287,7 +287,9 @@ def _tick_queue(webhook_url: object = None) -> dict[str, object]:
         or os.getenv("VERCEL_URL", "").strip()
         or _webhook_host(webhook_url)
     )
-    secret = os.getenv("CRON_SECRET", "").strip()
+    from music_links_bot.webhook_secret import queue_worker_secret
+
+    secret = queue_worker_secret()
     if not host or not secret:
         return {
             "ok": True,
