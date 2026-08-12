@@ -1,4 +1,6 @@
 from types import SimpleNamespace
+import ast
+from pathlib import Path
 import time
 import unittest
 from unittest.mock import AsyncMock
@@ -11,6 +13,7 @@ from music_links_bot.bot import (
 )
 from music_links_bot.bot_runtime import CallbackAction
 from music_links_bot.bot_runtime import BotRuntime
+from music_links_bot.bot_actions import action_spec
 from music_links_bot.bot_pipeline import delivery_kind
 from music_links_bot.bot_ui import (
     build_error_keyboard,
@@ -217,6 +220,41 @@ class TelegramUiContractTests(unittest.TestCase):
                     self.assertTrue(button.text.strip())
                     if button.callback_data:
                         self.assertLessEqual(len(button.callback_data.encode()), 64)
+
+    def test_current_callback_buttons_have_registered_actions(self) -> None:
+        missing: list[tuple[str, int, str, str]] = []
+        source_root = Path(__file__).resolve().parents[1] / "src" / "music_links_bot"
+        for path in source_root.glob("*.py"):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if not (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name)
+                    and node.func.id == "encode_callback"
+                    and len(node.args) >= 2
+                    and isinstance(node.args[0], ast.Constant)
+                    and isinstance(node.args[1], ast.Constant)
+                ):
+                    continue
+                scope = str(node.args[0].value)
+                action = str(node.args[1].value)
+                if action_spec(scope, action) is None:
+                    missing.append((path.name, node.lineno, scope, action))
+        self.assertEqual(missing, [])
+
+    def test_collection_controls_are_touch_friendly(self) -> None:
+        items = [
+            {"item": {"artist": "Artist", "title": f"Track {index}"}}
+            for index in range(1, 11)
+        ]
+        keyboard = render_crate(items, lang="ru")[1]
+        self.assertTrue(all(len(row) <= 2 for row in keyboard.inline_keyboard))
+
+    def test_both_languages_have_complete_builder_keyboards(self) -> None:
+        for lang in ("ru", "en"):
+            keyboard = build_start_keyboard(None, lang=lang, crate_count=2)
+            for row in keyboard.inline_keyboard:
+                self.assertTrue(all(button.text.strip() for button in row))
 
     def test_delivery_kind_is_a_single_explicit_contract(self) -> None:
         bundle = SimpleNamespace(

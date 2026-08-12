@@ -58,4 +58,3 @@ class PlaylistClientTests(unittest.IsolatedAsyncioTestCase):
             await client.lookup_playlist(
                 "https://music.apple.com/us/album/test/123?i=456"
             )
-

@@ -23,7 +23,7 @@ CALLBACK_TTL_SECONDS = 15 * 60
 ACTION_LOCK_SECONDS = 45
 INTENT_TTL_SECONDS = 4
 SESSION_TTL_SECONDS = 30 * 24 * 3600
-SESSION_SCHEMA_VERSION = 2
+SESSION_SCHEMA_VERSION = 3
 MAX_MEMORY_SESSIONS = 500
 MAX_MEMORY_KEYS = 2_000
 CIRCUIT_FAILURE_THRESHOLD = 3
@@ -137,7 +137,7 @@ def _normalize_pending_input(value: object) -> dict[str, Any]:
     if not isinstance(value, dict):
         return {}
     kind = str(value.get("kind") or "")
-    if kind not in {"intro", "hashtags", "crate_title"}:
+    if kind not in {"intro", "hashtags", "crate_title", "schedule"}:
         return {}
     result: dict[str, Any] = {"kind": kind}
     draft_id = str(value.get("draft_id") or "")[:32]

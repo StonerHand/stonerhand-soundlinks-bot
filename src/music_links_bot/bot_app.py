@@ -117,6 +117,7 @@ def build_application(settings: Settings) -> Application:
             "admin_chat_id": settings.admin_chat_id,
             "platform_order": handlers._build_platform_order(settings.primary_platform),
             "ui_mode": settings.ui_mode,
+            "timezone_name": settings.timezone_name,
             "runtime": BotRuntime(kv_store),
             "search_selections": {},
             "retry_sources": {},
@@ -133,6 +134,7 @@ def build_application(settings: Settings) -> Application:
     application.add_handler(CommandHandler("id", handlers.id_command))
     application.add_handler(CommandHandler("stats", handlers.stats_command))
     application.add_handler(CommandHandler("crate", handlers.crate_command))
+    application.add_handler(CommandHandler("cancel", handlers.cancel_command))
     application.add_handler(CommandHandler("status", handlers.status_command))
     application.add_handler(
         CallbackQueryHandler(handlers.bot_callback, pattern=r"^v2\|")

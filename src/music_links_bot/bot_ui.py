@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from html import escape
+import time
 from telegram import InlineKeyboardMarkup
 
 from music_links_bot.bot_builder import available_platforms, selected_platforms
@@ -418,20 +419,15 @@ def editor_more_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButt
         ],
         [
             InlineKeyboardButton(
-                get_text(lang, "ed_clean_preview"),
-                callback_data=encode_callback("editor", "pv", draft_id),
+                get_text(lang, "ed_done"),
+                callback_data=encode_callback("editor", "f", draft_id),
+                api_kwargs={"style": "primary"},
             ),
             InlineKeyboardButton(
                 get_text(lang, "ed_more"),
                 callback_data=encode_callback("editor", "o", draft_id),
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                get_text(lang, "ed_done"),
-                callback_data=encode_callback("editor", "f", draft_id),
                 api_kwargs={"style": "success"},
-            )
+            ),
         ],
     ]
 
@@ -458,7 +454,7 @@ def editor_style_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardBut
             )
         ]
     )
-    return rows
+    return append_setting_undo(rows, draft_id, draft)
 
 
 def editor_platform_rows(
@@ -495,7 +491,7 @@ def editor_platform_rows(
             )
         ]
     )
-    return rows
+    return append_setting_undo(rows, draft_id, draft)
 
 
 def editor_intro_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
@@ -529,7 +525,7 @@ def editor_intro_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardBut
             )
         ]
     )
-    return rows
+    return append_setting_undo(rows, draft_id, draft)
 
 
 def editor_hashtag_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
@@ -564,20 +560,27 @@ def editor_hashtag_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardB
             )
         ],
     ]
-    return rows
+    return append_setting_undo(rows, draft_id, draft)
 
 
 def editor_preview_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
     lang = draft.get("lang") or "ru"
-    return [
+    rows = [
+        [
+            InlineKeyboardButton(
+                get_text(lang, "ed_more"),
+                callback_data=encode_callback("editor", "o", draft_id),
+                api_kwargs={"style": "primary"},
+            )
+        ],
         [
             InlineKeyboardButton(
                 get_text(lang, "back_to_editor"),
                 callback_data=encode_callback("editor", "m", draft_id),
-                api_kwargs={"style": "primary"},
             )
-        ]
+        ],
     ]
+    return rows
 
 
 def editor_schedule_rows(
@@ -591,8 +594,8 @@ def editor_schedule_rows(
                 callback_data=encode_callback("editor", "q1", draft_id),
             ),
             InlineKeyboardButton(
-                get_text(lang, "schedule_3h"),
-                callback_data=encode_callback("editor", "q3", draft_id),
+                get_text(lang, "schedule_evening"),
+                callback_data=encode_callback("editor", "qe", draft_id),
             ),
         ],
         [
@@ -603,11 +606,40 @@ def editor_schedule_rows(
         ],
         [
             InlineKeyboardButton(
+                get_text(lang, "schedule_custom"),
+                callback_data=encode_callback("editor", "qi", draft_id),
+                api_kwargs={"style": "primary"},
+            )
+        ],
+        [
+            InlineKeyboardButton(
                 get_text(lang, "back"),
                 callback_data=encode_callback("editor", "o", draft_id),
             )
         ],
     ]
+
+
+def append_setting_undo(
+    rows: list[list[InlineKeyboardButton]], draft_id: str, draft: dict
+) -> list[list[InlineKeyboardButton]]:
+    state = draft.get("undo_state")
+    if not isinstance(state, dict) or int(state.get("expires_at") or 0) < int(
+        time.time()
+    ):
+        return rows
+    lang = draft.get("lang") or "ru"
+    insert_at = max(0, len(rows) - 1)
+    rows.insert(
+        insert_at,
+        [
+            InlineKeyboardButton(
+                get_text(lang, "settings_undo"),
+                callback_data=encode_callback("editor", "u", draft_id),
+            )
+        ],
+    )
+    return rows
 
 
 def editor_overflow_rows(
@@ -785,7 +817,7 @@ def render_crate(
             for index in range(len(items))
         ]
         rows.extend(
-            selectors[index : index + 5] for index in range(0, len(selectors), 5)
+            selectors[index : index + 2] for index in range(0, len(selectors), 2)
         )
 
         controls: list[InlineKeyboardButton] = []
@@ -803,14 +835,19 @@ def render_crate(
                     callback_data=encode_callback("crate", "down", str(selected_index)),
                 )
             )
-        controls.append(
-            InlineKeyboardButton(
-                get_text(lang, "crate_remove"),
-                callback_data=encode_callback("crate", "remove", str(selected_index)),
-                api_kwargs={"style": "danger"},
-            )
+        if controls:
+            rows.append(controls)
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "crate_remove"),
+                    callback_data=encode_callback(
+                        "crate", "remove", str(selected_index)
+                    ),
+                    api_kwargs={"style": "danger"},
+                )
+            ]
         )
-        rows.append(controls)
         footer: list[InlineKeyboardButton] = []
         if can_undo:
             footer.append(

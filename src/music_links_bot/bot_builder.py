@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from html import escape, unescape
 import re
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from music_links_bot.constants import PLATFORM_LABELS
 from music_links_bot.models import TrackMatch
@@ -152,16 +153,94 @@ def normalize_crate_title(value: str) -> str:
     return " ".join(str(value or "").split())[:MAX_CRATE_TITLE_LENGTH].strip()
 
 
-def schedule_timestamp(option: str, *, now: datetime | None = None) -> int:
-    current = now or datetime.now(timezone.utc)
-    delta = {
-        "q1": timedelta(hours=1),
-        "q3": timedelta(hours=3),
-        "qd": timedelta(days=1),
-    }.get(option)
-    if delta is None:
+def schedule_timestamp(
+    option: str,
+    *,
+    now: datetime | None = None,
+    timezone_name: str = "Europe/Moscow",
+) -> int:
+    current = now or datetime.now(_timezone(timezone_name))
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    if option == "q1":
+        result = current + timedelta(hours=1)
+    elif option == "q3":  # compatibility with already-sent keyboards
+        result = current + timedelta(hours=3)
+    elif option == "qe":
+        result = current.replace(hour=20, minute=0, second=0, microsecond=0)
+        if result <= current:
+            result += timedelta(days=1)
+    elif option == "qd":
+        result = (current + timedelta(days=1)).replace(
+            hour=12,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+    else:
         raise ValueError("Unsupported schedule option")
-    return int((current + delta).timestamp())
+    return int(result.timestamp())
+
+
+def parse_schedule_datetime(
+    value: str,
+    *,
+    now: datetime | None = None,
+    timezone_name: str = "Europe/Moscow",
+) -> int | None:
+    """Parse a compact local date/time without guessing ambiguous formats."""
+    current = now or datetime.now(_timezone(timezone_name))
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    match = re.fullmatch(
+        r"\s*(?:(\d{1,2})[./-](\d{1,2})(?:[./-](\d{2,4}))?\s+)?"
+        r"([01]?\d|2[0-3]):([0-5]\d)\s*",
+        str(value or ""),
+    )
+    if match is None:
+        return None
+    day, month, year, hour, minute = match.groups()
+    try:
+        if day is None:
+            result = current.replace(
+                hour=int(hour), minute=int(minute), second=0, microsecond=0
+            )
+            if result <= current:
+                result += timedelta(days=1)
+        else:
+            parsed_year = current.year if year is None else int(year)
+            if parsed_year < 100:
+                parsed_year += 2000
+            result = datetime(
+                parsed_year,
+                int(month),
+                int(day),
+                int(hour),
+                int(minute),
+                tzinfo=current.tzinfo,
+            )
+    except ValueError:
+        return None
+    if result <= current or result > current + timedelta(days=366):
+        return None
+    return int(result.timestamp())
+
+
+def format_schedule_datetime(
+    timestamp: int,
+    *,
+    timezone_name: str = "Europe/Moscow",
+) -> str:
+    return datetime.fromtimestamp(timestamp, _timezone(timezone_name)).strftime(
+        "%d.%m · %H:%M"
+    )
+
+
+def _timezone(name: str) -> ZoneInfo:
+    try:
+        return ZoneInfo(name)
+    except ZoneInfoNotFoundError:
+        return ZoneInfo("Europe/Moscow")
 
 
 def fit_telegram_html(text: str, limit: int = MESSAGE_TEXT_LIMIT) -> str:

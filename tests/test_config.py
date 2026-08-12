@@ -91,6 +91,23 @@ class ConfigTests(unittest.TestCase):
 
         self.assertEqual(settings.ui_mode, "stonerhand")
 
+    def test_from_env_validates_timezone(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"BOT_TOKEN": "token", "BOT_TIMEZONE": "Europe/Berlin"},
+            clear=False,
+        ):
+            settings = Settings.from_env()
+        self.assertEqual(settings.timezone_name, "Europe/Berlin")
+
+        with patch.dict(
+            os.environ,
+            {"BOT_TOKEN": "token", "BOT_TIMEZONE": "Mars/Olympus"},
+            clear=False,
+        ):
+            settings = Settings.from_env()
+        self.assertEqual(settings.timezone_name, "Europe/Moscow")
+
 
 if __name__ == "__main__":
     unittest.main()

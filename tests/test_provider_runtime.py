@@ -10,6 +10,7 @@ from music_links_bot.provider_runtime import (
     get_cached_lookup,
     lookup_cache_key,
     run_provider_tasks,
+    set_cached_negative_lookup,
     set_cached_lookup,
 )
 
@@ -83,6 +84,17 @@ class ProviderRuntimeTests(unittest.IsolatedAsyncioTestCase):
             lookup_cache_key(urls),
             lookup_cache_key(list(reversed(urls))),
         )
+
+    async def test_negative_lookup_cache_is_short_lived_and_explicit(self) -> None:
+        urls = ["https://example.test/not-found-negative"]
+        await set_cached_negative_lookup(
+            {}, urls, {"statuses": [{"state": "not_found"}]}
+        )
+
+        cached = await get_cached_lookup({}, urls)
+
+        self.assertIsNotNone(cached)
+        self.assertTrue(cached["_negative"])
 
 
 if __name__ == "__main__":

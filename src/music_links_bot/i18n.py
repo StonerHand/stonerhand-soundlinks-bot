@@ -417,16 +417,16 @@ STRINGS: dict[str, dict[str, str]] = {
     "ed_intro_change": {RU: "Изменить подводку", EN: "Edit intro"},
     "ed_intro_remove": {RU: "Убрать подводку", EN: "Remove intro"},
     "ed_intro_prompt": {
-        RU: "Напиши подводку одним сообщением (до 900 символов).",
-        EN: "Send the intro in one message (up to 900 characters).",
+        RU: "<b>Жду подводку</b>\nОтветь одним сообщением (до 900 символов).\n<code>/cancel</code> — отменить",
+        EN: "<b>Waiting for an intro</b>\nReply with one message (up to 900 characters).\n<code>/cancel</code> — cancel",
     },
     "ed_intro_saved": {RU: "Подводка сохранена", EN: "Intro saved"},
     "ed_tags_auto": {RU: "Автоматические", EN: "Automatic"},
     "ed_tags_custom": {RU: "Свои хэштеги", EN: "Custom hashtags"},
     "ed_tags_none": {RU: "Без хэштегов", EN: "No hashtags"},
     "ed_tags_prompt": {
-        RU: "Пришли до пяти хэштегов через пробел. Например: <code>#stonerrock #newmusic</code>",
-        EN: "Send up to five hashtags separated by spaces. Example: <code>#stonerrock #newmusic</code>",
+        RU: "<b>Жду хэштеги</b>\nПришли до пяти через пробел: <code>#stonerrock #newmusic</code>\n<code>/cancel</code> — отменить",
+        EN: "<b>Waiting for hashtags</b>\nSend up to five separated by spaces: <code>#stonerrock #newmusic</code>\n<code>/cancel</code> — cancel",
     },
     "ed_tags_saved": {RU: "Хэштеги сохранены", EN: "Hashtags saved"},
     "ed_deleted": {
@@ -437,7 +437,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "ed_undo_expired": {RU: "Время для отмены истекло", EN: "Undo time has expired"},
     "ed_done": {RU: "✓ Готово", EN: "✓ Done"},
     "ed_delete": {RU: "🗑 Удалить", EN: "🗑 Delete"},
-    "ed_more": {RU: "Действия", EN: "Actions"},
+    "ed_more": {RU: "Отправить", EN: "Send"},
     "ed_send_self": {RU: "✓ Получить готовый пост", EN: "✓ Get finished post"},
     "ed_add_crate": {RU: "+ В подборку", EN: "+ Add to crate"},
     "ed_crate_count": {RU: "В подборке · {count}/10", EN: "In crate · {count}/10"},
@@ -450,12 +450,22 @@ STRINGS: dict[str, dict[str, str]] = {
     "ed_publish": {RU: "📤 В канал", EN: "📤 To channel"},
     "ed_schedule": {RU: "🕒 Запланировать", EN: "🕒 Schedule"},
     "schedule_title": {
-        RU: "🕒 <b>Когда опубликовать?</b>\n<i>Время считается от текущего момента.</i>",
-        EN: "🕒 <b>When to publish?</b>\n<i>Time is relative to now.</i>",
+        RU: "🕒 <b>Когда опубликовать?</b>\n<i>Фиксированное время — по часовому поясу бота.</i>",
+        EN: "🕒 <b>When to publish?</b>\n<i>Fixed times use the bot timezone.</i>",
     },
     "schedule_1h": {RU: "Через 1 час", EN: "In 1 hour"},
     "schedule_3h": {RU: "Через 3 часа", EN: "In 3 hours"},
-    "schedule_1d": {RU: "Завтра", EN: "Tomorrow"},
+    "schedule_evening": {RU: "Сегодня в 20:00", EN: "Today at 20:00"},
+    "schedule_1d": {RU: "Завтра в 12:00", EN: "Tomorrow at 12:00"},
+    "schedule_custom": {RU: "Выбрать дату и время", EN: "Choose date and time"},
+    "schedule_prompt": {
+        RU: "<b>Жду дату и время</b>\nНапример: <code>15.08 19:30</code> или <code>21:00</code>\n<code>/cancel</code> — отменить",
+        EN: "<b>Waiting for date and time</b>\nFor example: <code>15.08 19:30</code> or <code>21:00</code>\n<code>/cancel</code> — cancel",
+    },
+    "schedule_invalid": {
+        RU: "Не понял время. Используй <code>15.08 19:30</code> или <code>21:00</code>.",
+        EN: "I could not read that time. Use <code>15.08 19:30</code> or <code>21:00</code>.",
+    },
     "schedule_done": {RU: "Запланировано: {date}", EN: "Scheduled: {date}"},
     "publish_confirm": {
         RU: (
@@ -473,6 +483,13 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "publish_confirm_button": {RU: "Опубликовать", EN: "Publish"},
     "settings_saved": {RU: "Настройки сохранены", EN: "Settings saved"},
+    "settings_undo": {RU: "Отменить изменение", EN: "Undo change"},
+    "settings_restored": {RU: "Изменение отменено", EN: "Change undone"},
+    "input_cancelled": {RU: "Ввод отменён", EN: "Input cancelled"},
+    "input_nothing": {
+        RU: "Сейчас бот ничего не ожидает",
+        EN: "Nothing is waiting for input",
+    },
     "ed_expired": {
         RU: "Карточка устарела — пришли ссылку заново",
         EN: "This card has expired — send the link again",

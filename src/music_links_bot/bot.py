@@ -19,7 +19,7 @@ from telegram import (
     Update,
 )
 from telegram.constants import ChatAction, ParseMode
-from telegram.error import BadRequest, Forbidden, TelegramError
+from telegram.error import BadRequest, TelegramError
 from telegram.ext import Application, ContextTypes
 from music_links_bot.branding import (
     brand_label,
@@ -43,7 +43,6 @@ from music_links_bot.bot_batch import (
 from music_links_bot.bot_admin import (
     id_command,
     stats_command,
-    stats_text as _stats_text,
     status_command,
 )
 from music_links_bot.bot_app import (
@@ -91,7 +90,10 @@ _build_podcast_fallback = _bot_lookup._build_podcast_fallback
 
 from music_links_bot.config import Settings
 from music_links_bot.chat_access import check_publish_access
-from music_links_bot.channel_templates import apply_channel_template, save_channel_template
+from music_links_bot.channel_templates import (
+    apply_channel_template,
+    save_channel_template,
+)
 from music_links_bot.ephemeral import (
     ephemeral_group_replies_enabled,
     send_ephemeral_message,
@@ -134,24 +136,24 @@ from music_links_bot.bot_crate import (
     crate_contains_item,
     load_crate,
     load_crate_title,
-    move_crate_item,
-    remove_crate_item,
-    restore_crate_item,
-    save_crate,
     save_crate_title,
+)
+from music_links_bot.bot_crate_handlers import (
+    crate_command,
+    dispatch_crate_action as _dispatch_crate_action,
 )
 from music_links_bot.bot_editor_state import (
     apply_setting_action as _apply_editor_setting,
     draft_owned_by as _draft_owned_by,
     draft_status as _draft_status,
+    remember_setting_state,
     remember_draft as _remember_session_draft,
+    restore_setting_state,
 )
 from music_links_bot.bot_runtime import (
     BotErrorCode,
     BotFlowError,
-    BotRuntime,
     CallbackAction,
-    UserSession,
     decode_callback,
     detect_action,
     encode_callback,
@@ -162,7 +164,6 @@ from music_links_bot.bot_storage import (
     load_draft as _load_draft,
     load_retry_sources as _load_retry_sources,
     load_search_selection as _load_search_selection,
-    remember_bounded as _remember_bounded,
     store_draft as _store_draft,
     store_search_selection as _store_search_selection,
 )
@@ -175,15 +176,13 @@ from music_links_bot.bot_progress import (
     update_progress_text as _update_progress_text,
 )
 from music_links_bot.bot_pipeline import LookupRequest, delivery_kind
-from music_links_bot.bot_recent import render_recent_view
 from music_links_bot.bot_ui import (
-    build_create_keyboard as _build_create_keyboard,
+    build_home_text as _build_home_text,
+    build_onboarding_keyboard as _build_onboarding_keyboard,
     build_deleted_draft_keyboard as _deleted_draft_keyboard,
     build_delete_confirmation_keyboard as _delete_confirmation_keyboard,
     build_duplicate_post_keyboard as _duplicate_post_keyboard,
     build_error_keyboard as _build_error_keyboard_view,
-    build_home_text as _build_home_text,
-    build_onboarding_keyboard as _build_onboarding_keyboard,
     build_publish_confirmation as _build_publish_confirmation,
     build_section_keyboard as _build_section_keyboard,
     build_start_keyboard as _build_start_keyboard,
@@ -215,11 +214,11 @@ from music_links_bot.models import (
 from music_links_bot.draft_model import new_track_draft
 from music_links_bot.bot_builder import (
     BuilderScreen,
-    active_card_label,
     apply_custom_tags,
     apply_intro_text,
     builder_screen,
     fit_telegram_html,
+    format_schedule_datetime,
     remove_intro,
     remove_tags,
     schedule_timestamp,
@@ -228,7 +227,24 @@ from music_links_bot.bot_builder import (
     toggle_platform,
     use_auto_tags,
     normalize_crate_title,
+    parse_schedule_datetime,
     PENDING_INPUT_TTL_SECONDS,
+)
+from music_links_bot.bot_actions import action_spec
+from music_links_bot.bot_menu import (
+    MENU_HELP,
+    cancel_command,
+    channel_command,
+    dispatch_menu_action as _dispatch_menu_action,
+    guide_command,
+    help_command,
+    legacy_menu_callback as menu_callback,
+    menu_text as _menu_text,
+    platforms_command,
+    reply_with_menu as _reply_with_menu,
+    runtime_for as _runtime,
+    start_command,
+    update_lang as _update_lang,
 )
 from music_links_bot.mixed_post import send_track_video_album
 from music_links_bot.publication_state import (
@@ -272,11 +288,23 @@ __all__ = [
     "PUBLIC_BOT_COMMANDS",
     "_build_inline_collection_result",
     "_build_inline_result",
+    "_build_home_text",
+    "_build_onboarding_keyboard",
+    "_build_start_keyboard",
+    "_menu_text",
     "_release_fingerprint",
     "close_application_resources",
+    "cancel_command",
+    "channel_command",
+    "crate_command",
+    "guide_command",
+    "help_command",
     "id_command",
     "inline_query_handler",
+    "menu_callback",
     "normalize_hashtag",
+    "platforms_command",
+    "start_command",
     "stats_command",
     "status_command",
     "sync_application_commands",
@@ -284,26 +312,6 @@ __all__ = [
 CHANNEL_USERNAME = "stonerhand"
 CHANNEL_URL = f"https://t.me/{CHANNEL_USERNAME}"
 CHANNEL_BUTTON_TEXT = "🪨 Открыть канал"
-MENU_START = "menu:start"
-MENU_HELP = "menu:help"
-MENU_GUIDE = "menu:guide"
-MENU_PLATFORMS = "menu:platforms"
-MENU_DEMO = "menu:demo"
-MENU_MORE = "menu:more"
-MENU_RECENT = "menu:recent"
-MENU_KEYS = frozenset(
-    (
-        MENU_START,
-        MENU_HELP,
-        MENU_GUIDE,
-        MENU_PLATFORMS,
-        MENU_DEMO,
-        MENU_MORE,
-        MENU_RECENT,
-    )
-)
-CRATE_UNDO_SECONDS = 15
-MAX_CRATE_UNDO_RECORDS = 300
 DRAFT_UNDO_SECONDS = 15
 DEFAULT_UI_MODE = "stonerhand"
 MAX_BUTTON_TEXT_LENGTH = 64
@@ -380,246 +388,32 @@ async def _application_error_handler(
     LOGGER.error("Unhandled Telegram update error: %r", error)
 
 
-def _update_lang(update: Update) -> str:
-    user = update.effective_user
-    return resolve_lang(user.language_code if user else None)
-
-
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not update.message:
-        return
-    lang = _update_lang(update)
-    user_id = update.effective_user.id if update.effective_user else update.message.chat_id
-    runtime = _runtime(context)
-    if not await runtime.claim_intent(user_id, kind="command", value="start"):
-        return
-    session = await runtime.get_session(user_id, lang=lang)
-    active_draft_id, active_draft_label = await _active_home_card(
-        context, runtime, session, lang=lang
-    )
-    crate_count, is_admin = await _home_state(context, user_id)
-    text = _build_home_text(
-        lang=lang,
-        first_name=update.effective_user.first_name if update.effective_user else "",
-        crate_count=crate_count,
-        is_admin=is_admin,
-        first_visit=not session.onboarding_seen,
-    )
-    keyboard = _build_start_keyboard(
-        context.bot.username,
-        lang=lang,
-        crate_count=crate_count,
-        is_admin=is_admin,
-        show_tour=not session.onboarding_seen,
-        active_draft_id=active_draft_id,
-        active_draft_label=active_draft_label,
-    )
-    sent = await update.message.reply_text(
-        text,
-        parse_mode=ParseMode.HTML,
-        reply_markup=keyboard,
-    )
-    if update.message.chat.type == "private":
-        await _remember_fresh_home_message(
-            context,
-            runtime,
-            session,
-            chat_id=update.message.chat_id,
-            sent=sent,
-        )
-
-
-async def _remember_fresh_home_message(
-    context: ContextTypes.DEFAULT_TYPE,
-    runtime: BotRuntime,
-    session: UserSession,
-    *,
-    chat_id: int,
-    sent: Message,
-) -> None:
-    """Point navigation at a visible reply, then retire the previous menu.
-
-    A slash command is an explicit request for feedback at the bottom of the
-    chat. Editing an old home message can succeed off-screen — or return
-    ``Message is not modified`` — while looking like the command was ignored.
-    """
-    message_id = getattr(sent, "message_id", None)
-    if not isinstance(message_id, int) or message_id <= 0:
-        return
-
-    previous_chat_id = session.home_chat_id
-    previous_message_id = session.home_message_id
-    session.home_chat_id = chat_id
-    session.home_message_id = message_id
-    await runtime.save_session(session)
-
-    if (
-        previous_chat_id != chat_id
-        or not previous_message_id
-        or previous_message_id == message_id
-    ):
-        return
-    try:
-        await context.bot.delete_message(
-            chat_id=previous_chat_id,
-            message_id=previous_message_id,
-        )
-    except TelegramError:
-        # The new menu is already live and saved, so stale-message cleanup must
-        # never make a successfully handled command look failed.
-        LOGGER.debug("Could not retire previous home message", exc_info=True)
-
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not update.message:
-        return
-
-    await _reply_with_menu(update.message, context, MENU_HELP, lang=_update_lang(update))
-
-
-async def guide_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    message = update.effective_message
-    if not message:
-        return
-
-    lang = _update_lang(update)
-    if message.chat.type == "private":
-        await _reply_with_menu(message, context, MENU_GUIDE, lang=lang)
-        return
-
-    user_id = update.effective_user.id if update.effective_user else message.chat_id
-    crate_count, _is_admin = await _home_state(context, user_id)
-    sent_message = await message.reply_text(
-        _menu_text(MENU_GUIDE, lang=lang),
-        parse_mode=ParseMode.HTML,
-        reply_markup=_build_section_keyboard(
-            context.bot.username,
-            lang=lang,
-            crate_count=crate_count,
-            active="guide",
-        ),
-    )
-
-    if message.chat.type in {"group", "supergroup", "channel"}:
-        try:
-            await sent_message.pin(disable_notification=True)
-        except (BadRequest, Forbidden):
-            LOGGER.info("Could not pin guide in chat %s", message.chat_id)
-
-
-async def platforms_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not update.message:
-        return
-
-    await _reply_with_menu(
-        update.message,
-        context,
-        MENU_PLATFORMS,
-        lang=_update_lang(update),
-    )
-
-
-async def channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    del context
-    if not update.message:
-        return
-
-    await update.message.reply_text(
-        "StonerHand рядом",
-        reply_markup=InlineKeyboardMarkup([[_channel_button()]]),
-    )
-
-
-def _runtime(context: ContextTypes.DEFAULT_TYPE) -> BotRuntime:
-    runtime = context.application.bot_data.get("runtime")
-    if not isinstance(runtime, BotRuntime):
-        runtime = BotRuntime(context.application.bot_data.get("kv_store"))
-        context.application.bot_data["runtime"] = runtime
-    return runtime
-
-
-async def _home_state(
-    context: ContextTypes.DEFAULT_TYPE, user_id: int
-) -> tuple[int, bool]:
-    items = await load_crate(context.application.bot_data, user_id)
-    admin_chat_id = context.application.bot_data.get("admin_chat_id")
-    return len(items), admin_chat_id is not None and user_id == admin_chat_id
-
-
-async def _active_home_draft_id(
-    context: ContextTypes.DEFAULT_TYPE,
-    runtime: BotRuntime,
-    session: UserSession,
-) -> str | None:
-    """Return only a live, restorable card and forget stale home pointers."""
-    draft_id = session.active_draft_id
-    if not draft_id:
-        return None
-    draft = await _load_draft(context, draft_id)
-    if draft is not None and not draft.get("deleted_at"):
-        return draft_id
-    session.active_draft_id = ""
-    await runtime.save_session(session)
-    return None
-
-
-async def _active_home_card(
-    context: ContextTypes.DEFAULT_TYPE,
-    runtime: BotRuntime,
-    session: UserSession,
-    *,
-    lang: str,
-) -> tuple[str | None, str | None]:
-    draft_id = await _active_home_draft_id(context, runtime, session)
-    if not draft_id:
-        return None, None
-    draft = await _load_draft(context, draft_id)
-    if draft is None:
-        return None, None
-    return draft_id, active_card_label(draft, get_text(lang, "home_continue"))
-
-
-async def _home_view(query, context, *, lang: str) -> tuple[str, InlineKeyboardMarkup]:
-    user = query.from_user
-    user_id = user.id if user else 0
-    crate_count, is_admin = await _home_state(context, user_id)
-    runtime = _runtime(context)
-    session = await runtime.get_session(user_id, lang=lang)
-    active_draft_id, active_draft_label = await _active_home_card(
-        context, runtime, session, lang=lang
-    )
-    text = _build_home_text(
-        lang=lang,
-        first_name=user.first_name if user else "",
-        crate_count=crate_count,
-        is_admin=is_admin,
-    )
-    keyboard = _build_start_keyboard(
-        context.bot.username,
-        lang=lang,
-        crate_count=crate_count,
-        is_admin=is_admin,
-        active_draft_id=active_draft_id,
-        active_draft_label=active_draft_label,
-    )
-    return text, keyboard
-
-
 async def bot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Versioned callback dispatcher for all new interactive bot surfaces."""
     query = update.callback_query
     parsed = decode_callback(query.data if query else None)
     if query is None or parsed is None:
         return
+    if action_spec(parsed.scope, parsed.action) is None and parsed.version == "v2":
+        await query.answer()
+        LOGGER.info(
+            "Ignored unknown callback action %s:%s", parsed.scope, parsed.action
+        )
+        return
 
     runtime = _runtime(context)
-    callback_id = str(getattr(query, "id", "") or hashlib.sha256(query.data.encode()).hexdigest())
+    callback_id = str(
+        getattr(query, "id", "") or hashlib.sha256(query.data.encode()).hexdigest()
+    )
     if not await runtime.claim_callback(callback_id):
         lang = resolve_lang(query.from_user.language_code if query.from_user else None)
         await query.answer(get_text(lang, "action_duplicate"))
         return
 
-    handlers: dict[str, Callable[[object, ContextTypes.DEFAULT_TYPE, CallbackAction], Awaitable[None]]] = {
+    handlers: dict[
+        str,
+        Callable[[object, ContextTypes.DEFAULT_TYPE, CallbackAction], Awaitable[None]],
+    ] = {
         "menu": _dispatch_menu_action,
         "select": _dispatch_selection_action,
         "editor": _dispatch_editor_action,
@@ -637,146 +431,6 @@ async def bot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def _dispatch_noop_action(query, context, action: CallbackAction) -> None:
     del context, action
     await query.answer()
-
-
-async def _dispatch_menu_action(query, context, action: CallbackAction) -> None:
-    lang = resolve_lang(query.from_user.language_code if query.from_user else None)
-    if action.action.startswith("onboard"):
-        step = action.action.removeprefix("onboard") or "1"
-        if step == "done":
-            session = await _runtime(context).get_session(query.from_user.id, lang=lang)
-            session.onboarding_seen = True
-            await _runtime(context).save_session(session)
-            text, keyboard = await _home_view(query, context, lang=lang)
-        else:
-            step_number = max(1, min(3, int(step)))
-            text = get_text(lang, f"onboarding_{step_number}")
-            keyboard = _build_onboarding_keyboard(step_number, lang)
-        await query.answer()
-        await _safe_edit(query, text, keyboard)
-        return
-
-    if action.action == "stats":
-        user_id = query.from_user.id if query.from_user else 0
-        crate_count, is_admin = await _home_state(context, user_id)
-        if not is_admin:
-            await query.answer(get_text(lang, "ed_admin_only"), show_alert=True)
-            return
-        text = escape(await _stats_text(context, include_private=True))
-        await query.answer()
-        await _safe_edit(
-            query,
-            text,
-            _build_section_keyboard(
-                context.bot.username,
-                lang=lang,
-                crate_count=crate_count,
-                active=None,
-            ),
-        )
-        return
-
-    if action.action == "start":
-        text, keyboard = await _home_view(query, context, lang=lang)
-        await query.answer()
-        await _safe_edit(query, text, keyboard)
-        return
-
-    if action.action == "recent":
-        await query.answer()
-        text, keyboard = await _recent_view(query, context, lang=lang)
-        await _safe_edit(query, text, keyboard)
-        return
-
-    if action.action == "create":
-        await query.answer()
-        await _safe_edit(
-            query,
-            get_text(lang, "create_prompt"),
-            _build_create_keyboard(lang=lang),
-        )
-        return
-
-    menu_key = {
-        "start": MENU_START,
-        "help": MENU_HELP,
-        "guide": MENU_GUIDE,
-        "platforms": MENU_PLATFORMS,
-        "demo": MENU_DEMO,
-        "more": MENU_MORE,
-    }.get(action.action, MENU_START)
-    await query.answer()
-    user_id = query.from_user.id if query.from_user else 0
-    crate_count, _is_admin = await _home_state(context, user_id)
-    await _safe_edit(
-        query,
-        _menu_text(menu_key, lang=lang),
-        _build_section_keyboard(
-            context.bot.username,
-            lang=lang,
-            crate_count=crate_count,
-            active=action.action,
-        ),
-    )
-
-
-async def _recent_view(
-    query,
-    context: ContextTypes.DEFAULT_TYPE,
-    *,
-    lang: str,
-) -> tuple[str, InlineKeyboardMarkup]:
-    user_id = query.from_user.id if query.from_user else 0
-    session = await _runtime(context).get_session(user_id, lang=lang)
-    return await render_recent_view(
-        context,
-        user_id=user_id,
-        lang=lang,
-        draft_ids=session.recent_draft_ids,
-        load_draft=_load_draft,
-    )
-
-
-async def _safe_edit(query, text: str, keyboard: InlineKeyboardMarkup | None) -> None:
-    try:
-        await query.edit_message_text(
-            text=text, parse_mode=ParseMode.HTML, reply_markup=keyboard
-        )
-    except BadRequest as exc:
-        if "Message is not modified" not in str(exc):
-            raise
-
-
-async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.callback_query
-    if query is None:
-        return
-
-    await query.answer()
-    lang = resolve_lang(query.from_user.language_code if query.from_user else None)
-    menu_key = query.data if query.data in MENU_KEYS else MENU_START
-    if menu_key == MENU_START:
-        text, keyboard = await _home_view(query, context, lang=lang)
-    else:
-        user_id = query.from_user.id if query.from_user else 0
-        crate_count, _is_admin = await _home_state(context, user_id)
-        text = _menu_text(menu_key, lang=lang)
-        keyboard = _build_section_keyboard(
-            context.bot.username,
-            lang=lang,
-            crate_count=crate_count,
-            active=menu_key.removeprefix("menu:"),
-        )
-    try:
-        await query.edit_message_text(
-            text=text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=keyboard,
-        )
-    except BadRequest as exc:
-        if "Message is not modified" in str(exc):
-            return
-        raise
 
 
 async def _send_track_draft(
@@ -797,9 +451,7 @@ async def _send_track_draft(
         lang=lang,
         prefix=user_prefix,
         search_query=search_query or "",
-        can_publish=(
-            admin_chat_id is not None and user_id == admin_chat_id
-        ),
+        can_publish=(admin_chat_id is not None and user_id == admin_chat_id),
     )
     await apply_channel_template(context, f"user:{user_id}", draft)
     if draft["can_publish"]:
@@ -985,7 +637,9 @@ async def _handle_editor_navigation(
         token = _INPUT_OVERRIDE.set(search_query)
         guard_token = _BYPASS_INTENT_GUARD.set(True)
         try:
-            await track_lookup_message(Update(update_id=0, callback_query=query), context)
+            await track_lookup_message(
+                Update(update_id=0, callback_query=query), context
+            )
         finally:
             _BYPASS_INTENT_GUARD.reset(guard_token)
             _INPUT_OVERRIDE.reset(token)
@@ -1134,10 +788,7 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
         return
 
     lang = draft.get("lang") or user_lang
-    if (
-        query.from_user is not None
-        and not _draft_owned_by(draft, query.from_user.id)
-    ):
+    if query.from_user is not None and not _draft_owned_by(draft, query.from_user.id):
         await query.answer(get_text(lang, "ed_owner_only"), show_alert=True)
         return
 
@@ -1163,9 +814,11 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
     track = TrackMatch(**draft["item"])
     return_screen: str | None = None
     if action in {"z0", "z1", "z2"}:
+        remember_setting_state(draft)
         select_preset(draft, int(action[1]))
         return_screen = "zs"
     elif len(action) >= 2 and action.startswith("l") and action[1:].isdigit():
+        remember_setting_state(draft)
         toggle_platform(
             draft,
             track,
@@ -1174,6 +827,7 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
         )
         return_screen = "ls"
     elif action == "la":
+        remember_setting_state(draft)
         select_all_platforms(
             draft,
             track,
@@ -1181,14 +835,30 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
         )
         return_screen = "ls"
     elif action == "ha":
+        remember_setting_state(draft)
         use_auto_tags(draft)
         return_screen = "hs"
     elif action == "hn":
+        remember_setting_state(draft)
         remove_tags(draft)
         return_screen = "hs"
     elif action == "t0":
+        remember_setting_state(draft)
         remove_intro(draft)
         return_screen = "ts"
+    elif action == "u":
+        if not restore_setting_state(draft):
+            await query.answer(get_text(lang, "ed_undo_expired"), show_alert=True)
+            return
+        await _store_draft(context, draft_id, draft)
+        if query.from_user is not None:
+            await save_channel_template(context, f"user:{query.from_user.id}", draft)
+        await query.answer(get_text(lang, "settings_restored"))
+        text, keyboard = _render_track_draft(
+            draft, context, draft_id=draft_id, settings=True, show_status=True
+        )
+        await _edit_editor_message(query, context, draft, text, keyboard)
+        return
 
     if return_screen is not None:
         await _store_draft(context, draft_id, draft)
@@ -1204,12 +874,12 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
         )
         return
 
-    if action in {"ti", "hi"}:
+    if action in {"ti", "hi", "qi"}:
         await _start_pending_editor_input(
             query,
             context,
             draft_id=draft_id,
-            kind="intro" if action == "ti" else "hashtags",
+            kind={"ti": "intro", "hi": "hashtags", "qi": "schedule"}[action],
             lang=lang,
         )
         return
@@ -1240,7 +910,7 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
         await _edit_editor_message(query, context, draft, text, keyboard)
         return
 
-    if action in {"q1", "q3", "qd"}:
+    if action in {"q1", "q3", "qe", "qd"}:
         user_id = query.from_user.id if query.from_user else 0
         runtime = _runtime(context)
         lock_key = f"{user_id}:schedule:{draft_id}"
@@ -1280,9 +950,7 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
         await query.answer()
         return
 
-    await query.answer(
-        get_text(lang, "settings_saved") if action != "f" else None
-    )
+    await query.answer(get_text(lang, "settings_saved") if action != "f" else None)
     await _store_draft(context, draft_id, draft)
     if query.from_user is not None:
         await save_channel_template(context, f"user:{query.from_user.id}", draft)
@@ -1307,7 +975,11 @@ async def _start_pending_editor_input(
     if query.from_user is None or query.message is None:
         await query.answer()
         return
-    prompt_key = "ed_intro_prompt" if kind == "intro" else "ed_tags_prompt"
+    prompt_key = {
+        "intro": "ed_intro_prompt",
+        "hashtags": "ed_tags_prompt",
+        "schedule": "schedule_prompt",
+    }[kind]
     prompt = await query.message.reply_text(
         get_text(lang, prompt_key),
         parse_mode=ParseMode.HTML,
@@ -1326,7 +998,9 @@ async def _start_pending_editor_input(
     await query.answer()
 
 
-async def _schedule_editor_draft(query, context, action: str, draft: dict, *, lang: str) -> None:
+async def _schedule_editor_draft(
+    query, context, action: str, draft: dict, *, lang: str
+) -> None:
     if query.from_user is None:
         await query.answer()
         return
@@ -1334,7 +1008,10 @@ async def _schedule_editor_draft(query, context, action: str, draft: dict, *, la
     if not draft.get("can_publish") or admin_chat_id != query.from_user.id:
         await query.answer(get_text(lang, "ed_admin_only"), show_alert=True)
         return
-    publish_at = schedule_timestamp(action)
+    timezone_name = str(
+        context.application.bot_data.get("timezone_name") or "Europe/Moscow"
+    )
+    publish_at = schedule_timestamp(action, timezone_name=timezone_name)
     try:
         await add_job(context, dict(draft), publish_at)
     except (QueueBusyError, QueueStorageError):
@@ -1342,20 +1019,34 @@ async def _schedule_editor_draft(query, context, action: str, draft: dict, *, la
         return
     date = get_text(
         lang,
-        {"q1": "schedule_1h", "q3": "schedule_3h", "qd": "schedule_1d"}[action],
+        {
+            "q1": "schedule_1h",
+            "q3": "schedule_3h",
+            "qe": "schedule_evening",
+            "qd": "schedule_1d",
+        }[action],
     )
     await query.answer(
         get_text(lang, "schedule_done").format(date=date), show_alert=True
     )
     text, keyboard = _render_track_draft(draft, context, draft_id=None)
-    text = f"<b>{escape(get_text(lang, 'schedule_done').format(date=date))}</b>\n\n{text}"
+    text = (
+        f"<b>{escape(get_text(lang, 'schedule_done').format(date=date))}</b>\n\n{text}"
+    )
     await _edit_editor_message(
         query,
         context,
         draft,
         text,
         InlineKeyboardMarkup(
-            [[InlineKeyboardButton(get_text(lang, "home_back"), callback_data=encode_callback("menu", "start"))]]
+            [
+                [
+                    InlineKeyboardButton(
+                        get_text(lang, "home_back"),
+                        callback_data=encode_callback("menu", "start"),
+                    )
+                ]
+            ]
         ),
     )
 
@@ -1385,9 +1076,7 @@ async def _run_primary_editor_action(
         return
 
     if action == "s":
-        sent = await _deliver_draft(
-            context, draft, target=user_id, channel_style=False
-        )
+        sent = await _deliver_draft(context, draft, target=user_id, channel_style=False)
         await query.answer(
             get_text(lang, "ed_sent" if sent else "ed_publish_failed"),
             show_alert=not bool(sent),
@@ -1441,9 +1130,7 @@ async def _run_primary_editor_action(
                     get_text(lang, "ed_publish_failed"),
                     show_alert=True,
                 )
-                text, _keyboard = _render_track_draft(
-                    draft, context, draft_id=None
-                )
+                text, _keyboard = _render_track_draft(draft, context, draft_id=None)
                 await _edit_editor_message(
                     query,
                     context,
@@ -1522,14 +1209,23 @@ async def _show_action_busy(query, lang: str) -> None:
     try:
         await query.edit_message_reply_markup(
             InlineKeyboardMarkup(
-                [[InlineKeyboardButton("⏳ " + get_text(lang, "progress_card"), callback_data=encode_callback("noop", "busy"))]]
+                [
+                    [
+                        InlineKeyboardButton(
+                            "⏳ " + get_text(lang, "progress_card"),
+                            callback_data=encode_callback("noop", "busy"),
+                        )
+                    ]
+                ]
             )
         )
     except (AttributeError, TelegramError):
         LOGGER.debug("Could not mark editor action busy", exc_info=True)
 
 
-async def _edit_editor_message(query, context, draft: dict, text: str, keyboard) -> None:
+async def _edit_editor_message(
+    query, context, draft: dict, text: str, keyboard
+) -> None:
     track = TrackMatch(**draft["item"])
     text = fit_telegram_html(text)
     try:
@@ -1584,228 +1280,6 @@ async def _deliver_draft(
         target=target,
         channel_style=channel_style,
     )
-
-
-async def crate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    message = update.effective_message
-    if message is None:
-        return
-    user_id = update.effective_user.id if update.effective_user else message.chat_id
-    lang = _update_lang(update)
-    items = await load_crate(context.application.bot_data, user_id)
-    title = await load_crate_title(context.application.bot_data, user_id)
-    text, keyboard = _render_bot_crate(items, lang=lang, title=title)
-    await message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
-
-
-async def _dispatch_crate_action(query, context, action: CallbackAction) -> None:
-    if query.from_user is None:
-        await query.answer()
-        return
-    lang = resolve_lang(query.from_user.language_code)
-    user_id = query.from_user.id
-    bot_data = context.application.bot_data
-    title = await load_crate_title(bot_data, user_id)
-    undo_map = bot_data.setdefault("crate_undo", {})
-    now = time.time()
-    for key, value in list(undo_map.items()):
-        try:
-            active = (
-                isinstance(value, dict)
-                and float(value.get("expires_at") or 0) > now
-            )
-        except (TypeError, ValueError):
-            active = False
-        if not active:
-            undo_map.pop(key, None)
-    undo_record = undo_map.get(user_id)
-    try:
-        index = int(action.payload)
-    except (TypeError, ValueError):
-        index = -1
-    selected_index: int | None = None
-    notice: str | None = None
-    if action.action == "rename":
-        if query.message is None:
-            await query.answer()
-            return
-        prompt = await query.message.reply_text(
-            get_text(lang, "crate_name_prompt"),
-            reply_markup=ForceReply(selective=True),
-        )
-        session = await _runtime(context).get_session(user_id, lang=lang)
-        session.pending_input = {
-            "kind": "crate_title",
-            "editor_chat_id": query.message.chat_id,
-            "editor_message_id": query.message.message_id,
-            "prompt_message_id": prompt.message_id,
-            "created_at": int(time.time()),
-        }
-        await _runtime(context).save_session(session)
-        await query.answer()
-        return
-    if action.action == "preview":
-        items = await load_crate(bot_data, user_id)
-        tracks = [
-            TrackMatch(**entry["item"])
-            for entry in items
-            if isinstance(entry.get("item"), dict)
-        ]
-        if not tracks:
-            await query.answer()
-            text, keyboard = _render_bot_crate([], lang=lang, title=title)
-            await _safe_edit(query, text, keyboard)
-            return
-        preview_keyboard = _build_collection_keyboard(
-            tracks,
-            include_channel_button=False,
-        )
-        keyboard = InlineKeyboardMarkup(
-            [
-                *[list(row) for row in preview_keyboard.inline_keyboard],
-                [
-                    InlineKeyboardButton(
-                        get_text(lang, "back"),
-                        callback_data=encode_callback("crate", "open"),
-                    )
-                ],
-            ]
-        )
-        await query.answer()
-        await _safe_edit(
-            query,
-            format_collection_message(
-                tracks,
-                title=title or get_text(lang, "crate_preview_title"),
-                include_hashtags=True,
-            ),
-            keyboard,
-        )
-        return
-    if action.action == "up":
-        items = await move_crate_item(bot_data, user_id, index, -1)
-        selected_index = max(0, index - 1)
-    elif action.action == "down":
-        items = await move_crate_item(bot_data, user_id, index, 1)
-        selected_index = min(len(items) - 1, index + 1) if items else None
-    elif action.action == "select":
-        items = await load_crate(bot_data, user_id)
-        selected_index = index
-    elif action.action == "remove":
-        before = await load_crate(bot_data, user_id)
-        removed = before[index] if 0 <= index < len(before) else None
-        items = await remove_crate_item(bot_data, user_id, index)
-        if removed is not None:
-            undo_record = {
-                "entry": removed,
-                "index": index,
-                "expires_at": time.time() + CRATE_UNDO_SECONDS,
-            }
-            _remember_bounded(
-                undo_map,
-                user_id,
-                undo_record,
-                max_size=MAX_CRATE_UNDO_RECORDS,
-            )
-            notice = get_text(lang, "crate_removed")
-        selected_index = min(index, len(items) - 1) if items else None
-    elif action.action == "undo":
-        if undo_record:
-            if undo_record.get("kind") == "clear":
-                items = list(undo_record.get("items") or [])
-                await save_crate(bot_data, user_id, items)
-                restored = bool(items)
-            else:
-                items, restored = await restore_crate_item(
-                    bot_data,
-                    user_id,
-                    index=int(undo_record.get("index") or 0),
-                    entry=undo_record.get("entry") or {},
-                )
-            if restored:
-                selected_index = min(
-                    int(undo_record.get("index") or 0), len(items) - 1
-                )
-                notice = get_text(lang, "crate_restored")
-                undo_map.pop(user_id, None)
-                undo_record = None
-        else:
-            items = await load_crate(bot_data, user_id)
-    elif action.action == "clear":
-        items = await load_crate(bot_data, user_id)
-        await query.answer()
-        text, keyboard = _render_bot_crate(
-            items, lang=lang, confirm_clear=True, title=title
-        )
-        await _safe_edit(query, text, keyboard)
-        return
-    elif action.action == "clear_confirm":
-        previous_items = await load_crate(bot_data, user_id)
-        await save_crate(bot_data, user_id, [])
-        undo_record = {
-            "kind": "clear",
-            "items": previous_items,
-            "index": 0,
-            "expires_at": time.time() + CRATE_UNDO_SECONDS,
-        }
-        _remember_bounded(
-            undo_map,
-            user_id,
-            undo_record,
-            max_size=MAX_CRATE_UNDO_RECORDS,
-        )
-        items = []
-    elif action.action in {"clear_cancel", "open"}:
-        items = await load_crate(bot_data, user_id)
-    else:
-        await query.answer()
-        return
-    await query.answer(notice)
-    text, keyboard = _render_bot_crate(
-        items,
-        lang=lang,
-        selected_index=selected_index,
-        can_undo=undo_record is not None,
-        title=title,
-    )
-    await _safe_edit(query, text, keyboard)
-
-
-async def _reply_with_menu(
-    message: Message,
-    context: ContextTypes.DEFAULT_TYPE,
-    menu_key: str,
-    *,
-    lang: str = "ru",
-) -> None:
-    runtime = _runtime(context)
-    subject_id = message.from_user.id if message.from_user else message.chat_id
-    crate_count, _is_admin = await _home_state(context, subject_id)
-    text = _menu_text(menu_key, lang=lang)
-    keyboard = _build_section_keyboard(
-        context.bot.username,
-        lang=lang,
-        crate_count=crate_count,
-        active=menu_key.removeprefix("menu:"),
-    )
-    session = (
-        await runtime.get_session(subject_id, lang=lang)
-        if message.chat.type == "private"
-        else None
-    )
-    sent = await message.reply_text(
-        text,
-        parse_mode=ParseMode.HTML,
-        reply_markup=keyboard,
-    )
-    if session is not None:
-        await _remember_fresh_home_message(
-            context,
-            runtime,
-            session,
-            chat_id=message.chat_id,
-            sent=sent,
-        )
 
 
 async def _reply_with_error(
@@ -1978,7 +1452,7 @@ async def _resolve_search_sources(
                             get_text(lang, "home_back"),
                             encode_callback("menu", "start"),
                         )
-                    ]
+                    ],
                 ]
             )
             if placeholder is not None:
@@ -2010,7 +1484,9 @@ async def _resolve_search_sources(
         return None
 
 
-async def track_lookup_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def track_lookup_message(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
     started = asyncio.get_running_loop().time()
     completed = False
     message = update.effective_message
@@ -2068,8 +1544,7 @@ async def _handle_empty_lookup(
     if bundle.unavailable_urls:
         await _notify_admin(
             context,
-            "Song.link недоступен при обработке: "
-            + ", ".join(bundle.unavailable_urls),
+            "Song.link недоступен при обработке: " + ", ".join(bundle.unavailable_urls),
             only_for_channel_message=message,
         )
 
@@ -2304,25 +1779,58 @@ async def _consume_pending_input(
     saved_key = "settings_saved"
     draft_id = str(pending.get("draft_id") or "")
     draft = await _load_draft(context, draft_id) if draft_id else None
-    if kind in {"intro", "hashtags"} and draft is None:
+    if kind in {"intro", "hashtags", "schedule"} and draft is None:
         session.pending_input = {}
         await runtime.save_session(session)
         await message.reply_text(get_text(lang, "ed_expired"))
         return True
-    if kind in {"intro", "hashtags"} and draft is not None:
+    if kind in {"intro", "hashtags", "schedule"} and draft is not None:
         if not _draft_owned_by(draft, user.id):
             session.pending_input = {}
             await runtime.save_session(session)
             await message.reply_text(get_text(lang, "ed_owner_only"))
             return True
         if kind == "intro":
+            remember_setting_state(draft)
             apply_intro_text(draft, value)
             saved_key = "ed_intro_saved"
-        else:
+        elif kind == "hashtags":
+            remember_setting_state(draft)
             apply_custom_tags(draft, value)
             saved_key = "ed_tags_saved"
+        else:
+            timezone_name = str(
+                context.application.bot_data.get("timezone_name") or "Europe/Moscow"
+            )
+            publish_at = parse_schedule_datetime(
+                value,
+                timezone_name=timezone_name,
+            )
+            if publish_at is None:
+                await message.reply_text(
+                    get_text(lang, "schedule_invalid"),
+                    parse_mode=ParseMode.HTML,
+                )
+                return True
+            admin_chat_id = context.application.bot_data.get("admin_chat_id")
+            if not draft.get("can_publish") or admin_chat_id != user.id:
+                session.pending_input = {}
+                await runtime.save_session(session)
+                await message.reply_text(get_text(lang, "ed_admin_only"))
+                return True
+            try:
+                await add_job(context, dict(draft), publish_at)
+            except (QueueBusyError, QueueStorageError):
+                await message.reply_text(get_text(lang, "ed_publish_failed"))
+                return True
+            date = format_schedule_datetime(
+                publish_at,
+                timezone_name=timezone_name,
+            )
+            saved_key = "schedule_done"
         await _store_draft(context, draft_id, draft)
-        await save_channel_template(context, f"user:{user.id}", draft)
+        if kind != "schedule":
+            await save_channel_template(context, f"user:{user.id}", draft)
     elif kind == "crate_title":
         title = normalize_crate_title(value)
         await save_crate_title(context.application.bot_data, user.id, title)
@@ -2365,8 +1873,13 @@ async def _consume_pending_input(
             show_status=True,
         )
         track = TrackMatch(**draft["item"])
+        saved_label = (
+            get_text(lang, saved_key).format(date=date)
+            if saved_key == "schedule_done"
+            else get_text(lang, saved_key)
+        )
         await message.reply_text(
-            f"<b>{escape(get_text(lang, saved_key))}</b>\n\n{text}",
+            f"<b>{escape(saved_label)}</b>\n\n{text}",
             parse_mode=ParseMode.HTML,
             link_preview_options=_build_link_preview_options(
                 _select_preview_url(track.links, context) or track.thumbnail_url,
@@ -2419,13 +1932,10 @@ async def _track_lookup_message_impl(
             if source_urls
             else message_text or ""
         )
-        if (
-            not _BYPASS_INTENT_GUARD.get()
-            and not await runtime.claim_intent(
-                user_id,
-                kind=action_kind,
-                value=intent_value,
-            )
+        if not _BYPASS_INTENT_GUARD.get() and not await runtime.claim_intent(
+            user_id,
+            kind=action_kind,
+            value=intent_value,
         ):
             return
         if action_kind == "help":
@@ -2464,9 +1974,7 @@ async def _track_lookup_message_impl(
         access = await check_publish_access(context, message.chat_id)
         if not access.allowed or not access.can_delete:
             missing = (
-                "публиковать"
-                if not access.allowed
-                else "удалять исходные сообщения"
+                "публиковать" if not access.allowed else "удалять исходные сообщения"
             )
             await _notify_admin(
                 context,
@@ -2769,17 +2277,6 @@ def _build_error_keyboard(
         search_query=search_query,
         source_url=source_url,
     )
-
-
-def _menu_text(menu_key: str, *, lang: str = "ru") -> str:
-    key_map = {
-        MENU_HELP: "menu_help",
-        MENU_DEMO: "menu_demo",
-        MENU_GUIDE: "menu_guide",
-        MENU_PLATFORMS: "menu_platforms",
-        MENU_MORE: "menu_more",
-    }
-    return get_text(lang, key_map.get(menu_key, "menu_start"))
 
 
 async def _notify_admin(
