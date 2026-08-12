@@ -162,7 +162,7 @@ class OverallHealthTests(unittest.TestCase):
             ),
             patch("api.health.urlopen", return_value=response) as open_mock,
         ):
-            result = _tick_queue("attacker.example")
+            result = _tick_queue("https://attacker.example/api/telegram")
 
         self.assertEqual(result["published"], 2)
         self.assertTrue(result["ok"])
@@ -192,7 +192,7 @@ class OverallHealthTests(unittest.TestCase):
             ),
             patch("api.health.urlopen", return_value=response) as open_mock,
         ):
-            result = _tick_queue("attacker.example")
+            result = _tick_queue("https://attacker.example/api/telegram")
 
         self.assertTrue(result["ok"])
         request = open_mock.call_args.args[0]
@@ -210,7 +210,7 @@ class OverallHealthTests(unittest.TestCase):
             clear=True,
         ):
             self.assertEqual(
-                _tick_queue("bot.example"),
+                _tick_queue("https://bot.example/api/telegram"),
                 {
                     "ok": True,
                     "configured": False,
@@ -218,6 +218,35 @@ class OverallHealthTests(unittest.TestCase):
                     "detail": "not configured",
                 },
             )
+
+    def test_queue_tick_uses_registered_webhook_when_env_host_is_missing(self) -> None:
+        import os
+        from unittest.mock import MagicMock, patch
+
+        from api.health import _tick_queue
+
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = b'{"ok":true}'
+        with (
+            patch.dict(os.environ, {"CRON_SECRET": "secret"}, clear=True),
+            patch("api.health.urlopen", return_value=response) as open_mock,
+        ):
+            result = _tick_queue("https://bot.example/api/telegram")
+
+        self.assertTrue(result["ok"])
+        request = open_mock.call_args.args[0]
+        self.assertEqual(request.full_url, "https://bot.example/api/queue_worker")
+
+    def test_queue_tick_rejects_untrusted_webhook_origin(self) -> None:
+        import os
+        from unittest.mock import patch
+
+        from api.health import _tick_queue
+
+        with patch.dict(os.environ, {"CRON_SECRET": "secret"}, clear=True):
+            result = _tick_queue("http://internal.example/api/telegram")
+
+        self.assertFalse(result["configured"])
 
     def test_queue_tick_failure_is_visible(self) -> None:
         import os
@@ -236,7 +265,7 @@ class OverallHealthTests(unittest.TestCase):
             ),
             patch("api.health.urlopen", side_effect=TimeoutError),
         ):
-            result = _tick_queue("bot.example")
+            result = _tick_queue("https://bot.example/api/telegram")
 
         self.assertFalse(result["ok"])
         self.assertTrue(result["configured"])

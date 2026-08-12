@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
+from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -43,9 +44,12 @@ class handler(BaseHTTPRequestHandler):
         with ThreadPoolExecutor(max_workers=3) as executor:
             telegram_check = executor.submit(_check_telegram)
             webhook_check = executor.submit(_check_webhook)
-            queue_tick = executor.submit(_tick_queue, self.headers.get("host"))
             telegram = telegram_check.result()
             webhook = webhook_check.result()
+            # The registered Telegram webhook is the authoritative public
+            # production origin even when optional Vercel hostname variables
+            # are not exposed to the Python runtime.
+            queue_tick = executor.submit(_tick_queue, webhook.get("detail"))
             queue_worker = queue_tick.result()
         redis, queue, metrics = _storage_snapshot()
         checks: dict[str, dict] = {
@@ -274,13 +278,14 @@ def _summarize_queue_jobs(jobs: list, *, now: float | None = None) -> dict:
     return {"configured": True, "size": valid_jobs, "overdue": overdue}
 
 
-def _tick_queue(_request_host: str | None) -> dict[str, object]:
+def _tick_queue(webhook_url: object = None) -> dict[str, object]:
     """Piggyback the scheduled-posts tick on every health ping, so one
     uptime monitor keeps the queue delivering on time."""
     host = (
         os.getenv("WEBHOOK_BASE_URL", "").strip()
         or os.getenv("VERCEL_PROJECT_PRODUCTION_URL", "").strip()
         or os.getenv("VERCEL_URL", "").strip()
+        or _webhook_host(webhook_url)
     )
     secret = os.getenv("CRON_SECRET", "").strip()
     if not host or not secret:
@@ -316,3 +321,18 @@ def _tick_queue(_request_host: str | None) -> dict[str, object]:
         "published": 0,
         "detail": "unreachable",
     }
+
+
+def _webhook_host(value: object) -> str:
+    """Accept only the public HTTPS origin returned by Telegram itself."""
+    if not isinstance(value, str):
+        return ""
+    parsed = urlparse(value.strip())
+    if (
+        parsed.scheme != "https"
+        or not parsed.netloc
+        or parsed.username
+        or not parsed.path.endswith("/api/telegram")
+    ):
+        return ""
+    return parsed.netloc
