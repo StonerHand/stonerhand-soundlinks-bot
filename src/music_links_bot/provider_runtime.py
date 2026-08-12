@@ -158,7 +158,9 @@ def lookup_cache_key(source_urls: list[str]) -> str:
         ensure_ascii=True,
         separators=(",", ":"),
     )
-    return "lookup:v2:" + hashlib.sha256(canonical.encode()).hexdigest()
+    # Version the aggregate key whenever completeness semantics change so an
+    # old partial result cannot look like a complete collection after deploy.
+    return "lookup:v3:" + hashlib.sha256(canonical.encode()).hexdigest()
 
 
 async def get_cached_lookup(bot_data: dict, source_urls: list[str]) -> dict | None:

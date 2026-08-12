@@ -11,6 +11,7 @@ from music_links_bot.cache import TTLCache
 from music_links_bot.constants import HTTP_USER_AGENT, PLATFORM_ALIASES
 from music_links_bot.kvstore import KVStore
 from music_links_bot.models import TrackMatch
+from music_links_bot.spotify import SpotifyClient, SpotifyLookupError
 from music_links_bot.url_utils import cache_key_for_url
 
 HTTP_HEADERS = {"User-Agent": HTTP_USER_AGENT}
@@ -35,10 +36,13 @@ class SonglinkClient:
         api_key: str | None = None,
         timeout: float = 8.0,
         kv: KVStore | None = None,
+        spotify_client: SpotifyClient | None = None,
     ) -> None:
         self._user_countries = user_countries
         self._api_key = api_key
         self._kv = kv
+        self._spotify_client = spotify_client or SpotifyClient(timeout=timeout)
+        self._owns_spotify_client = spotify_client is None
         self._client = httpx.AsyncClient(
             base_url="https://api.song.link/v1-alpha.1",
             headers=HTTP_HEADERS,
@@ -50,6 +54,8 @@ class SonglinkClient:
 
     async def aclose(self) -> None:
         await self._client.aclose()
+        if self._owns_spotify_client:
+            await self._spotify_client.aclose()
 
     async def lookup_track(self, source_url: str) -> TrackMatch:
         cache_key = cache_key_for_url(source_url)
@@ -132,7 +138,12 @@ class SonglinkClient:
                 (result for result in results if isinstance(result, SonglinkLookupError)),
                 None,
             )
-            raise lookup_error or SonglinkLookupError("Song.link could not resolve the URL.")
+            try:
+                return await self._spotify_client.lookup_release(source_url)
+            except SpotifyLookupError as exc:
+                raise lookup_error or SonglinkLookupError(
+                    "Song.link could not resolve the URL."
+                ) from exc
 
         match = self._merge_matches(matches)
         self._cache.set(cache_key, match)
