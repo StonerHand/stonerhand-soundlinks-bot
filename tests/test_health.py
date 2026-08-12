@@ -172,6 +172,32 @@ class OverallHealthTests(unittest.TestCase):
         self.assertEqual(request.full_url, "https://bot.example/api/queue_worker")
         self.assertEqual(request.get_header("Authorization"), "Bearer secret")
 
+    def test_queue_tick_prefers_explicit_production_base_url(self) -> None:
+        import os
+        from unittest.mock import MagicMock, patch
+
+        from api.health import _tick_queue
+
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = b'{"ok":true}'
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "WEBHOOK_BASE_URL": "https://public.example/path",
+                    "VERCEL_URL": "preview.example",
+                    "CRON_SECRET": "secret",
+                },
+                clear=True,
+            ),
+            patch("api.health.urlopen", return_value=response) as open_mock,
+        ):
+            result = _tick_queue("attacker.example")
+
+        self.assertTrue(result["ok"])
+        request = open_mock.call_args.args[0]
+        self.assertEqual(request.full_url, "https://public.example/api/queue_worker")
+
     def test_queue_tick_is_disabled_without_secret(self) -> None:
         import os
         from unittest.mock import patch

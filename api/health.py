@@ -278,7 +278,8 @@ def _tick_queue(_request_host: str | None) -> dict[str, object]:
     """Piggyback the scheduled-posts tick on every health ping, so one
     uptime monitor keeps the queue delivering on time."""
     host = (
-        os.getenv("VERCEL_PROJECT_PRODUCTION_URL", "").strip()
+        os.getenv("WEBHOOK_BASE_URL", "").strip()
+        or os.getenv("VERCEL_PROJECT_PRODUCTION_URL", "").strip()
         or os.getenv("VERCEL_URL", "").strip()
     )
     secret = os.getenv("CRON_SECRET", "").strip()

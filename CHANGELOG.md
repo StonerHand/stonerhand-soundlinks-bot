@@ -11,9 +11,9 @@ Production stabilization and performance release.
 - Cancelled metadata enrichment that cannot finish before rendering instead of leaking background work past the response.
 - Made a full queue explicit and lossless: existing scheduled posts are never silently evicted, and the user receives a specific recovery message.
 - Aligned batch input, native crate and scheduling limits: 10 sources per post and a 90-day queue horizon.
-- Consolidated Redis health reads, parallelized independent production checks, made worker failures and overdue jobs fail the canary, and ignored active queue leases.
+- Consolidated Redis health reads, parallelized independent production checks, reused the configured public base URL for worker ticks, made worker failures and overdue jobs fail the canary, and ignored active queue leases.
 - Added deployed version and commit identity to `/api/health`; the production canary now detects a stale deployment.
-- Extended regression coverage to 426 automated tests and tightened lint/type hygiene.
+- Extended regression coverage to 427 automated tests and tightened lint/type hygiene.
 
 ## 1.0.0 — 2026-08-12
 
