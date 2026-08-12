@@ -1,11 +1,17 @@
+import sys
 import time
 import unittest
 from pathlib import Path
-import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from api.health import describe_failures, evaluate_webhook_info, overall_ok
+from api.health import (
+    describe_failures,
+    evaluate_webhook_info,
+    overall_ok,
+    overall_service_ok,
+    release_info,
+)
 from music_links_bot.alerts import alert_dedup_digest
 
 
@@ -55,11 +61,20 @@ class WebhookEvaluationTests(unittest.TestCase):
 
 
 class OverallHealthTests(unittest.TestCase):
-    def _checks(self, telegram=True, webhook=True, redis_ok=True, redis_conf=True):
+    def _checks(
+        self,
+        telegram=True,
+        webhook=True,
+        redis_ok=True,
+        redis_conf=True,
+        worker_ok=True,
+        worker_conf=True,
+    ):
         return {
             "telegram": {"ok": telegram},
             "webhook": {"ok": webhook},
             "redis": {"ok": redis_ok, "configured": redis_conf},
+            "queue_worker": {"ok": worker_ok, "configured": worker_conf},
         }
 
     def test_all_green(self) -> None:
@@ -73,20 +88,60 @@ class OverallHealthTests(unittest.TestCase):
         self.assertTrue(overall_ok(self._checks(redis_ok=False, redis_conf=False)))
         self.assertFalse(overall_ok(self._checks(redis_ok=False, redis_conf=True)))
 
+    def test_configured_queue_worker_is_critical(self) -> None:
+        self.assertFalse(overall_ok(self._checks(worker_ok=False)))
+        self.assertTrue(
+            overall_ok(self._checks(worker_ok=False, worker_conf=False))
+        )
+
+    def test_overdue_queue_fails_whole_service_health(self) -> None:
+        self.assertTrue(
+            overall_service_ok(
+                self._checks(),
+                {"configured": True, "overdue": 0},
+            )
+        )
+        self.assertFalse(
+            overall_service_ok(
+                self._checks(),
+                {"configured": True, "overdue": 1},
+            )
+        )
+
+    def test_release_info_identifies_deployed_build(self) -> None:
+        import os
+        from unittest.mock import patch
+
+        with patch.dict(
+            os.environ,
+            {
+                "VERCEL_GIT_COMMIT_SHA": "1234567890abcdef",
+                "VERCEL_ENV": "production",
+            },
+            clear=True,
+        ):
+            release = release_info()
+
+        self.assertEqual(release["commit"], "1234567890ab")
+        self.assertEqual(release["environment"], "production")
+        self.assertRegex(release["version"], r"^\d+\.\d+\.\d+$")
+
     def test_describe_failures_skips_unconfigured_redis(self) -> None:
         failures = describe_failures(self._checks(webhook=False, redis_ok=False, redis_conf=False))
         self.assertEqual(failures, ["webhook"])
 
-    def test_queue_status_without_redis_is_empty(self) -> None:
+    def test_storage_snapshot_without_redis_is_empty(self) -> None:
         import os
         from unittest.mock import patch
 
-        from api.health import _queue_status
+        from api.health import _storage_snapshot
 
         with patch.dict(os.environ, {}, clear=True):
-            status = _queue_status()
+            redis, queue, metrics = _storage_snapshot()
 
-        self.assertEqual(status, {"configured": False, "size": 0, "overdue": 0})
+        self.assertEqual(redis["configured"], False)
+        self.assertEqual(queue, {"configured": False, "size": 0, "overdue": 0})
+        self.assertEqual(metrics, {"configured": False})
 
     def test_queue_tick_uses_protected_worker_and_trusted_host(self) -> None:
         import os
@@ -107,7 +162,11 @@ class OverallHealthTests(unittest.TestCase):
             ),
             patch("api.health.urlopen", return_value=response) as open_mock,
         ):
-            self.assertEqual(_tick_queue("attacker.example"), 2)
+            result = _tick_queue("attacker.example")
+
+        self.assertEqual(result["published"], 2)
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["configured"])
 
         request = open_mock.call_args.args[0]
         self.assertEqual(request.full_url, "https://bot.example/api/queue_worker")
@@ -124,7 +183,38 @@ class OverallHealthTests(unittest.TestCase):
             {"VERCEL_PROJECT_PRODUCTION_URL": "bot.example"},
             clear=True,
         ):
-            self.assertEqual(_tick_queue("bot.example"), 0)
+            self.assertEqual(
+                _tick_queue("bot.example"),
+                {
+                    "ok": True,
+                    "configured": False,
+                    "published": 0,
+                    "detail": "not configured",
+                },
+            )
+
+    def test_queue_tick_failure_is_visible(self) -> None:
+        import os
+        from unittest.mock import patch
+
+        from api.health import _tick_queue
+
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "VERCEL_PROJECT_PRODUCTION_URL": "bot.example",
+                    "CRON_SECRET": "secret",
+                },
+                clear=True,
+            ),
+            patch("api.health.urlopen", side_effect=TimeoutError),
+        ):
+            result = _tick_queue("bot.example")
+
+        self.assertFalse(result["ok"])
+        self.assertTrue(result["configured"])
+        self.assertEqual(result["published"], 0)
 
     def test_queue_summary_skips_corrupt_jobs(self) -> None:
         from api.health import _summarize_queue_jobs
@@ -134,12 +224,30 @@ class OverallHealthTests(unittest.TestCase):
                 [
                     {"publish_at": 100},
                     {"publish_at": "broken"},
+                    {"status": "pending"},
                     None,
                     {"publish_at": 950},
                 ],
                 now=1000,
             ),
             {"configured": True, "size": 2, "overdue": 1},
+        )
+
+    def test_queue_summary_does_not_flag_an_active_processing_lease(self) -> None:
+        from api.health import _summarize_queue_jobs
+
+        self.assertEqual(
+            _summarize_queue_jobs(
+                [
+                    {
+                        "publish_at": 100,
+                        "status": "processing",
+                        "lease_until": 1100,
+                    }
+                ],
+                now=1000,
+            ),
+            {"configured": True, "size": 1, "overdue": 0},
         )
 
 

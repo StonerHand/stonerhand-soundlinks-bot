@@ -8,6 +8,7 @@ import sys
 from urllib.request import Request, urlopen
 
 BASE_URL = os.getenv("CANARY_BASE_URL", "https://tg-bot-sh.vercel.app").rstrip("/")
+EXPECTED_COMMIT = os.getenv("CANARY_EXPECT_COMMIT", "").strip()
 TIMEOUT_SECONDS = 20
 
 
@@ -39,6 +40,17 @@ def main() -> int:
         )
         if "application/json" not in content_type:
             failures.append("health content-type is not JSON")
+        release = payload.get("release") or {}
+        if not release.get("version"):
+            failures.append("health release version is missing")
+        deployed_commit = str(release.get("commit") or "")
+        if EXPECTED_COMMIT and (
+            not deployed_commit or not EXPECTED_COMMIT.startswith(deployed_commit)
+        ):
+            failures.append(
+                f"production commit={deployed_commit or 'missing'} "
+                f"expected={EXPECTED_COMMIT[:12]}"
+            )
     except Exception as exc:
         failures.append(f"health request failed: {type(exc).__name__}")
 

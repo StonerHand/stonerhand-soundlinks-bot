@@ -35,6 +35,9 @@ opening a separate web interface.
 - lets the user cancel any native text input with `/cancel`;
 - works inline: `@StonerHandBot artist — track`.
 
+A single message accepts up to 10 unique sources — the same explicit limit as
+the editable crate. Duplicate and tracking variants are removed before lookup.
+
 Supported sources include Spotify, Apple Music, YouTube, SoundCloud, Bandcamp,
 Deezer, Tidal, Yandex Music, podcasts, Spotify and Apple Music playlists,
 Spotify artists and NTS Radio.
@@ -64,6 +67,9 @@ Lookup uses visible `1/3 → 3/3` progress. When one source fails, resolved item
 are still delivered and retry targets only the failed links.
 All output is checked against Telegram message and caption limits before
 delivery, with a safe fallback for oversized formatted text.
+Transient Song.link failures fall back to Spotify metadata for Spotify URLs;
+the short fallback cache is automatically replaced by the complete platform
+result after the provider recovers.
 
 ## Local setup
 
@@ -85,7 +91,8 @@ PRIMARY_PLATFORM=spotify
 ```
 
 Production also uses webhook secrets, a cron secret and Upstash Redis. Fixed
-schedule choices use `BOT_TIMEZONE` (`Europe/Moscow` by default).
+schedule choices use `BOT_TIMEZONE` (`Europe/Moscow` by default); custom dates
+can be scheduled up to 90 days ahead.
 
 ## Validation
 
@@ -110,9 +117,15 @@ tests/                  unit and integration tests
 vercel.json             production routes and cron jobs
 ```
 
-Production runs on Vercel using a Telegram webhook. Redis stores caches,
+Production runs on Vercel using a Telegram webhook. The webhook only processes
+Telegram updates; scheduled posts are leased by the protected queue worker.
+Redis stores caches,
 sessions, drafts, collections, history, the publishing queue and deduplication
 claims. Stored state is versioned and automatically migrates legacy records.
 Non-critical flows have a bounded in-memory fallback.
+
+`/api/health` reports Telegram, webhook, Redis, queue worker, queue state,
+runtime metrics and the exact deployed version/commit. The production canary
+rejects stale deployments, a failed worker and an overdue durable queue.
 
 License: [MIT](LICENSE).

@@ -2299,6 +2299,33 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(tracks[0].genre, "Industrial")
 
+    async def test_lookup_tracks_cancels_slow_genre_enrichment(self) -> None:
+        class SlowGenreSearchStub:
+            def __init__(self) -> None:
+                self.cancelled = False
+
+            async def lookup_genre(self, artist: str, title: str) -> str | None:
+                del artist, title
+                try:
+                    await asyncio.sleep(10)
+                except asyncio.CancelledError:
+                    self.cancelled = True
+                    raise
+
+        search = SlowGenreSearchStub()
+        with patch(
+            "music_links_bot.bot_lookup._GENRE_ENRICHMENT_TIMEOUT_SECONDS",
+            0.001,
+        ):
+            tracks, _ = await _lookup_tracks(
+                SuccessfulLookupClient(),
+                ["https://open.spotify.com/track/abc"],
+                search_client=search,
+            )
+
+        self.assertIsNone(tracks[0].genre)
+        self.assertTrue(search.cancelled)
+
     async def test_lookup_tracks_retries_transient_batch_failures(self) -> None:
         class FlakyBatchLookupClient:
             def __init__(self) -> None:
@@ -2330,7 +2357,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             [track.title for track in tracks],
             ["Track abc", "Track def", "Track ghi"],
         )
-        self.assertEqual(client.calls, {url: 2 for url in urls})
+        self.assertEqual(client.calls, dict.fromkeys(urls, 2))
 
     async def test_lookup_tracks_guarantees_spotify_button_first(self) -> None:
         class NoSpotifyLookupClient:

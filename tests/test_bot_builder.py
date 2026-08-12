@@ -128,6 +128,12 @@ class BuilderJourneyTests(unittest.TestCase):
         self.assertLessEqual(len(limited), 1024)
         self.assertTrue(limited.endswith("…"))
 
+    def test_custom_schedule_is_bounded_to_operational_queue_window(self) -> None:
+        now = datetime(2026, 8, 10, 10, 0, tzinfo=timezone.utc)
+
+        self.assertIsNotNone(parse_schedule_datetime("01.09.2026 12:00", now=now))
+        self.assertIsNone(parse_schedule_datetime("01.12.2026 12:00", now=now))
+
     def test_session_keeps_native_input_state(self) -> None:
         session = UserSession.from_dict(
             {

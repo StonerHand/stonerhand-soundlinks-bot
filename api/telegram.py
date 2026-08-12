@@ -30,8 +30,6 @@ from music_links_bot.loop_runner import (
     stop_background_loop,
 )
 from music_links_bot.logging_config import quiet_transport_logs
-from music_links_bot.publish_queue import process_due_jobs
-
 LOGGER = logging.getLogger(__name__)
 MAX_UPDATE_BYTES = 1024 * 1024
 
@@ -48,7 +46,6 @@ _APPLICATION = None
 # A single hung await must never hold the shared lock forever and wedge the
 # whole warm instance, so every event-loop run is time-bounded.
 PROCESS_TIMEOUT_SECONDS = 25
-QUEUE_TICK_TIMEOUT_SECONDS = 20
 # One bad update shouldn't cold-start the next user: only recycle the cached
 # application after several consecutive failures (a genuinely broken instance).
 _DISPOSE_AFTER_FAILURES = 3
@@ -168,15 +165,6 @@ def _process_claimed_update(loop, application, update_payload: dict[str, object]
         "update=%s processed in %.0fms", update_id, (time.monotonic() - started) * 1000
     )
 
-    try:
-        run_on_loop(
-            loop,
-            _run_queue_tick(application),
-            timeout=QUEUE_TICK_TIMEOUT_SECONDS,
-        )
-    except Exception:
-        LOGGER.warning("Queue tick failed", exc_info=True)
-
 
 async def _claim_update(application, update_id: int) -> bool:
     """Reserve an update_id so a Telegram retry of the same update is skipped.
@@ -256,13 +244,6 @@ def _note_update_finished() -> bool:
             _recycle_requested = False
             _consecutive_failures = 0
         return should_recycle
-
-
-async def _run_queue_tick(application) -> int:
-    from types import SimpleNamespace
-
-    context = SimpleNamespace(application=application, bot=application.bot)
-    return await process_due_jobs(context)
 
 
 def _alert_crash_safely(exc: Exception) -> None:

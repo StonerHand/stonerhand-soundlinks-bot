@@ -24,8 +24,9 @@ SUPPORTED_INPUT_HOSTS = {
     "www.nts.live",
 }
 
-HTTP_USER_AGENT = "StonerHandBot/0.1 (+https://t.me/stonerhand)"
-MAX_LINKS_PER_MESSAGE = 12
+HTTP_USER_AGENT = "StonerHandBot/1.1 (+https://t.me/stonerhand)"
+# The native crate and a multi-link input share one explicit product limit.
+MAX_LINKS_PER_MESSAGE = 10
 
 PLATFORM_LABELS = {
     "spotify": "🟢 Spotify",

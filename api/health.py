@@ -3,11 +3,12 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
+import time
+from concurrent.futures import ThreadPoolExecutor
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
-import sys
-import time
 from urllib.request import Request, urlopen
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -15,6 +16,7 @@ SRC_PATH = PROJECT_ROOT / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
+from music_links_bot import __version__
 from music_links_bot.alerts import send_admin_alert
 from music_links_bot.logging_config import quiet_transport_logs
 
@@ -35,17 +37,25 @@ class handler(BaseHTTPRequestHandler):
     """
 
     def do_GET(self) -> None:
+        # Telegram diagnostics and the independent queue worker are network
+        # calls, so run them together. Read Redis afterwards to report the
+        # queue state produced by this exact tick, including retries.
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            telegram_check = executor.submit(_check_telegram)
+            webhook_check = executor.submit(_check_webhook)
+            queue_tick = executor.submit(_tick_queue, self.headers.get("host"))
+            telegram = telegram_check.result()
+            webhook = webhook_check.result()
+            queue_worker = queue_tick.result()
+        redis, queue, metrics = _storage_snapshot()
         checks: dict[str, dict] = {
-            "telegram": _check_telegram(),
-            "webhook": _check_webhook(),
-            "redis": _check_redis(),
+            "telegram": telegram,
+            "webhook": webhook,
+            "redis": redis,
+            "queue_worker": queue_worker,
         }
         healthy = overall_ok(checks)
-        queue_published = _tick_queue(self.headers.get("host"))
-        # Read the queue AFTER the tick: anything still overdue means it isn't
-        # draining (a repeatedly failing publish or a queue nobody is ticking).
-        queue = _queue_status()
-        metrics = _runtime_metrics_status()
+        service_healthy = overall_service_ok(checks, queue)
 
         if not healthy:
             failing = ", ".join(sorted(describe_failures(checks)))
@@ -62,16 +72,19 @@ class handler(BaseHTTPRequestHandler):
 
         body = json.dumps(
             {
-                "ok": healthy,
+                "ok": service_healthy,
                 "checks": checks,
                 "queue": queue,
                 "metrics": metrics,
-                "queue_published": queue_published,
+                "queue_published": int(queue_worker.get("published") or 0),
+                "release": release_info(),
                 "ts": int(time.time()),
             },
             ensure_ascii=False,
         ).encode("utf-8")
-        self.send_response(HTTPStatus.OK if healthy else HTTPStatus.SERVICE_UNAVAILABLE)
+        self.send_response(
+            HTTPStatus.OK if service_healthy else HTTPStatus.SERVICE_UNAVAILABLE
+        )
         self.send_header("content-type", "application/json; charset=utf-8")
         self.send_header("content-length", str(len(body)))
         self.end_headers()
@@ -88,18 +101,37 @@ def overall_ok(checks: dict[str, dict]) -> bool:
         return False
 
     redis_check = checks.get("redis", {})
-    return not redis_check.get("configured") or bool(redis_check.get("ok"))
+    if redis_check.get("configured") and not redis_check.get("ok"):
+        return False
+
+    worker_check = checks.get("queue_worker", {})
+    return not worker_check.get("configured") or bool(worker_check.get("ok"))
+
+
+def overall_service_ok(checks: dict[str, dict], queue: dict) -> bool:
+    """A configured queue with overdue work is a production failure too."""
+    queue_ok = not queue.get("configured") or not queue.get("overdue")
+    return overall_ok(checks) and queue_ok
 
 
 def describe_failures(checks: dict[str, dict]) -> list[str]:
     failures = []
     for name, check in checks.items():
-        if name == "redis" and not check.get("configured"):
+        if name in {"redis", "queue_worker"} and not check.get("configured"):
             continue
         if not check.get("ok"):
             failures.append(name)
 
     return failures
+
+
+def release_info() -> dict[str, str]:
+    """Identify the exact build serving traffic, not just repository main."""
+    return {
+        "version": __version__,
+        "commit": os.getenv("VERCEL_GIT_COMMIT_SHA", "").strip()[:12],
+        "environment": os.getenv("VERCEL_ENV", "local").strip() or "local",
+    }
 
 
 def evaluate_webhook_info(payload: object) -> tuple[bool, str]:
@@ -136,7 +168,7 @@ def _telegram_api(method: str) -> dict | None:
         with urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # nosec B310
             payload = json.loads(response.read().decode("utf-8"))
         return payload if isinstance(payload, dict) else None
-    except Exception:
+    except Exception:  # noqa: BLE001 — health must degrade to JSON, never crash.
         LOGGER.warning("Health call %s failed", method, exc_info=True)
         return None
 
@@ -163,82 +195,57 @@ def _check_webhook() -> dict:
     return {"ok": healthy, "detail": detail}
 
 
-def _check_redis() -> dict:
+def _storage_snapshot() -> tuple[dict, dict, dict]:
+    """Read Redis health, queue and metrics through one client and event loop."""
     import asyncio
 
-    from music_links_bot.kvstore import KVStore
-
-    kv = KVStore.from_env()
-    if kv is None:
-        return {"ok": True, "configured": False, "detail": "not configured"}
-
-    async def ping() -> bool:
-        try:
-            return await kv.set("health:ping", str(int(time.time())), ttl_seconds=300)
-        finally:
-            await kv.aclose()
-
-    try:
-        healthy = asyncio.run(ping())
-    except Exception:
-        healthy = False
-
-    return {"ok": healthy, "configured": True, "detail": "ping" if healthy else "unreachable"}
-
-
-def _queue_status(*, now: float | None = None) -> dict:
-    """Surface the publish queue in the health payload: total jobs and how many
-    are meaningfully overdue, so a stuck queue is visible before a post is missed."""
-    import asyncio
-
+    from music_links_bot.bot_runtime import METRICS_KV_KEY
     from music_links_bot.kvstore import KVStore
     from music_links_bot.publish_queue import QUEUE_KV_KEY
 
     kv = KVStore.from_env()
     if kv is None:
-        return {"configured": False, "size": 0, "overdue": 0}
+        return (
+            {"ok": True, "configured": False, "detail": "not configured"},
+            {"configured": False, "size": 0, "overdue": 0},
+            {"configured": False},
+        )
 
-    async def read():
+    async def read() -> tuple[bool, object, object]:
         try:
-            return await kv.get_json(QUEUE_KV_KEY)
+            ping, jobs, metrics = await asyncio.gather(
+                kv.set("health:ping", str(int(time.time())), ttl_seconds=300),
+                kv.get_json(QUEUE_KV_KEY),
+                kv.get_json(METRICS_KV_KEY),
+            )
+            return bool(ping), jobs, metrics
         finally:
             await kv.aclose()
 
     try:
-        jobs = asyncio.run(read())
+        ping, jobs, metrics = asyncio.run(read())
     except Exception:
-        return {"configured": True, "size": 0, "overdue": 0, "detail": "unreachable"}
+        return (
+            {"ok": False, "configured": True, "detail": "unreachable"},
+            {"configured": True, "size": 0, "overdue": 0, "detail": "unreachable"},
+            {"configured": True, "available": False},
+        )
 
-    if not isinstance(jobs, list):
-        jobs = []
-
-    return _summarize_queue_jobs(jobs, now=now)
-
-
-def _runtime_metrics_status() -> dict:
-    """Expose the most recent warm bot process metrics through Redis."""
-    import asyncio
-
-    from music_links_bot.bot_runtime import METRICS_KV_KEY
-    from music_links_bot.kvstore import KVStore
-
-    kv = KVStore.from_env()
-    if kv is None:
-        return {"configured": False}
-
-    async def read():
-        try:
-            return await kv.get_json(METRICS_KV_KEY)
-        finally:
-            await kv.aclose()
-
-    try:
-        payload = asyncio.run(read())
-    except Exception:
-        return {"configured": True, "available": False}
-    if not isinstance(payload, dict):
-        return {"configured": True, "available": False}
-    return {"configured": True, "available": True, **payload}
+    queue = _summarize_queue_jobs(jobs if isinstance(jobs, list) else [])
+    metrics_status = (
+        {"configured": True, "available": True, **metrics}
+        if isinstance(metrics, dict)
+        else {"configured": True, "available": False}
+    )
+    return (
+        {
+            "ok": ping,
+            "configured": True,
+            "detail": "ping" if ping else "unreachable",
+        },
+        queue,
+        metrics_status,
+    )
 
 
 def _summarize_queue_jobs(jobs: list, *, now: float | None = None) -> dict:
@@ -253,13 +260,21 @@ def _summarize_queue_jobs(jobs: list, *, now: float | None = None) -> dict:
             publish_at = int(job.get("publish_at") or 0)
         except (TypeError, ValueError):
             continue
+        if publish_at <= 0:
+            continue
         valid_jobs += 1
-        if publish_at < current - 120:
+        status = str(job.get("status") or "pending")
+        try:
+            lease_until = int(job.get("lease_until") or 0)
+        except (TypeError, ValueError):
+            lease_until = 0
+        actively_processing = status == "processing" and lease_until > current
+        if publish_at < current - 120 and not actively_processing:
             overdue += 1
     return {"configured": True, "size": valid_jobs, "overdue": overdue}
 
 
-def _tick_queue(_request_host: str | None) -> int:
+def _tick_queue(_request_host: str | None) -> dict[str, object]:
     """Piggyback the scheduled-posts tick on every health ping, so one
     uptime monitor keeps the queue delivering on time."""
     host = (
@@ -268,7 +283,12 @@ def _tick_queue(_request_host: str | None) -> int:
     )
     secret = os.getenv("CRON_SECRET", "").strip()
     if not host or not secret:
-        return 0
+        return {
+            "ok": True,
+            "configured": False,
+            "published": 0,
+            "detail": "not configured",
+        }
     host = host.removeprefix("https://").removeprefix("http://").split("/", 1)[0]
 
     try:
@@ -279,9 +299,19 @@ def _tick_queue(_request_host: str | None) -> int:
         # The deployment hostname comes from Vercel environment and HTTPS is forced.
         with urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # nosec B310
             payload = json.loads(response.read().decode("utf-8"))
-        if isinstance(payload, dict):
-            return int(payload.get("published") or 0)
+        if isinstance(payload, dict) and payload.get("ok") is True:
+            return {
+                "ok": True,
+                "configured": True,
+                "published": int(payload.get("published") or 0),
+                "detail": "reachable",
+            }
     except Exception:
         LOGGER.debug("Queue tick via health failed", exc_info=True)
 
-    return 0
+    return {
+        "ok": False,
+        "configured": True,
+        "published": 0,
+        "detail": "unreachable",
+    }

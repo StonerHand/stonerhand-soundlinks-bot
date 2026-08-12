@@ -9,14 +9,12 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
 from types import SimpleNamespace
 
-from api.telegram import (
-    QUEUE_TICK_TIMEOUT_SECONDS,
-    _ensure_application,
-)
+from api.telegram import _ensure_application
 from music_links_bot.loop_runner import run_on_loop
 from music_links_bot.publish_queue import process_due_jobs
 
 LOGGER = logging.getLogger(__name__)
+QUEUE_TICK_TIMEOUT_SECONDS = 20
 
 
 def is_authorized(authorization_header: str | None) -> bool:

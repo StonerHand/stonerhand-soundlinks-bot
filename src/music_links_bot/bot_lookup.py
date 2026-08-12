@@ -43,7 +43,11 @@ from music_links_bot.soundcloud import (
     SoundCloudLookupError,
     build_soundcloud_fallback,
 )
-from music_links_bot.url_utils import apple_podcasts_url_type, spotify_url_type
+from music_links_bot.url_utils import (
+    apple_podcasts_url_type,
+    cache_key_for_url,
+    spotify_url_type,
+)
 from music_links_bot.youtube import YouTubeClient, YouTubeLookupError
 from music_links_bot.provider_runtime import (
     ProviderTask,
@@ -62,9 +66,9 @@ NOT_FOUND_DETAIL = (
 )
 _track_result_sender: Callable[..., Awaitable[Any]] | None = None
 _track_video_pair_sender: Callable[..., Awaitable[bool]] | None = None
-_BACKGROUND_TASKS: set[asyncio.Task[Any]] = set()
 _BATCH_LOOKUP_CONCURRENCY = 2
 _BATCH_RETRY_DELAY_SECONDS = 0.2
+_GENRE_ENRICHMENT_TIMEOUT_SECONDS = 0.75
 
 
 def configure_track_result_sender(sender: Callable[..., Awaitable[Any]]) -> None:
@@ -99,7 +103,7 @@ class LookupBundle:
     radios: list[RadioMatch]
     playlists: list[PlaylistMatch]
     artists: list[ArtistMatch]
-    statuses: list["SourceStatus"] = field(default_factory=list)
+    statuses: list[SourceStatus] = field(default_factory=list)
 
     @property
     def item_count(self) -> int:
@@ -342,9 +346,14 @@ def _provider_statuses(
             for url in source_urls
         ]
 
+    items_by_url = {
+        cache_key_for_url(str(item_url)): item
+        for item in items
+        if (item_url := getattr(item, "url", None))
+    }
     statuses: list[SourceStatus] = []
-    for index, source_url in enumerate(source_urls):
-        item = items[index] if index < len(items) else None
+    for source_url in source_urls:
+        item = items_by_url.get(cache_key_for_url(source_url))
         statuses.append(
             SourceStatus(
                 source_url=source_url,
@@ -1022,15 +1031,16 @@ async def _lookup_tracks_detailed(
 
     tracks = [_ensure_spotify_link(track) for track in tracks]
     if search_client is not None and tracks:
-        enrichment = asyncio.create_task(_fill_genres(search_client, tracks))
-        _BACKGROUND_TASKS.add(enrichment)
-        enrichment.add_done_callback(_BACKGROUND_TASKS.discard)
         try:
-            # Fast metadata enriches the initial card; a slow provider never
-            # blocks the core link result and can finish in the background.
-            await asyncio.wait_for(asyncio.shield(enrichment), timeout=0.75)
+            # Only enrichment completed before rendering can affect this card.
+            # wait_for cancels a slow request so it cannot outlive the update
+            # and mutate data after the result has already been cached/sent.
+            await asyncio.wait_for(
+                _fill_genres(search_client, tracks),
+                timeout=_GENRE_ENRICHMENT_TIMEOUT_SECONDS,
+            )
         except TimeoutError:
-            LOGGER.debug("Genre enrichment continues in background")
+            LOGGER.debug("Genre enrichment timed out and was cancelled")
 
     return tracks, unavailable_urls, statuses
 

@@ -253,7 +253,12 @@ from music_links_bot.publication_state import (
     release_fingerprint as _release_fingerprint,
 )
 from music_links_bot.publication_service import PublicationService
-from music_links_bot.publish_queue import QueueBusyError, QueueStorageError, add_job
+from music_links_bot.publish_queue import (
+    QueueBusyError,
+    QueueFullError,
+    QueueStorageError,
+    add_job,
+)
 from music_links_bot.publication_view import (
     build_publication_view,
     draft_message_overrides,
@@ -286,16 +291,16 @@ __all__ = [
     "BOT_DESCRIPTIONS",
     "BOT_SHORT_DESCRIPTIONS",
     "PUBLIC_BOT_COMMANDS",
+    "_build_home_text",
     "_build_inline_collection_result",
     "_build_inline_result",
-    "_build_home_text",
     "_build_onboarding_keyboard",
     "_build_start_keyboard",
     "_menu_text",
     "_release_fingerprint",
-    "close_application_resources",
     "cancel_command",
     "channel_command",
+    "close_application_resources",
     "crate_command",
     "guide_command",
     "help_command",
@@ -1014,8 +1019,11 @@ async def _schedule_editor_draft(
     publish_at = schedule_timestamp(action, timezone_name=timezone_name)
     try:
         await add_job(context, dict(draft), publish_at)
+    except QueueFullError:
+        await query.answer(get_text(lang, "ed_queue_full"), show_alert=True)
+        return
     except (QueueBusyError, QueueStorageError):
-        await query.answer(get_text(lang, "ed_publish_failed"), show_alert=True)
+        await query.answer(get_text(lang, "ed_queue_unavailable"), show_alert=True)
         return
     date = get_text(
         lang,
@@ -1029,7 +1037,7 @@ async def _schedule_editor_draft(
     await query.answer(
         get_text(lang, "schedule_done").format(date=date), show_alert=True
     )
-    text, keyboard = _render_track_draft(draft, context, draft_id=None)
+    text, _ = _render_track_draft(draft, context, draft_id=None)
     text = (
         f"<b>{escape(get_text(lang, 'schedule_done').format(date=date))}</b>\n\n{text}"
     )
@@ -1814,8 +1822,11 @@ async def _consume_pending_input(
                 return True
             try:
                 await add_job(context, dict(draft), publish_at)
+            except QueueFullError:
+                await message.reply_text(get_text(lang, "ed_queue_full"))
+                return True
             except (QueueBusyError, QueueStorageError):
-                await message.reply_text(get_text(lang, "ed_publish_failed"))
+                await message.reply_text(get_text(lang, "ed_queue_unavailable"))
                 return True
             date = format_schedule_datetime(
                 publish_at,

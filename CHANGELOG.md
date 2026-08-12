@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.1.0 — 2026-08-12
+
+Production stabilization and performance release.
+
+- Removed durable-queue processing from Telegram's webhook request path; queue work now stays in the dedicated protected worker.
+- Canonicalized aggregate lookup keys, so tracking variants of the same links share cache and single-flight work.
+- Added Spotify metadata fallback for transient Song.link outages, with a short shared fallback TTL that upgrades to a full platform result after recovery.
+- Matched partial provider results by canonical source URL instead of fragile list position.
+- Cancelled metadata enrichment that cannot finish before rendering instead of leaking background work past the response.
+- Made a full queue explicit and lossless: existing scheduled posts are never silently evicted, and the user receives a specific recovery message.
+- Aligned batch input, native crate and scheduling limits: 10 sources per post and a 90-day queue horizon.
+- Consolidated Redis health reads, parallelized independent production checks, made worker failures and overdue jobs fail the canary, and ignored active queue leases.
+- Added deployed version and commit identity to `/api/health`; the production canary now detects a stale deployment.
+- Extended regression coverage to 426 automated tests and tightened lint/type hygiene.
+
 ## 1.0.0 — 2026-08-12
 
 First production-stable release of the Telegram-only StonerHand editor.
