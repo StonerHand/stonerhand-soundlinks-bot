@@ -1270,7 +1270,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         keyboard = result.reply_markup.inline_keyboard
         self.assertEqual(keyboard[0][0].text, "🟢 Spotify")
         self.assertEqual(keyboard[-1][0].text, "↗ Поделиться")
-        self.assertTrue(keyboard[-1][0].switch_inline_query.startswith("sh|"))
+        self.assertTrue(keyboard[-1][0].switch_inline_query.startswith("sh2|"))
 
     async def test_inline_result_localizes_english_description(self) -> None:
         result = await _build_inline_result(
