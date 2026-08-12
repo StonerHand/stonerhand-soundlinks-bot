@@ -1979,6 +1979,29 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("open.spotify.com", message.replies[0])
         self.assertNotIn("<blockquote>", message.replies[0])
 
+    async def test_collection_post_hides_internal_duplicate_status(self) -> None:
+        class DistinctLookupClient:
+            async def lookup_track(self, source_url: str) -> TrackMatch:
+                track_id = source_url.split("/track/", 1)[-1].split("?", 1)[0]
+                return TrackMatch(
+                    title=f"Track {track_id}",
+                    artist="Artist",
+                    links={"spotify": source_url},
+                    page_url=f"https://song.link/{track_id}",
+                )
+
+        message = PrivateSpotifyCollectionMessageStub()
+        context = ContextStub(songlink_client=DistinctLookupClient())
+        with patch(
+            "music_links_bot.bot._add_track_drafts_to_crate",
+            AsyncMock(return_value=([], 0)),
+        ):
+            await track_lookup_message(UpdateStub(message), context)
+
+        rendered = "\n".join(message.replies)
+        self.assertNotIn("Не добавлено повторов", rendered)
+        self.assertNotIn("сверх лимита", rendered)
+
     async def test_youtube_video_links_use_video_post(self) -> None:
         message = PrivateYouTubeMessageStub()
         context = ContextStub()

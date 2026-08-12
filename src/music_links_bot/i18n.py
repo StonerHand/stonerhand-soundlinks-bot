@@ -535,10 +535,6 @@ STRINGS: dict[str, dict[str, str]] = {
         RU: "<b>Готово не всё</b>\n{ok} из {total} ссылок обработано. Остальные можно повторить отдельно.",
         EN: "<b>Some links need another try</b>\n{ok} of {total} links were processed. Retry only the failed ones.",
     },
-    "collection_duplicates": {
-        RU: "<i>Не добавлено повторов или сверх лимита: {count}</i>",
-        EN: "<i>Duplicates or over-limit items skipped: {count}</i>",
-    },
     "duplicate_repeat": {
         RU: "Опубликовать снова",
         EN: "Publish again",
