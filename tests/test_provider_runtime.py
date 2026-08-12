@@ -6,6 +6,7 @@ from music_links_bot import bot_lookup
 from music_links_bot.bot_lookup import LookupBundle
 from music_links_bot.bot_runtime import BotRuntime
 from music_links_bot.provider_runtime import (
+    ProviderOutcome,
     ProviderTask,
     get_cached_lookup,
     lookup_cache_key,
@@ -13,6 +14,7 @@ from music_links_bot.provider_runtime import (
     set_cached_negative_lookup,
     set_cached_lookup,
 )
+from music_links_bot.models import VideoMatch
 
 
 class ProviderRuntimeTests(unittest.IsolatedAsyncioTestCase):
@@ -84,6 +86,38 @@ class ProviderRuntimeTests(unittest.IsolatedAsyncioTestCase):
             lookup_cache_key(urls),
             lookup_cache_key(list(reversed(urls))),
         )
+
+    async def test_lookup_cache_ignores_tracking_query_variants(self) -> None:
+        first = ["https://open.spotify.com/track/abc?si=one&utm_source=telegram"]
+        second = ["https://open.spotify.com/track/abc?si=two"]
+        payload = {"tracks": [{"title": "Dragonaut"}]}
+
+        await set_cached_lookup({}, first, payload)
+
+        self.assertEqual(lookup_cache_key(first), lookup_cache_key(second))
+        self.assertEqual(await get_cached_lookup({}, second), payload)
+
+    async def test_provider_statuses_match_urls_not_shortened_list_positions(self) -> None:
+        urls = [
+            "https://youtu.be/first",
+            "https://youtu.be/missing",
+            "https://youtu.be/third",
+        ]
+        videos = [
+            VideoMatch("First", "A", urls[0]),
+            VideoMatch("Third", "C", urls[2]),
+        ]
+        outcome = ProviderOutcome("youtube", videos, True, 1)
+
+        statuses = bot_lookup._provider_statuses(
+            "youtube", urls, videos, {"youtube": outcome}
+        )
+
+        self.assertEqual(
+            [status.state for status in statuses],
+            ["success", "not_found", "success"],
+        )
+        self.assertEqual(statuses[2].label, "C — Third")
 
     async def test_negative_lookup_cache_is_short_lived_and_explicit(self) -> None:
         urls = ["https://example.test/not-found-negative"]

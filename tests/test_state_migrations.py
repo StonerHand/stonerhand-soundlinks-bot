@@ -47,7 +47,7 @@ class StateMigrationTests(unittest.IsolatedAsyncioTestCase):
     async def test_template_v1_is_read_and_written_as_v2(self) -> None:
         import hashlib
 
-        digest = hashlib.sha256("@stonerhand".encode()).hexdigest()[:20]
+        digest = hashlib.sha256(b"@stonerhand").hexdigest()[:20]
         kv = KVStub({f"channel:template:v1:{digest}": {"hashtags": False}})
         context = SimpleNamespace(
             application=SimpleNamespace(bot_data={"kv_store": kv})

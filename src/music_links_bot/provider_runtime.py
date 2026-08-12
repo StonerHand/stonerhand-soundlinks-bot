@@ -11,6 +11,7 @@ from typing import Any
 
 from music_links_bot.cache import TTLCache
 from music_links_bot.kvstore import KVStore
+from music_links_bot.url_utils import cache_key_for_url
 
 LOGGER = logging.getLogger(__name__)
 PROVIDER_TIMEOUT_SECONDS = 9.0
@@ -51,7 +52,7 @@ class RequestBudget:
     deadline: float
 
     @classmethod
-    def start(cls, seconds: float = REQUEST_BUDGET_SECONDS) -> "RequestBudget":
+    def start(cls, seconds: float = REQUEST_BUDGET_SECONDS) -> RequestBudget:
         return cls(deadline=monotonic() + max(0.05, seconds))
 
     def remaining(self) -> float:
@@ -154,13 +155,13 @@ def _close_awaitable(awaitable: Awaitable[Any]) -> None:
 
 def lookup_cache_key(source_urls: list[str]) -> str:
     canonical = json.dumps(
-        list(dict.fromkeys(source_urls)),
+        list(dict.fromkeys(cache_key_for_url(url) for url in source_urls)),
         ensure_ascii=True,
         separators=(",", ":"),
     )
     # Version the aggregate key whenever completeness semantics change so an
     # old partial result cannot look like a complete collection after deploy.
-    return "lookup:v3:" + hashlib.sha256(canonical.encode()).hexdigest()
+    return "lookup:v4:" + hashlib.sha256(canonical.encode()).hexdigest()
 
 
 async def get_cached_lookup(bot_data: dict, source_urls: list[str]) -> dict | None:

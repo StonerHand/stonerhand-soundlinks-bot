@@ -15,8 +15,18 @@ from music_links_bot.songlink import (
 
 
 class FakeSonglinkClient(SonglinkClient):
-    def __init__(self, outcomes: dict[str, TrackMatch | Exception]) -> None:
-        super().__init__(user_countries=tuple(outcomes))
+    def __init__(
+        self,
+        outcomes: dict[str, TrackMatch | Exception],
+        *,
+        spotify_client=None,
+        kv=None,
+    ) -> None:
+        super().__init__(
+            user_countries=tuple(outcomes),
+            spotify_client=spotify_client,
+            kv=kv,
+        )
         self._outcomes = outcomes
         self.calls = 0
 
@@ -344,11 +354,18 @@ class SonglinkClientAsyncTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(client.calls, 1)
 
     async def test_lookup_track_prefers_service_error_when_all_countries_fail(self) -> None:
+        class FailingSpotifyClient:
+            async def lookup_release(self, _source_url: str) -> TrackMatch:
+                from music_links_bot.spotify import SpotifyLookupError
+
+                raise SpotifyLookupError("spotify down")
+
         client = FakeSonglinkClient(
             {
                 "RU": SonglinkLookupError("not found"),
                 "US": SonglinkError("service down"),
-            }
+            },
+            spotify_client=FailingSpotifyClient(),
         )
 
         try:
@@ -358,6 +375,72 @@ class SonglinkClientAsyncTests(unittest.IsolatedAsyncioTestCase):
             await client.aclose()
 
         self.assertNotIsInstance(context.exception, SonglinkLookupError)
+
+    async def test_spotify_fallback_survives_songlink_outage_and_is_shared_cached(self) -> None:
+        class SpotifyFallback:
+            calls = 0
+
+            async def lookup_release(self, source_url: str) -> TrackMatch:
+                self.calls += 1
+                return TrackMatch(
+                    title="Dragonaut",
+                    artist="Sleep",
+                    links={"spotify": source_url},
+                )
+
+        class MemoryKV:
+            def __init__(self) -> None:
+                self.values = {}
+
+            async def get_json(self, key):
+                return self.values.get(key)
+
+            async def set_json(self, key, value, **_kwargs):
+                self.values[key] = value
+                return True
+
+        spotify = SpotifyFallback()
+        kv = MemoryKV()
+        client = FakeSonglinkClient(
+            {"US": SonglinkError("service down")},
+            spotify_client=spotify,
+            kv=kv,
+        )
+        url = "https://open.spotify.com/track/dragonaut?si=tracking"
+        try:
+            track = await client.lookup_track(url)
+        finally:
+            await client.aclose()
+
+        self.assertEqual(track.title, "Dragonaut")
+        self.assertEqual(spotify.calls, 1)
+        cached = kv.values["sl:https://open.spotify.com/track/dragonaut"]
+        self.assertTrue(cached["_fallback"])
+
+    async def test_shared_spotify_fallback_keeps_its_short_cache_class(self) -> None:
+        class MemoryKV:
+            async def get_json(self, _key):
+                return {
+                    "title": "Dragonaut",
+                    "artist": "Sleep",
+                    "links": {"spotify": "https://open.spotify.com/track/x"},
+                    "_fallback": True,
+                }
+
+            async def set_json(self, *_args, **_kwargs):
+                return True
+
+        client = SonglinkClient(user_countries=("US",), kv=MemoryKV())
+        try:
+            track = await client.lookup_track("https://open.spotify.com/track/x")
+        finally:
+            await client.aclose()
+
+        self.assertEqual(track.title, "Dragonaut")
+        self.assertIsNone(client._cache.get("https://open.spotify.com/track/x"))
+        self.assertIsNotNone(
+            client._fallback_cache.get("https://open.spotify.com/track/x")
+        )
 
 
 if __name__ == "__main__":

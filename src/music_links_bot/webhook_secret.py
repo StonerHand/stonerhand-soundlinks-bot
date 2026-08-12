@@ -21,5 +21,5 @@ def telegram_webhook_secret() -> str:
     if not bot_token:
         return ""
 
-    digest = hashlib.sha256(f"stonerhand-webhook:{bot_token}".encode("utf-8"))
+    digest = hashlib.sha256(f"stonerhand-webhook:{bot_token}".encode())
     return digest.hexdigest()[:48]

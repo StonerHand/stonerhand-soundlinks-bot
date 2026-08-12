@@ -1,6 +1,7 @@
 import asyncio
 import os
 import unittest
+from typing import ClassVar
 from pathlib import Path
 from unittest.mock import patch
 import sys
@@ -21,8 +22,8 @@ class _FakeResponse:
 class _FakeClient:
     """Captures the outgoing request and returns a canned Telegram response."""
 
-    posts: list[dict] = []
-    reply = {"ok": True, "result": {"message_id": 5}}
+    posts: ClassVar[list[dict]] = []
+    reply: ClassVar[dict] = {"ok": True, "result": {"message_id": 5}}
 
     def __init__(self, *args, **kwargs):
         pass

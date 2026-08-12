@@ -25,6 +25,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Verify bot, webhook and Redis
+        env:
+          CANARY_EXPECT_COMMIT: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
         run: |
           for attempt in 1 2 3 4 5 6; do
             python tests/e2e/production_canary.py && exit 0

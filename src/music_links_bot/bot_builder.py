@@ -18,6 +18,7 @@ MAX_CRATE_TITLE_LENGTH = 72
 MAX_CUSTOM_TAGS = 5
 MAX_SELECTED_PLATFORMS = 6
 PENDING_INPUT_TTL_SECONDS = 15 * 60
+MAX_SCHEDULE_DAYS = 90
 
 
 class BuilderScreen(str, Enum):
@@ -221,7 +222,7 @@ def parse_schedule_datetime(
             )
     except ValueError:
         return None
-    if result <= current or result > current + timedelta(days=366):
+    if result <= current or result > current + timedelta(days=MAX_SCHEDULE_DAYS):
         return None
     return int(result.timestamp())
 

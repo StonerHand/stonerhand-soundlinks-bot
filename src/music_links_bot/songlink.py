@@ -16,6 +16,7 @@ from music_links_bot.url_utils import cache_key_for_url
 
 HTTP_HEADERS = {"User-Agent": HTTP_USER_AGENT}
 KV_TTL_SECONDS = 7 * 24 * 3600
+FALLBACK_TTL_SECONDS = 15 * 60
 MIN_COMPLETE_PLATFORM_COUNT = 4
 _TRACK_FIELDS = {field.name for field in fields(TrackMatch)}
 
@@ -50,6 +51,9 @@ class SonglinkClient:
             timeout=httpx.Timeout(timeout, connect=3.0),
         )
         self._cache: TTLCache[TrackMatch] = TTLCache()
+        self._fallback_cache: TTLCache[TrackMatch] = TTLCache(
+            ttl_seconds=FALLBACK_TTL_SECONDS
+        )
         self._inflight: dict[str, asyncio.Task[TrackMatch]] = {}
 
     async def aclose(self) -> None:
@@ -62,6 +66,9 @@ class SonglinkClient:
         cached_match = self._cache.get(cache_key)
         if cached_match is not None:
             return cached_match
+        fallback_match = self._fallback_cache.get(cache_key)
+        if fallback_match is not None:
+            return fallback_match
 
         pending = self._inflight.get(cache_key)
         if pending is not None:
@@ -90,9 +97,11 @@ class SonglinkClient:
             task.exception()
 
     async def _lookup_and_cache(self, source_url: str, cache_key: str) -> TrackMatch:
-        shared_match = await self._get_shared_cache(cache_key)
-        if shared_match is not None:
-            self._cache.set(cache_key, shared_match)
+        shared = await self._get_shared_cache(cache_key)
+        if shared is not None:
+            shared_match, is_fallback = shared
+            cache = self._fallback_cache if is_fallback else self._cache
+            cache.set(cache_key, shared_match)
             return shared_match
 
         countries = self._user_countries or ("US",)
@@ -131,26 +140,28 @@ class SonglinkClient:
                 ),
                 None,
             )
-            if service_error:
-                raise service_error
-
             lookup_error = next(
                 (result for result in results if isinstance(result, SonglinkLookupError)),
                 None,
             )
             try:
-                return await self._spotify_client.lookup_release(source_url)
+                match = await self._spotify_client.lookup_release(source_url)
             except SpotifyLookupError as exc:
-                raise lookup_error or SonglinkLookupError(
+                raise service_error or lookup_error or SonglinkLookupError(
                     "Song.link could not resolve the URL."
                 ) from exc
+            self._fallback_cache.set(cache_key, match)
+            await self._set_shared_cache(cache_key, match, fallback=True)
+            return match
 
         match = self._merge_matches(matches)
         self._cache.set(cache_key, match)
         await self._set_shared_cache(cache_key, match)
         return match
 
-    async def _get_shared_cache(self, cache_key: str) -> TrackMatch | None:
+    async def _get_shared_cache(
+        self, cache_key: str
+    ) -> tuple[TrackMatch, bool] | None:
         if self._kv is None:
             return None
 
@@ -158,6 +169,7 @@ class SonglinkClient:
         if not isinstance(payload, dict):
             return None
 
+        is_fallback = payload.get("_fallback") is True
         known_fields = {
             key: value for key, value in payload.items() if key in _TRACK_FIELDS
         }
@@ -169,16 +181,25 @@ class SonglinkClient:
         if not match.title or not isinstance(match.links, dict):
             return None
 
-        return match
+        return match, is_fallback
 
-    async def _set_shared_cache(self, cache_key: str, match: TrackMatch) -> None:
+    async def _set_shared_cache(
+        self,
+        cache_key: str,
+        match: TrackMatch,
+        *,
+        fallback: bool = False,
+    ) -> None:
         if self._kv is None:
             return
 
+        payload = asdict(match)
+        if fallback:
+            payload["_fallback"] = True
         await self._kv.set_json(
             f"sl:{cache_key}",
-            asdict(match),
-            ttl_seconds=KV_TTL_SECONDS,
+            payload,
+            ttl_seconds=FALLBACK_TTL_SECONDS if fallback else KV_TTL_SECONDS,
         )
 
     async def _lookup_track_for_country(self, source_url: str, user_country: str) -> TrackMatch:

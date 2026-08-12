@@ -37,7 +37,7 @@ class KVStore:
         )
 
     @classmethod
-    def from_env(cls) -> "KVStore | None":
+    def from_env(cls) -> KVStore | None:
         base_url = (
             os.getenv("UPSTASH_REDIS_REST_URL", "").strip()
             or os.getenv("KV_REST_API_URL", "").strip()

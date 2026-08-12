@@ -17,7 +17,6 @@ QUEUE_LOCK_TTL_SECONDS = 30
 QUEUE_MEMORY_KEY = "publish_queue"
 QUEUE_MEMORY_LOCK_KEY = "publish_queue_lock"
 MAX_QUEUE_JOBS = 50
-MAX_DELAY_SECONDS = 90 * 24 * 3600
 MAX_JOB_ATTEMPTS = 3
 RETRY_BACKOFF_SECONDS = (120, 600, 1800)
 PROCESSING_LEASE_SECONDS = 90
@@ -28,6 +27,10 @@ JOB_PROCESSING = "processing"
 
 class QueueBusyError(RuntimeError):
     """Raised when a concurrent queue mutation still owns the Redis lease."""
+
+
+class QueueFullError(QueueBusyError):
+    """Raised instead of silently evicting an existing scheduled post."""
 
 
 class QueueStorageError(RuntimeError):
@@ -173,14 +176,10 @@ async def add_job(context, draft: dict, publish_at: int) -> dict:
     }
 
     def mutate(jobs: list[dict]):
-        # Never evict an in-flight job when applying the queue cap.
         if len(jobs) >= MAX_QUEUE_JOBS:
-            pending = [item for item in jobs if item.get("status") == JOB_PENDING]
-            if pending:
-                oldest = min(pending, key=lambda item: int(item.get("created_at") or 0))
-                jobs = [item for item in jobs if item.get("id") != oldest.get("id")]
-            else:
-                raise QueueBusyError("all queue slots are processing")
+            # A full queue must be visible to the user. Silently deleting the
+            # oldest scheduled publication is data loss, even if it is pending.
+            raise QueueFullError("publish queue is full")
         return job, _sort_jobs([*jobs, job])
 
     return await _locked_mutate(context, mutate)

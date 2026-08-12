@@ -214,12 +214,15 @@ class PublishQueueTests(unittest.TestCase):
         context = make_context()
 
         async def scenario():
-            for index in range(publish_queue.MAX_QUEUE_JOBS + 5):
+            for index in range(publish_queue.MAX_QUEUE_JOBS):
                 await publish_queue.add_job(context, make_draft(), 1000 + index)
+            with self.assertRaises(publish_queue.QueueFullError):
+                await publish_queue.add_job(context, make_draft(), 9999)
             return await publish_queue.load_jobs(context)
 
         jobs = asyncio.run(scenario())
         self.assertEqual(len(jobs), publish_queue.MAX_QUEUE_JOBS)
+        self.assertEqual(jobs[0]["publish_at"], 1000)
 
 
 class FailingBot:

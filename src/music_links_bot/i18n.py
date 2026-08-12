@@ -518,6 +518,14 @@ STRINGS: dict[str, dict[str, str]] = {
         RU: "Не получилось опубликовать — проверь права бота в канале",
         EN: "Could not publish — check the bot's rights in the channel",
     },
+    "ed_queue_full": {
+        RU: "Очередь заполнена — сначала опубликуй или удали один из 50 постов",
+        EN: "The queue is full — publish or remove one of the 50 posts first",
+    },
+    "ed_queue_unavailable": {
+        RU: "Очередь временно недоступна — попробуй ещё раз через несколько секунд",
+        EN: "The queue is temporarily unavailable — try again in a few seconds",
+    },
     "action_busy": {
         RU: "Это действие уже выполняется. Подожди пару секунд.",
         EN: "This action is already running. Give it a few seconds.",
