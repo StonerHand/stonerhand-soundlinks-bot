@@ -2,6 +2,8 @@ import unittest
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
+from music_links_bot.bot_lookup import LookupBundle
+from music_links_bot.models import TrackMatch
 from music_links_bot.sharing import (
     MAX_SHARE_QUERY_LENGTH,
     add_share_button,
@@ -10,6 +12,7 @@ from music_links_bot.sharing import (
     collection_title,
     make_channel_safe_keyboard,
     parse_share_query,
+    render_inline_share_card,
 )
 
 
@@ -29,6 +32,36 @@ class SharingTests(unittest.TestCase):
             collection_result_title("en", found=3, total=4),
             "⚠️ Collection · 3 of 4",
         )
+
+    def test_inline_collection_never_hides_missing_source_count(self) -> None:
+        tracks = [
+            TrackMatch(
+                title=f"Track {index}",
+                artist="Artist",
+                links={"spotify": f"https://open.spotify.com/track/{index}"},
+            )
+            for index in range(3)
+        ]
+        bundle = LookupBundle(
+            tracks=tracks,
+            unavailable_urls=[],
+            videos=[],
+            radios=[],
+            playlists=[],
+            artists=[],
+        )
+
+        card = render_inline_share_card(
+            bundle,
+            context=None,
+            lang="ru",
+            share_query=None,
+            share_label="Поделиться",
+            requested_count=6,
+        )
+
+        self.assertEqual(card.title, "⚠️ Подборка · 3 из 6")
+        self.assertIn("<b>⚠️ Подборка · 3 из 6</b>", card.text)
 
     def test_spotify_collection_is_compact_and_round_trips(self) -> None:
         urls = [

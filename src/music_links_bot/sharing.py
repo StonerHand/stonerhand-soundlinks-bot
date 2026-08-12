@@ -166,33 +166,62 @@ def render_inline_share_card(
     lang: str,
     share_query: str | None,
     share_label: str,
+    requested_count: int | None = None,
 ) -> InlineShareCard:
     preview_url = _bundle_preview_url(bundle, context)
 
     if bundle.content_type_count == 1 and bundle.tracks:
-        text = format_collection_message(bundle.tracks, include_hashtags=True)
+        title = collection_result_title(
+            lang,
+            found=len(bundle.tracks),
+            total=max(len(bundle.tracks), int(requested_count or len(bundle.tracks))),
+        )
+        text = format_collection_message(
+            bundle.tracks,
+            include_hashtags=True,
+            title=title,
+        )
         keyboard = _build_collection_keyboard(bundle.tracks)
-        title = collection_title(lang, len(bundle.tracks), "release")
     elif bundle.content_type_count == 1 and bundle.videos:
         text = format_video_collection_message(bundle.videos, include_hashtags=True)
         keyboard = _build_youtube_collection_keyboard(bundle.videos)
-        title = collection_title(lang, len(bundle.videos), "video")
+        title = collection_result_title(
+            lang,
+            found=len(bundle.videos),
+            total=max(len(bundle.videos), int(requested_count or len(bundle.videos))),
+            item_kind="video",
+        )
     elif bundle.content_type_count == 1 and bundle.radios:
         text = format_radio_collection_message(bundle.radios, include_hashtags=True)
         keyboard = _build_nts_collection_keyboard(bundle.radios)
-        title = collection_title(lang, len(bundle.radios), "radio")
+        title = collection_result_title(
+            lang,
+            found=len(bundle.radios),
+            total=max(len(bundle.radios), int(requested_count or len(bundle.radios))),
+            item_kind="radio",
+        )
     elif bundle.content_type_count == 1 and bundle.playlists:
         text = format_playlist_collection_message(
             bundle.playlists, include_hashtags=True
         )
         keyboard = _build_playlist_collection_keyboard(bundle.playlists)
-        title = collection_title(lang, len(bundle.playlists), "playlist")
-    elif bundle.content_type_count == 1 and bundle.artists:
-        text = format_artist_collection_message(
-            bundle.artists, include_hashtags=True
+        title = collection_result_title(
+            lang,
+            found=len(bundle.playlists),
+            total=max(
+                len(bundle.playlists), int(requested_count or len(bundle.playlists))
+            ),
+            item_kind="playlist",
         )
+    elif bundle.content_type_count == 1 and bundle.artists:
+        text = format_artist_collection_message(bundle.artists, include_hashtags=True)
         keyboard = _build_artist_collection_keyboard(bundle.artists)
-        title = collection_title(lang, len(bundle.artists), "artist")
+        title = collection_result_title(
+            lang,
+            found=len(bundle.artists),
+            total=max(len(bundle.artists), int(requested_count or len(bundle.artists))),
+            item_kind="artist",
+        )
     else:
         text = format_mixed_collection_message(
             bundle.tracks,
@@ -209,7 +238,12 @@ def render_inline_share_card(
             bundle.artists,
             bundle.radios,
         )
-        title = collection_title(lang, bundle.item_count, "item")
+        title = collection_result_title(
+            lang,
+            found=bundle.item_count,
+            total=max(bundle.item_count, int(requested_count or bundle.item_count)),
+            item_kind="item",
+        )
 
     return InlineShareCard(
         title=title,

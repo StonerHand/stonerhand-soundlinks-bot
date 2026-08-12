@@ -476,6 +476,7 @@ async def _build_inline_collection_result(
         lang=lang,
         share_query=share_query,
         share_label=get_text(lang, "share_post"),
+        requested_count=len(source_urls),
     )
     return _inline_article(
         "|".join(source_urls),

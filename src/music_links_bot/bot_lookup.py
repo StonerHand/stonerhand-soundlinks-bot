@@ -268,7 +268,12 @@ async def _resolve_sources_uncached(
         artists=artists,
         statuses=_sort_statuses(statuses, source_urls),
     )
-    if bundle.item_count and not bundle.unavailable_urls:
+    complete = (
+        bool(bundle.statuses)
+        and len(bundle.statuses) == len(source_urls)
+        and all(status.state == "success" for status in bundle.statuses)
+    )
+    if bundle.item_count and complete:
         await set_cached_lookup(bot_data, source_urls, _bundle_to_cache(bundle))
     elif (
         not bundle.item_count
