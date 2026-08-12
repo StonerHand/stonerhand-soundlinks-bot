@@ -25,7 +25,10 @@ async def send_partial_lookup_status(
     if not failed:
         return
 
-    retry_urls = [item.source_url for item in failed if item.retryable]
+    # Retry the original batch, not only failed members. The UI result is one
+    # atomic collection; rebuilding all sources preserves order and avoids
+    # making the user manually merge recovered items with the earlier partial.
+    retry_urls = [item.source_url for item in statuses] if failed else []
     if message.chat.type == "channel":
         summary = ", ".join(f"{item.provider}:{item.state}" for item in failed)
         await notify_admin(
@@ -37,7 +40,7 @@ async def send_partial_lookup_status(
     if message.chat.type != "private":
         return
 
-    successful = sum(item.state == "success" for item in statuses)
+    successful = bundle.successful_source_count
     text = get_text(lang, "partial_result").format(
         ok=successful,
         total=len(statuses),

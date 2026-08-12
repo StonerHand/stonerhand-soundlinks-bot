@@ -29,7 +29,12 @@ from music_links_bot.keyboards import (
     _select_preview_url,
 )
 from music_links_bot.models import ArtistMatch, PlaylistMatch, RadioMatch, TrackMatch, VideoMatch
-from music_links_bot.sharing import add_share_button, build_share_query, track_share_url
+from music_links_bot.sharing import (
+    add_share_button,
+    build_share_query,
+    collection_result_title,
+    track_share_url,
+)
 from music_links_bot.nts import NTSClient, NTSLookupError, build_nts_fallback
 from music_links_bot.phrases import pick_phrase
 from music_links_bot.playlist import (
@@ -67,8 +72,12 @@ NOT_FOUND_DETAIL = (
 )
 _track_result_sender: Callable[..., Awaitable[Any]] | None = None
 _track_video_pair_sender: Callable[..., Awaitable[bool]] | None = None
-_BATCH_LOOKUP_CONCURRENCY = 2
+_BATCH_LOOKUP_CONCURRENCY = 5
+_BATCH_LOOKUP_START_INTERVAL_SECONDS = 0.08
 _BATCH_RETRY_DELAY_SECONDS = 0.2
+_BATCH_ITEM_TIMEOUT_SECONDS = 8.5
+_BATCH_PROVIDER_WORK_SECONDS = 18.0
+_LOOKUP_REQUEST_BUDGET_SECONDS = 20.0
 _GENRE_ENRICHMENT_TIMEOUT_SECONDS = 0.75
 
 
@@ -132,6 +141,30 @@ class LookupBundle:
             )
         )
 
+    @property
+    def successful_source_count(self) -> int:
+        return sum(status.state == "success" for status in self.statuses)
+
+    def is_complete_for(self, source_urls: list[str]) -> bool:
+        expected = [cache_key_for_url(url) for url in source_urls]
+        actual = [cache_key_for_url(status.source_url) for status in self.statuses]
+        return (
+            bool(expected)
+            and actual == expected
+            and all(status.state == "success" for status in self.statuses)
+            and self.item_count == len(expected)
+        )
+
+    def is_negative_for(self, source_urls: list[str]) -> bool:
+        expected = [cache_key_for_url(url) for url in source_urls]
+        actual = [cache_key_for_url(status.source_url) for status in self.statuses]
+        return (
+            bool(expected)
+            and actual == expected
+            and self.item_count == 0
+            and all(status.state == "not_found" for status in self.statuses)
+        )
+
 
 @dataclass(slots=True)
 class SourceStatus:
@@ -143,11 +176,16 @@ class SourceStatus:
 
 
 async def resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBundle:
+    source_urls = _unique_source_urls(source_urls)
     cached = await get_cached_lookup(bot_data, source_urls)
     if cached is not None:
         restored = _bundle_from_cache(cached)
         if restored is not None:
-            return restored
+            restored = _ensure_source_accounting(restored, source_urls)
+            if restored.is_complete_for(source_urls) or restored.is_negative_for(
+                source_urls
+            ):
+                return restored
 
     key = lookup_cache_key(source_urls)
     inflight: dict[str, asyncio.Task[LookupBundle]] = bot_data.setdefault(
@@ -172,6 +210,19 @@ async def resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBundl
     finally:
         if task.done():
             finish(task)
+
+
+def _unique_source_urls(source_urls: list[str]) -> list[str]:
+    """Defensively deduplicate tracking variants while preserving order."""
+    unique: list[str] = []
+    seen: set[str] = set()
+    for source_url in source_urls:
+        key = cache_key_for_url(source_url)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(source_url)
+    return unique
 
 
 async def _resolve_sources_uncached(
@@ -210,6 +261,11 @@ async def _resolve_sources_uncached(
                         for url in music_urls
                     ],
                 ),
+                # Individual music sources have their own timeouts below. Do
+                # not let one slow URL cancel the entire batch and discard
+                # siblings that have already completed successfully.
+                timeout_seconds=19.0,
+                respect_circuit=False,
             )
         )
     if youtube_urls:
@@ -244,7 +300,11 @@ async def _resolve_sources_uncached(
                 [],
             )
         )
-    outcomes = await run_provider_tasks_detailed(bot_data, tasks)
+    outcomes = await run_provider_tasks_detailed(
+        bot_data,
+        tasks,
+        budget_seconds=_LOOKUP_REQUEST_BUDGET_SECONDS,
+    )
     lookup_result = _outcome_value(outcomes, "songlink", ([], [], []))
     videos = _outcome_value(outcomes, "youtube", [])
     radios = _outcome_value(outcomes, "nts", [])
@@ -273,11 +333,8 @@ async def _resolve_sources_uncached(
         artists=artists,
         statuses=_sort_statuses(statuses, source_urls),
     )
-    complete = (
-        bool(bundle.statuses)
-        and len(bundle.statuses) == len(source_urls)
-        and all(status.state == "success" for status in bundle.statuses)
-    )
+    bundle = _ensure_source_accounting(bundle, source_urls)
+    complete = bundle.is_complete_for(source_urls)
     if bundle.item_count and complete:
         await set_cached_lookup(bot_data, source_urls, _bundle_to_cache(bundle))
     elif (
@@ -364,6 +421,33 @@ def _provider_statuses(
             )
         )
     return statuses
+
+
+def _ensure_source_accounting(
+    bundle: LookupBundle,
+    source_urls: list[str],
+) -> LookupBundle:
+    """Guarantee that every accepted source has exactly one visible status."""
+    by_key = {
+        cache_key_for_url(status.source_url): status
+        for status in bundle.statuses
+    }
+    bundle.statuses = [
+        by_key.get(cache_key_for_url(source_url))
+        or SourceStatus(
+            source_url=source_url,
+            provider=DEFAULT_PROVIDER_REGISTRY.provider_for(source_url),
+            state="unavailable",
+            retryable=True,
+        )
+        for source_url in source_urls
+    ]
+    bundle.unavailable_urls = [
+        status.source_url
+        for status in bundle.statuses
+        if status.state == "unavailable"
+    ]
+    return bundle
 
 
 def _item_label(item: object) -> str:
@@ -465,17 +549,17 @@ async def _lookup_playlists(
     )
 
     playlists: list[PlaylistMatch] = []
-    for source_url, result in zip(source_urls, results, strict=False):
+    for source_url, result in zip(source_urls, results, strict=True):
         if isinstance(result, PlaylistMatch):
             playlists.append(result)
             continue
 
         if isinstance(result, PlaylistLookupError):
-            LOGGER.info("Could not fetch playlist metadata for %s", source_url)
+            LOGGER.info("Could not fetch playlist metadata source=%s", _source_log_id(source_url))
         elif isinstance(result, Exception):
             LOGGER.error(
-                "Unexpected error while fetching playlist metadata for %s",
-                source_url,
+                "Unexpected error while fetching playlist metadata source=%s",
+                _source_log_id(source_url),
                 exc_info=(type(result), result, result.__traceback__),
             )
 
@@ -494,17 +578,17 @@ async def _lookup_artists(
     )
 
     artists: list[ArtistMatch] = []
-    for source_url, result in zip(source_urls, results, strict=False):
+    for source_url, result in zip(source_urls, results, strict=True):
         if isinstance(result, ArtistMatch):
             artists.append(result)
             continue
 
         if isinstance(result, ArtistLookupError):
-            LOGGER.info("Could not fetch artist metadata for %s", source_url)
+            LOGGER.info("Could not fetch artist metadata source=%s", _source_log_id(source_url))
         elif isinstance(result, Exception):
             LOGGER.error(
-                "Unexpected error while fetching artist metadata for %s",
-                source_url,
+                "Unexpected error while fetching artist metadata source=%s",
+                _source_log_id(source_url),
                 exc_info=(type(result), result, result.__traceback__),
             )
 
@@ -545,17 +629,17 @@ async def _lookup_youtube_videos(
     )
 
     videos: list[VideoMatch] = []
-    for source_url, result in zip(source_urls, results, strict=False):
+    for source_url, result in zip(source_urls, results, strict=True):
         if isinstance(result, VideoMatch):
             videos.append(result)
             continue
 
         if isinstance(result, YouTubeLookupError):
-            LOGGER.info("Could not fetch YouTube metadata for %s", source_url)
+            LOGGER.info("Could not fetch YouTube metadata source=%s", _source_log_id(source_url))
         elif isinstance(result, Exception):
             LOGGER.error(
-                "Unexpected error while fetching YouTube metadata for %s",
-                source_url,
+                "Unexpected error while fetching YouTube metadata source=%s",
+                _source_log_id(source_url),
                 exc_info=(type(result), result, result.__traceback__),
             )
 
@@ -574,17 +658,17 @@ async def _lookup_nts_radios(
     )
 
     radios: list[RadioMatch] = []
-    for source_url, result in zip(source_urls, results, strict=False):
+    for source_url, result in zip(source_urls, results, strict=True):
         if isinstance(result, RadioMatch):
             radios.append(result)
             continue
 
         if isinstance(result, NTSLookupError):
-            LOGGER.info("Could not fetch NTS metadata for %s", source_url)
+            LOGGER.info("Could not fetch NTS metadata source=%s", _source_log_id(source_url))
         elif isinstance(result, Exception):
             LOGGER.error(
-                "Unexpected error while fetching NTS metadata for %s",
-                source_url,
+                "Unexpected error while fetching NTS metadata source=%s",
+                _source_log_id(source_url),
                 exc_info=(type(result), result, result.__traceback__),
             )
 
@@ -604,42 +688,57 @@ async def _send_youtube_result(
     include_channel_button: bool,
     include_hashtags: bool,
     lang: str,
+    allow_share: bool = True,
+    requested_count: int | None = None,
 ) -> None:
     if not videos:
         return
 
-    if len(videos) == 1:
+    total = max(len(videos), int(requested_count or len(videos)))
+    if total == 1:
         video = videos[0]
+        keyboard = _build_youtube_keyboard(
+            video.url,
+            include_channel_button=include_channel_button,
+        )
+        if allow_share:
+            keyboard = add_share_button(
+                keyboard,
+                share_query=build_share_query([video.url]),
+                label=get_text(lang, "share_post"),
+            )
         await _send_track_result(
             bot,
             message,
             user_prefix + format_video_message(video, include_hashtags=include_hashtags),
             preview_url=video.url,
-            reply_markup=add_share_button(
-                _build_youtube_keyboard(
-                    video.url,
-                    include_channel_button=include_channel_button,
-                ),
-                share_query=build_share_query([video.url]),
-                label=get_text(lang, "share_post"),
-            ),
+            reply_markup=keyboard,
         )
         return
 
+    collection_keyboard = _build_youtube_collection_keyboard(
+        videos,
+        include_channel_button=include_channel_button,
+    )
+    if allow_share:
+        collection_keyboard = add_share_button(
+            collection_keyboard,
+            share_query=build_share_query([video.url for video in videos]),
+            label=get_text(lang, "share_post"),
+        )
     await _send_track_result(
         bot,
         message,
         user_prefix
-        + format_video_collection_message(videos, include_hashtags=include_hashtags),
-        preview_url=videos[0].url,
-        reply_markup=add_share_button(
-            _build_youtube_collection_keyboard(
-                videos,
-                include_channel_button=include_channel_button,
+        + format_video_collection_message(
+            videos,
+            include_hashtags=include_hashtags,
+            title=collection_result_title(
+                lang, found=len(videos), total=total, item_kind="video"
             ),
-            share_query=build_share_query([video.url for video in videos]),
-            label=get_text(lang, "share_post"),
         ),
+        preview_url=videos[0].url,
+        reply_markup=collection_keyboard,
     )
 
 
@@ -652,42 +751,57 @@ async def _send_nts_result(
     include_channel_button: bool,
     include_hashtags: bool,
     lang: str,
+    allow_share: bool = True,
+    requested_count: int | None = None,
 ) -> None:
     if not radios:
         return
 
-    if len(radios) == 1:
+    total = max(len(radios), int(requested_count or len(radios)))
+    if total == 1:
         radio = radios[0]
+        keyboard = _build_nts_keyboard(
+            radio.url,
+            include_channel_button=include_channel_button,
+        )
+        if allow_share:
+            keyboard = add_share_button(
+                keyboard,
+                share_query=build_share_query([radio.url]),
+                label=get_text(lang, "share_post"),
+            )
         await _send_track_result(
             bot,
             message,
             user_prefix + format_radio_message(radio, include_hashtags=include_hashtags),
             preview_url=radio.url,
-            reply_markup=add_share_button(
-                _build_nts_keyboard(
-                    radio.url,
-                    include_channel_button=include_channel_button,
-                ),
-                share_query=build_share_query([radio.url]),
-                label=get_text(lang, "share_post"),
-            ),
+            reply_markup=keyboard,
         )
         return
 
+    collection_keyboard = _build_nts_collection_keyboard(
+        radios,
+        include_channel_button=include_channel_button,
+    )
+    if allow_share:
+        collection_keyboard = add_share_button(
+            collection_keyboard,
+            share_query=build_share_query([radio.url for radio in radios]),
+            label=get_text(lang, "share_post"),
+        )
     await _send_track_result(
         bot,
         message,
         user_prefix
-        + format_radio_collection_message(radios, include_hashtags=include_hashtags),
-        preview_url=radios[0].url,
-        reply_markup=add_share_button(
-            _build_nts_collection_keyboard(
-                radios,
-                include_channel_button=include_channel_button,
+        + format_radio_collection_message(
+            radios,
+            include_hashtags=include_hashtags,
+            title=collection_result_title(
+                lang, found=len(radios), total=total, item_kind="radio"
             ),
-            share_query=build_share_query([radio.url for radio in radios]),
-            label=get_text(lang, "share_post"),
         ),
+        preview_url=radios[0].url,
+        reply_markup=collection_keyboard,
     )
 
 
@@ -700,29 +814,45 @@ async def _send_playlist_result(
     include_channel_button: bool,
     include_hashtags: bool,
     lang: str,
+    allow_share: bool = True,
+    requested_count: int | None = None,
 ) -> None:
     if not playlists:
         return
 
-    if len(playlists) == 1:
+    total = max(len(playlists), int(requested_count or len(playlists)))
+    if total == 1:
         playlist = playlists[0]
+        keyboard = _build_playlist_keyboard(
+            playlist.url,
+            include_channel_button=include_channel_button,
+        )
+        if allow_share:
+            keyboard = add_share_button(
+                keyboard,
+                share_query=build_share_query([playlist.url]),
+                label=get_text(lang, "share_post"),
+            )
         await _send_track_result(
             bot,
             message,
             user_prefix
             + format_playlist_message(playlist, include_hashtags=include_hashtags),
             preview_url=playlist.url,
-            reply_markup=add_share_button(
-                _build_playlist_keyboard(
-                    playlist.url,
-                    include_channel_button=include_channel_button,
-                ),
-                share_query=build_share_query([playlist.url]),
-                label=get_text(lang, "share_post"),
-            ),
+            reply_markup=keyboard,
         )
         return
 
+    collection_keyboard = _build_playlist_collection_keyboard(
+        playlists,
+        include_channel_button=include_channel_button,
+    )
+    if allow_share:
+        collection_keyboard = add_share_button(
+            collection_keyboard,
+            share_query=build_share_query([playlist.url for playlist in playlists]),
+            label=get_text(lang, "share_post"),
+        )
     await _send_track_result(
         bot,
         message,
@@ -730,16 +860,12 @@ async def _send_playlist_result(
         + format_playlist_collection_message(
             playlists,
             include_hashtags=include_hashtags,
+            title=collection_result_title(
+                lang, found=len(playlists), total=total, item_kind="playlist"
+            ),
         ),
         preview_url=playlists[0].url,
-        reply_markup=add_share_button(
-            _build_playlist_collection_keyboard(
-                playlists,
-                include_channel_button=include_channel_button,
-            ),
-            share_query=build_share_query([playlist.url for playlist in playlists]),
-            label=get_text(lang, "share_post"),
-        ),
+        reply_markup=collection_keyboard,
     )
 
 
@@ -752,28 +878,44 @@ async def _send_artist_result(
     include_channel_button: bool,
     include_hashtags: bool,
     lang: str,
+    allow_share: bool = True,
+    requested_count: int | None = None,
 ) -> None:
     if not artists:
         return
 
-    if len(artists) == 1:
+    total = max(len(artists), int(requested_count or len(artists)))
+    if total == 1:
         artist = artists[0]
+        keyboard = _build_artist_keyboard(
+            artist.url,
+            include_channel_button=include_channel_button,
+        )
+        if allow_share:
+            keyboard = add_share_button(
+                keyboard,
+                share_query=build_share_query([artist.url]),
+                label=get_text(lang, "share_post"),
+            )
         await _send_track_result(
             bot,
             message,
             user_prefix + format_artist_message(artist, include_hashtags=include_hashtags),
             preview_url=artist.url,
-            reply_markup=add_share_button(
-                _build_artist_keyboard(
-                    artist.url,
-                    include_channel_button=include_channel_button,
-                ),
-                share_query=build_share_query([artist.url]),
-                label=get_text(lang, "share_post"),
-            ),
+            reply_markup=keyboard,
         )
         return
 
+    collection_keyboard = _build_artist_collection_keyboard(
+        artists,
+        include_channel_button=include_channel_button,
+    )
+    if allow_share:
+        collection_keyboard = add_share_button(
+            collection_keyboard,
+            share_query=build_share_query([artist.url for artist in artists]),
+            label=get_text(lang, "share_post"),
+        )
     await _send_track_result(
         bot,
         message,
@@ -781,16 +923,12 @@ async def _send_artist_result(
         + format_artist_collection_message(
             artists,
             include_hashtags=include_hashtags,
+            title=collection_result_title(
+                lang, found=len(artists), total=total, item_kind="artist"
+            ),
         ),
         preview_url=artists[0].url,
-        reply_markup=add_share_button(
-            _build_artist_collection_keyboard(
-                artists,
-                include_channel_button=include_channel_button,
-            ),
-            share_query=build_share_query([artist.url for artist in artists]),
-            label=get_text(lang, "share_post"),
-        ),
+        reply_markup=collection_keyboard,
     )
 
 
@@ -808,6 +946,8 @@ async def _send_mixed_result(
     include_hashtags: bool,
     context: ContextTypes.DEFAULT_TYPE,
     lang: str,
+    allow_share: bool = True,
+    requested_count: int | None = None,
 ) -> None:
     preview_url = _select_mixed_preview_url(
         tracks,
@@ -817,6 +957,10 @@ async def _send_mixed_result(
         videos,
         context,
     )
+    found_count = (
+        len(tracks) + len(videos) + len(radios) + len(playlists) + len(artists)
+    )
+    total = max(found_count, int(requested_count or found_count))
     text = user_prefix + format_mixed_collection_message(
         tracks,
         videos,
@@ -824,27 +968,39 @@ async def _send_mixed_result(
         artists,
         radios,
         include_hashtags=include_hashtags,
-    )
-    keyboard = add_share_button(
-        _build_mixed_collection_keyboard(
-            tracks,
-            videos,
-            playlists,
-            artists,
-            radios,
-            include_channel_button=include_channel_button,
+        title=(
+            collection_result_title(
+                lang,
+                found=found_count,
+                total=total,
+                item_kind="item",
+            )
+            if found_count < total
+            else None
         ),
-        share_query=build_share_query(
-            [
-                *[track_share_url(track) or "" for track in tracks],
-                *[playlist.url for playlist in playlists],
-                *[artist.url for artist in artists],
-                *[radio.url for radio in radios],
-                *[video.url for video in videos],
-            ]
-        ),
-        label=get_text(lang, "share_post"),
     )
+    keyboard = _build_mixed_collection_keyboard(
+        tracks,
+        videos,
+        playlists,
+        artists,
+        radios,
+        include_channel_button=include_channel_button,
+    )
+    if allow_share:
+        keyboard = add_share_button(
+            keyboard,
+            share_query=build_share_query(
+                [
+                    *[track_share_url(track) or "" for track in tracks],
+                    *[playlist.url for playlist in playlists],
+                    *[artist.url for artist in artists],
+                    *[radio.url for radio in radios],
+                    *[video.url for video in videos],
+                ]
+            ),
+            label=get_text(lang, "share_post"),
+        )
     if (
         len(tracks) == 1
         and len(videos) == 1
@@ -924,45 +1080,87 @@ async def _lookup_tracks_detailed(
     # lookups bounded and retry transient provider failures once so a
     # three-link collection cannot silently collapse into a one-track post.
     semaphore = asyncio.Semaphore(_BATCH_LOOKUP_CONCURRENCY)
+    loop = asyncio.get_running_loop()
+    start_lock = asyncio.Lock()
+    next_start_at = loop.time()
+
+    async def pace_provider_start() -> None:
+        """Spread a batch burst without reducing the ten-link capacity."""
+        nonlocal next_start_at
+        async with start_lock:
+            now = loop.time()
+            delay = max(0.0, next_start_at - now)
+            next_start_at = max(now, next_start_at) + _BATCH_LOOKUP_START_INTERVAL_SECONDS
+        if delay:
+            await asyncio.sleep(delay)
 
     async def lookup_one(
         index: int,
         source_url: str,
-        *,
-        attempt: int = 0,
     ) -> TrackMatch | Exception:
-        # Each recursive retry reacquires the semaphore after backoff instead
-        # of occupying a batch slot while the provider recovers.
-        try:
+        item_deadline: float | None = None
+        provider_attempt = 0
+        while True:
             async with semaphore:
-                return await client.lookup_track(source_url)
-        except SonglinkLookupError as exc:
-            if attempt == 0 and spotify_url_type(source_url) in {"track", "album"}:
-                await asyncio.sleep(
-                    _BATCH_RETRY_DELAY_SECONDS + (index % 3) * 0.05
-                )
-                return await lookup_one(index, source_url, attempt=1)
-            return exc
-        except SonglinkError as exc:
-            if attempt == 1:
-                return exc
-            await asyncio.sleep(_BATCH_RETRY_DELAY_SECONDS + (index % 3) * 0.05)
-            return await lookup_one(index, source_url, attempt=1)
-        except Exception as exc:
-            return exc
+                await pace_provider_start()
+                if item_deadline is None:
+                    # Queue wait must not consume a source's own timeout. This
+                    # guarantees that slow URLs at the start of a ten-link
+                    # batch cannot starve otherwise fast followers. Five
+                    # paced slots also let all ten accepted sources receive
+                    # their full deadline within the webhook budget.
+                    item_deadline = loop.time() + _BATCH_ITEM_TIMEOUT_SECONDS
+                remaining = item_deadline - loop.time()
+                if remaining <= 0:
+                    return TimeoutError("source lookup deadline exhausted")
+                try:
+                    return await asyncio.wait_for(
+                        client.lookup_track(source_url),
+                        timeout=remaining,
+                    )
+                except TimeoutError as exc:
+                    return exc
+                except SonglinkLookupError as exc:
+                    can_retry = spotify_url_type(source_url) in {"track", "album"}
+                    if provider_attempt > 0 or not can_retry:
+                        return exc
+                except SonglinkError as exc:
+                    if provider_attempt > 0:
+                        return exc
+                except Exception as exc:
+                    return exc
 
-    results = await asyncio.gather(
-        *(
-            lookup_one(index, source_url)
-            for index, source_url in enumerate(source_urls)
-        ),
+            provider_attempt += 1
+            delay = _BATCH_RETRY_DELAY_SECONDS + (index % 3) * 0.05
+            remaining = item_deadline - loop.time()
+            if remaining <= delay:
+                return TimeoutError("source lookup deadline exhausted")
+            await asyncio.sleep(delay)
+
+    lookup_tasks = [
+        asyncio.create_task(lookup_one(index, source_url))
+        for index, source_url in enumerate(source_urls)
+    ]
+    done, pending = await asyncio.wait(
+        lookup_tasks,
+        timeout=_BATCH_PROVIDER_WORK_SECONDS,
     )
+    for task in pending:
+        task.cancel()
+    if pending:
+        await asyncio.gather(*pending, return_exceptions=True)
+    results: list[TrackMatch | Exception] = [
+        task.result()
+        if task in done and not task.cancelled()
+        else TimeoutError("batch provider deadline exhausted")
+        for task in lookup_tasks
+    ]
 
     tracks: list[TrackMatch] = []
     unavailable_urls: list[str] = []
     statuses: list[SourceStatus] = []
 
-    for source_url, result in zip(source_urls, results, strict=False):
+    for source_url, result in zip(source_urls, results, strict=True):
         if isinstance(result, TrackMatch):
             tracks.append(result)
             statuses.append(
@@ -1010,8 +1208,8 @@ async def _lookup_tracks_detailed(
                 continue
 
             LOGGER.error(
-                "Song.link request failed for %s",
-                source_url,
+                "Song.link request failed source=%s",
+                _source_log_id(source_url),
                 exc_info=(type(result), result, result.__traceback__),
             )
             unavailable_urls.append(source_url)
@@ -1026,10 +1224,16 @@ async def _lookup_tracks_detailed(
             continue
 
         if isinstance(result, Exception):
-            LOGGER.error(
-                "Unexpected error while resolving %s",
-                source_url,
-                exc_info=(type(result), result, result.__traceback__),
+            log = LOGGER.warning if isinstance(result, TimeoutError) else LOGGER.error
+            log(
+                "Resolver failed source=%s error=%s",
+                _source_log_id(source_url),
+                type(result).__name__,
+                exc_info=(
+                    (type(result), result, result.__traceback__)
+                    if not isinstance(result, TimeoutError)
+                    else None
+                ),
             )
             unavailable_urls.append(source_url)
             statuses.append(
@@ -1076,7 +1280,7 @@ async def _fill_genres(search_client: SearchClient, tracks: list[TrackMatch]) ->
         *(search_client.lookup_genre(track.artist, track.title) for track in pending),
         return_exceptions=True,
     )
-    for track, genre in zip(pending, genres, strict=False):
+    for track, genre in zip(pending, genres, strict=True):
         if isinstance(genre, str):
             track.genre = genre
 
@@ -1117,11 +1321,11 @@ async def _build_lookup_fallback(
     try:
         return await soundcloud_client.lookup_track(source_url)
     except SoundCloudLookupError:
-        LOGGER.info("Could not fetch SoundCloud metadata for %s", source_url)
+        LOGGER.info("Could not fetch SoundCloud metadata source=%s", _source_log_id(source_url))
     except Exception:
         LOGGER.exception(
-            "Unexpected error while fetching SoundCloud metadata for %s",
-            source_url,
+            "Unexpected error while fetching SoundCloud metadata source=%s",
+            _source_log_id(source_url),
         )
 
     return generic_soundcloud_fallback

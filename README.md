@@ -63,16 +63,21 @@ input shapes: a release or artist link, an `artist — title` query, or several
 links for a collection. Restoring an unfinished card is a separate named
 secondary action and never replaces the main flow.
 
-Lookup uses visible `1/3 → 3/3` progress. When one source fails, resolved items
-are still delivered and retry targets only the failed links.
+Lookup uses visible `1/3 → 3/3` progress. Every accepted source receives an
+ordered success/failure status; one slow provider call cannot cancel completed
+siblings or starve later links. An incomplete result stays visibly marked as
+`3 of 4`, cannot be shared as finished, and its recovery action rebuilds the
+entire original collection in the same order.
 All output is checked against Telegram message and caption limits before
 delivery, with a safe fallback for oversized formatted text.
 Transient Song.link failures fall back to Spotify metadata for Spotify URLs;
 regional misses are checked against bounded secondary regions and stable
 public Spotify page metadata. The short fallback cache is automatically
 replaced by the complete platform result after the provider recovers.
-Incomplete inline collections are never cached or offered as finished shares;
-their action rechecks every original source instead.
+Incomplete regular and inline collections are never cached or offered as
+finished shares; their action rechecks every original source instead. Links
+hidden behind Telegram text entities are resolved too, while tracking variants
+are deduplicated before lookup and sharing.
 
 ## Local setup
 

@@ -117,7 +117,9 @@ async def _fetch_bytes(client: httpx.AsyncClient, url: str | None) -> bytes | No
         response.raise_for_status()
         return response.content
     except Exception:
-        LOGGER.debug("Branding asset fetch failed: %s", url, exc_info=True)
+        # Artwork URLs can contain signed query parameters. Keep diagnostics
+        # useful without writing those private tokens to provider logs.
+        LOGGER.debug("Branding asset fetch failed", exc_info=True)
         return None
 
 

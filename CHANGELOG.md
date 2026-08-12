@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.1.4 — 2026-08-12
+
+- Made multi-link resolution source-accountable: every unique input now has
+  exactly one ordered status and complete-cache entries must match every item.
+- Prevented slow sources at the beginning of a batch from starving later
+  links; five paced provider slots let all ten accepted sources receive their
+  complete per-source deadline inside the webhook budget.
+- Kept one-item partial results as visibly incomplete collections across
+  music, video, radio, playlist, artist and mixed cards.
+- Removed finished-share actions from all partial results and made retry
+  atomically rebuild the complete original collection.
+- Added support for Telegram links hidden behind text entities and deduplicated
+  tracking variants in lookup and share queries.
+- Stopped transient Song.link outages from fanning out regional requests,
+  while keeping the independent Spotify metadata fallback available even when
+  the provider circuit is open.
+- Removed raw source and signed artwork URLs from diagnostics and added batch,
+  timeout, cache-repair, hidden-link and partial-card regression coverage.
+- Extended the release suite to 459 automated tests.
+
 ## 1.1.3 — 2026-08-12
 
 - Recovered Spotify releases that Song.link misses in its primary region by

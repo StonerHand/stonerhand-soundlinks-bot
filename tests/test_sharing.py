@@ -155,9 +155,29 @@ class SharingTests(unittest.TestCase):
             )
         )
 
+    def test_share_query_deduplicates_tracking_variants(self) -> None:
+        query = build_share_query(
+            [
+                "https://open.spotify.com/track/abc?si=first",
+                "https://open.spotify.com/track/abc?si=second",
+            ]
+        )
+
+        self.assertEqual(query, "sh2|tabc")
+        self.assertEqual(
+            parse_share_query(query or ""),
+            ["https://open.spotify.com/track/abc"],
+        )
+
     def test_malformed_share_query_is_rejected(self) -> None:
         self.assertEqual(parse_share_query("sh|tgood|bad"), [])
         self.assertIsNone(parse_share_query("normal search"))
+
+    def test_incoming_share_query_deduplicates_repeated_sources(self) -> None:
+        self.assertEqual(
+            parse_share_query("sh2|tabc|tabc"),
+            ["https://open.spotify.com/track/abc"],
+        )
 
     def test_share_button_preserves_existing_keyboard(self) -> None:
         keyboard = InlineKeyboardMarkup(

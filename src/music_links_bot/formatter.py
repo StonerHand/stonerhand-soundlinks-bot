@@ -97,8 +97,9 @@ def format_artist_collection_message(
     artists: list[ArtistMatch],
     *,
     include_hashtags: bool = True,
+    title: str | None = None,
 ) -> str:
-    lines = ["<b>Артисты</b>", ""]
+    lines = [f"<b>{escape(title or 'Артисты')}</b>", ""]
     for index, artist in enumerate(artists, start=1):
         heading = f"<b>{_display_text(artist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
         lines.append(f"{index}. 🧬 · {heading}")
@@ -110,8 +111,9 @@ def format_playlist_collection_message(
     playlists: list[PlaylistMatch],
     *,
     include_hashtags: bool = True,
+    title: str | None = None,
 ) -> str:
-    lines = ["<b>Плейлисты</b>", ""]
+    lines = [f"<b>{escape(title or 'Плейлисты')}</b>", ""]
     for index, playlist in enumerate(playlists, start=1):
         heading = f"<b>{_display_text(playlist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
         lines.append(f"{index}. 🎛 · {heading}")
@@ -123,8 +125,9 @@ def format_video_collection_message(
     videos: list[VideoMatch],
     *,
     include_hashtags: bool = True,
+    title: str | None = None,
 ) -> str:
-    lines = ["<b>Видео</b>", ""]
+    lines = [f"<b>{escape(title or 'Видео')}</b>", ""]
     for index, video in enumerate(videos, start=1):
         heading = f"<b>{_display_text(video.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
         lines.append(f"{index}. 📺 · {heading}")
@@ -136,8 +139,9 @@ def format_radio_collection_message(
     radios: list[RadioMatch],
     *,
     include_hashtags: bool = True,
+    title: str | None = None,
 ) -> str:
-    lines = ["<b>Радио</b>", ""]
+    lines = [f"<b>{escape(title or 'Радио')}</b>", ""]
     for index, radio in enumerate(radios, start=1):
         heading = f"<b>{_display_text(radio.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
         lines.append(f"{index}. 📡 · {heading}")
@@ -153,6 +157,7 @@ def format_mixed_collection_message(
     radios: list[RadioMatch] | None = None,
     *,
     include_hashtags: bool = True,
+    title: str | None = None,
 ) -> str:
     playlists = playlists or []
     artists = artists or []
@@ -163,6 +168,7 @@ def format_mixed_collection_message(
         and not playlists
         and not artists
         and not radios
+        and not title
     ):
         return format_track_video_pair_message(
             tracks[0],
@@ -170,7 +176,7 @@ def format_mixed_collection_message(
             include_hashtags=include_hashtags,
         )
 
-    lines = ["<b>Подборка</b>", ""]
+    lines = [f"<b>{escape(title or 'Подборка')}</b>", ""]
 
     index = 1
     for track in tracks:

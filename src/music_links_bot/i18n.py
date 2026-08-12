@@ -536,12 +536,12 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "retry": {RU: "Повторить", EN: "Retry"},
     "retry_failed": {
-        RU: "Повторить только ошибки",
-        EN: "Retry failed links",
+        RU: "Проверить все ссылки",
+        EN: "Check all links again",
     },
     "partial_result": {
-        RU: "<b>Готово не всё</b>\n{ok} из {total} ссылок обработано. Остальные можно повторить отдельно.",
-        EN: "<b>Some links need another try</b>\n{ok} of {total} links were processed. Retry only the failed ones.",
+        RU: "<b>Готово не всё</b>\n{ok} из {total} ссылок обработано. Проверь всю подборку ещё раз.",
+        EN: "<b>Some links need another try</b>\n{ok} of {total} links were processed. Check the complete collection again.",
     },
     "duplicate_repeat": {
         RU: "Опубликовать снова",

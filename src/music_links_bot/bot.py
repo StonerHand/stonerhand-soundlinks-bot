@@ -29,6 +29,7 @@ from music_links_bot.branding import (
 )
 from music_links_bot.bot_stats import (
     build_user_prefix as _build_user_prefix,
+    message_source_urls as _message_source_urls,
     message_text as _message_text,
     record_artist_items as _record_artists_safely,
     record_mixed_items as _record_mixed_safely,
@@ -1552,7 +1553,8 @@ async def _handle_empty_lookup(
     if bundle.unavailable_urls:
         await _notify_admin(
             context,
-            "Song.link недоступен при обработке: " + ", ".join(bundle.unavailable_urls),
+            "Внешний resolver недоступен для "
+            f"{len(bundle.unavailable_urls)} из {len(source_urls)} источников.",
             only_for_channel_message=message,
         )
 
@@ -1562,8 +1564,8 @@ async def _handle_empty_lookup(
     if not bundle.unavailable_urls:
         await _notify_admin(
             context,
-            f"Не нашел платформы для ссылок в чате {message.chat_id}: "
-            + ", ".join(source_urls),
+            f"Не найдено ни одного релиза для {len(source_urls)} источников "
+            f"в чате {message.chat_id}.",
             only_for_channel_message=message,
         )
 
@@ -1654,10 +1656,11 @@ async def _send_track_matches(
     include_hashtags: bool,
     search_query: str | None = None,
     requested_count: int | None = None,
+    allow_share: bool = True,
 ) -> None:
     """Deliver one release or a collection without mixing lookup concerns."""
-    if len(tracks) > 1:
-        total = max(len(tracks), int(requested_count or len(tracks)))
+    total = max(len(tracks), int(requested_count or len(tracks)))
+    if total > 1:
         title = collection_result_title(
             lang,
             found=len(tracks),
@@ -1688,16 +1691,18 @@ async def _send_track_matches(
             ]
             collection_keyboard = InlineKeyboardMarkup(rows)
         else:
-            collection_keyboard = add_share_button(
-                _build_collection_keyboard(
-                    tracks,
-                    include_channel_button=include_channel_button,
-                ),
-                share_query=build_share_query(
-                    [track_share_url(track) or "" for track in tracks]
-                ),
-                label=get_text(lang, "share_post"),
+            collection_keyboard = _build_collection_keyboard(
+                tracks,
+                include_channel_button=include_channel_button,
             )
+            if allow_share:
+                collection_keyboard = add_share_button(
+                    collection_keyboard,
+                    share_query=build_share_query(
+                        [track_share_url(track) or "" for track in tracks]
+                    ),
+                    label=get_text(lang, "share_post"),
+                )
         collection_text = user_prefix + format_collection_message(
             tracks,
             include_hashtags=include_hashtags,
@@ -1726,6 +1731,22 @@ async def _send_track_matches(
             search_query=search_query,
         )
     else:
+        keyboard = _build_link_keyboard(
+            track.links,
+            context=context,
+            include_channel_button=include_channel_button,
+            release_page_url=track.page_url,
+            release_kind=track.kind,
+            release_format=track.release_format,
+        )
+        if allow_share:
+            keyboard = add_share_button(
+                keyboard,
+                share_query=build_share_query(
+                    [url] if (url := track_share_url(track)) else []
+                ),
+                label=get_text(lang, "share_post"),
+            )
         await _send_track_result(
             context.bot,
             message,
@@ -1736,20 +1757,7 @@ async def _send_track_matches(
             ),
             preview_url=_select_preview_url(track.links, context)
             or track.thumbnail_url,
-            reply_markup=add_share_button(
-                _build_link_keyboard(
-                    track.links,
-                    context=context,
-                    include_channel_button=include_channel_button,
-                    release_page_url=track.page_url,
-                    release_kind=track.kind,
-                    release_format=track.release_format,
-                ),
-                share_query=build_share_query(
-                    [url] if (url := track_share_url(track)) else []
-                ),
-                label=get_text(lang, "share_post"),
-            ),
+            reply_markup=keyboard,
         )
     _record_matches_safely([track], message, context=context)
 
@@ -1915,7 +1923,11 @@ async def _track_lookup_message_impl(
     is_private = message.chat.type == "private"
     request = LookupRequest(
         message_text=message_text,
-        source_urls=extract_supported_urls(message_text)[:MAX_LINKS_PER_MESSAGE],
+        source_urls=(
+            extract_supported_urls(message_text)
+            if _INPUT_OVERRIDE.get() is not None
+            else _message_source_urls(message, text=message_text)
+        )[:MAX_LINKS_PER_MESSAGE],
         is_private=is_private,
         lang=_update_lang(update) if is_private else "ru",
         user_id=(
@@ -2041,6 +2053,7 @@ async def _deliver_lookup_bundle(
     user_prefix: str,
 ) -> None:
     """Render an already resolved bundle; lookup orchestration stays separate."""
+    partial = not bundle.is_complete_for(request.source_urls)
     kind = delivery_kind(bundle)
     prefix = "" if bundle.item_count > 1 else user_prefix
     common = {
@@ -2058,19 +2071,48 @@ async def _deliver_lookup_bundle(
             user_id=request.user_id,
             search_query=request.search_query,
             requested_count=len(request.source_urls),
+            allow_share=not partial,
             **common,
         )
     elif kind == "videos":
-        await _send_youtube_result(context.bot, message, bundle.videos, **common)
+        await _send_youtube_result(
+            context.bot,
+            message,
+            bundle.videos,
+            requested_count=len(request.source_urls),
+            allow_share=not partial,
+            **common,
+        )
         _record_videos_safely(bundle.videos, message, context=context)
     elif kind == "radios":
-        await _send_nts_result(context.bot, message, bundle.radios, **common)
+        await _send_nts_result(
+            context.bot,
+            message,
+            bundle.radios,
+            requested_count=len(request.source_urls),
+            allow_share=not partial,
+            **common,
+        )
         _record_radios_safely(bundle.radios, message, context=context)
     elif kind == "playlists":
-        await _send_playlist_result(context.bot, message, bundle.playlists, **common)
+        await _send_playlist_result(
+            context.bot,
+            message,
+            bundle.playlists,
+            requested_count=len(request.source_urls),
+            allow_share=not partial,
+            **common,
+        )
         _record_playlists_safely(bundle.playlists, message, context=context)
     elif kind == "artists":
-        await _send_artist_result(context.bot, message, bundle.artists, **common)
+        await _send_artist_result(
+            context.bot,
+            message,
+            bundle.artists,
+            requested_count=len(request.source_urls),
+            allow_share=not partial,
+            **common,
+        )
         _record_artists_safely(bundle.artists, message, context=context)
     elif kind == "mixed":
         await _send_mixed_result(
@@ -2082,6 +2124,8 @@ async def _deliver_lookup_bundle(
             bundle.playlists,
             bundle.artists,
             context=context,
+            requested_count=len(request.source_urls),
+            allow_share=not partial,
             **common,
         )
         _record_mixed_safely(

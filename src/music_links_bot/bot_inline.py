@@ -150,13 +150,13 @@ async def inline_query_handler(
         return_exceptions=True,
     )
     results: list[InlineQueryResultArticle] = []
-    for source_url, outcome in zip(page_urls, outcomes, strict=False):
+    for source_url, outcome in zip(page_urls, outcomes, strict=True):
         if isinstance(outcome, InlineQueryResultArticle):
             results.append(outcome)
         elif isinstance(outcome, Exception):
             LOGGER.error(
-                "Inline lookup failed for %s",
-                source_url,
+                "Inline lookup failed source=%s",
+                hashlib.sha256(source_url.encode()).hexdigest()[:12],
                 exc_info=(type(outcome), outcome, outcome.__traceback__),
             )
 

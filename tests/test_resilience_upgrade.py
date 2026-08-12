@@ -240,8 +240,38 @@ class PartialBatchJourneyTests(unittest.IsolatedAsyncioTestCase):
         stored = await load_retry_sources(context, retry_id)
         self.assertEqual(
             stored["urls"],
-            ["https://open.spotify.com/track/b"],
+            [
+                "https://open.spotify.com/track/a",
+                "https://open.spotify.com/track/b",
+                "https://open.spotify.com/track/c",
+            ],
         )
+
+    async def test_retry_button_includes_retryable_not_found_sources(self) -> None:
+        class Message:
+            chat = SimpleNamespace(type="private")
+
+            def __init__(self) -> None:
+                self.sent = []
+
+            async def reply_text(self, text, **kwargs):
+                self.sent.append((text, kwargs))
+
+        message = Message()
+        context = SimpleNamespace(application=SimpleNamespace(bot_data={}))
+        url = "https://open.spotify.com/track/retry-not-found"
+        bundle = LookupBundle(
+            tracks=[], unavailable_urls=[], videos=[], radios=[], playlists=[], artists=[],
+            statuses=[SourceStatus(url, "songlink", "not_found", retryable=True)],
+        )
+
+        await _send_partial_lookup_status(
+            message, context, bundle, user_id=7, lang="ru"
+        )
+
+        callback = message.sent[0][1]["reply_markup"].inline_keyboard[0][0].callback_data
+        stored = await load_retry_sources(context, callback.rsplit("|", 1)[-1])
+        self.assertEqual(stored["urls"], [url])
 
     async def test_retryable_not_found_is_labeled_as_unrecognized(self) -> None:
         class Message:
