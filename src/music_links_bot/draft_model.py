@@ -35,6 +35,7 @@ class TrackDraft(TypedDict, total=False):
     crate_count: int
     deleted_at: int
     duplicate_record: dict[str, Any]
+    undo_state: dict[str, Any]
     created_at: int
 
 
@@ -103,4 +104,9 @@ def normalize_track_draft(value: object) -> TrackDraft | None:
             if isinstance(key, str) and key in PLATFORM_LABELS
         ]
         draft["platforms"] = selected
+    undo_state = value.get("undo_state")
+    if isinstance(undo_state, dict):
+        draft["undo_state"] = dict(undo_state)
+    else:
+        draft.pop("undo_state", None)
     return draft

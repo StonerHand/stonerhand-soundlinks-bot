@@ -51,6 +51,7 @@ from music_links_bot.provider_runtime import (
     lookup_cache_key,
     run_provider_tasks_detailed,
     set_cached_lookup,
+    set_cached_negative_lookup,
 )
 from music_links_bot.provider_registry import DEFAULT_PROVIDER_REGISTRY
 
@@ -269,6 +270,14 @@ async def _resolve_sources_uncached(
     )
     if bundle.item_count and not bundle.unavailable_urls:
         await set_cached_lookup(bot_data, source_urls, _bundle_to_cache(bundle))
+    elif (
+        not bundle.item_count
+        and bundle.statuses
+        and all(status.state == "not_found" for status in bundle.statuses)
+    ):
+        await set_cached_negative_lookup(
+            bot_data, source_urls, _bundle_to_cache(bundle)
+        )
     return bundle
 
 

@@ -622,6 +622,7 @@ class BotKeyboardTests(unittest.TestCase):
                 "id",
                 "stats",
                 "crate",
+                "cancel",
                 "status",
             },
         )
@@ -1610,7 +1611,7 @@ class PostEditorTests(unittest.TestCase):
         self.assertIn("превью обновится сразу", text)
         labels = [button.text for row in keyboard.inline_keyboard for button in row]
         self.assertIn("✓ Готово", labels)
-        self.assertIn("Действия", labels)
+        self.assertIn("Отправить", labels)
 
     def test_quick_card_is_capped_at_four_actions(self) -> None:
         draft = self._draft()

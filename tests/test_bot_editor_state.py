@@ -5,7 +5,9 @@ from music_links_bot.bot_editor_state import (
     cycle_preset,
     draft_owned_by,
     draft_status,
+    remember_setting_state,
     remember_draft,
+    restore_setting_state,
     toggle_platform_selection,
 )
 from music_links_bot.models import TrackMatch
@@ -60,3 +62,24 @@ class BotEditorStateTests(unittest.TestCase):
         self.assertFalse(draft_owned_by({"chat_id": 7}, 8))
         self.assertFalse(draft_owned_by({}, 7))
         self.assertFalse(draft_owned_by({"chat_id": "7"}, 7))
+
+    def test_last_setting_change_can_be_restored_once(self) -> None:
+        draft = {"hashtags": True, "platforms": ["spotify"]}
+        remember_setting_state(draft)
+        expires_at = draft["undo_state"]["expires_at"]
+        draft["hashtags"] = False
+        draft["platforms"] = ["appleMusic"]
+
+        self.assertTrue(restore_setting_state(draft, now=expires_at))
+        self.assertTrue(draft["hashtags"])
+        self.assertEqual(draft["platforms"], ["spotify"])
+        self.assertFalse(restore_setting_state(draft, now=expires_at))
+
+    def test_expired_setting_change_is_not_restored(self) -> None:
+        draft = {"hashtags": True}
+        remember_setting_state(draft)
+        expires_at = draft["undo_state"]["expires_at"]
+        draft["hashtags"] = False
+
+        self.assertFalse(restore_setting_state(draft, now=expires_at + 1))
+        self.assertFalse(draft["hashtags"])

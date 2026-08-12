@@ -87,4 +87,3 @@ async def send_partial_lookup_status(
         parse_mode=ParseMode.HTML,
         reply_markup=keyboard,
     )
-

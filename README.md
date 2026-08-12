@@ -13,6 +13,10 @@
 
 </div>
 
+StonerHand is a Telegram-native music publishing editor. It turns a release
+link, an `artist — title` query or a batch of links into a finished post without
+opening a separate web interface.
+
 ## Features
 
 - accepts a music URL or an `artist — track` query;
@@ -27,6 +31,8 @@
 - sends to the user, another chat or a configured channel;
 - shows a compact final check before channel publication;
 - supports a durable scheduled-publishing queue;
+- uses an explicit bot timezone for fixed and custom publication times;
+- lets the user cancel any native text input with `/cancel`;
 - works inline: `@StonerHandBot artist — track`.
 
 Supported sources include Spotify, Apple Music, YouTube, SoundCloud, Bandcamp,
@@ -78,7 +84,8 @@ LOG_LEVEL=INFO
 PRIMARY_PLATFORM=spotify
 ```
 
-Production also uses webhook secrets, a cron secret and Upstash Redis.
+Production also uses webhook secrets, a cron secret and Upstash Redis. Fixed
+schedule choices use `BOT_TIMEZONE` (`Europe/Moscow` by default).
 
 ## Validation
 
@@ -92,11 +99,13 @@ python tests/check_dependency_pins.py
 python -m json.tool vercel.json >/dev/null
 ```
 
+See [CHANGELOG.md](CHANGELOG.md) for release notes.
+
 ## Layout
 
 ```text
 api/                    webhook, health, webhook setup and queue worker
-src/music_links_bot/    bot logic, providers, editor and persistence
+src/music_links_bot/    bot orchestration, menu, editor, providers and persistence
 tests/                  unit and integration tests
 vercel.json             production routes and cron jobs
 ```

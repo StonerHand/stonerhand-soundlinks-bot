@@ -9,7 +9,9 @@ from music_links_bot.bot_builder import (
     apply_intro_text,
     builder_screen,
     fit_telegram_html,
+    format_schedule_datetime,
     normalize_crate_title,
+    parse_schedule_datetime,
     remove_tags,
     schedule_timestamp,
     select_all_platforms,
@@ -109,6 +111,19 @@ class BuilderJourneyTests(unittest.TestCase):
     def test_schedule_and_telegram_limits_are_deterministic(self) -> None:
         now = datetime(2026, 8, 10, 10, 0, tzinfo=timezone.utc)
         self.assertEqual(schedule_timestamp("q1", now=now), int(now.timestamp()) + 3600)
+        evening = schedule_timestamp(
+            "qe",
+            now=datetime(2026, 8, 10, 19, 0, tzinfo=timezone.utc),
+        )
+        self.assertEqual(
+            evening, int(datetime(2026, 8, 10, 20, 0, tzinfo=timezone.utc).timestamp())
+        )
+        local_now = datetime(2026, 8, 10, 18, 0, tzinfo=timezone.utc)
+        custom = parse_schedule_datetime("15.08 19:30", now=local_now)
+        self.assertEqual(
+            format_schedule_datetime(custom or 0, timezone_name="UTC"),
+            "15.08 · 19:30",
+        )
         limited = fit_telegram_html("<b>" + "<&" * 5000 + "</b>", 1024)
         self.assertLessEqual(len(limited), 1024)
         self.assertTrue(limited.endswith("…"))

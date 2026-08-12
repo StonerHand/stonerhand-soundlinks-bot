@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dotenv import load_dotenv
 
@@ -16,6 +17,7 @@ class Settings:
     primary_platform: str | None
     ui_mode: str
     publish_chat_id: str | None = None
+    timezone_name: str = "Europe/Moscow"
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -39,6 +41,7 @@ class Settings:
             primary_platform=_parse_primary_platform(),
             ui_mode=_parse_ui_mode(),
             publish_chat_id=os.getenv("PUBLISH_CHAT_ID", "").strip() or None,
+            timezone_name=_parse_timezone(),
         )
 
 
@@ -78,4 +81,17 @@ def _parse_primary_platform() -> str | None:
 
 def _parse_ui_mode() -> str:
     raw_value = os.getenv("BOT_UI_MODE", "stonerhand").strip().casefold()
-    return raw_value if raw_value in {"stonerhand", "minimal", "editorial"} else "stonerhand"
+    return (
+        raw_value
+        if raw_value in {"stonerhand", "minimal", "editorial"}
+        else "stonerhand"
+    )
+
+
+def _parse_timezone() -> str:
+    value = os.getenv("BOT_TIMEZONE", "Europe/Moscow").strip() or "Europe/Moscow"
+    try:
+        ZoneInfo(value)
+    except ZoneInfoNotFoundError:
+        return "Europe/Moscow"
+    return value

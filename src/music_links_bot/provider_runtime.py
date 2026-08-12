@@ -16,8 +16,13 @@ LOGGER = logging.getLogger(__name__)
 PROVIDER_TIMEOUT_SECONDS = 9.0
 REQUEST_BUDGET_SECONDS = 10.0
 LOOKUP_CACHE_TTL_SECONDS = 15 * 60
+NEGATIVE_LOOKUP_TTL_SECONDS = 3 * 60
 _LOOKUP_CACHE: TTLCache[dict[str, Any]] = TTLCache(
     ttl_seconds=LOOKUP_CACHE_TTL_SECONDS,
+    max_size=512,
+)
+_NEGATIVE_LOOKUP_CACHE: TTLCache[dict[str, Any]] = TTLCache(
+    ttl_seconds=NEGATIVE_LOOKUP_TTL_SECONDS,
     max_size=512,
 )
 
@@ -159,6 +164,8 @@ def lookup_cache_key(source_urls: list[str]) -> str:
 async def get_cached_lookup(bot_data: dict, source_urls: list[str]) -> dict | None:
     key = lookup_cache_key(source_urls)
     cached = _LOOKUP_CACHE.get(key)
+    if not isinstance(cached, dict):
+        cached = _NEGATIVE_LOOKUP_CACHE.get(key)
     if isinstance(cached, dict):
         _record_cache(bot_data, hit=True)
         return cached
@@ -166,7 +173,8 @@ async def get_cached_lookup(bot_data: dict, source_urls: list[str]) -> dict | No
     kv: KVStore | None = bot_data.get("kv_store")
     cached = await kv.get_json(key) if kv is not None else None
     if isinstance(cached, dict):
-        _LOOKUP_CACHE.set(key, cached)
+        cache = _NEGATIVE_LOOKUP_CACHE if cached.get("_negative") else _LOOKUP_CACHE
+        cache.set(key, cached)
         _record_cache(bot_data, hit=True)
         return cached
     _record_cache(bot_data, hit=False)
@@ -183,6 +191,19 @@ async def set_cached_lookup(
     kv: KVStore | None = bot_data.get("kv_store")
     if kv is not None:
         await kv.set_json(key, payload, ttl_seconds=LOOKUP_CACHE_TTL_SECONDS)
+
+
+async def set_cached_negative_lookup(
+    bot_data: dict,
+    source_urls: list[str],
+    payload: dict[str, Any],
+) -> None:
+    key = lookup_cache_key(source_urls)
+    cached = {**payload, "_negative": True}
+    _NEGATIVE_LOOKUP_CACHE.set(key, cached)
+    kv: KVStore | None = bot_data.get("kv_store")
+    if kv is not None:
+        await kv.set_json(key, cached, ttl_seconds=NEGATIVE_LOOKUP_TTL_SECONDS)
 
 
 def _record_cache(bot_data: dict, *, hit: bool) -> None:
