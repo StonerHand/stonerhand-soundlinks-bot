@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from html import escape, unescape
-import re
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from music_links_bot.constants import PLATFORM_LABELS
@@ -13,7 +13,7 @@ from music_links_bot.text_utils import normalize_hashtag
 
 MESSAGE_TEXT_LIMIT = 4096
 PHOTO_CAPTION_LIMIT = 1024
-MAX_INTRO_LENGTH = 900
+MAX_INTRO_LENGTH = 3_000
 MAX_CRATE_TITLE_LENGTH = 72
 MAX_CUSTOM_TAGS = 5
 MAX_SELECTED_PLATFORMS = 6
@@ -109,17 +109,45 @@ def select_preset(draft: dict, index: int) -> str:
     return apply_preset(draft, PRESET_ORDER[index])
 
 
-def apply_intro_text(draft: dict, value: str) -> str:
+def apply_intro_text(
+    draft: dict,
+    value: str,
+    *,
+    max_length: int | None = None,
+) -> str:
     lines = [" ".join(line.split()) for line in str(value or "").splitlines()]
-    clean = "\n".join(lines).strip()[:MAX_INTRO_LENGTH].strip()
+    limit = MAX_INTRO_LENGTH if max_length is None else max(0, min(MAX_INTRO_LENGTH, max_length))
+    clean = "\n".join(lines).strip()[:limit].strip()
     draft["prefix"] = f"<blockquote>{escape(clean)}</blockquote>\n\n" if clean else ""
     draft["quote"] = bool(clean)
+    draft["intro_length"] = len(clean)
+    draft["intro_limit"] = limit
+    draft["intro_truncated"] = len("\n".join(lines).strip()) > len(clean)
+    return clean
+
+
+def apply_intro_html(
+    draft: dict,
+    value: str,
+    *,
+    visible_length: int,
+    max_length: int,
+    truncated: bool = False,
+) -> str:
+    clean = str(value or "").strip()
+    draft["prefix"] = f"<blockquote>{clean}</blockquote>\n\n" if clean else ""
+    draft["quote"] = bool(clean)
+    draft["intro_length"] = max(0, int(visible_length))
+    draft["intro_limit"] = max(0, min(MAX_INTRO_LENGTH, int(max_length)))
+    draft["intro_truncated"] = bool(truncated)
     return clean
 
 
 def remove_intro(draft: dict) -> None:
     draft["prefix"] = ""
     draft["quote"] = False
+    draft["intro_length"] = 0
+    draft["intro_truncated"] = False
 
 
 def parse_custom_tags(value: str) -> list[str]:

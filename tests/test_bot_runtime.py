@@ -11,17 +11,17 @@ from music_links_bot.bot_crate import (
     restore_crate_item,
     save_crate_title,
 )
+from music_links_bot.bot_progress import (
+    adopt_progress_message,
+    cancel_progress,
+    take_progress,
+)
 from music_links_bot.bot_runtime import (
     BotRuntime,
     UserSession,
     decode_callback,
     detect_action,
     encode_callback,
-)
-from music_links_bot.bot_progress import (
-    adopt_progress_message,
-    cancel_progress,
-    take_progress,
 )
 
 
@@ -152,6 +152,31 @@ class RuntimeSafetyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(snapshot[0]["provider"], "songlink")
         self.assertFalse(snapshot[0]["ok"])
         self.assertEqual(snapshot[0]["last_error"], "TimeoutError")
+        self.assertEqual(snapshot[0]["timeouts"], 1)
+        self.assertEqual(snapshot[0]["avg_latency_ms"], 250)
+        self.assertEqual(snapshot[0]["success_rate_percent"], 0.0)
+
+    async def test_provider_metrics_aggregate_success_latency_and_fallbacks(self) -> None:
+        runtime = BotRuntime()
+        runtime.record_provider("songlink", ok=True, latency_ms=100)
+        runtime.record_provider(
+            "songlink",
+            ok=False,
+            latency_ms=300,
+            error=RuntimeError("429 too many requests"),
+            partial=True,
+        )
+
+        item = runtime.provider_snapshot()[0]
+        self.assertEqual(item["requests"], 2)
+        self.assertEqual(item["avg_latency_ms"], 200)
+        self.assertEqual(item["success_rate_percent"], 50.0)
+        self.assertEqual(item["partials"], 1)
+        self.assertEqual(item["rate_limits"], 1)
+        self.assertEqual(
+            runtime.metrics_snapshot()["providers"]["songlink"]["requests"],
+            2,
+        )
 
 
 class BotCrateTests(unittest.IsolatedAsyncioTestCase):

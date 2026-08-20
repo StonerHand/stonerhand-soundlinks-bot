@@ -8,6 +8,7 @@ from music_links_bot.constants import PLATFORM_LABELS
 from music_links_bot.formatter import format_track_message
 from music_links_bot.keyboards import _build_link_keyboard
 from music_links_bot.models import TrackMatch
+from music_links_bot.publication_budget import IntroBudget, compose_with_intro
 from music_links_bot.text_utils import normalize_hashtag
 
 
@@ -15,6 +16,7 @@ from music_links_bot.text_utils import normalize_hashtag
 class PublicationView:
     text: str
     keyboard: InlineKeyboardMarkup
+    intro: IntroBudget
 
 
 def draft_message_overrides(
@@ -62,10 +64,15 @@ def build_publication_view(
         include_hashtags=(True if channel_style else bool(draft.get("hashtags", True))),
     )
     prefix = str(draft.get("prefix") or "")
-    text = (prefix if draft.get("quote") and prefix else "") + format_track_message(
+    body = format_track_message(
         track,
         include_hashtags=include_hashtags,
         **overrides,
+    )
+    text, intro = compose_with_intro(
+        draft,
+        prefix_html=prefix,
+        body_html=body,
     )
     keyboard = _build_link_keyboard(
         track.links,
@@ -77,4 +84,4 @@ def build_publication_view(
         platform_selection=draft_platform_selection(draft),
         max_visible_platforms=max_visible_platforms,
     )
-    return PublicationView(text=text, keyboard=keyboard)
+    return PublicationView(text=text, keyboard=keyboard, intro=intro)

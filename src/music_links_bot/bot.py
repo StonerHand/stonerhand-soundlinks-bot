@@ -2,18 +2,17 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
-from collections.abc import Awaitable, Callable
-from dataclasses import asdict
 import hashlib
-from html import escape
 import logging
 import secrets
 import time
+from collections.abc import Awaitable, Callable
+from dataclasses import asdict
+from html import escape
 
 from telegram import (
     Bot,
     ForceReply,
-    InlineKeyboardButton,
     InlineKeyboardMarkup,
     Message,
     Update,
@@ -21,26 +20,8 @@ from telegram import (
 from telegram.constants import ChatAction, ParseMode
 from telegram.error import BadRequest, TelegramError
 from telegram.ext import Application, ContextTypes
-from music_links_bot.branding import (
-    brand_label,
-    brand_logo_url,
-    build_branded_cover,
-    photo_branding_enabled,
-)
-from music_links_bot.bot_stats import (
-    build_user_prefix as _build_user_prefix,
-    message_source_urls as _message_source_urls,
-    message_text as _message_text,
-    record_artist_items as _record_artists_safely,
-    record_mixed_items as _record_mixed_safely,
-    record_playlist_items as _record_playlists_safely,
-    record_radio_items as _record_radios_safely,
-    record_tracks as _record_matches_safely,
-    record_video_items as _record_videos_safely,
-)
-from music_links_bot.bot_batch import (
-    send_partial_lookup_status as _send_partial_lookup_status_impl,
-)
+
+from music_links_bot import bot_lookup as _bot_lookup
 from music_links_bot.bot_admin import (
     id_command,
     stats_command,
@@ -53,13 +34,32 @@ from music_links_bot.bot_app import (
     close_application_resources,
     sync_application_commands,
 )
+from music_links_bot.bot_batch import (
+    send_partial_lookup_status as _send_partial_lookup_status_impl,
+)
 from music_links_bot.bot_inline import (
     _build_inline_collection_result,
     _build_inline_result,
     inline_query_handler,
 )
-
-from music_links_bot import bot_lookup as _bot_lookup
+from music_links_bot.bot_stats import (
+    build_user_prefix as _build_user_prefix,
+    message_entities as _message_entities,
+    message_source_urls as _message_source_urls,
+    message_text as _message_text,
+    record_artist_items as _record_artists_safely,
+    record_mixed_items as _record_mixed_safely,
+    record_playlist_items as _record_playlists_safely,
+    record_radio_items as _record_radios_safely,
+    record_tracks as _record_matches_safely,
+    record_video_items as _record_videos_safely,
+)
+from music_links_bot.branding import (
+    brand_label,
+    brand_logo_url,
+    build_branded_cover,
+    photo_branding_enabled,
+)
 
 _split_source_urls = _bot_lookup._split_source_urls
 _format_not_found_message = _bot_lookup._format_not_found_message
@@ -89,19 +89,19 @@ _build_lookup_fallback = _bot_lookup._build_lookup_fallback
 _songlink_page_url = _bot_lookup._songlink_page_url
 _build_podcast_fallback = _bot_lookup._build_podcast_fallback
 
-from music_links_bot.config import Settings
-from music_links_bot.chat_access import check_publish_access
+from music_links_bot import keyboards as _keyboards
 from music_links_bot.channel_templates import (
     apply_channel_template,
+    apply_template,
     save_channel_template,
 )
+from music_links_bot.chat_access import check_publish_access
+from music_links_bot.config import Settings
 from music_links_bot.ephemeral import (
     ephemeral_group_replies_enabled,
     send_ephemeral_message,
 )
 from music_links_bot.i18n import get_text, resolve_lang
-
-from music_links_bot import keyboards as _keyboards
 
 _select_preview_url = _keyboards._select_preview_url
 _build_link_preview_options = _keyboards._build_link_preview_options
@@ -131,6 +131,25 @@ _single_url_keyboard = _keyboards._single_url_keyboard
 _channel_button = _keyboards._channel_button
 _get_platform_order = _keyboards._get_platform_order
 
+from music_links_bot.bot_actions import action_spec
+from music_links_bot.bot_builder import (
+    PENDING_INPUT_TTL_SECONDS,
+    BuilderScreen,
+    apply_custom_tags,
+    apply_intro_html,
+    builder_screen,
+    fit_telegram_html,
+    format_schedule_datetime,
+    normalize_crate_title,
+    parse_schedule_datetime,
+    remove_intro,
+    remove_tags,
+    schedule_timestamp,
+    select_all_platforms,
+    select_preset,
+    toggle_platform,
+    use_auto_tags,
+)
 from music_links_bot.bot_crate import (
     add_many_to_crate,
     add_to_crate,
@@ -146,10 +165,33 @@ from music_links_bot.bot_crate_handlers import (
 from music_links_bot.bot_editor_state import (
     apply_setting_action as _apply_editor_setting,
     draft_owned_by as _draft_owned_by,
-    draft_status as _draft_status,
-    remember_setting_state,
     remember_draft as _remember_session_draft,
+    remember_setting_state,
     restore_setting_state,
+)
+from music_links_bot.bot_menu import (
+    MENU_HELP,
+    cancel_command,
+    channel_command,
+    dispatch_menu_action as _dispatch_menu_action,
+    guide_command,
+    help_command,
+    legacy_menu_callback as menu_callback,
+    menu_text as _menu_text,
+    platforms_command,
+    reply_with_menu as _reply_with_menu,
+    runtime_for as _runtime,
+    start_command,
+    update_lang as _update_lang,
+)
+from music_links_bot.bot_pipeline import LookupRequest, delivery_kind
+from music_links_bot.bot_progress import (
+    adopt_progress_message as _adopt_progress_message,
+    cancel_progress as _cancel_progress,
+    start_progress as _send_loading_placeholder,
+    take_progress as _take_placeholder,
+    update_progress as _update_loading_placeholder,
+    update_progress_text as _update_progress_text,
 )
 from music_links_bot.bot_runtime import (
     BotErrorCode,
@@ -168,28 +210,19 @@ from music_links_bot.bot_storage import (
     store_draft as _store_draft,
     store_search_selection as _store_search_selection,
 )
-from music_links_bot.bot_progress import (
-    adopt_progress_message as _adopt_progress_message,
-    cancel_progress as _cancel_progress,
-    start_progress as _send_loading_placeholder,
-    take_progress as _take_placeholder,
-    update_progress as _update_loading_placeholder,
-    update_progress_text as _update_progress_text,
-)
-from music_links_bot.bot_pipeline import LookupRequest, delivery_kind
 from music_links_bot.bot_ui import (
-    build_home_text as _build_home_text,
-    build_onboarding_keyboard as _build_onboarding_keyboard,
-    build_deleted_draft_keyboard as _deleted_draft_keyboard,
     build_delete_confirmation_keyboard as _delete_confirmation_keyboard,
+    build_deleted_draft_keyboard as _deleted_draft_keyboard,
     build_duplicate_post_keyboard as _duplicate_post_keyboard,
     build_error_keyboard as _build_error_keyboard_view,
+    build_home_text as _build_home_text,
+    build_onboarding_keyboard as _build_onboarding_keyboard,
     build_publish_confirmation as _build_publish_confirmation,
     build_section_keyboard as _build_section_keyboard,
     build_start_keyboard as _build_start_keyboard,
-    editor_more_rows as _editor_more_rows,
     editor_hashtag_rows as _editor_hashtag_rows,
     editor_intro_rows as _editor_intro_rows,
+    editor_more_rows as _editor_more_rows,
     editor_overflow_rows as _editor_overflow_rows,
     editor_platform_rows as _editor_platform_rows,
     editor_preview_rows as _editor_preview_rows,
@@ -198,76 +231,47 @@ from music_links_bot.bot_ui import (
     editor_style_rows as _editor_style_rows,
     render_crate as _render_bot_crate,
 )
-from music_links_bot.search import (
-    SearchClient,
-    SearchLookupError,
-    normalize_search_query,
-)
 from music_links_bot.constants import MAX_LINKS_PER_MESSAGE
+from music_links_bot.draft_model import new_track_draft
+from music_links_bot.editor_view import (
+    draft_intro_limit as _draft_intro_limit,
+    render_track_draft as _render_track_draft,
+)
 from music_links_bot.formatter import (
     format_collection_message,
     format_track_message,
 )
+from music_links_bot.mixed_post import send_track_video_album
 from music_links_bot.models import (
     TrackMatch,
     VideoMatch,
 )
-from music_links_bot.draft_model import new_track_draft
-from music_links_bot.bot_builder import (
-    BuilderScreen,
-    apply_custom_tags,
-    apply_intro_text,
-    builder_screen,
-    fit_telegram_html,
-    format_schedule_datetime,
-    remove_intro,
-    remove_tags,
-    schedule_timestamp,
-    select_all_platforms,
-    select_preset,
-    toggle_platform,
-    use_auto_tags,
-    normalize_crate_title,
-    parse_schedule_datetime,
-    PENDING_INPUT_TTL_SECONDS,
-)
-from music_links_bot.bot_actions import action_spec
-from music_links_bot.bot_menu import (
-    MENU_HELP,
-    cancel_command,
-    channel_command,
-    dispatch_menu_action as _dispatch_menu_action,
-    guide_command,
-    help_command,
-    legacy_menu_callback as menu_callback,
-    menu_text as _menu_text,
-    platforms_command,
-    reply_with_menu as _reply_with_menu,
-    runtime_for as _runtime,
-    start_command,
-    update_lang as _update_lang,
-)
-from music_links_bot.mixed_post import send_track_video_album
+from music_links_bot.publication_service import PublicationService
 from music_links_bot.publication_state import (
     find_posted_record as _find_posted_record,
     mark_posted as _schedule_mark_posted,
     release_fingerprint as _release_fingerprint,
-)
-from music_links_bot.publication_service import PublicationService
-from music_links_bot.publish_queue import (
-    QueueBusyError,
-    QueueFullError,
-    QueueStorageError,
-    add_job,
 )
 from music_links_bot.publication_view import (
     build_publication_view,
     draft_message_overrides,
     draft_platform_selection,
 )
+from music_links_bot.publish_queue import (
+    QueueBusyError,
+    QueueFullError,
+    QueueStorageError,
+    add_job,
+)
+from music_links_bot.search import (
+    SearchClient,
+    SearchLookupError,
+    normalize_search_query,
+)
 
 _draft_message_overrides = draft_message_overrides
 _draft_platform_selection = draft_platform_selection
+from music_links_bot.bot_history import record_history as _record_recent_item
 from music_links_bot.sharing import (
     add_share_button,
     build_share_query,
@@ -275,16 +279,18 @@ from music_links_bot.sharing import (
     make_channel_safe_keyboard,
     track_share_url,
 )
-from music_links_bot.bot_history import record_history as _record_recent_item
-from music_links_bot.text_utils import normalize_hashtag
 from music_links_bot.telegram_buttons import (
     ButtonTone,
+    button as InlineKeyboardButton,
     callback_button,
     current_chat_button,
 )
+from music_links_bot.telegram_text import format_user_note_html, telegram_text_length
+from music_links_bot.text_utils import normalize_hashtag
 from music_links_bot.url_utils import (
     cache_key_for_url,
     extract_supported_urls,
+    strip_supported_urls,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -297,6 +303,8 @@ __all__ = [
     "_build_inline_result",
     "_build_onboarding_keyboard",
     "_build_start_keyboard",
+    "_editor_more_rows",
+    "_editor_rows",
     "_menu_text",
     "_release_fingerprint",
     "cancel_command",
@@ -488,56 +496,6 @@ async def _send_track_draft(
         await _record_recent_item(context, user_id, track, source_url)
 
 
-def _render_track_draft(
-    draft: dict,
-    context: ContextTypes.DEFAULT_TYPE | None,
-    *,
-    draft_id: str | None = None,
-    settings: bool = False,
-    show_status: bool = False,
-) -> tuple[str, InlineKeyboardMarkup]:
-    track = TrackMatch(**draft["item"])
-    view = build_publication_view(
-        draft,
-        track,
-        context=context,
-        include_channel_button=False,
-        max_visible_platforms=1 if draft_id is not None else None,
-    )
-    text = view.text
-    if settings:
-        lang = draft.get("lang") or "ru"
-        status = _draft_status(draft, track, lang=lang)
-        text = (
-            f"🎛 <b>{escape(get_text(lang, 'ed_constructor_title'))}</b>\n"
-            f"<i>{escape(get_text(lang, 'ed_constructor_hint'))}</i>\n"
-            f"<i>{escape(status)}</i>\n\n{text}"
-        )
-    elif show_status:
-        lang = draft.get("lang") or "ru"
-        status = _draft_status(draft, track, lang=lang)
-        text = f"{text}\n\n<i>{escape(status)}</i>"
-    keyboard = view.keyboard
-    if draft_id is None:
-        return text, add_share_button(
-            keyboard,
-            share_query=build_share_query(
-                [url] if (url := track_share_url(track)) else []
-            ),
-            label=get_text(draft.get("lang") or "ru", "share_post"),
-        )
-
-    base_rows = [list(row) for row in keyboard.inline_keyboard]
-    url_buttons = [button for row in base_rows for button in row]
-    rows = [url_buttons[:2]] if url_buttons else []
-    rows.extend(
-        _editor_more_rows(draft_id, draft)
-        if settings
-        else _editor_rows(draft_id, draft)
-    )
-    return text, InlineKeyboardMarkup(rows)
-
-
 async def _dispatch_selection_action(query, context, action: CallbackAction) -> None:
     lang = resolve_lang(query.from_user.language_code if query.from_user else None)
     if action.action != "pick" or ":" not in action.payload:
@@ -577,6 +535,39 @@ async def _dispatch_retry_action(query, context, action: CallbackAction) -> None
         await query.answer()
         return
     lang = resolve_lang(query.from_user.language_code)
+    if action.action == "replace" and action.payload:
+        try:
+            retry_id, raw_index = action.payload.rsplit(":", 1)
+            source_index = int(raw_index)
+        except (TypeError, ValueError):
+            await query.answer(get_text(lang, "ed_expired"), show_alert=True)
+            return
+        payload = await _load_retry_sources(context, retry_id)
+        urls = payload.get("urls", []) if isinstance(payload, dict) else []
+        if (
+            not isinstance(payload, dict)
+            or int(payload.get("user_id") or 0) != query.from_user.id
+            or not 1 <= source_index <= len(urls)
+        ):
+            await query.answer(get_text(lang, "ed_expired"), show_alert=True)
+            return
+        prompt = await query.message.reply_text(
+            get_text(lang, "replace_source_prompt").format(index=source_index),
+            parse_mode=ParseMode.HTML,
+            reply_markup=ForceReply(selective=True),
+        )
+        session = await _runtime(context).get_session(query.from_user.id, lang=lang)
+        session.pending_input = {
+            "kind": "replace_source",
+            "retry_id": retry_id,
+            "source_index": source_index,
+            "prompt_message_id": prompt.message_id,
+            "created_at": int(time.time()),
+        }
+        await _runtime(context).save_session(session)
+        await query.answer()
+        return
+
     value = ""
     if action.action == "failed" and action.payload:
         payload = await _load_retry_sources(context, action.payload)
@@ -817,6 +808,24 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
     ):
         return
 
+    if action == "lp":
+        template = draft.get("last_template")
+        if not isinstance(template, dict) or not apply_template(draft, template):
+            await query.answer(get_text(lang, "ed_expired"), show_alert=True)
+            return
+        draft["last_template_applied"] = True
+        await _store_draft(context, draft_id, draft)
+        await query.answer(get_text(lang, "ed_last_template_applied"))
+        text, keyboard = _render_track_draft(
+            draft,
+            context,
+            draft_id=draft_id,
+            settings=True,
+            show_status=True,
+        )
+        await _edit_editor_message(query, context, draft, text, keyboard)
+        return
+
     track = TrackMatch(**draft["item"])
     return_screen: str | None = None
     if action in {"z0", "z1", "z2"}:
@@ -887,6 +896,7 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
             draft_id=draft_id,
             kind={"ti": "intro", "hi": "hashtags", "qi": "schedule"}[action],
             lang=lang,
+            draft=draft,
         )
         return
 
@@ -977,6 +987,7 @@ async def _start_pending_editor_input(
     draft_id: str,
     kind: str,
     lang: str,
+    draft: dict | None = None,
 ) -> None:
     if query.from_user is None or query.message is None:
         await query.answer()
@@ -986,8 +997,13 @@ async def _start_pending_editor_input(
         "hashtags": "ed_tags_prompt",
         "schedule": "schedule_prompt",
     }[kind]
+    prompt_text = get_text(lang, prompt_key)
+    if kind == "intro" and draft is not None:
+        prompt_text = prompt_text.format(
+            limit=_draft_intro_limit(draft, context),
+        )
     prompt = await query.message.reply_text(
-        get_text(lang, prompt_key),
+        prompt_text,
         parse_mode=ParseMode.HTML,
         reply_markup=ForceReply(selective=True),
     )
@@ -1087,7 +1103,7 @@ async def _run_primary_editor_action(
     if action == "s":
         sent = await _deliver_draft(context, draft, target=user_id, channel_style=False)
         await query.answer(
-            get_text(lang, "ed_sent" if sent else "ed_publish_failed"),
+            get_text(lang, "ed_sent_short" if sent else "ed_publish_failed"),
             show_alert=not bool(sent),
         )
         text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
@@ -1789,6 +1805,42 @@ async def _consume_pending_input(
     saved_key = "settings_saved"
     draft_id = str(pending.get("draft_id") or "")
     draft = await _load_draft(context, draft_id) if draft_id else None
+
+    if kind == "replace_source":
+        replacement_urls = extract_supported_urls(value)
+        retry_id = str(pending.get("retry_id") or "")
+        source_index = int(pending.get("source_index") or 0) - 1
+        payload = await _load_retry_sources(context, retry_id)
+        original_urls = (
+            [str(url) for url in payload.get("urls", []) if isinstance(url, str)]
+            if isinstance(payload, dict)
+            and int(payload.get("user_id") or 0) == user.id
+            else []
+        )
+        if len(replacement_urls) != 1 or not 0 <= source_index < len(original_urls):
+            await message.reply_text(get_text(lang, "replace_source_invalid"))
+            return True
+        original_urls[source_index] = replacement_urls[0]
+        session.pending_input = {}
+        await runtime.save_session(session)
+        prompt_message_id = pending.get("prompt_message_id")
+        if isinstance(prompt_message_id, int) and prompt_message_id > 0:
+            try:
+                await context.bot.delete_message(
+                    chat_id=int(pending.get("editor_chat_id") or message.chat_id),
+                    message_id=prompt_message_id,
+                )
+            except TelegramError:
+                LOGGER.debug("Could not clean up replacement prompt", exc_info=True)
+        token = _INPUT_OVERRIDE.set("\n".join(original_urls))
+        guard_token = _BYPASS_INTENT_GUARD.set(True)
+        try:
+            await track_lookup_message(Update(update_id=0, message=message), context)
+        finally:
+            _BYPASS_INTENT_GUARD.reset(guard_token)
+            _INPUT_OVERRIDE.reset(token)
+        return True
+
     if kind in {"intro", "hashtags", "schedule"} and draft is None:
         session.pending_input = {}
         await runtime.save_session(session)
@@ -1802,7 +1854,20 @@ async def _consume_pending_input(
             return True
         if kind == "intro":
             remember_setting_state(draft)
-            apply_intro_text(draft, value)
+            limit = _draft_intro_limit(draft, context)
+            visible_source = strip_supported_urls(value).strip()
+            intro_html = format_user_note_html(
+                value,
+                _message_entities(message),
+                max_length=limit,
+            )
+            apply_intro_html(
+                draft,
+                intro_html,
+                visible_length=min(telegram_text_length(visible_source), limit),
+                max_length=limit,
+                truncated=telegram_text_length(visible_source) > limit,
+            )
             saved_key = "ed_intro_saved"
         elif kind == "hashtags":
             remember_setting_state(draft)
@@ -1855,7 +1920,7 @@ async def _consume_pending_input(
 
     session.pending_input = {}
     await runtime.save_session(session)
-    for key in ("prompt_message_id", "editor_message_id"):
+    for key in ("prompt_message_id",):
         message_id = pending.get(key)
         if isinstance(message_id, int) and message_id > 0:
             try:
@@ -1866,15 +1931,26 @@ async def _consume_pending_input(
             except TelegramError:
                 LOGGER.debug("Could not clean up native editor input", exc_info=True)
 
+    editor_message_id = pending.get("editor_message_id")
+    editor_chat_id = int(pending.get("editor_chat_id") or message.chat_id)
+
     if kind == "crate_title":
         items = await load_crate(context.application.bot_data, user.id)
         title = await load_crate_title(context.application.bot_data, user.id)
         text, keyboard = _render_bot_crate(items, lang=lang, title=title)
-        await message.reply_text(
-            f"<b>{escape(get_text(lang, saved_key))}</b>\n\n{text}",
-            parse_mode=ParseMode.HTML,
-            reply_markup=keyboard,
+        restored = await _edit_pending_screen(
+            context,
+            chat_id=editor_chat_id,
+            message_id=editor_message_id,
+            text=f"<b>{escape(get_text(lang, saved_key))}</b>\n\n{text}",
+            keyboard=keyboard,
         )
+        if not restored:
+            await message.reply_text(
+                f"<b>{escape(get_text(lang, saved_key))}</b>\n\n{text}",
+                parse_mode=ParseMode.HTML,
+                reply_markup=keyboard,
+            )
         return True
 
     if draft is not None:
@@ -1891,16 +1967,62 @@ async def _consume_pending_input(
             if saved_key == "schedule_done"
             else get_text(lang, saved_key)
         )
-        await message.reply_text(
-            f"<b>{escape(saved_label)}</b>\n\n{text}",
-            parse_mode=ParseMode.HTML,
-            link_preview_options=_build_link_preview_options(
-                _select_preview_url(track.links, context) or track.thumbnail_url,
-                prefer_large_media=bool(draft.get("large_preview")),
-            ),
-            reply_markup=keyboard,
+        restored = await _edit_pending_screen(
+            context,
+            chat_id=editor_chat_id,
+            message_id=editor_message_id,
+            text=f"<b>{escape(saved_label)}</b>\n\n{text}",
+            keyboard=keyboard,
+            preview_url=_select_preview_url(track.links, context)
+            or track.thumbnail_url,
+            prefer_large_preview=bool(draft.get("large_preview")),
         )
+        if not restored:
+            await message.reply_text(
+                f"<b>{escape(saved_label)}</b>\n\n{text}",
+                parse_mode=ParseMode.HTML,
+                link_preview_options=_build_link_preview_options(
+                    _select_preview_url(track.links, context) or track.thumbnail_url,
+                    prefer_large_media=bool(draft.get("large_preview")),
+                ),
+                reply_markup=keyboard,
+            )
     return True
+
+
+async def _edit_pending_screen(
+    context,
+    *,
+    chat_id: int,
+    message_id: object,
+    text: str,
+    keyboard,
+    preview_url: str | None = None,
+    prefer_large_preview: bool = False,
+) -> bool:
+    if not isinstance(message_id, int) or message_id <= 0:
+        return False
+    edit = getattr(context.bot, "edit_message_text", None)
+    if not callable(edit):
+        return False
+    try:
+        kwargs = {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "text": text,
+            "parse_mode": ParseMode.HTML,
+            "reply_markup": keyboard,
+        }
+        if preview_url:
+            kwargs["link_preview_options"] = _build_link_preview_options(
+                preview_url,
+                prefer_large_media=prefer_large_preview,
+            )
+        await edit(**kwargs)
+        return True
+    except TelegramError:
+        LOGGER.debug("Could not restore editor in place", exc_info=True)
+        return False
 
 
 async def _track_lookup_message_impl(
@@ -2008,8 +2130,20 @@ async def _track_lookup_message_impl(
         else _build_user_prefix(message, bot_username=context.bot.username)
     )
     if is_private:
-        await _send_loading_placeholder(message, lang)
-        await _update_loading_placeholder(lang, "progress_links")
+        await _send_loading_placeholder(
+            message,
+            lang,
+            total=max(1, len(source_urls)),
+        )
+        if len(source_urls) > 1:
+            await _update_progress_text(
+                get_text(lang, "progress_batch_links").format(
+                    total=len(source_urls),
+                ),
+                stage=2,
+            )
+        else:
+            await _update_loading_placeholder(lang, "progress_links")
     else:
         await _send_typing_action(context.bot, message)
 
@@ -2019,7 +2153,12 @@ async def _track_lookup_message_impl(
     if is_private:
         if len(source_urls) > 1:
             await _update_progress_text(
-                get_text(lang, "progress_batch").format(
+                get_text(
+                    lang,
+                    "progress_batch"
+                    if bundle.is_complete_for(source_urls)
+                    else "progress_batch_partial",
+                ).format(
                     done=bundle.item_count,
                     total=len(source_urls),
                 )

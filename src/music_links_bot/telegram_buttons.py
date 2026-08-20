@@ -57,14 +57,22 @@ def share_button(text: str, query: str) -> TelegramInlineKeyboardButton:
     return TelegramInlineKeyboardButton(text=text, switch_inline_query=query)
 
 
-def button(text: str, **kwargs) -> TelegramInlineKeyboardButton:
+def button(
+    text: str,
+    *,
+    tone: ButtonTone | None = None,
+    **kwargs,
+) -> TelegramInlineKeyboardButton:
     """Compatibility factory that validates semantic Bot API styles centrally."""
     api_kwargs = kwargs.pop("api_kwargs", None)
     if api_kwargs:
         style = api_kwargs.get("style")
         try:
-            tone = ButtonTone(style) if style else None
+            legacy_tone = ButtonTone(style) if style else None
         except ValueError as exc:
             raise ValueError(f"Unknown Telegram button style: {style}") from exc
-        kwargs.update(_style_kwargs(tone))
+        if tone is not None and legacy_tone is not None and tone is not legacy_tone:
+            raise ValueError("Conflicting Telegram button styles")
+        tone = tone or legacy_tone
+    kwargs.update(_style_kwargs(tone))
     return TelegramInlineKeyboardButton(text=text, **kwargs)

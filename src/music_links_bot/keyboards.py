@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from telegram import (
-    InlineKeyboardButton,
     InlineKeyboardMarkup,
     LinkPreviewOptions,
     Message,
@@ -16,7 +15,11 @@ from music_links_bot.models import (
     TrackMatch,
     VideoMatch,
 )
-from music_links_bot.telegram_buttons import ButtonTone, url_button
+from music_links_bot.telegram_buttons import (
+    ButtonTone,
+    button as InlineKeyboardButton,
+    url_button,
+)
 
 CHANNEL_USERNAME = "stonerhand"
 CHANNEL_URL = f"https://t.me/{CHANNEL_USERNAME}"

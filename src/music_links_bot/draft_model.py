@@ -1,14 +1,37 @@
 from __future__ import annotations
 
-from dataclasses import asdict
 import time
+from dataclasses import asdict
 from typing import Any, TypedDict
 
 from music_links_bot.constants import PLATFORM_LABELS
 from music_links_bot.models import TrackMatch
 from music_links_bot.release_presentation import normalize_preset
 
-CURRENT_DRAFT_VERSION = 3
+CURRENT_DRAFT_VERSION = 4
+
+
+def _safe_int(value: object, *, default: int = 0) -> int:
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError, OverflowError):
+        return default
+
+
+class DraftTrackItem(TypedDict, total=False):
+    title: str
+    artist: str
+    links: dict[str, str]
+    page_url: str | None
+    kind: str
+    release_format: str | None
+    release_year: int | None
+    thumbnail_url: str | None
+
+
+class DraftUndoState(TypedDict, total=False):
+    expires_at: int
+    values: dict[str, Any]
 
 
 class TrackDraft(TypedDict, total=False):
@@ -16,7 +39,7 @@ class TrackDraft(TypedDict, total=False):
 
     v: int
     type: str
-    item: dict[str, Any]
+    item: DraftTrackItem
     prefix: str
     hashtags: bool
     custom_tags: list[str]
@@ -35,8 +58,14 @@ class TrackDraft(TypedDict, total=False):
     crate_count: int
     deleted_at: int
     duplicate_record: dict[str, Any]
-    undo_state: dict[str, Any]
+    undo_state: DraftUndoState
     created_at: int
+    intro_length: int
+    intro_limit: int
+    intro_truncated: bool
+    last_template_available: bool
+    last_template_applied: bool
+    last_template: dict[str, Any]
 
 
 def new_track_draft(
@@ -63,6 +92,9 @@ def new_track_draft(
         "can_publish": bool(can_publish),
         "preset": "cover",
         "publication_mode": "card",
+        "intro_length": 0,
+        "intro_limit": 0,
+        "intro_truncated": False,
         "created_at": int(time.time()),
     }
 
@@ -95,7 +127,24 @@ def normalize_track_draft(value: object) -> TrackDraft | None:
     draft["publication_mode"] = (
         "longread" if value.get("publication_mode") == "longread" else "card"
     )
-    draft["created_at"] = int(value.get("created_at") or time.time())
+    draft["created_at"] = _safe_int(
+        value.get("created_at"),
+        default=int(time.time()),
+    )
+    draft["intro_length"] = max(0, _safe_int(value.get("intro_length")))
+    draft["intro_limit"] = max(0, _safe_int(value.get("intro_limit")))
+    draft["intro_truncated"] = bool(value.get("intro_truncated", False))
+    draft["last_template_available"] = bool(
+        value.get("last_template_available", False)
+    )
+    draft["last_template_applied"] = bool(
+        value.get("last_template_applied", False)
+    )
+    last_template = value.get("last_template")
+    if isinstance(last_template, dict):
+        draft["last_template"] = dict(last_template)
+    else:
+        draft.pop("last_template", None)
     platforms = value.get("platforms")
     if isinstance(platforms, list):
         selected = [

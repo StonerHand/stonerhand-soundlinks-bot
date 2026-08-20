@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from html import escape
 from datetime import datetime
+from html import escape
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardMarkup
 
+from music_links_bot.bot_history import load_history_items
 from music_links_bot.bot_runtime import encode_callback
 from music_links_bot.i18n import get_text
-from music_links_bot.bot_history import load_history_items
+from music_links_bot.telegram_buttons import button as InlineKeyboardButton
 
 
 async def render_recent_view(
@@ -72,8 +73,10 @@ def _append_recent_line(lines: list[str], index: int, item: dict, *, lang: str) 
     timestamp = item.get("ts")
     when = ""
     if isinstance(timestamp, (int, float)) and timestamp > 0:
-        moment = datetime.fromtimestamp(timestamp)
-        today = datetime.now().date()
+        # Preserve the deployment's local presentation timezone. Runtime
+        # timestamps are only a compact relative hint, never schedule input.
+        moment = datetime.fromtimestamp(timestamp)  # noqa: DTZ006
+        today = datetime.now().date()  # noqa: DTZ005
         when = (
             moment.strftime(("today" if lang == "en" else "сегодня") + " · %H:%M")
             if moment.date() == today

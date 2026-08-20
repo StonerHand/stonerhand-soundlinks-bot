@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable
-from dataclasses import dataclass
 import hashlib
 import json
 import logging
+from collections.abc import Awaitable
+from dataclasses import dataclass
 from time import monotonic
 from typing import Any
 
@@ -136,6 +136,7 @@ async def run_provider_tasks_detailed(
                 ok=error is None,
                 latency_ms=int((monotonic() - started) * 1000),
                 error=error,
+                partial=error is not None,
             )
         latency_ms = int((monotonic() - started) * 1000)
         return task.name, ProviderOutcome(

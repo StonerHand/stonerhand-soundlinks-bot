@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from html import escape
 import time
+from html import escape
+
 from telegram import InlineKeyboardMarkup
 
 from music_links_bot.bot_builder import available_platforms, selected_platforms
@@ -341,36 +342,41 @@ def build_onboarding_keyboard(step: int, lang: str) -> InlineKeyboardMarkup:
 
 
 def editor_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
+    """Quick card actions with one unmistakable primary destination."""
     lang = draft.get("lang") or "ru"
     if draft.get("in_crate"):
         label = get_text(lang, "ed_crate_count").format(
             count=max(0, min(10, int(draft.get("crate_count") or 0)))
         )
-        button = InlineKeyboardButton(
+        crate_button = InlineKeyboardButton(
             label,
             callback_data=encode_callback("crate", "open"),
-            api_kwargs={"style": "success"},
         )
     else:
-        button = InlineKeyboardButton(
+        crate_button = InlineKeyboardButton(
             get_text(lang, "ed_add_crate"),
             callback_data=encode_callback("editor", "c", draft_id),
         )
     if draft.get("can_publish"):
-        secondary = InlineKeyboardButton(
+        primary = InlineKeyboardButton(
             get_text(lang, "ed_publish"),
             callback_data=encode_callback("editor", "p", draft_id),
             api_kwargs={"style": "success"},
         )
     else:
-        secondary = button
+        primary = InlineKeyboardButton(
+            get_text(lang, "ed_send_self"),
+            callback_data=encode_callback("editor", "s", draft_id),
+            api_kwargs={"style": "primary"},
+        )
     return [
+        [primary],
         [
             InlineKeyboardButton(
                 get_text(lang, "ed_edit"),
                 callback_data=encode_callback("editor", "m", draft_id),
             ),
-            secondary,
+            crate_button,
         ]
     ]
 
@@ -396,7 +402,7 @@ def editor_more_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButt
     platform_label = get_text(lang, "ed_platforms_selected").format(
         count=platform_count
     )
-    return [
+    rows = [
         [
             InlineKeyboardButton(
                 get_text(lang, f"ed_preset_{preset}"),
@@ -426,10 +432,20 @@ def editor_more_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButt
             InlineKeyboardButton(
                 get_text(lang, "ed_more"),
                 callback_data=encode_callback("editor", "o", draft_id),
-                api_kwargs={"style": "success"},
             ),
         ],
     ]
+    if draft.get("last_template_available"):
+        rows.insert(
+            2,
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "ed_last_template"),
+                    callback_data=encode_callback("editor", "lp", draft_id),
+                )
+            ],
+        )
+    return rows
 
 
 def editor_style_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
@@ -441,7 +457,6 @@ def editor_style_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardBut
                 ("✓ " if preset == selected else "")
                 + get_text(lang, f"ed_preset_name_{preset}"),
                 callback_data=encode_callback("editor", f"z{index}", draft_id),
-                **({"api_kwargs": {"style": "primary"}} if preset == selected else {}),
             )
         ]
         for index, preset in enumerate(PRESET_ORDER)
@@ -470,7 +485,6 @@ def editor_platform_rows(
         InlineKeyboardButton(
             ("✓ " if key in selected else "") + PLATFORM_LABELS[key],
             callback_data=encode_callback("editor", f"l{index}", draft_id),
-            **({"api_kwargs": {"style": "primary"}} if key in selected else {}),
         )
         for index, key in enumerate(available)
     ]
@@ -544,7 +558,6 @@ def editor_hashtag_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardB
             InlineKeyboardButton(
                 ("✓ " if custom else "") + get_text(lang, "ed_tags_custom"),
                 callback_data=encode_callback("editor", "hi", draft_id),
-                api_kwargs={"style": "primary"},
             )
         ],
         [
@@ -651,7 +664,11 @@ def editor_overflow_rows(
             InlineKeyboardButton(
                 get_text(lang, "ed_send_self"),
                 callback_data=encode_callback("editor", "s", draft_id),
-                api_kwargs={"style": "primary"},
+                **(
+                    {}
+                    if draft.get("can_publish")
+                    else {"api_kwargs": {"style": "primary"}}
+                ),
             )
         ]
     ]
@@ -751,6 +768,16 @@ def build_delete_confirmation_keyboard(
     )
 
 
+def _crate_item_button_label(entry: dict, index: int, *, selected: bool) -> str:
+    item = entry.get("item") if isinstance(entry, dict) else None
+    item = item if isinstance(item, dict) else {}
+    artist = " ".join(str(item.get("artist") or "—").split())
+    title = " ".join(str(item.get("title") or "—").split())
+    prefix = "✓ " if selected else ""
+    label = f"{prefix}{index + 1} · {artist} — {title}"
+    return label if len(label) <= 52 else label[:51].rstrip() + "…"
+
+
 def render_crate(
     items: list[dict],
     *,
@@ -806,19 +833,12 @@ def render_crate(
         )
         selectors = [
             InlineKeyboardButton(
-                f"{'● ' if index == selected_index else ''}{index + 1}",
+                _crate_item_button_label(entry, index, selected=index == selected_index),
                 callback_data=encode_callback("crate", "select", str(index)),
-                **(
-                    {"api_kwargs": {"style": "primary"}}
-                    if index == selected_index
-                    else {}
-                ),
             )
-            for index in range(len(items))
+            for index, entry in enumerate(items)
         ]
-        rows.extend(
-            selectors[index : index + 2] for index in range(0, len(selectors), 2)
-        )
+        rows.extend([button] for button in selectors)
 
         controls: list[InlineKeyboardButton] = []
         if selected_index > 0:

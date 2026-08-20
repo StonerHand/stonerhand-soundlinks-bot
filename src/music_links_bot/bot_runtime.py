@@ -1,18 +1,18 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import asdict, dataclass, field
 import hashlib
 import logging
 import secrets
+from dataclasses import asdict, dataclass, field
 from time import monotonic, time
 from typing import Any
 
-from music_links_bot.kvstore import KVStore
 from music_links_bot.errors import (
     BotErrorCode as _BotErrorCode,
     BotFlowError as _BotFlowError,
 )
+from music_links_bot.kvstore import KVStore
 
 # Backwards-compatible exports for existing imports and callbacks.
 BotErrorCode = _BotErrorCode
@@ -137,7 +137,13 @@ def _normalize_pending_input(value: object) -> dict[str, Any]:
     if not isinstance(value, dict):
         return {}
     kind = str(value.get("kind") or "")
-    if kind not in {"intro", "hashtags", "crate_title", "schedule"}:
+    if kind not in {
+        "intro",
+        "hashtags",
+        "crate_title",
+        "schedule",
+        "replace_source",
+    }:
         return {}
     result: dict[str, Any] = {"kind": kind}
     draft_id = str(value.get("draft_id") or "")[:32]
@@ -152,6 +158,13 @@ def _normalize_pending_input(value: object) -> dict[str, Any]:
         parsed = _optional_int(value.get(key))
         if parsed is not None:
             result[key] = parsed
+    if kind == "replace_source":
+        retry_id = str(value.get("retry_id") or "")[:64]
+        source_index = _optional_int(value.get("source_index"))
+        if retry_id:
+            result["retry_id"] = retry_id
+        if source_index is not None:
+            result["source_index"] = source_index
     return result
 
 
@@ -162,6 +175,10 @@ class ProviderDiagnostic:
     latency_ms: int = 0
     failures: int = 0
     successes: int = 0
+    total_latency_ms: int = 0
+    partials: int = 0
+    timeouts: int = 0
+    rate_limits: int = 0
     consecutive_failures: int = 0
     circuit_open_until: int = 0
     last_error: str = ""
@@ -334,13 +351,23 @@ class BotRuntime:
         ok: bool,
         latency_ms: int,
         error: BaseException | None = None,
+        partial: bool = False,
     ) -> None:
         diagnostic = self.diagnostics.setdefault(
             provider, ProviderDiagnostic(provider=provider)
         )
         diagnostic.ok = ok
         diagnostic.latency_ms = max(0, latency_ms)
+        diagnostic.total_latency_ms += diagnostic.latency_ms
         diagnostic.checked_at = int(time())
+        error_name = type(error).__name__ if error else ""
+        error_key = f"{error_name} {error or ''}".casefold()
+        if partial:
+            diagnostic.partials += 1
+        if "timeout" in error_key:
+            diagnostic.timeouts += 1
+        if "ratelimit" in error_key or "too many requests" in error_key or "429" in error_key:
+            diagnostic.rate_limits += 1
         if ok:
             diagnostic.successes += 1
             diagnostic.consecutive_failures = 0
@@ -349,7 +376,7 @@ class BotRuntime:
         else:
             diagnostic.failures += 1
             diagnostic.consecutive_failures += 1
-            diagnostic.last_error = type(error).__name__ if error else "unknown"
+            diagnostic.last_error = error_name or "unknown"
             if diagnostic.consecutive_failures >= CIRCUIT_FAILURE_THRESHOLD:
                 diagnostic.circuit_open_until = (
                     diagnostic.checked_at + CIRCUIT_COOLDOWN_SECONDS
@@ -368,6 +395,14 @@ class BotRuntime:
         for item in sorted(self.diagnostics.values(), key=lambda value: value.provider):
             payload = asdict(item)
             payload["circuit_open"] = item.circuit_open_until > current
+            requests = item.successes + item.failures
+            payload["requests"] = requests
+            payload["avg_latency_ms"] = (
+                item.total_latency_ms // requests if requests else 0
+            )
+            payload["success_rate_percent"] = (
+                round(item.successes * 100 / requests, 1) if requests else 0.0
+            )
             snapshot.append(payload)
         return snapshot
 
@@ -390,13 +425,24 @@ class BotRuntime:
         if not ok:
             self.metrics["publication_errors"] += 1
 
-    def metrics_snapshot(self) -> dict[str, int]:
+    def metrics_snapshot(self) -> dict[str, Any]:
         snapshot = dict(self.metrics)
         requests = snapshot["requests"]
         snapshot["request_ms_avg"] = (
             snapshot["request_ms_total"] // requests if requests else 0
         )
         snapshot["updated_at"] = int(time())
+        snapshot["providers"] = {
+            item["provider"]: {
+                "requests": item["requests"],
+                "success_rate_percent": item["success_rate_percent"],
+                "avg_latency_ms": item["avg_latency_ms"],
+                "partials": item["partials"],
+                "timeouts": item["timeouts"],
+                "rate_limits": item["rate_limits"],
+            }
+            for item in self.provider_snapshot()
+        }
         return snapshot
 
     async def persist_metrics(self) -> None:

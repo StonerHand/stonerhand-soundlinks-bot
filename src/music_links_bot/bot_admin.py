@@ -65,9 +65,10 @@ async def stats_text(context, *, include_private: bool) -> str:
                 else "✅" if item["ok"] else "⚠️"
             )
             lines.append(
-                f"{marker} {item['provider']} · {item['latency_ms']} ms"
+                f"{marker} {item['provider']} · {item['avg_latency_ms']} ms avg · "
+                f"{item['success_rate_percent']}% · {item['requests']} запросов"
                 + (
-                    f" · {item['last_error']}"
+                    f" · {item['partials']} fallback · {item['last_error']}"
                     if item["last_error"]
                     else ""
                 )
@@ -187,7 +188,13 @@ async def build_status_text(context) -> str:
             marker = "⛔" if item.get("circuit_open") else (
                 "✅" if item.get("ok") else "⚠️"
             )
-            detail = f"{item.get('latency_ms', 0)} ms"
+            detail = (
+                f"{item.get('avg_latency_ms', 0)} ms avg, "
+                f"{item.get('success_rate_percent', 0)}%, "
+                f"fallback: {item.get('partials', 0)}, "
+                f"timeout: {item.get('timeouts', 0)}, "
+                f"429: {item.get('rate_limits', 0)}"
+            )
             if item.get("last_error"):
                 detail += f", {item['last_error']}"
             lines.append(

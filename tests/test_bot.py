@@ -955,7 +955,7 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertIn("↓ Ниже", labels)
         self.assertIn("✕ Удалить", labels)
         self.assertIn("Очистить", labels)
-        self.assertIn("● 1", labels)
+        self.assertTrue(any(label.startswith("✓ 1 · Sleep") for label in labels))
         self.assertEqual(keyboard.inline_keyboard[-1][0].text, "← Главное меню")
         self.assertEqual(keyboard.inline_keyboard[-1][0].callback_data, "v2|menu|start")
 
@@ -1527,10 +1527,12 @@ class PostEditorTests(unittest.TestCase):
     def test_editor_rows_show_toggle_states_and_actions(self) -> None:
         rows = _editor_rows("abc123", self._draft(hashtags=True))
 
-        self.assertEqual(rows[0][0].text, "🎛 Настроить")
-        self.assertEqual(rows[0][0].callback_data, "v2|editor|m|abc123")
-        self.assertEqual(rows[0][1].text, "+ В подборку")
-        self.assertEqual(rows[0][1].callback_data, "v2|editor|c|abc123")
+        self.assertEqual(rows[0][0].text, "Получить готовый пост")
+        self.assertEqual(rows[0][0].callback_data, "v2|editor|s|abc123")
+        self.assertEqual(rows[1][0].text, "Изменить")
+        self.assertEqual(rows[1][0].callback_data, "v2|editor|m|abc123")
+        self.assertEqual(rows[1][1].text, "+ В подборку")
+        self.assertEqual(rows[1][1].callback_data, "v2|editor|c|abc123")
         more = _editor_more_rows("abc123", self._draft(hashtags=True))
         self.assertEqual(more[1][0].text, "# Хэштеги · авто")
         self.assertEqual(more[1][0].callback_data, "v2|editor|hs|abc123")
@@ -1539,8 +1541,8 @@ class PostEditorTests(unittest.TestCase):
         rows = _editor_rows("abc123", self._draft(can_publish=True))
 
         labels = [button.text for row in rows for button in row]
-        self.assertEqual(labels, ["🎛 Настроить", "📤 В канал"])
-        self.assertEqual(rows[0][1].api_kwargs, {"style": "success"})
+        self.assertEqual(labels, ["📤 В канал", "Изменить", "+ В подборку"])
+        self.assertEqual(rows[0][0].api_kwargs, {"style": "success"})
 
     def test_editor_rows_turn_added_item_into_crate_shortcut(self) -> None:
         rows = _editor_rows(
@@ -1548,9 +1550,9 @@ class PostEditorTests(unittest.TestCase):
             self._draft(in_crate=True, crate_count=3),
         )
 
-        self.assertEqual(rows[0][1].text, "В подборке · 3/10")
-        self.assertEqual(rows[0][1].callback_data, "v2|crate|open")
-        self.assertEqual(rows[0][1].api_kwargs, {"style": "success"})
+        self.assertEqual(rows[1][1].text, "В подборке · 3/10")
+        self.assertEqual(rows[1][1].callback_data, "v2|crate|open")
+        self.assertEqual(dict(rows[1][1].api_kwargs or {}), {})
 
     def test_editor_rows_keep_text_toggle_predictable(self) -> None:
         rows_without_quote = _editor_more_rows("abc123", self._draft())
@@ -1588,8 +1590,8 @@ class PostEditorTests(unittest.TestCase):
     def test_editor_rows_keep_one_compact_action_row(self) -> None:
         rows = _editor_rows("abc123", self._draft())
 
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0][0].text, "🎛 Настроить")
+        self.assertEqual([len(row) for row in rows], [1, 2])
+        self.assertEqual(rows[0][0].text, "Получить готовый пост")
 
     def test_render_track_draft_respects_toggles(self) -> None:
         draft = self._draft(
@@ -1646,11 +1648,12 @@ class PostEditorTests(unittest.TestCase):
         _, keyboard = _render_track_draft(draft, None, draft_id="abc123")
         buttons = [button for row in keyboard.inline_keyboard for button in row]
 
-        self.assertEqual(len(buttons), 4)
+        self.assertEqual(len(buttons), 5)
         self.assertEqual(buttons[0].text, "🟢 Spotify")
         self.assertEqual(buttons[1].text, "🪩 Все платформы")
-        self.assertEqual(buttons[2].text, "🎛 Настроить")
-        self.assertEqual(buttons[3].text, "+ В подборку")
+        self.assertEqual(buttons[2].text, "Получить готовый пост")
+        self.assertEqual(buttons[3].text, "Изменить")
+        self.assertEqual(buttons[4].text, "+ В подборку")
 
 
 class BotLookupTests(unittest.IsolatedAsyncioTestCase):
@@ -2085,8 +2088,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(keyboard[0][0].text, "🟢 Spotify")
         self.assertEqual(keyboard[0][1].text, "🪩 Все платформы")
         self.assertEqual(keyboard[0][1].url, "https://song.link/transitions")
-        self.assertEqual(keyboard[1][0].text, "🎛 Настроить")
-        self.assertEqual(keyboard[1][1].text, "+ В подборку")
+        self.assertEqual(keyboard[1][0].text, "Получить готовый пост")
+        self.assertEqual(keyboard[2][0].text, "Изменить")
+        self.assertEqual(keyboard[2][1].text, "+ В подборку")
         preview_options = message.reply_kwargs[0]["link_preview_options"]
         self.assertTrue(preview_options.prefer_large_media)
         self.assertFalse(bool(preview_options.prefer_small_media))
