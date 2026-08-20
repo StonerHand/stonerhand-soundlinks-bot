@@ -22,6 +22,11 @@ FORMATTING_ENTITY_TYPES = {
 SAFE_LINK_SCHEMES = {"http", "https", "tg", "mailto"}
 
 
+def telegram_text_length(text: str) -> int:
+    """Return Telegram's UTF-16 character count for text/entity limits."""
+    return _utf16_length(str(text or ""))
+
+
 def format_user_note_html(
     text: str | None,
     entities: tuple[MessageEntity, ...] | list[MessageEntity] | None,
@@ -102,10 +107,21 @@ def _truncate_entities(
     *,
     max_length: int,
 ) -> tuple[str, tuple[MessageEntity, ...]]:
-    if len(text) <= max_length:
+    if max_length <= 0:
+        return "", ()
+    if _utf16_length(text) <= max_length:
         return text, entities
 
-    visible_text = text[: max_length - 1].rstrip()
+    available = max_length - 1
+    used = 0
+    end = 0
+    for end, character in enumerate(text, start=1):
+        character_length = _utf16_length(character)
+        if used + character_length > available:
+            end -= 1
+            break
+        used += character_length
+    visible_text = text[:end].rstrip()
     shortened_text = visible_text + "…"
     cutoff = _utf16_length(visible_text)
     shortened_entities: list[MessageEntity] = []

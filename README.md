@@ -25,6 +25,10 @@ opening a separate web interface.
 - combines several links into one numbered collection;
 - pairs a song and YouTube clip in one media post;
 - includes a native card builder with separate style, intro, hashtag and platform screens;
+- keeps exactly one primary action on editor screens and edits the active message in place;
+- preserves bold, italic, links and other Telegram formatting in author intros;
+- calculates the available intro length for the exact card or photo caption;
+- reapplies the previous publication format with one tap;
 - offers a clean final preview and returns to the active card by release name;
 - remembers card preferences and keeps timestamped recent posts;
 - names, previews, reorders and deduplicates collections;
@@ -34,6 +38,7 @@ opening a separate web interface.
 - uses an explicit bot timezone for fixed and custom publication times;
 - lets the user cancel any native text input with `/cancel`;
 - works inline: `@StonerHandBot artist — track`.
+- explains incomplete batches per source and lets the user replace a failed link by number.
 
 A single message accepts up to 10 unique sources — the same explicit limit as
 the editable crate. Duplicate and tracking variants are removed before lookup.
@@ -56,7 +61,10 @@ Cards keep only useful information: artwork, artist, title, hashtags selected
 by the user, chosen services and the complete release hub. Secondary actions
 appear only in context. Multi-link inputs are not quoted back into the result.
 Style, intro, hashtags, platforms, preview and delivery have explicit screens;
-free-form intro and tags are entered through native Telegram replies.
+free-form intro and tags are entered through native Telegram replies. Intro
+formatting is preserved, while its live limit adapts to Telegram's regular
+message or photo-caption budget instead of silently cutting the release card.
+The editor remembers the previous format and can restore it with one action.
 
 The primary **Create post** action opens a native input guide for all three
 input shapes: a release or artist link, an `artist — title` query, or several
@@ -68,6 +76,8 @@ ordered success/failure status; one slow provider call cannot cancel completed
 siblings or starve later links. An incomplete result stays visibly marked as
 `3 of 4`, cannot be shared as finished, and its recovery action rebuilds the
 entire original collection in the same order.
+Each failed position also has a **Replace #N** action, so a mistyped or private
+URL can be corrected without reconstructing the rest of the batch.
 All output is checked against Telegram message and caption limits before
 delivery, with a safe fallback for oversized formatted text.
 Transient Song.link failures fall back to Spotify metadata for Spotify URLs;
@@ -122,7 +132,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ```text
 api/                    webhook, health, webhook setup and queue worker
-src/music_links_bot/    bot orchestration, menu, editor, providers and persistence
+src/music_links_bot/    orchestration, typed lookup, editor, providers and persistence
 tests/                  unit and integration tests
 vercel.json             production routes and cron jobs
 ```
@@ -137,5 +147,7 @@ Non-critical flows have a bounded in-memory fallback.
 `/api/health` reports Telegram, webhook, Redis, queue worker, queue state,
 runtime metrics and the exact deployed version/commit. The production canary
 rejects stale deployments, a failed worker and an overdue durable queue.
+Provider diagnostics include request volume, success rate, average latency,
+fallbacks, timeouts and rate limits.
 
 License: [MIT](LICENSE).

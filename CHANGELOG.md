@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.2.0 — 2026-08-20
+
+- Rebuilt the native card actions around one unmistakable primary button and
+  neutral secondary controls; editor screens now use one accent action each.
+- Added a reusable “same as last time” format, full Telegram formatting for
+  author intros and a dynamic character budget for messages and photo captions.
+- Made partial batches explain every failed source and offer replacement of a
+  specific link without rebuilding the collection manually.
+- Added source-aware progress, short in-place confirmations and named item
+  actions in the collection editor.
+- Centralized semantic Telegram button construction and introduced a versioned,
+  typed draft schema v4.
+- Split editor rendering and lookup accounting out of the orchestration modules,
+  keeping cache/source invariants in a dedicated typed layer.
+- Added per-provider request, success-rate, average-latency, fallback, timeout
+  and rate-limit metrics to runtime diagnostics and health persistence.
+- Added stable UI snapshots plus regressions for formatted intros, dynamic
+  limits, reusable templates and provider metrics.
+- Extended the release suite to 468 automated tests.
+
 ## 1.1.4 — 2026-08-12
 
 - Made multi-link resolution source-accountable: every unique input now has

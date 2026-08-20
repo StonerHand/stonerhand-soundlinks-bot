@@ -1,6 +1,6 @@
+import sys
 import unittest
 from pathlib import Path
-import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -101,6 +101,12 @@ class TelegramTextTests(unittest.TestCase):
         self.assertEqual(
             format_user_note_html(text, (entity,), max_length=12),
             "<b>очень длинн</b>…",
+        )
+
+    def test_truncation_counts_emoji_as_telegram_utf16_units(self) -> None:
+        self.assertEqual(
+            format_user_note_html("🎧🎧🎧", (), max_length=5),
+            "🎧🎧…",
         )
 
 

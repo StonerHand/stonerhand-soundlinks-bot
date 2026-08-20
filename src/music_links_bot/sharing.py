@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardMarkup
 
 from music_links_bot.formatter import (
     format_artist_collection_message,
@@ -26,6 +26,7 @@ from music_links_bot.keyboards import (
     _select_preview_url,
 )
 from music_links_bot.models import TrackMatch
+from music_links_bot.telegram_buttons import button as InlineKeyboardButton
 from music_links_bot.url_utils import cache_key_for_url, is_supported_music_url
 
 SHARE_QUERY_PREFIX = "sh2|"

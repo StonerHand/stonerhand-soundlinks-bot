@@ -1,20 +1,25 @@
-from types import SimpleNamespace
 import ast
-from pathlib import Path
+import json
 import time
 import unittest
-from unittest.mock import AsyncMock
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
+
+from telegram import MessageEntity
 
 from music_links_bot.bot import (
-    _dispatch_menu_action,
-    _handle_editor_action,
     _consume_pending_input,
+    _dispatch_menu_action,
+    _draft_intro_limit,
+    _handle_editor_action,
     _render_track_draft,
 )
-from music_links_bot.bot_runtime import CallbackAction
-from music_links_bot.bot_runtime import BotRuntime
 from music_links_bot.bot_actions import action_spec
+from music_links_bot.bot_builder import apply_intro_html
 from music_links_bot.bot_pipeline import delivery_kind
+from music_links_bot.bot_runtime import BotRuntime, CallbackAction
+from music_links_bot.bot_storage import store_retry_sources
 from music_links_bot.bot_ui import (
     build_error_keyboard,
     build_publish_confirmation,
@@ -23,6 +28,7 @@ from music_links_bot.bot_ui import (
 )
 from music_links_bot.draft_model import CURRENT_DRAFT_VERSION, new_track_draft
 from music_links_bot.models import TrackMatch
+from music_links_bot.publication_view import build_publication_view
 
 
 def _track() -> TrackMatch:
@@ -51,7 +57,69 @@ class PublicationGoldenTests(unittest.TestCase):
         self.assertEqual(draft["v"], CURRENT_DRAFT_VERSION)
         labels = [button.text for row in keyboard.inline_keyboard for button in row]
         self.assertEqual(labels[:2], ["🟢 Spotify", "🪩 Все платформы"])
-        self.assertIn("🎛 Настроить", labels)
+        self.assertIn("Изменить", labels)
+
+    def test_editor_card_snapshots_are_stable(self) -> None:
+        context = SimpleNamespace(application=SimpleNamespace(bot_data={}))
+        snapshots = Path(__file__).parent / "snapshots"
+        for settings, filename in (
+            (False, "editor_card_ru.json"),
+            (True, "editor_settings_ru.json"),
+        ):
+            draft = new_track_draft(_track(), chat_id=7, lang="ru")
+            text, keyboard = _render_track_draft(
+                draft,
+                context,
+                draft_id="draft123",
+                settings=settings,
+                show_status=settings,
+            )
+            actual = {
+                "text": text,
+                "rows": [
+                    [
+                        [
+                            button.text,
+                            button.callback_data,
+                            button.url,
+                            dict(button.api_kwargs or {}).get("style"),
+                        ]
+                        for button in row
+                    ]
+                    for row in keyboard.inline_keyboard
+                ],
+            }
+            expected = json.loads((snapshots / filename).read_text(encoding="utf-8"))
+            self.assertEqual(actual, expected)
+
+    def test_intro_budget_depends_on_publication_format(self) -> None:
+        context = SimpleNamespace(application=SimpleNamespace(bot_data={}))
+        draft = new_track_draft(_track(), chat_id=7, lang="ru")
+        message_limit = _draft_intro_limit(draft, context)
+        draft["as_photo"] = True
+        caption_limit = _draft_intro_limit(draft, context)
+
+        self.assertGreater(message_limit, caption_limit)
+        self.assertLessEqual(caption_limit, 1024)
+
+    def test_formatted_intro_stays_formatted_when_it_fits(self) -> None:
+        draft = new_track_draft(_track(), chat_id=7, lang="ru")
+        apply_intro_html(
+            draft,
+            "<b>Slowdive</b> и <i>Outbreak</i>",
+            visible_length=22,
+            max_length=900,
+        )
+        view = build_publication_view(
+            draft,
+            _track(),
+            context=SimpleNamespace(application=SimpleNamespace(bot_data={})),
+            include_channel_button=False,
+        )
+
+        self.assertIn("<b>Slowdive</b>", view.text)
+        self.assertIn("<i>Outbreak</i>", view.text)
+        self.assertFalse(view.intro.truncated)
 
     def test_publish_confirmation_is_one_clear_primary_action(self) -> None:
         draft = new_track_draft(_track(), chat_id=7, lang="ru", can_publish=True)
@@ -110,6 +178,110 @@ class EditorFlowContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(stored["custom_tags"], ["#doom", "#stonerrock"])
         self.assertEqual((await runtime.get_session(7)).pending_input, {})
         message.reply_text.assert_awaited_once()
+
+    async def test_native_intro_reply_preserves_telegram_formatting(self) -> None:
+        draft = new_track_draft(_track(), chat_id=7, lang="ru")
+        runtime = BotRuntime()
+        session = await runtime.get_session(7)
+        session.pending_input = {
+            "kind": "intro",
+            "draft_id": "draft123",
+            "editor_chat_id": 7,
+            "editor_message_id": 10,
+            "prompt_message_id": 11,
+            "created_at": int(time.time()),
+        }
+        await runtime.save_session(session)
+        message = SimpleNamespace(
+            chat=SimpleNamespace(type="private"),
+            chat_id=7,
+            text="Slowdive и Outbreak",
+            caption=None,
+            entities=(MessageEntity(MessageEntity.BOLD, 0, 8),),
+            caption_entities=(),
+            reply_text=AsyncMock(),
+        )
+        update = SimpleNamespace(
+            effective_message=message,
+            effective_user=SimpleNamespace(id=7, language_code="ru"),
+        )
+        context = SimpleNamespace(
+            bot=SimpleNamespace(
+                delete_message=AsyncMock(),
+                edit_message_text=AsyncMock(),
+            ),
+            application=SimpleNamespace(
+                bot_data={
+                    "drafts": {"draft123": draft},
+                    "runtime": runtime,
+                    "platform_order": ("spotify", "deezer"),
+                }
+            ),
+        )
+
+        self.assertTrue(await _consume_pending_input(update, context))
+        stored = context.application.bot_data["drafts"]["draft123"]
+        self.assertIn("<b>Slowdive</b>", stored["prefix"])
+        context.bot.edit_message_text.assert_awaited_once()
+        message.reply_text.assert_not_awaited()
+
+    async def test_failed_batch_source_can_be_replaced_in_place(self) -> None:
+        runtime = BotRuntime()
+        context = SimpleNamespace(
+            bot=SimpleNamespace(delete_message=AsyncMock()),
+            application=SimpleNamespace(bot_data={"runtime": runtime}),
+        )
+        retry_id = await store_retry_sources(
+            context,
+            user_id=7,
+            urls=[
+                "https://open.spotify.com/track/first",
+                "https://open.spotify.com/track/broken",
+            ],
+        )
+        session = await runtime.get_session(7)
+        session.pending_input = {
+            "kind": "replace_source",
+            "retry_id": retry_id,
+            "source_index": 2,
+            "prompt_message_id": 11,
+            "created_at": int(time.time()),
+        }
+        await runtime.save_session(session)
+        message = SimpleNamespace(
+            chat=SimpleNamespace(type="private"),
+            chat_id=7,
+            text="https://open.spotify.com/track/replacement",
+            caption=None,
+            entities=(),
+            caption_entities=(),
+            reply_text=AsyncMock(),
+        )
+        update = SimpleNamespace(
+            effective_message=message,
+            effective_user=SimpleNamespace(id=7, language_code="ru"),
+        )
+        captured: list[str] = []
+
+        async def capture_lookup(_update, _context) -> None:
+            from music_links_bot.bot import _INPUT_OVERRIDE
+
+            captured.append(str(_INPUT_OVERRIDE.get() or ""))
+
+        with patch("music_links_bot.bot.track_lookup_message", capture_lookup):
+            self.assertTrue(await _consume_pending_input(update, context))
+
+        self.assertEqual(
+            captured,
+            [
+                (
+                    "https://open.spotify.com/track/first\n"
+                    "https://open.spotify.com/track/replacement"
+                )
+            ],
+        )
+        context.bot.delete_message.assert_awaited_once()
+        self.assertEqual((await runtime.get_session(7)).pending_input, {})
 
     async def test_native_create_and_explicit_style_are_one_tap_flows(self) -> None:
         class Query:
@@ -267,6 +439,15 @@ class TelegramUiContractTests(unittest.TestCase):
             artists=[],
         )
         self.assertEqual(delivery_kind(bundle), "tracks")
+        bundle.tracks = []
+        bundle.videos = [SimpleNamespace(title="Live")]
+        self.assertEqual(delivery_kind(bundle), "videos")
+        bundle.tracks = [_track()]
+        bundle.content_type_count = 2
+        bundle.item_count = 2
+        self.assertEqual(delivery_kind(bundle), "mixed")
+        bundle.item_count = 0
+        self.assertEqual(delivery_kind(bundle), "empty")
 
 
 if __name__ == "__main__":

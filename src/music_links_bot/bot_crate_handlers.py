@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 
-from telegram import ForceReply, InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import ForceReply, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
@@ -22,6 +22,7 @@ from music_links_bot.formatter import format_collection_message
 from music_links_bot.i18n import get_text, resolve_lang
 from music_links_bot.keyboards import _build_collection_keyboard
 from music_links_bot.models import TrackMatch
+from music_links_bot.telegram_buttons import button as InlineKeyboardButton
 
 CRATE_UNDO_SECONDS = 15
 MAX_CRATE_UNDO_RECORDS = 300

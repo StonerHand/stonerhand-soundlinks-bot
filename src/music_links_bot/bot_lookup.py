@@ -3,37 +3,54 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
-from urllib.parse import quote
 from collections.abc import Awaitable, Callable
-from dataclasses import asdict, dataclass, field
 from typing import Any
+from urllib.parse import quote
 
 from telegram import Bot, Message
 from telegram.ext import ContextTypes
 
 from music_links_bot.artist import ArtistClient, ArtistLookupError
 from music_links_bot.formatter import (
-    format_artist_collection_message, format_artist_message,
+    format_artist_collection_message,
+    format_artist_message,
     format_mixed_collection_message,
-    format_playlist_collection_message, format_playlist_message,
-    format_radio_collection_message, format_radio_message,
-    format_video_collection_message, format_video_message,
+    format_playlist_collection_message,
+    format_playlist_message,
+    format_radio_collection_message,
+    format_radio_message,
+    format_video_collection_message,
+    format_video_message,
 )
 from music_links_bot.i18n import get_text
 from music_links_bot.keyboards import (
-    _build_artist_collection_keyboard, _build_artist_keyboard,
+    _build_artist_collection_keyboard,
+    _build_artist_keyboard,
     _build_mixed_collection_keyboard,
-    _build_nts_collection_keyboard, _build_nts_keyboard,
-    _build_playlist_collection_keyboard, _build_playlist_keyboard,
-    _build_youtube_collection_keyboard, _build_youtube_keyboard,
+    _build_nts_collection_keyboard,
+    _build_nts_keyboard,
+    _build_playlist_collection_keyboard,
+    _build_playlist_keyboard,
+    _build_youtube_collection_keyboard,
+    _build_youtube_keyboard,
     _select_preview_url,
 )
-from music_links_bot.models import ArtistMatch, PlaylistMatch, RadioMatch, TrackMatch, VideoMatch
-from music_links_bot.sharing import (
-    add_share_button,
-    build_share_query,
-    collection_result_title,
-    track_share_url,
+from music_links_bot.lookup_models import (
+    LookupBundle,
+    SourceStatus,
+    bundle_from_cache as _bundle_from_cache,
+    bundle_to_cache as _bundle_to_cache,
+    ensure_source_accounting as _ensure_source_accounting,
+    item_label as _item_label,
+    sort_statuses as _sort_statuses,
+    unique_source_urls as _unique_source_urls,
+)
+from music_links_bot.models import (
+    ArtistMatch,
+    PlaylistMatch,
+    RadioMatch,
+    TrackMatch,
+    VideoMatch,
 )
 from music_links_bot.nts import NTSClient, NTSLookupError, build_nts_fallback
 from music_links_bot.phrases import pick_phrase
@@ -42,7 +59,22 @@ from music_links_bot.playlist import (
     PlaylistLookupError,
     build_playlist_fallback,
 )
+from music_links_bot.provider_registry import DEFAULT_PROVIDER_REGISTRY
+from music_links_bot.provider_runtime import (
+    ProviderTask,
+    get_cached_lookup,
+    lookup_cache_key,
+    run_provider_tasks_detailed,
+    set_cached_lookup,
+    set_cached_negative_lookup,
+)
 from music_links_bot.search import SearchClient
+from music_links_bot.sharing import (
+    add_share_button,
+    build_share_query,
+    collection_result_title,
+    track_share_url,
+)
 from music_links_bot.songlink import SonglinkClient, SonglinkError, SonglinkLookupError
 from music_links_bot.soundcloud import (
     SoundCloudClient,
@@ -55,15 +87,6 @@ from music_links_bot.url_utils import (
     spotify_url_type,
 )
 from music_links_bot.youtube import YouTubeClient, YouTubeLookupError
-from music_links_bot.provider_runtime import (
-    ProviderTask,
-    get_cached_lookup,
-    lookup_cache_key,
-    run_provider_tasks_detailed,
-    set_cached_lookup,
-    set_cached_negative_lookup,
-)
-from music_links_bot.provider_registry import DEFAULT_PROVIDER_REGISTRY
 
 LOGGER = logging.getLogger(__name__)
 NOT_FOUND_DETAIL = (
@@ -105,76 +128,6 @@ async def _send_track_video_pair_result(*args, **kwargs) -> bool:
     return await _track_video_pair_sender(*args, **kwargs)
 
 
-@dataclass(slots=True)
-class LookupBundle:
-    tracks: list[TrackMatch]
-    unavailable_urls: list[str]
-    videos: list[VideoMatch]
-    radios: list[RadioMatch]
-    playlists: list[PlaylistMatch]
-    artists: list[ArtistMatch]
-    statuses: list[SourceStatus] = field(default_factory=list)
-
-    @property
-    def item_count(self) -> int:
-        return sum(
-            len(items)
-            for items in (
-                self.tracks,
-                self.videos,
-                self.radios,
-                self.playlists,
-                self.artists,
-            )
-        )
-
-    @property
-    def content_type_count(self) -> int:
-        return sum(
-            bool(items)
-            for items in (
-                self.tracks,
-                self.videos,
-                self.radios,
-                self.playlists,
-                self.artists,
-            )
-        )
-
-    @property
-    def successful_source_count(self) -> int:
-        return sum(status.state == "success" for status in self.statuses)
-
-    def is_complete_for(self, source_urls: list[str]) -> bool:
-        expected = [cache_key_for_url(url) for url in source_urls]
-        actual = [cache_key_for_url(status.source_url) for status in self.statuses]
-        return (
-            bool(expected)
-            and actual == expected
-            and all(status.state == "success" for status in self.statuses)
-            and self.item_count == len(expected)
-        )
-
-    def is_negative_for(self, source_urls: list[str]) -> bool:
-        expected = [cache_key_for_url(url) for url in source_urls]
-        actual = [cache_key_for_url(status.source_url) for status in self.statuses]
-        return (
-            bool(expected)
-            and actual == expected
-            and self.item_count == 0
-            and all(status.state == "not_found" for status in self.statuses)
-        )
-
-
-@dataclass(slots=True)
-class SourceStatus:
-    source_url: str
-    provider: str
-    state: str
-    label: str = ""
-    retryable: bool = False
-
-
 async def resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBundle:
     source_urls = _unique_source_urls(source_urls)
     cached = await get_cached_lookup(bot_data, source_urls)
@@ -210,19 +163,6 @@ async def resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBundl
     finally:
         if task.done():
             finish(task)
-
-
-def _unique_source_urls(source_urls: list[str]) -> list[str]:
-    """Defensively deduplicate tracking variants while preserving order."""
-    unique: list[str] = []
-    seen: set[str] = set()
-    for source_url in source_urls:
-        key = cache_key_for_url(source_url)
-        if key in seen:
-            continue
-        seen.add(key)
-        unique.append(source_url)
-    return unique
 
 
 async def _resolve_sources_uncached(
@@ -322,7 +262,11 @@ async def _resolve_sources_uncached(
         runtime = bot_data.get("runtime")
         if runtime is not None and hasattr(runtime, "record_provider"):
             runtime.record_provider(
-                "songlink", ok=False, latency_ms=0, error=SonglinkError("lookup failed")
+                "songlink",
+                ok=False,
+                latency_ms=0,
+                error=SonglinkError("lookup failed"),
+                partial=True,
             )
     bundle = LookupBundle(
         tracks=[track for track in tracks if track.links],
@@ -348,39 +292,6 @@ async def _resolve_sources_uncached(
     return bundle
 
 
-def _bundle_to_cache(bundle: LookupBundle) -> dict[str, Any]:
-    return {
-        "tracks": [asdict(item) for item in bundle.tracks],
-        "unavailable_urls": list(bundle.unavailable_urls),
-        "videos": [asdict(item) for item in bundle.videos],
-        "radios": [asdict(item) for item in bundle.radios],
-        "playlists": [asdict(item) for item in bundle.playlists],
-        "artists": [asdict(item) for item in bundle.artists],
-        "statuses": [asdict(item) for item in bundle.statuses],
-    }
-
-
-def _bundle_from_cache(payload: dict) -> LookupBundle | None:
-    try:
-        return LookupBundle(
-            tracks=[TrackMatch(**item) for item in payload.get("tracks", [])],
-            unavailable_urls=[
-                str(url) for url in payload.get("unavailable_urls", [])
-            ],
-            videos=[VideoMatch(**item) for item in payload.get("videos", [])],
-            radios=[RadioMatch(**item) for item in payload.get("radios", [])],
-            playlists=[
-                PlaylistMatch(**item) for item in payload.get("playlists", [])
-            ],
-            artists=[ArtistMatch(**item) for item in payload.get("artists", [])],
-            statuses=[
-                SourceStatus(**item) for item in payload.get("statuses", [])
-            ],
-        )
-    except (TypeError, ValueError):
-        return None
-
-
 def _outcome_value(outcomes: dict, provider: str, fallback):
     outcome = outcomes.get(provider)
     return outcome.value if outcome is not None else fallback
@@ -394,12 +305,21 @@ def _provider_statuses(
 ) -> list[SourceStatus]:
     outcome = outcomes.get(provider)
     if outcome is not None and not outcome.ok:
+        error_key = str(outcome.error or "provider_unavailable").casefold()
+        reason = (
+            "rate_limited"
+            if "rate" in error_key or "429" in error_key
+            else "timeout"
+            if "timeout" in error_key
+            else "provider_unavailable"
+        )
         return [
             SourceStatus(
                 source_url=url,
                 provider=provider,
                 state="unavailable",
                 retryable=True,
+                reason=reason,
             )
             for url in source_urls
         ]
@@ -421,54 +341,6 @@ def _provider_statuses(
             )
         )
     return statuses
-
-
-def _ensure_source_accounting(
-    bundle: LookupBundle,
-    source_urls: list[str],
-) -> LookupBundle:
-    """Guarantee that every accepted source has exactly one visible status."""
-    by_key = {
-        cache_key_for_url(status.source_url): status
-        for status in bundle.statuses
-    }
-    bundle.statuses = [
-        by_key.get(cache_key_for_url(source_url))
-        or SourceStatus(
-            source_url=source_url,
-            provider=DEFAULT_PROVIDER_REGISTRY.provider_for(source_url),
-            state="unavailable",
-            retryable=True,
-        )
-        for source_url in source_urls
-    ]
-    bundle.unavailable_urls = [
-        status.source_url
-        for status in bundle.statuses
-        if status.state == "unavailable"
-    ]
-    return bundle
-
-
-def _item_label(item: object) -> str:
-    if item is None:
-        return ""
-    title = str(getattr(item, "title", "") or "")
-    artist = str(
-        getattr(item, "artist", "")
-        or getattr(item, "author", "")
-        or getattr(item, "station", "")
-        or ""
-    )
-    return " — ".join(part for part in (artist, title) if part)[:120]
-
-
-def _sort_statuses(
-    statuses: list[SourceStatus],
-    source_urls: list[str],
-) -> list[SourceStatus]:
-    positions = {url: index for index, url in enumerate(source_urls)}
-    return sorted(statuses, key=lambda item: positions.get(item.source_url, 10_000))
 
 
 def _split_source_urls(
@@ -1127,7 +999,7 @@ async def _lookup_tracks_detailed(
                 except SonglinkError as exc:
                     if provider_attempt > 0:
                         return exc
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 — provider SDKs vary.
                     return exc
 
             provider_attempt += 1
@@ -1203,6 +1075,7 @@ async def _lookup_tracks_detailed(
                         provider="songlink",
                         state="not_found",
                         retryable=retryable,
+                        reason="release_not_found",
                     )
                 )
                 continue
@@ -1219,6 +1092,7 @@ async def _lookup_tracks_detailed(
                     provider="songlink",
                     state="unavailable",
                     retryable=True,
+                    reason=_failure_reason(result),
                 )
             )
             continue
@@ -1242,6 +1116,7 @@ async def _lookup_tracks_detailed(
                     provider="songlink",
                     state="unavailable",
                     retryable=True,
+                    reason=_failure_reason(result),
                 )
             )
 
@@ -1265,6 +1140,16 @@ def _source_log_id(source_url: str) -> str:
     """Return a diagnostic token without writing a user's raw URL to logs."""
     canonical = cache_key_for_url(source_url)
     return hashlib.sha256(canonical.encode()).hexdigest()[:12]
+
+
+def _failure_reason(error: BaseException) -> str:
+    name = type(error).__name__.casefold()
+    detail = str(error).casefold()
+    if "rate" in name or "429" in detail:
+        return "rate_limited"
+    if isinstance(error, TimeoutError) or "timeout" in name:
+        return "timeout"
+    return "provider_unavailable"
 
 
 async def _fill_genres(search_client: SearchClient, tracks: list[TrackMatch]) -> None:

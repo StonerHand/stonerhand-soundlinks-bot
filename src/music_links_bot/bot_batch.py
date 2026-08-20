@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from html import escape
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
 from music_links_bot.bot_runtime import encode_callback
 from music_links_bot.bot_storage import store_retry_sources
 from music_links_bot.i18n import get_text
+from music_links_bot.telegram_buttons import ButtonTone, callback_button
 
 
 async def send_partial_lookup_status(
@@ -52,14 +53,17 @@ async def send_partial_lookup_status(
             label = item.label or item.provider
         elif item.state == "unavailable":
             marker = "⚠️"
-            label = (
-                "сервис временно недоступен"
-                if lang == "ru"
-                else "service unavailable"
+            label = get_text(
+                lang,
+                "partial_rate_limited"
+                if item.reason == "rate_limited"
+                else "partial_timeout"
+                if item.reason == "timeout"
+                else "partial_unavailable",
             )
         else:
             marker = "·"
-            label = "не удалось распознать" if lang == "ru" else "not recognized"
+            label = get_text(lang, "partial_not_found")
         details.append(f"{marker} {index}. {escape(label)}")
     text += "\n\n<blockquote>" + "\n".join(details) + "</blockquote>"
 
@@ -70,21 +74,28 @@ async def send_partial_lookup_status(
             user_id=user_id,
             urls=retry_urls,
         )
-        keyboard = InlineKeyboardMarkup(
+        rows = [
             [
-                [
-                    InlineKeyboardButton(
-                        get_text(lang, "retry_failed"),
-                        callback_data=encode_callback(
-                            "retry",
-                            "failed",
-                            retry_id,
-                        ),
-                        api_kwargs={"style": "primary"},
-                    )
-                ]
+                callback_button(
+                    get_text(lang, "retry_failed"),
+                    encode_callback("retry", "failed", retry_id),
+                    tone=ButtonTone.PRIMARY,
+                )
             ]
+        ]
+        replace_buttons = [
+            callback_button(
+                get_text(lang, "replace_source").format(index=index),
+                encode_callback("retry", "replace", f"{retry_id}:{index}"),
+            )
+            for index, item in enumerate(statuses, start=1)
+            if item.state != "success"
+        ]
+        rows.extend(
+            replace_buttons[index : index + 2]
+            for index in range(0, len(replace_buttons), 2)
         )
+        keyboard = InlineKeyboardMarkup(rows)
     await message.reply_text(
         text,
         parse_mode=ParseMode.HTML,

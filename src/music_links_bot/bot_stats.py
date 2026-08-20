@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
-from datetime import datetime, timezone
 import logging
 import re
+from collections.abc import Callable
+from datetime import datetime, timezone
 
 from telegram import Message, MessageEntity
 from telegram.ext import ContextTypes
@@ -37,7 +37,7 @@ from music_links_bot.url_utils import (
 
 LOGGER = logging.getLogger(__name__)
 STATS_KV_KEY = "stats:v1"
-MAX_USER_NOTE_LENGTH = 700
+MAX_USER_NOTE_LENGTH = 3_000
 
 
 def message_text(message: Message) -> str | None:

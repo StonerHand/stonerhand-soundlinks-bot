@@ -1,5 +1,5 @@
-from types import SimpleNamespace
 import unittest
+from types import SimpleNamespace
 
 from music_links_bot.bot_crate import load_crate
 from music_links_bot.bot_progress import adopt_progress_message, update_progress
@@ -73,6 +73,25 @@ class StateMigrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(draft["v"], CURRENT_DRAFT_VERSION)
         self.assertEqual(draft["preset"], "cover")
         self.assertTrue(draft["hashtags"])
+
+    def test_corrupt_optional_draft_metrics_are_repaired(self) -> None:
+        draft = normalize_track_draft(
+            {
+                "v": 3,
+                "type": "track",
+                "item": {"artist": "Sleep", "title": "Dragonaut", "links": {}},
+                "chat_id": 7,
+                "created_at": "broken",
+                "intro_length": "broken",
+                "intro_limit": object(),
+            }
+        )
+
+        self.assertIsNotNone(draft)
+        assert draft is not None
+        self.assertEqual(draft["intro_length"], 0)
+        self.assertEqual(draft["intro_limit"], 0)
+        self.assertGreater(draft["created_at"], 0)
 
 
 class ProgressContractTests(unittest.IsolatedAsyncioTestCase):

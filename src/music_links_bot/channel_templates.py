@@ -80,15 +80,24 @@ async def load_channel_template(context, target: int | str) -> dict:
     return template
 
 
-async def apply_channel_template(context, target: int | str, draft: dict) -> None:
-    template = await load_channel_template(context, target)
+def apply_template(draft: dict, template: dict) -> bool:
+    template = _sanitize_template(template)
     if "preset" in template:
         apply_preset(draft, template["preset"])
     for key, value in template.items():
         if key == "preset":
             continue
         draft[key] = list(value) if isinstance(value, list) else value
-    draft["channel_template_applied"] = bool(template)
+    return bool(template)
+
+
+async def apply_channel_template(context, target: int | str, draft: dict) -> None:
+    template = await load_channel_template(context, target)
+    draft["last_template"] = dict(template)
+    applied = apply_template(draft, template)
+    draft["channel_template_applied"] = applied
+    draft["last_template_available"] = applied
+    draft["last_template_applied"] = applied
 
 
 async def save_channel_template(context, target: int | str, draft: dict) -> None:

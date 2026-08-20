@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from enum import Enum
-import re
 
 
 class ActionKind(str, Enum):
@@ -59,6 +59,7 @@ ACTION_SPECS = tuple(
         ("editor", "hn", "no_hashtags", ActionKind.SETTING),
         ("editor", "t0", "remove_intro", ActionKind.SETTING),
         ("editor", "u", "undo_setting", ActionKind.SETTING),
+        ("editor", "lp", "last_template", ActionKind.SETTING),
         ("editor", "h", "toggle_hashtags_legacy", ActionKind.SETTING),
         ("editor", "q", "toggle_quote_legacy", ActionKind.SETTING),
         ("editor", "t", "toggle_text_legacy", ActionKind.SETTING),
@@ -94,6 +95,7 @@ ACTION_SPECS = tuple(
         ("crate", "clear_cancel", "cancel_clear", ActionKind.NAVIGATION),
         ("retry", "last", "retry", ActionKind.DELIVERY),
         ("retry", "failed", "retry_failed", ActionKind.DELIVERY),
+        ("retry", "replace", "replace_failed_source", ActionKind.INPUT),
         ("select", "pick", "pick_search_result", ActionKind.NAVIGATION),
         ("noop", "busy", "busy", ActionKind.NAVIGATION),
     )

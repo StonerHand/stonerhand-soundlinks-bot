@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import contextvars
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
 
 from telegram import Message
 from telegram.error import TelegramError
@@ -34,12 +34,22 @@ def adopt_progress_message(message: Message | None) -> None:
     _PLACEHOLDER.set(ProgressState(message) if message is not None else None)
 
 
-async def start_progress(message: Message, lang: str = "ru") -> None:
+async def start_progress(
+    message: Message,
+    lang: str = "ru",
+    *,
+    total: int = 1,
+) -> None:
     """Create at most one visible progress message for the active request."""
     if _PLACEHOLDER.get() is not None:
         return
     try:
-        placeholder = await message.reply_text(get_text(lang, "progress_search"))
+        text = (
+            get_text(lang, "progress_batch_start").format(total=total)
+            if total > 1
+            else get_text(lang, "progress_search")
+        )
+        placeholder = await message.reply_text(text)
     except TelegramError:
         LOGGER.debug("Could not send progress message", exc_info=True)
         return

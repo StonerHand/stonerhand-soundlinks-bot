@@ -361,7 +361,12 @@ STRINGS: dict[str, dict[str, str]] = {
     "ed_hashtags_auto": {RU: "# Хэштеги · авто", EN: "# Hashtags · auto"},
     "ed_hashtags_custom": {RU: "# Свои · {count}", EN: "# Custom · {count}"},
     "ed_hashtags_none": {RU: "# Без хэштегов", EN: "# No hashtags"},
-    "ed_edit": {RU: "🎛 Настроить", EN: "🎛 Customize"},
+    "ed_edit": {RU: "Изменить", EN: "Edit"},
+    "ed_last_template": {RU: "↻ Как в прошлый раз", EN: "↻ Same as last time"},
+    "ed_last_template_applied": {
+        RU: "Прошлый формат восстановлен",
+        EN: "Previous format restored",
+    },
     "ed_text_on": {RU: "Подводка · есть", EN: "Intro · on"},
     "ed_text_off": {RU: "Подводка · нет", EN: "Intro · none"},
     "ed_platforms_all_short": {RU: "все", EN: "all"},
@@ -385,6 +390,14 @@ STRINGS: dict[str, dict[str, str]] = {
     "ed_status": {
         RU: "{preset} · площадок: {services} · сохранено",
         EN: "{preset} · platforms: {services} · saved",
+    },
+    "ed_intro_counter": {
+        RU: "Подводка: {used}/{limit}",
+        EN: "Intro: {used}/{limit}",
+    },
+    "ed_intro_will_trim": {
+        RU: "⚠️ Подводка длиннее доступного места и будет сокращена",
+        EN: "⚠️ The intro is longer than the available space and will be shortened",
     },
     "ed_constructor_title": {RU: "Конструктор карточки", EN: "Card builder"},
     "ed_constructor_hint": {
@@ -417,8 +430,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "ed_intro_change": {RU: "Изменить подводку", EN: "Edit intro"},
     "ed_intro_remove": {RU: "Убрать подводку", EN: "Remove intro"},
     "ed_intro_prompt": {
-        RU: "<b>Жду подводку</b>\nОтветь одним сообщением (до 900 символов).\n<code>/cancel</code> — отменить",
-        EN: "<b>Waiting for an intro</b>\nReply with one message (up to 900 characters).\n<code>/cancel</code> — cancel",
+        RU: "<b>Жду подводку</b>\nОтветь одним сообщением — доступно до {limit} символов. Форматирование Telegram сохранится.\n<code>/cancel</code> — отменить",
+        EN: "<b>Waiting for an intro</b>\nReply with one message — up to {limit} characters are available. Telegram formatting is preserved.\n<code>/cancel</code> — cancel",
     },
     "ed_intro_saved": {RU: "Подводка сохранена", EN: "Intro saved"},
     "ed_tags_auto": {RU: "Автоматические", EN: "Automatic"},
@@ -438,7 +451,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "ed_done": {RU: "✓ Готово", EN: "✓ Done"},
     "ed_delete": {RU: "🗑 Удалить", EN: "🗑 Delete"},
     "ed_more": {RU: "Отправить", EN: "Send"},
-    "ed_send_self": {RU: "✓ Получить готовый пост", EN: "✓ Get finished post"},
+    "ed_send_self": {RU: "Получить готовый пост", EN: "Get finished post"},
     "ed_add_crate": {RU: "+ В подборку", EN: "+ Add to crate"},
     "ed_crate_count": {RU: "В подборке · {count}/10", EN: "In crate · {count}/10"},
     "ed_crate_added": {RU: "Добавлено · {count}/10", EN: "Added · {count}/10"},
@@ -447,6 +460,7 @@ STRINGS: dict[str, dict[str, str]] = {
         EN: "Already in crate · {count}/10",
     },
     "ed_sent": {RU: "Готово — пост отправлен ниже", EN: "Done — the post is below"},
+    "ed_sent_short": {RU: "Готово · пост отправлен", EN: "Done · post sent"},
     "ed_publish": {RU: "📤 В канал", EN: "📤 To channel"},
     "ed_schedule": {RU: "🕒 Запланировать", EN: "🕒 Schedule"},
     "schedule_title": {
@@ -539,6 +553,34 @@ STRINGS: dict[str, dict[str, str]] = {
         RU: "Проверить все ссылки",
         EN: "Check all links again",
     },
+    "replace_source": {
+        RU: "Заменить №{index}",
+        EN: "Replace #{index}",
+    },
+    "replace_source_prompt": {
+        RU: "<b>Замена ссылки №{index}</b>\nПришли одну новую музыкальную ссылку.\n<code>/cancel</code> — отменить",
+        EN: "<b>Replace link #{index}</b>\nSend one new music link.\n<code>/cancel</code> — cancel",
+    },
+    "replace_source_invalid": {
+        RU: "Нужна ровно одна поддерживаемая музыкальная ссылка.",
+        EN: "Send exactly one supported music link.",
+    },
+    "partial_not_found": {
+        RU: "не удалось распознать релиз — ссылка удалена, закрыта или недоступна",
+        EN: "release could not be recognized — the link is private, removed, or unavailable",
+    },
+    "partial_unavailable": {
+        RU: "сервис временно не ответил",
+        EN: "service did not respond in time",
+    },
+    "partial_timeout": {
+        RU: "истекло время ожидания сервиса",
+        EN: "service response timed out",
+    },
+    "partial_rate_limited": {
+        RU: "площадка временно ограничила запросы",
+        EN: "platform temporarily rate-limited requests",
+    },
     "partial_result": {
         RU: "<b>Готово не всё</b>\n{ok} из {total} ссылок обработано. Проверь всю подборку ещё раз.",
         EN: "<b>Some links need another try</b>\n{ok} of {total} links were processed. Check the complete collection again.",
@@ -602,6 +644,18 @@ STRINGS: dict[str, dict[str, str]] = {
     "progress_batch": {
         RU: "3/3 · Собираю подборку · {done}/{total}",
         EN: "3/3 · Building collection · {done}/{total}",
+    },
+    "progress_batch_start": {
+        RU: "0/{total} · Проверяю ссылки…",
+        EN: "0/{total} · Checking links…",
+    },
+    "progress_batch_links": {
+        RU: "0/{total} · Получаю данные площадок…",
+        EN: "0/{total} · Fetching platform data…",
+    },
+    "progress_batch_partial": {
+        RU: "{done}/{total} · Оформляю результат и отмечаю проблемные ссылки…",
+        EN: "{done}/{total} · Building the result and marking failed links…",
     },
     "progress_cancelled": {
         RU: "Поиск отменён — обрабатываю новый запрос.",
