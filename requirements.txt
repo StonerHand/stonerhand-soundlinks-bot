@@ -2,5 +2,5 @@
 # untested. Bump deliberately and let CI verify.
 python-telegram-bot==22.8
 httpx==0.28.1
-python-dotenv==1.2.2
+python-dotenv==1.2.3
 Pillow==12.3.0
