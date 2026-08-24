@@ -768,6 +768,18 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[1][0].url, "https://song.link/transitions")
         self.assertFalse(rows[1][0].api_kwargs)
 
+    def test_release_keyboard_hides_hub_when_it_duplicates_spotify(self) -> None:
+        keyboard = _build_link_keyboard(
+            {"spotify": "https://open.spotify.com/track/1?si=tracking"},
+            include_channel_button=False,
+            release_page_url="https://open.spotify.com/track/1",
+        )
+
+        rows = keyboard.inline_keyboard
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0][0].text, "🟢 Spotify")
+        self.assertEqual(rows[0][0].url, "https://open.spotify.com/track/1?si=tracking")
+
     def test_minimal_ui_mode_strips_platform_button_emoji(self) -> None:
         keyboard = _build_link_keyboard(
             {
@@ -809,7 +821,7 @@ class BotKeyboardTests(unittest.TestCase):
         keyboard = _build_link_keyboard(
             {"applePodcasts": "https://podcasts.apple.com/show/1"},
             include_channel_button=False,
-            release_page_url="https://podcasts.apple.com/show/1",
+            release_page_url="https://pod.link/show/1",
             release_kind="podcast",
         )
 

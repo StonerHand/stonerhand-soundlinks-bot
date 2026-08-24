@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.2 — 2026-08-25
+
+- Hid the misleading release-hub action when its destination duplicates a
+  Spotify or another platform button, including tracking URL variants.
+- Kept all real platform buttons visible when no distinct universal release
+  page is available.
+
 ## 1.4.1 — 2026-08-25
 
 - Hardened durable draft migration: unknown future fields and unsafe URLs no
