@@ -32,38 +32,34 @@ PUBLIC_BOT_COMMANDS_EN = (
 BOT_DESCRIPTIONS = {
     "": (
         "Музыкальный редактор для Telegram.\n\n"
-        "• Ссылка или название → точный релиз и готовая карточка\n"
-        "• Несколько ссылок → одна редактируемая подборка\n"
-        "• Стиль, подводка, хэштеги и площадки — в понятном конструкторе\n"
-        "• Чистое превью, история и именованные подборки без дублей\n"
+        "• Ссылка, название или аудио → точный релиз и готовая карточка\n"
+        "• Несколько ссылок или плейлист → одна редактируемая подборка\n"
+        "• Стиль, подводка, шаблоны, обложка и площадки — в конструкторе\n"
+        "• Превью, история и подборки без дублей\n"
         "• Нативная отправка поста с кнопками в любой чат\n"
         "• Inline: @StonerHandBot + запрос прямо в переписке\n"
-        "• Отправка, очередь и публикация прямо в боте\n\n"
+        "• Отправка, управляемая очередь и публикация прямо в боте\n\n"
         "Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
         "Yandex Music, NTS Radio."
     ),
     "en": (
         "A music post editor for Telegram.\n\n"
-        "• A link or title → the exact release and a finished card\n"
-        "• Several links → one editable crate\n"
-        "• Explicit style, intro, hashtag and platform controls\n"
+        "• A link, title or audio file → a finished card\n"
+        "• Several links or a playlist → one editable crate\n"
+        "• Explicit style, intro, template, artwork and platform controls\n"
         "• Clean preview, history and named duplicate-free crates\n"
         "• Native sharing that preserves buttons in any chat\n"
         "• Inline: @StonerHandBot + a query inside any conversation\n"
-        "• Sending, queueing and publishing inside the bot\n\n"
+        "• Sending, queue management and publishing inside the bot\n\n"
         "Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
         "Yandex Music and NTS Radio."
     ),
 }
 BOT_SHORT_DESCRIPTIONS = {
     "": (
-        "Ссылка или несколько треков → карточка или подборка. "
-        "Обложка, площадки и публикация — прямо в боте."
+        "Ссылка, название, аудио или несколько треков → готовая карточка или подборка."
     ),
-    "en": (
-        "A link or tracks → a card or crate. "
-        "Artwork, platforms and publishing — directly in the bot."
-    ),
+    "en": ("A link, title, audio or several tracks → a finished card or collection."),
 }
 
 
@@ -75,8 +71,8 @@ def build_application(settings: Settings) -> Application:
     """
     quiet_transport_logs()
 
-    from music_links_bot.artist import ArtistClient
     from music_links_bot import bot as handlers
+    from music_links_bot.artist import ArtistClient
     from music_links_bot.nts import NTSClient
     from music_links_bot.playlist import PlaylistClient
     from music_links_bot.search import SearchClient
@@ -112,6 +108,7 @@ def build_application(settings: Settings) -> Application:
                 )
             ),
             "kv_store": kv_store,
+            "lookup_cache_namespace": "production",
             "drafts": {},
             "publish_chat_id": settings.publish_chat_id,
             "admin_chat_id": settings.admin_chat_id,
@@ -148,7 +145,8 @@ def build_application(settings: Settings) -> Application:
     application.add_handler(InlineQueryHandler(handlers.inline_query_handler))
     application.add_handler(
         MessageHandler(
-            (filters.TEXT | filters.CAPTION) & ~filters.COMMAND,
+            (filters.TEXT | filters.CAPTION | filters.PHOTO | filters.AUDIO)
+            & ~filters.COMMAND,
             handlers.track_lookup_message,
         )
     )

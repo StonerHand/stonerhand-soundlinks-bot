@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import re
 from collections.abc import Mapping
 from html.parser import HTMLParser
 
@@ -16,6 +18,14 @@ from music_links_bot.url_utils import (
 )
 
 HTTP_HEADERS = {"User-Agent": HTTP_USER_AGENT}
+MAX_PLAYLIST_IMPORT_TRACKS = 10
+PLAYLIST_IMPORT_TIMEOUT_SECONDS = 2.0
+_SPOTIFY_TRACK_RE = re.compile(
+    r"(?:https://open\.spotify\.com/track/|spotify:track:)([A-Za-z0-9]{10,32})"
+)
+_APPLE_TRACK_RE = re.compile(
+    r"https://music\.apple\.com/[^\s\"'<>?]+\?[^\s\"'<>]*\bi=\d+[^\s\"'<>]*"
+)
 
 
 class PlaylistLookupError(RuntimeError):
@@ -108,10 +118,23 @@ class PlaylistClient:
             raise PlaylistLookupError("Unexpected playlist metadata.")
 
         title = str(payload.get("title") or "").strip()
+        track_urls: list[str] = []
+        try:
+            page = await asyncio.wait_for(
+                self._client.get(source_url),
+                timeout=PLAYLIST_IMPORT_TIMEOUT_SECONDS,
+            )
+            page.raise_for_status()
+            track_urls = _extract_spotify_track_urls(page.text)
+        except (httpx.HTTPError, TimeoutError):
+            # Metadata still makes a useful playlist card. Track import is a
+            # progressive enhancement and must not make the lookup fail.
+            track_urls = []
         return PlaylistMatch(
             title=title or "Spotify playlist",
             platform="Spotify",
             url=source_url,
+            track_urls=track_urls,
         )
 
     async def _lookup_apple_music_playlist(
@@ -132,7 +155,38 @@ class PlaylistClient:
             title=title,
             platform="Apple Music",
             url=source_url,
+            track_urls=_extract_apple_track_urls(response.text),
         )
+
+
+def _unique_urls(values: list[str]) -> list[str]:
+    result: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+        if len(result) >= MAX_PLAYLIST_IMPORT_TRACKS:
+            break
+    return result
+
+
+def _extract_spotify_track_urls(page_html: str) -> list[str]:
+    normalized = str(page_html or "").replace("\\/", "/")
+    return _unique_urls(
+        [
+            f"https://open.spotify.com/track/{match.group(1)}"
+            for match in _SPOTIFY_TRACK_RE.finditer(normalized)
+        ]
+    )
+
+
+def _extract_apple_track_urls(page_html: str) -> list[str]:
+    normalized = str(page_html or "").replace("\\/", "/").replace("&amp;", "&")
+    return _unique_urls(
+        [match.group(0) for match in _APPLE_TRACK_RE.finditer(normalized)]
+    )
 
 
 def _extract_apple_music_title(page_html: str) -> str:
@@ -142,11 +196,7 @@ def _extract_apple_music_title(page_html: str) -> str:
     except (TypeError, ValueError):
         return ""
 
-    title = (
-        parser.open_graph_title
-        or parser.twitter_title
-        or parser.document_title
-    )
+    title = parser.open_graph_title or parser.twitter_title or parser.document_title
     title = title.strip().lstrip("\u200e\u200f\ufeff")
     for suffix in (
         " on Apple Music",

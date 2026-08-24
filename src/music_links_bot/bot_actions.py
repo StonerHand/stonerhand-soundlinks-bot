@@ -49,6 +49,8 @@ ACTION_SPECS = tuple(
         ("editor", "pv", "preview", ActionKind.NAVIGATION),
         ("editor", "o", "actions", ActionKind.NAVIGATION),
         ("editor", "qs", "schedule", ActionKind.NAVIGATION),
+        ("editor", "rs", "telegram_format", ActionKind.NAVIGATION),
+        ("editor", "tp", "templates", ActionKind.NAVIGATION),
         ("editor", "f", "finish_settings", ActionKind.NAVIGATION),
         ("editor", "a", "another_release", ActionKind.NAVIGATION),
         ("editor", "z0", "minimal_style", ActionKind.SETTING),
@@ -60,6 +62,11 @@ ACTION_SPECS = tuple(
         ("editor", "t0", "remove_intro", ActionKind.SETTING),
         ("editor", "u", "undo_setting", ActionKind.SETTING),
         ("editor", "lp", "last_template", ActionKind.SETTING),
+        ("editor", "ra", "telegram_format_auto", ActionKind.SETTING),
+        ("editor", "rc", "telegram_format_classic", ActionKind.SETTING),
+        ("editor", "ci", "custom_cover", ActionKind.INPUT),
+        ("editor", "tn", "save_template", ActionKind.INPUT),
+        ("editor", "cr", "reset_cover", ActionKind.SETTING),
         ("editor", "h", "toggle_hashtags_legacy", ActionKind.SETTING),
         ("editor", "q", "toggle_quote_legacy", ActionKind.SETTING),
         ("editor", "t", "toggle_text_legacy", ActionKind.SETTING),
@@ -98,6 +105,8 @@ ACTION_SPECS = tuple(
         ("retry", "replace", "replace_failed_source", ActionKind.INPUT),
         ("select", "pick", "pick_search_result", ActionKind.NAVIGATION),
         ("noop", "busy", "busy", ActionKind.NAVIGATION),
+        ("queue", "open", "open_queue", ActionKind.NAVIGATION),
+        ("playlist", "import", "import_playlist", ActionKind.DELIVERY),
     )
 )
 
@@ -105,6 +114,8 @@ ACTION_REGISTRY = {(spec.scope, spec.code): spec for spec in ACTION_SPECS}
 _DYNAMIC_ACTIONS = (
     re.compile(r"^menu:onboard(?:[123]|done)$"),
     re.compile(r"^editor:l\d+$"),
+    re.compile(r"^editor:t[ad]\d+$"),
+    re.compile(r"^queue:cancel$"),
 )
 
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(slots=True)
@@ -36,6 +36,7 @@ class PlaylistMatch:
     title: str
     platform: str
     url: str
+    track_urls: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)

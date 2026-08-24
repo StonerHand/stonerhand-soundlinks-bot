@@ -18,6 +18,7 @@ _TEMPLATE_FIELDS = (
     "platforms",
     "preset",
     "publication_mode",
+    "delivery_mode",
 )
 
 
@@ -46,7 +47,16 @@ def _sanitize_template(value: object) -> dict:
     publication_mode = value.get("publication_mode")
     if publication_mode in {"card", "longread"}:
         template["publication_mode"] = publication_mode
+    delivery_mode = value.get("delivery_mode")
+    if delivery_mode in {"auto", "classic"}:
+        template["delivery_mode"] = delivery_mode
     return template
+
+
+def template_from_draft(draft: dict) -> dict:
+    return _sanitize_template(
+        {key: draft.get(key) for key in _TEMPLATE_FIELDS if key in draft}
+    )
 
 
 async def load_channel_template(context, target: int | str) -> dict:
@@ -101,9 +111,7 @@ async def apply_channel_template(context, target: int | str, draft: dict) -> Non
 
 
 async def save_channel_template(context, target: int | str, draft: dict) -> None:
-    template = _sanitize_template(
-        {key: draft.get(key) for key in _TEMPLATE_FIELDS if key in draft}
-    )
+    template = template_from_draft(draft)
     if not template:
         return
     key = _template_key(target)

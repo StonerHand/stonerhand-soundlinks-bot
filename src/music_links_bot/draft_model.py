@@ -8,7 +8,7 @@ from music_links_bot.constants import PLATFORM_LABELS
 from music_links_bot.models import TrackMatch
 from music_links_bot.release_presentation import normalize_preset
 
-CURRENT_DRAFT_VERSION = 4
+CURRENT_DRAFT_VERSION = 5
 
 
 def _safe_int(value: object, *, default: int = 0) -> int:
@@ -52,6 +52,12 @@ class TrackDraft(TypedDict, total=False):
     can_publish: bool
     preset: str
     publication_mode: str
+    delivery_mode: str
+    custom_cover_file_id: str
+    custom_cover_unique_id: str
+    source_audio_file_id: str
+    source_audio_unique_id: str
+    source_audio_duration: int
     platforms: list[str]
     channel_template_applied: bool
     in_crate: bool
@@ -59,6 +65,7 @@ class TrackDraft(TypedDict, total=False):
     deleted_at: int
     duplicate_record: dict[str, Any]
     undo_state: DraftUndoState
+    undo_stack: list[DraftUndoState]
     created_at: int
     intro_length: int
     intro_limit: int
@@ -92,6 +99,7 @@ def new_track_draft(
         "can_publish": bool(can_publish),
         "preset": "cover",
         "publication_mode": "card",
+        "delivery_mode": "auto",
         "intro_length": 0,
         "intro_limit": 0,
         "intro_truncated": False,
@@ -127,6 +135,23 @@ def normalize_track_draft(value: object) -> TrackDraft | None:
     draft["publication_mode"] = (
         "longread" if value.get("publication_mode") == "longread" else "card"
     )
+    draft["delivery_mode"] = (
+        "classic" if value.get("delivery_mode") == "classic" else "auto"
+    )
+    for field in (
+        "custom_cover_file_id",
+        "custom_cover_unique_id",
+        "source_audio_file_id",
+        "source_audio_unique_id",
+    ):
+        stored_value = value.get(field)
+        if isinstance(stored_value, str) and stored_value:
+            draft[field] = stored_value[:512]
+        else:
+            draft.pop(field, None)
+    draft["source_audio_duration"] = max(
+        0, _safe_int(value.get("source_audio_duration"))
+    )
     draft["created_at"] = _safe_int(
         value.get("created_at"),
         default=int(time.time()),
@@ -134,12 +159,8 @@ def normalize_track_draft(value: object) -> TrackDraft | None:
     draft["intro_length"] = max(0, _safe_int(value.get("intro_length")))
     draft["intro_limit"] = max(0, _safe_int(value.get("intro_limit")))
     draft["intro_truncated"] = bool(value.get("intro_truncated", False))
-    draft["last_template_available"] = bool(
-        value.get("last_template_available", False)
-    )
-    draft["last_template_applied"] = bool(
-        value.get("last_template_applied", False)
-    )
+    draft["last_template_available"] = bool(value.get("last_template_available", False))
+    draft["last_template_applied"] = bool(value.get("last_template_applied", False))
     last_template = value.get("last_template")
     if isinstance(last_template, dict):
         draft["last_template"] = dict(last_template)
@@ -158,4 +179,11 @@ def normalize_track_draft(value: object) -> TrackDraft | None:
         draft["undo_state"] = dict(undo_state)
     else:
         draft.pop("undo_state", None)
+    undo_stack = value.get("undo_stack")
+    if isinstance(undo_stack, list):
+        draft["undo_stack"] = [
+            dict(state) for state in undo_stack[-5:] if isinstance(state, dict)
+        ]
+    else:
+        draft.pop("undo_stack", None)
     return draft

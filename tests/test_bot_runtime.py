@@ -73,6 +73,25 @@ class CallbackContractTests(unittest.TestCase):
         assert session is not None
         self.assertEqual((session.home_chat_id, session.home_message_id), (7, 321))
 
+    def test_session_restores_new_editor_inputs(self) -> None:
+        for kind in ("cover", "template_name"):
+            with self.subTest(kind=kind):
+                session = UserSession.from_dict(
+                    {
+                        "user_id": 7,
+                        "pending_input": {
+                            "kind": kind,
+                            "draft_id": "draft123",
+                            "created_at": 123,
+                        },
+                    }
+                )
+
+                self.assertIsNotNone(session)
+                assert session is not None
+                self.assertEqual(session.pending_input["kind"], kind)
+                self.assertEqual(session.pending_input["draft_id"], "draft123")
+
 
 class RuntimeSafetyTests(unittest.IsolatedAsyncioTestCase):
     async def test_private_progress_can_use_rich_streaming_draft(self) -> None:

@@ -56,6 +56,14 @@ class BotEditorStateTests(unittest.TestCase):
             draft_status({"preset": "cover"}, self.track, lang="ru"),
             "Обложка · площадок: 2 · сохранено",
         )
+        self.assertEqual(
+            draft_status(
+                {"preset": "cover", "source_audio_file_id": "audio"},
+                self.track,
+                lang="ru",
+            ),
+            "Обложка · аудио Telegram · сохранено",
+        )
 
     def test_private_draft_rejects_another_user(self) -> None:
         self.assertTrue(draft_owned_by({"chat_id": 7}, 7))
@@ -63,7 +71,7 @@ class BotEditorStateTests(unittest.TestCase):
         self.assertFalse(draft_owned_by({}, 7))
         self.assertFalse(draft_owned_by({"chat_id": "7"}, 7))
 
-    def test_last_setting_change_can_be_restored_once(self) -> None:
+    def test_setting_change_can_be_restored(self) -> None:
         draft = {"hashtags": True, "platforms": ["spotify"]}
         remember_setting_state(draft)
         expires_at = draft["undo_state"]["expires_at"]
@@ -74,6 +82,17 @@ class BotEditorStateTests(unittest.TestCase):
         self.assertTrue(draft["hashtags"])
         self.assertEqual(draft["platforms"], ["spotify"])
         self.assertFalse(restore_setting_state(draft, now=expires_at))
+
+    def test_five_setting_changes_can_be_restored_in_order(self) -> None:
+        draft = {"hashtags": True}
+        for index in range(7):
+            remember_setting_state(draft)
+            draft["hashtags"] = bool(index % 2)
+        expires_at = draft["undo_state"]["expires_at"]
+
+        restored = [restore_setting_state(draft, now=expires_at) for _ in range(6)]
+
+        self.assertEqual(restored, [True, True, True, True, True, False])
 
     def test_expired_setting_change_is_not_restored(self) -> None:
         draft = {"hashtags": True}

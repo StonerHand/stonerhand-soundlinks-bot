@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.4.0 — 2026-08-24
+
+- Expanded the Telegram-native composer: uploaded audio becomes an editable
+  publication, and any release card can use a user-supplied cover.
+- Added explicit Auto and Classic Telegram delivery modes with the existing
+  lossless Rich Message fallback kept in Auto mode.
+- Added reusable named design templates, up to five reversible setting steps
+  and a preflight check that blocks invalid delivery before it reaches Telegram.
+- Added an admin queue dashboard with refresh and per-item cancellation.
+- Added best-effort track import from public Spotify and Apple Music playlists.
+- Coalesced matching cross-platform links into one release with the union of
+  service buttons while preserving per-source diagnostics and retry state.
+- Isolated aggregate caches for custom client bundles while retaining one
+  stable Redis namespace across production cold starts and deployments.
+- Added regressions for audio delivery, custom covers, templates, playlist
+  extraction, queue UI, preflight validation, session recovery and cache scope.
+- Extended the release suite to 502 automated tests.
+
 ## 1.3.0 — 2026-08-24
 
 - Added a Bot API 10.3 compatibility gateway for Rich Messages, Rich drafts,

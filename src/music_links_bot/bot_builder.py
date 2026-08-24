@@ -30,6 +30,8 @@ class BuilderScreen(str, Enum):
     PREVIEW = "preview"
     ACTIONS = "actions"
     SCHEDULE = "schedule"
+    DELIVERY = "delivery"
+    TEMPLATES = "templates"
 
 
 SCREEN_ACTIONS = {
@@ -41,6 +43,8 @@ SCREEN_ACTIONS = {
     "pv": BuilderScreen.PREVIEW,
     "o": BuilderScreen.ACTIONS,
     "qs": BuilderScreen.SCHEDULE,
+    "rs": BuilderScreen.DELIVERY,
+    "tp": BuilderScreen.TEMPLATES,
 }
 
 
@@ -116,7 +120,11 @@ def apply_intro_text(
     max_length: int | None = None,
 ) -> str:
     lines = [" ".join(line.split()) for line in str(value or "").splitlines()]
-    limit = MAX_INTRO_LENGTH if max_length is None else max(0, min(MAX_INTRO_LENGTH, max_length))
+    limit = (
+        MAX_INTRO_LENGTH
+        if max_length is None
+        else max(0, min(MAX_INTRO_LENGTH, max_length))
+    )
     clean = "\n".join(lines).strip()[:limit].strip()
     draft["prefix"] = f"<blockquote>{escape(clean)}</blockquote>\n\n" if clean else ""
     draft["quote"] = bool(clean)
