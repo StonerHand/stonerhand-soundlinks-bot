@@ -193,6 +193,7 @@ from music_links_bot.bot_progress import (
     update_progress as _update_loading_placeholder,
     update_progress_text as _update_progress_text,
 )
+from music_links_bot.bot_queue import dispatch_queue_action
 from music_links_bot.bot_runtime import (
     BotErrorCode,
     BotFlowError,
@@ -208,6 +209,7 @@ from music_links_bot.bot_storage import (
     load_retry_sources as _load_retry_sources,
     load_search_selection as _load_search_selection,
     store_draft as _store_draft,
+    store_retry_sources as _store_retry_sources,
     store_search_selection as _store_search_selection,
 )
 from music_links_bot.bot_ui import (
@@ -220,6 +222,7 @@ from music_links_bot.bot_ui import (
     build_publish_confirmation as _build_publish_confirmation,
     build_section_keyboard as _build_section_keyboard,
     build_start_keyboard as _build_start_keyboard,
+    editor_delivery_rows as _editor_delivery_rows,
     editor_hashtag_rows as _editor_hashtag_rows,
     editor_intro_rows as _editor_intro_rows,
     editor_more_rows as _editor_more_rows,
@@ -229,6 +232,7 @@ from music_links_bot.bot_ui import (
     editor_rows as _editor_rows,
     editor_schedule_rows as _editor_schedule_rows,
     editor_style_rows as _editor_style_rows,
+    editor_template_rows as _editor_template_rows,
     render_crate as _render_bot_crate,
 )
 from music_links_bot.constants import MAX_LINKS_PER_MESSAGE
@@ -245,6 +249,13 @@ from music_links_bot.mixed_post import send_track_video_album
 from music_links_bot.models import (
     TrackMatch,
     VideoMatch,
+)
+from music_links_bot.publication_preflight import validate_publication
+from music_links_bot.publication_presets import (
+    apply_named_preset,
+    delete_named_preset,
+    load_presets,
+    save_named_preset,
 )
 from music_links_bot.publication_service import PublicationService
 from music_links_bot.publication_state import (
@@ -274,6 +285,7 @@ from music_links_bot.search import (
     SearchLookupError,
     normalize_search_query,
 )
+from music_links_bot.track_merge import coalesce_equivalent_tracks
 
 _draft_message_overrides = draft_message_overrides
 _draft_platform_selection = draft_platform_selection
@@ -440,6 +452,8 @@ async def bot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "crate": _dispatch_crate_action,
         "retry": _dispatch_retry_action,
         "noop": _dispatch_noop_action,
+        "queue": dispatch_queue_action,
+        "playlist": _dispatch_playlist_action,
     }
     handler = handlers.get(parsed.scope)
     if handler is None:
@@ -500,6 +514,65 @@ async def _send_track_draft(
     source_url = track_share_url(track) or track.page_url or ""
     if source_url:
         await _record_recent_item(context, user_id, track, source_url)
+
+
+async def _send_uploaded_audio_draft(
+    message: Message,
+    context: ContextTypes.DEFAULT_TYPE,
+    *,
+    user_id: int,
+    lang: str,
+) -> None:
+    audio = message.audio
+    if audio is None:
+        return
+    filename = str(getattr(audio, "file_name", "") or "").rsplit("/", 1)[-1]
+    fallback_title = (
+        filename.rsplit(".", 1)[0]
+        if filename
+        else get_text(lang, "uploaded_audio_title")
+    )
+    track = TrackMatch(
+        title=str(getattr(audio, "title", "") or fallback_title)[:160],
+        artist=str(
+            getattr(audio, "performer", "") or get_text(lang, "uploaded_audio_artist")
+        )[:160],
+        links={},
+        kind="audio",
+    )
+    intro = ""
+    if message.caption:
+        intro = format_user_note_html(
+            message.caption,
+            _message_entities(message),
+            max_length=900,
+        )
+        if intro:
+            intro = f"<blockquote>{intro}</blockquote>\n\n"
+    draft_id = secrets.token_hex(8)
+    admin_chat_id = context.application.bot_data.get("admin_chat_id")
+    draft = new_track_draft(
+        track,
+        chat_id=message.chat_id,
+        lang=lang,
+        prefix=intro,
+        can_publish=admin_chat_id is not None and user_id == admin_chat_id,
+    )
+    draft["source_audio_file_id"] = str(audio.file_id)
+    draft["source_audio_unique_id"] = str(audio.file_unique_id)
+    draft["source_audio_duration"] = int(audio.duration or 0)
+    draft["delivery_mode"] = "classic"
+    draft["as_photo"] = False
+    text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
+    await message.reply_text(
+        text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=keyboard,
+    )
+    await _store_draft(context, draft_id, draft)
+    session = await _runtime(context).get_session(user_id, lang=lang)
+    _remember_session_draft(session, draft_id)
+    await _runtime(context).save_session(session)
 
 
 async def _dispatch_selection_action(query, context, action: CallbackAction) -> None:
@@ -601,6 +674,40 @@ async def _dispatch_retry_action(query, context, action: CallbackAction) -> None
         _INPUT_OVERRIDE.reset(token)
 
 
+async def _dispatch_playlist_action(query, context, action: CallbackAction) -> None:
+    if (
+        action.action != "import"
+        or not action.payload
+        or query.from_user is None
+        or query.message is None
+    ):
+        await query.answer()
+        return
+    lang = resolve_lang(query.from_user.language_code)
+    payload = await _load_retry_sources(context, action.payload)
+    if (
+        not isinstance(payload, dict)
+        or int(payload.get("user_id") or 0) != query.from_user.id
+    ):
+        await query.answer(get_text(lang, "ed_expired"), show_alert=True)
+        return
+    urls = [str(url) for url in payload.get("urls", []) if isinstance(url, str)][
+        :MAX_LINKS_PER_MESSAGE
+    ]
+    if not urls:
+        await query.answer(get_text(lang, "ed_expired"), show_alert=True)
+        return
+    await query.answer(get_text(lang, "playlist_import_started"))
+    _adopt_progress_message(query.message)
+    token = _INPUT_OVERRIDE.set("\n".join(urls))
+    guard_token = _BYPASS_INTENT_GUARD.set(True)
+    try:
+        await track_lookup_message(Update(update_id=0, callback_query=query), context)
+    finally:
+        _BYPASS_INTENT_GUARD.reset(guard_token)
+        _INPUT_OVERRIDE.reset(token)
+
+
 async def editor_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     parsed = decode_callback(query.data if query else None)
@@ -629,6 +736,7 @@ async def _handle_editor_navigation(
     draft_id: str,
     draft: dict,
     lang: str,
+    answer_text: str | None = None,
 ) -> bool:
     if action == "a":
         search_query = str(draft.get("search_query") or "").strip()
@@ -718,11 +826,22 @@ async def _handle_editor_navigation(
             f"<blockquote><b>{escape(track.artist)}</b> — {escape(track.title)}</blockquote>"
         )
         keyboard = InlineKeyboardMarkup(_editor_schedule_rows(draft_id, draft))
+    elif screen == BuilderScreen.DELIVERY:
+        text, _ = _render_track_draft(draft, context, draft_id=None)
+        text = f"{get_text(lang, 'ed_delivery_title')}\n\n{text}"
+        keyboard = InlineKeyboardMarkup(_editor_delivery_rows(draft_id, draft))
+    elif screen == BuilderScreen.TEMPLATES:
+        presets = await load_presets(
+            context, query.from_user.id if query.from_user else 0
+        )
+        text, _ = _render_track_draft(draft, context, draft_id=None)
+        text = f"{get_text(lang, 'ed_templates_title')}\n\n{text}"
+        keyboard = InlineKeyboardMarkup(_editor_template_rows(draft_id, draft, presets))
     elif action == "b":
         text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
     else:
         return False
-    await query.answer()
+    await query.answer(answer_text)
     await _edit_editor_message(query, context, draft, text, keyboard)
     return True
 
@@ -833,6 +952,27 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
         return
 
     track = TrackMatch(**draft["item"])
+    preflight = validate_publication(draft, track)
+    if (
+        action
+        in {
+            "p",
+            "q1",
+            "q3",
+            "qe",
+            "qd",
+            "pc",
+            "r",
+            "x",
+            "s",
+        }
+        and not preflight.ready
+    ):
+        await query.answer(
+            get_text(lang, f"ed_preflight_{preflight.blocking_code}"),
+            show_alert=True,
+        )
+        return
     return_screen: str | None = None
     if action in {"z0", "z1", "z2"}:
         remember_setting_state(draft)
@@ -895,12 +1035,51 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
         )
         return
 
-    if action in {"ti", "hi", "qi"}:
+    if action.startswith(("ta", "td")) and action[2:].isdigit():
+        index = int(action[2:])
+        if action.startswith("ta"):
+            remember_setting_state(draft)
+            changed = await apply_named_preset(
+                context,
+                query.from_user.id if query.from_user else 0,
+                index,
+                draft,
+            )
+            answer_key = "ed_template_applied"
+        else:
+            changed = await delete_named_preset(
+                context,
+                query.from_user.id if query.from_user else 0,
+                index,
+            )
+            answer_key = "ed_template_deleted"
+        if not changed:
+            await query.answer(get_text(lang, "ed_expired"), show_alert=True)
+            return
+        await _store_draft(context, draft_id, draft)
+        await _handle_editor_navigation(
+            query,
+            context,
+            action="tp",
+            draft_id=draft_id,
+            draft=draft,
+            lang=lang,
+            answer_text=get_text(lang, answer_key),
+        )
+        return
+
+    if action in {"ti", "hi", "qi", "ci", "tn"}:
         await _start_pending_editor_input(
             query,
             context,
             draft_id=draft_id,
-            kind={"ti": "intro", "hi": "hashtags", "qi": "schedule"}[action],
+            kind={
+                "ti": "intro",
+                "hi": "hashtags",
+                "qi": "schedule",
+                "ci": "cover",
+                "tn": "template_name",
+            }[action],
             lang=lang,
             draft=draft,
         )
@@ -963,6 +1142,27 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
             await runtime.release_action(lock_key, token)
         return
 
+    if action in {"ra", "rc", "cr"}:
+        remember_setting_state(draft)
+        if action == "ra":
+            draft["delivery_mode"] = "auto"
+        elif action == "rc":
+            draft["delivery_mode"] = "classic"
+        else:
+            draft.pop("custom_cover_file_id", None)
+            draft.pop("custom_cover_unique_id", None)
+        await _store_draft(context, draft_id, draft)
+        await _handle_editor_navigation(
+            query,
+            context,
+            action="rs",
+            draft_id=draft_id,
+            draft=draft,
+            lang=lang,
+            answer_text=get_text(lang, "settings_saved"),
+        )
+        return
+
     if action != "f" and not _apply_editor_setting(
         draft,
         action,
@@ -1002,6 +1202,8 @@ async def _start_pending_editor_input(
         "intro": "ed_intro_prompt",
         "hashtags": "ed_tags_prompt",
         "schedule": "schedule_prompt",
+        "cover": "ed_cover_prompt",
+        "template_name": "ed_template_prompt",
     }[kind]
     prompt_text = get_text(lang, prompt_key)
     if kind == "intro" and draft is not None:
@@ -1838,14 +2040,13 @@ async def _consume_pending_input(
         session.pending_input = {}
         await runtime.save_session(session)
         return False
-    value = (_message_text(message) or "").strip()
-    if not value:
-        return True
-
     kind = str(pending.get("kind") or "")
     saved_key = "settings_saved"
     draft_id = str(pending.get("draft_id") or "")
     draft = await _load_draft(context, draft_id) if draft_id else None
+    value = (_message_text(message) or "").strip()
+    if not value and kind != "cover":
+        return True
 
     if kind == "replace_source":
         replacement_urls = extract_supported_urls(value)
@@ -1881,18 +2082,40 @@ async def _consume_pending_input(
             _INPUT_OVERRIDE.reset(token)
         return True
 
-    if kind in {"intro", "hashtags", "schedule"} and draft is None:
+    if (
+        kind in {"intro", "hashtags", "schedule", "cover", "template_name"}
+        and draft is None
+    ):
         session.pending_input = {}
         await runtime.save_session(session)
         await message.reply_text(get_text(lang, "ed_expired"))
         return True
-    if kind in {"intro", "hashtags", "schedule"} and draft is not None:
+    if (
+        kind in {"intro", "hashtags", "schedule", "cover", "template_name"}
+        and draft is not None
+    ):
         if not _draft_owned_by(draft, user.id):
             session.pending_input = {}
             await runtime.save_session(session)
             await message.reply_text(get_text(lang, "ed_owner_only"))
             return True
-        if kind == "intro":
+        if kind == "cover":
+            photos = list(getattr(message, "photo", ()) or ())
+            if not photos:
+                await message.reply_text(get_text(lang, "ed_cover_invalid"))
+                return True
+            remember_setting_state(draft)
+            cover = photos[-1]
+            draft["custom_cover_file_id"] = str(cover.file_id)
+            unique_id = getattr(cover, "file_unique_id", None)
+            if unique_id:
+                draft["custom_cover_unique_id"] = str(unique_id)
+            draft["as_photo"] = True
+            saved_key = "ed_cover_saved"
+        elif kind == "template_name":
+            await save_named_preset(context, user.id, value, draft)
+            saved_key = "ed_template_saved"
+        elif kind == "intro":
             remember_setting_state(draft)
             limit = _draft_intro_limit(draft, context)
             visible_source = strip_supported_urls(value).strip()
@@ -1947,7 +2170,7 @@ async def _consume_pending_input(
             )
             saved_key = "schedule_done"
         await _store_draft(context, draft_id, draft)
-        if kind != "schedule":
+        if kind not in {"schedule", "cover", "template_name"}:
             await save_channel_template(context, f"user:{user.id}", draft)
     elif kind == "crate_title":
         title = normalize_crate_title(value)
@@ -2073,6 +2296,25 @@ async def _track_lookup_message_impl(
         return
 
     if await _consume_pending_input(update, context):
+        return
+
+    if message.chat.type == "private" and getattr(message, "audio", None) is not None:
+        user_id = update.effective_user.id if update.effective_user else message.chat_id
+        await _send_uploaded_audio_draft(
+            message,
+            context,
+            user_id=user_id,
+            lang=_update_lang(update),
+        )
+        return
+
+    # PHOTO is registered so the custom-cover Force Reply works. An unrelated
+    # photo without a caption is not a search request and should stay silent.
+    if (
+        message.chat.type == "private"
+        and getattr(message, "photo", None)
+        and not (_message_text(message) or "").strip()
+    ):
         return
 
     # Posts inserted through this bot's own inline mode arrive as regular
@@ -2233,8 +2475,17 @@ async def _deliver_lookup_bundle(
 ) -> None:
     """Render an already resolved bundle; lookup orchestration stays separate."""
     partial = not bundle.is_complete_for(request.source_urls)
+    # Different platform URLs often point to the exact same release. Keep the
+    # per-source statuses for retries and diagnostics, but show one merged card
+    # with all discovered service buttons instead of duplicate releases.
+    if bundle.tracks:
+        bundle.tracks = coalesce_equivalent_tracks(bundle.tracks)
     kind = delivery_kind(bundle)
-    prefix = "" if bundle.item_count > 1 else user_prefix
+    # Multi-source input is an instruction, not editorial copy. Even when
+    # cross-service merging leaves one card, never quote the submitted URLs.
+    prefix = (
+        "" if len(request.source_urls) > 1 or bundle.item_count > 1 else user_prefix
+    )
     common = {
         "user_prefix": prefix,
         "include_channel_button": request.include_channel_button,
@@ -2249,7 +2500,9 @@ async def _deliver_lookup_bundle(
             is_private=request.is_private,
             user_id=request.user_id,
             search_query=request.search_query,
-            requested_count=len(request.source_urls),
+            requested_count=(
+                len(bundle.tracks) if not partial else len(request.source_urls)
+            ),
             allow_share=not partial,
             **common,
         )
@@ -2274,12 +2527,24 @@ async def _deliver_lookup_bundle(
         )
         _record_radios_safely(bundle.radios, message, context=context)
     elif kind == "playlists":
+        import_id = None
+        if (
+            request.is_private
+            and len(bundle.playlists) == 1
+            and bundle.playlists[0].track_urls
+        ):
+            import_id = await _store_retry_sources(
+                context,
+                request.user_id,
+                bundle.playlists[0].track_urls[:MAX_LINKS_PER_MESSAGE],
+            )
         await _send_playlist_result(
             context.bot,
             message,
             bundle.playlists,
             requested_count=len(request.source_urls),
             allow_share=not partial,
+            import_id=import_id,
             **common,
         )
         _record_playlists_safely(bundle.playlists, message, context=context)

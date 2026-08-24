@@ -7,10 +7,11 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 from urllib.parse import quote
 
-from telegram import Bot, Message
+from telegram import Bot, InlineKeyboardMarkup, Message
 from telegram.ext import ContextTypes
 
 from music_links_bot.artist import ArtistClient, ArtistLookupError
+from music_links_bot.bot_runtime import encode_callback
 from music_links_bot.formatter import (
     format_artist_collection_message,
     format_artist_message,
@@ -81,6 +82,7 @@ from music_links_bot.soundcloud import (
     SoundCloudLookupError,
     build_soundcloud_fallback,
 )
+from music_links_bot.telegram_buttons import button as InlineKeyboardButton
 from music_links_bot.url_utils import (
     apple_podcasts_url_type,
     cache_key_for_url,
@@ -427,7 +429,10 @@ async def _lookup_playlists(
             continue
 
         if isinstance(result, PlaylistLookupError):
-            LOGGER.info("Could not fetch playlist metadata source=%s", _source_log_id(source_url))
+            LOGGER.info(
+                "Could not fetch playlist metadata source=%s",
+                _source_log_id(source_url),
+            )
         elif isinstance(result, Exception):
             LOGGER.error(
                 "Unexpected error while fetching playlist metadata source=%s",
@@ -456,7 +461,9 @@ async def _lookup_artists(
             continue
 
         if isinstance(result, ArtistLookupError):
-            LOGGER.info("Could not fetch artist metadata source=%s", _source_log_id(source_url))
+            LOGGER.info(
+                "Could not fetch artist metadata source=%s", _source_log_id(source_url)
+            )
         elif isinstance(result, Exception):
             LOGGER.error(
                 "Unexpected error while fetching artist metadata source=%s",
@@ -507,7 +514,9 @@ async def _lookup_youtube_videos(
             continue
 
         if isinstance(result, YouTubeLookupError):
-            LOGGER.info("Could not fetch YouTube metadata source=%s", _source_log_id(source_url))
+            LOGGER.info(
+                "Could not fetch YouTube metadata source=%s", _source_log_id(source_url)
+            )
         elif isinstance(result, Exception):
             LOGGER.error(
                 "Unexpected error while fetching YouTube metadata source=%s",
@@ -515,7 +524,9 @@ async def _lookup_youtube_videos(
                 exc_info=(type(result), result, result.__traceback__),
             )
 
-        videos.append(VideoMatch(title="YouTube video", author="YouTube", url=source_url))
+        videos.append(
+            VideoMatch(title="YouTube video", author="YouTube", url=source_url)
+        )
 
     return videos
 
@@ -536,7 +547,9 @@ async def _lookup_nts_radios(
             continue
 
         if isinstance(result, NTSLookupError):
-            LOGGER.info("Could not fetch NTS metadata source=%s", _source_log_id(source_url))
+            LOGGER.info(
+                "Could not fetch NTS metadata source=%s", _source_log_id(source_url)
+            )
         elif isinstance(result, Exception):
             LOGGER.error(
                 "Unexpected error while fetching NTS metadata source=%s",
@@ -582,7 +595,8 @@ async def _send_youtube_result(
         await _send_track_result(
             bot,
             message,
-            user_prefix + format_video_message(video, include_hashtags=include_hashtags),
+            user_prefix
+            + format_video_message(video, include_hashtags=include_hashtags),
             preview_url=video.url,
             reply_markup=keyboard,
         )
@@ -645,7 +659,8 @@ async def _send_nts_result(
         await _send_track_result(
             bot,
             message,
-            user_prefix + format_radio_message(radio, include_hashtags=include_hashtags),
+            user_prefix
+            + format_radio_message(radio, include_hashtags=include_hashtags),
             preview_url=radio.url,
             reply_markup=keyboard,
         )
@@ -688,6 +703,7 @@ async def _send_playlist_result(
     lang: str,
     allow_share: bool = True,
     requested_count: int | None = None,
+    import_id: str | None = None,
 ) -> None:
     if not playlists:
         return
@@ -699,6 +715,21 @@ async def _send_playlist_result(
             playlist.url,
             include_channel_button=include_channel_button,
         )
+        if import_id:
+            keyboard = InlineKeyboardMarkup(
+                [
+                    *[list(row) for row in keyboard.inline_keyboard],
+                    [
+                        InlineKeyboardButton(
+                            get_text(lang, "playlist_import"),
+                            callback_data=encode_callback(
+                                "playlist", "import", import_id
+                            ),
+                            api_kwargs={"style": "success"},
+                        )
+                    ],
+                ]
+            )
         if allow_share:
             keyboard = add_share_button(
                 keyboard,
@@ -772,7 +803,8 @@ async def _send_artist_result(
         await _send_track_result(
             bot,
             message,
-            user_prefix + format_artist_message(artist, include_hashtags=include_hashtags),
+            user_prefix
+            + format_artist_message(artist, include_hashtags=include_hashtags),
             preview_url=artist.url,
             reply_markup=keyboard,
         )
@@ -962,7 +994,9 @@ async def _lookup_tracks_detailed(
         async with start_lock:
             now = loop.time()
             delay = max(0.0, next_start_at - now)
-            next_start_at = max(now, next_start_at) + _BATCH_LOOKUP_START_INTERVAL_SECONDS
+            next_start_at = (
+                max(now, next_start_at) + _BATCH_LOOKUP_START_INTERVAL_SECONDS
+            )
         if delay:
             await asyncio.sleep(delay)
 
@@ -1206,7 +1240,9 @@ async def _build_lookup_fallback(
     try:
         return await soundcloud_client.lookup_track(source_url)
     except SoundCloudLookupError:
-        LOGGER.info("Could not fetch SoundCloud metadata source=%s", _source_log_id(source_url))
+        LOGGER.info(
+            "Could not fetch SoundCloud metadata source=%s", _source_log_id(source_url)
+        )
     except Exception:
         LOGGER.exception(
             "Unexpected error while fetching SoundCloud metadata source=%s",

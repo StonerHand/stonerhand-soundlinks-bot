@@ -1,74 +1,75 @@
 import asyncio
+import sys
 import unittest
 from pathlib import Path
-import sys
 from unittest.mock import AsyncMock, patch
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import BadRequest
 from telegram.ext import CommandHandler
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+from music_links_bot.artist import ArtistLookupError
 from music_links_bot.bot import (
     BOT_DESCRIPTIONS,
     BOT_SHORT_DESCRIPTIONS,
-    MAX_MEMORY_DRAFTS,
     MAX_BUTTON_TEXT_LENGTH,
+    MAX_MEMORY_DRAFTS,
     PUBLIC_BOT_COMMANDS,
-    _build_collection_keyboard,
-    _delete_confirmation_keyboard,
-    _build_inline_result,
-    _build_inline_collection_result,
     _build_artist_keyboard,
+    _build_collection_keyboard,
     _build_error_keyboard,
-    _build_intro_keyboard,
     _build_home_text,
-    _build_onboarding_keyboard,
-    _build_section_keyboard,
-    _build_start_keyboard,
+    _build_inline_collection_result,
+    _build_inline_result,
+    _build_intro_keyboard,
     _build_link_keyboard,
     _build_mixed_collection_keyboard,
     _build_nts_keyboard,
-    _build_playlist_keyboard,
+    _build_onboarding_keyboard,
     _build_platform_order,
+    _build_playlist_keyboard,
     _build_podcast_fallback,
+    _build_section_keyboard,
+    _build_start_keyboard,
     _build_youtube_keyboard,
+    _delete_confirmation_keyboard,
+    _editor_more_rows,
+    _editor_overflow_rows,
+    _editor_rows,
     _format_not_found_message,
     _format_service_unavailable_message,
+    _lookup_artists,
     _lookup_nts_radios,
     _lookup_playlists,
-    _lookup_artists,
     _lookup_tracks,
     _lookup_youtube_videos,
-    _message_text,
     _menu_text,
+    _message_text,
+    _release_fingerprint,
+    _render_bot_crate,
+    _render_track_draft,
+    _send_track_result,
     _should_include_channel_button,
     _should_include_hashtags,
     _split_source_urls,
-    _send_track_result,
-    _strip_bot_mention,
     _store_draft,
-    _release_fingerprint,
-    _editor_rows,
-    _editor_more_rows,
-    _editor_overflow_rows,
-    _render_bot_crate,
-    _render_track_draft,
+    _strip_bot_mention,
     build_application,
-    sync_application_commands,
     channel_command,
     crate_command,
     guide_command,
+    help_command,
     id_command,
     platforms_command,
+    start_command,
     stats_command,
     status_command,
+    sync_application_commands,
     track_lookup_message,
-    help_command,
-    start_command,
 )
 from music_links_bot.config import Settings
-from music_links_bot.artist import ArtistLookupError
 from music_links_bot.i18n import get_text
 from music_links_bot.models import (
     ArtistMatch,
@@ -80,12 +81,12 @@ from music_links_bot.models import (
 from music_links_bot.nts import NTSLookupError
 from music_links_bot.playlist import PlaylistLookupError
 from music_links_bot.search import SearchCandidate, SearchLookupError
-from music_links_bot.songlink import SonglinkError, SonglinkLookupError
 from music_links_bot.sharing import (
     add_share_button,
     build_share_query,
     parse_share_query,
 )
+from music_links_bot.songlink import SonglinkError, SonglinkLookupError
 from music_links_bot.soundcloud import SoundCloudLookupError
 from music_links_bot.youtube import YouTubeLookupError
 
@@ -696,9 +697,13 @@ class BotKeyboardTests(unittest.TestCase):
             include_channel_button=False,
         )
 
-        button_texts = [button.text for row in keyboard.inline_keyboard for button in row]
+        button_texts = [
+            button.text for row in keyboard.inline_keyboard for button in row
+        ]
         self.assertEqual(button_texts, ["🟢 Spotify"])
-        self.assertEqual(keyboard.inline_keyboard[0][0].api_kwargs, {"style": "primary"})
+        self.assertEqual(
+            keyboard.inline_keyboard[0][0].api_kwargs, {"style": "primary"}
+        )
 
     def test_release_keyboard_uses_two_columns(self) -> None:
         keyboard = _build_link_keyboard(
@@ -812,7 +817,9 @@ class BotKeyboardTests(unittest.TestCase):
             include_channel_button=False,
         )
 
-        button_texts = [button.text for row in keyboard.inline_keyboard for button in row]
+        button_texts = [
+            button.text for row in keyboard.inline_keyboard for button in row
+        ]
         self.assertEqual(button_texts, ["🎧 1. Youth Code - Transitions"])
         self.assertFalse(keyboard.inline_keyboard[0][0].api_kwargs)
 
@@ -822,9 +829,13 @@ class BotKeyboardTests(unittest.TestCase):
             include_channel_button=False,
         )
 
-        button_texts = [button.text for row in keyboard.inline_keyboard for button in row]
+        button_texts = [
+            button.text for row in keyboard.inline_keyboard for button in row
+        ]
         self.assertEqual(button_texts, ["📺 Смотреть на YouTube"])
-        self.assertEqual(keyboard.inline_keyboard[0][0].api_kwargs, {"style": "primary"})
+        self.assertEqual(
+            keyboard.inline_keyboard[0][0].api_kwargs, {"style": "primary"}
+        )
 
     def test_nts_keyboard_can_hide_channel_button(self) -> None:
         keyboard = _build_nts_keyboard(
@@ -832,9 +843,13 @@ class BotKeyboardTests(unittest.TestCase):
             include_channel_button=False,
         )
 
-        button_texts = [button.text for row in keyboard.inline_keyboard for button in row]
+        button_texts = [
+            button.text for row in keyboard.inline_keyboard for button in row
+        ]
         self.assertEqual(button_texts, ["📡 Открыть на NTS"])
-        self.assertEqual(keyboard.inline_keyboard[0][0].api_kwargs, {"style": "primary"})
+        self.assertEqual(
+            keyboard.inline_keyboard[0][0].api_kwargs, {"style": "primary"}
+        )
 
     def test_playlist_keyboard_can_hide_channel_button(self) -> None:
         keyboard = _build_playlist_keyboard(
@@ -842,9 +857,13 @@ class BotKeyboardTests(unittest.TestCase):
             include_channel_button=False,
         )
 
-        button_texts = [button.text for row in keyboard.inline_keyboard for button in row]
+        button_texts = [
+            button.text for row in keyboard.inline_keyboard for button in row
+        ]
         self.assertEqual(button_texts, ["🎛 Открыть плейлист"])
-        self.assertEqual(keyboard.inline_keyboard[0][0].api_kwargs, {"style": "primary"})
+        self.assertEqual(
+            keyboard.inline_keyboard[0][0].api_kwargs, {"style": "primary"}
+        )
 
     def test_artist_keyboard_can_hide_channel_button(self) -> None:
         keyboard = _build_artist_keyboard(
@@ -852,9 +871,13 @@ class BotKeyboardTests(unittest.TestCase):
             include_channel_button=False,
         )
 
-        button_texts = [button.text for row in keyboard.inline_keyboard for button in row]
+        button_texts = [
+            button.text for row in keyboard.inline_keyboard for button in row
+        ]
         self.assertEqual(button_texts, ["🧬 Открыть артиста"])
-        self.assertEqual(keyboard.inline_keyboard[0][0].api_kwargs, {"style": "primary"})
+        self.assertEqual(
+            keyboard.inline_keyboard[0][0].api_kwargs, {"style": "primary"}
+        )
 
     def test_mixed_collection_keyboard_lists_music_and_video_buttons(self) -> None:
         keyboard = _build_mixed_collection_keyboard(
@@ -866,7 +889,11 @@ class BotKeyboardTests(unittest.TestCase):
                     page_url="https://song.link/transitions",
                 )
             ],
-            [VideoMatch(title="Live Session", author="Channel", url="https://youtu.be/1")],
+            [
+                VideoMatch(
+                    title="Live Session", author="Channel", url="https://youtu.be/1"
+                )
+            ],
         )
 
         rows = keyboard.inline_keyboard
@@ -880,7 +907,11 @@ class BotKeyboardTests(unittest.TestCase):
     def test_mixed_collection_keyboard_lists_radio_buttons(self) -> None:
         keyboard = _build_mixed_collection_keyboard(
             [],
-            [VideoMatch(title="Live Session", author="Channel", url="https://youtu.be/1")],
+            [
+                VideoMatch(
+                    title="Live Session", author="Channel", url="https://youtu.be/1"
+                )
+            ],
             radios=[
                 RadioMatch(
                     title="Dark Energy",
@@ -925,8 +956,12 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         rows = keyboard.inline_keyboard
-        self.assertEqual([button.text for button in rows[2]], ["❓ Помощь", "🎛 Сервисы"])
-        self.assertEqual([button.text for button in rows[3]], ["📣 Для каналов", "🧪 Пример поста"])
+        self.assertEqual(
+            [button.text for button in rows[2]], ["❓ Помощь", "🎛 Сервисы"]
+        )
+        self.assertEqual(
+            [button.text for button in rows[3]], ["📣 Для каналов", "🧪 Пример поста"]
+        )
         self.assertEqual(rows[-1][0].text, "← Главное меню")
         self.assertEqual(rows[-1][0].callback_data, "v2|menu|start")
 
@@ -1011,7 +1046,8 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[1][1].text, "История")
         self.assertEqual(rows[2][0].text, "Как это работает?")
         self.assertEqual(rows[2][0].api_kwargs, {})
-        self.assertEqual(len(rows), 3)
+        self.assertEqual(rows[3][0].text, "🕒 Очередь публикаций")
+        self.assertEqual(len(rows), 4)
 
     def test_home_keeps_new_search_primary_when_a_card_can_be_restored(self) -> None:
         keyboard = _build_start_keyboard(
@@ -1055,10 +1091,18 @@ class BotKeyboardTests(unittest.TestCase):
 
     def test_menu_text_uses_compact_html_headings(self) -> None:
         self.assertTrue(_menu_text("menu:start").startswith("🎧 <b>"))
-        self.assertTrue(_menu_text("menu:help").startswith("❓ <b>Как собрать пост</b>"))
+        self.assertTrue(
+            _menu_text("menu:help").startswith("❓ <b>Как собрать пост</b>")
+        )
 
     def test_menu_sections_use_semantic_telegram_formatting(self) -> None:
-        for menu in ("menu:help", "menu:guide", "menu:platforms", "menu:demo", "menu:more"):
+        for menu in (
+            "menu:help",
+            "menu:guide",
+            "menu:platforms",
+            "menu:demo",
+            "menu:more",
+        ):
             with self.subTest(menu=menu):
                 text = _menu_text(menu)
                 self.assertIn("<b>", text)
@@ -1088,7 +1132,9 @@ class BotKeyboardTests(unittest.TestCase):
                 with self.subTest(lang=lang, key=key):
                     text = get_text(lang, key)
                     for tag in ("b", "i", "code", "blockquote"):
-                        self.assertEqual(text.count(f"<{tag}>"), text.count(f"</{tag}>"))
+                        self.assertEqual(
+                            text.count(f"<{tag}>"), text.count(f"</{tag}>")
+                        )
 
     def test_demo_menu_shows_compact_example_post(self) -> None:
         demo_text = _menu_text("menu:demo")
@@ -1187,9 +1233,7 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(track.title, "Podcast show")
 
     def test_spotify_fallback_ignores_regular_tracks(self) -> None:
-        self.assertIsNone(
-            _build_podcast_fallback("https://open.spotify.com/track/abc")
-        )
+        self.assertIsNone(_build_podcast_fallback("https://open.spotify.com/track/abc"))
 
     def test_apple_podcast_episode_fallback_builds_podcast_match(self) -> None:
         source_url = "https://podcasts.apple.com/us/podcast/apple-events/id1473854035?i=1000479125753"
@@ -1250,7 +1294,9 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
     def test_service_unavailable_message_adds_next_step(self) -> None:
-        message = _format_service_unavailable_message("https://open.spotify.com/track/1")
+        message = _format_service_unavailable_message(
+            "https://open.spotify.com/track/1"
+        )
 
         self.assertIn("Попробуй еще раз чуть позже", message)
 
@@ -1282,7 +1328,9 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(result)
         self.assertEqual(result.description, "Post with every platform button")
 
-    async def test_inline_channel_result_keeps_urls_and_drops_switch_button(self) -> None:
+    async def test_inline_channel_result_keeps_urls_and_drops_switch_button(
+        self,
+    ) -> None:
         result = await _build_inline_result(
             "https://open.spotify.com/track/abc",
             ContextStub(),
@@ -1291,9 +1339,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsNotNone(result)
         buttons = [
-            button
-            for row in result.reply_markup.inline_keyboard
-            for button in row
+            button for row in result.reply_markup.inline_keyboard for button in row
         ]
         self.assertTrue(any(button.url for button in buttons))
         self.assertFalse(any(button.switch_inline_query for button in buttons))
@@ -1342,7 +1388,9 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.title, "Подборка · 2 релиза")
         self.assertIn("1.", result.input_message_content.message_text)
         self.assertIn("2.", result.input_message_content.message_text)
-        self.assertEqual(result.reply_markup.inline_keyboard[-1][0].switch_inline_query, query)
+        self.assertEqual(
+            result.reply_markup.inline_keyboard[-1][0].switch_inline_query, query
+        )
 
     async def test_inline_share_handler_returns_one_collection_card(self) -> None:
         from music_links_bot.bot import inline_query_handler
@@ -1572,6 +1620,15 @@ class PostEditorTests(unittest.TestCase):
         )
         self.assertLessEqual(len(rows_without_quote), 4)
 
+    def test_uploaded_audio_does_not_offer_irrelevant_platform_picker(self) -> None:
+        rows = _editor_more_rows(
+            "abc123",
+            self._draft(source_audio_file_id="telegram-audio"),
+        )
+
+        self.assertEqual(rows[1][1].text, "Площадки · не нужны")
+        self.assertEqual(rows[1][1].callback_data, "v2|noop|busy")
+
     def test_editor_offers_fast_search_correction_for_search_drafts(self) -> None:
         rows = _editor_overflow_rows(
             "abc123",
@@ -1673,7 +1730,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(message.deleted)
         self.assertEqual(message.replies, [])
 
-    async def test_channel_result_keeps_url_buttons_and_drops_inline_share(self) -> None:
+    async def test_channel_result_keeps_url_buttons_and_drops_inline_share(
+        self,
+    ) -> None:
         message = ReplaceableChannelMessageStub()
         bot = BotStub()
         keyboard = add_share_button(
@@ -1727,11 +1786,17 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             fake_send.called = {"args": args, "kwargs": kwargs}
             return True
 
-        with env_patch.dict(os.environ, {"EPHEMERAL_GROUP_REPLIES": "1"}, clear=False):
-            with env_patch.object(bot_module, "send_ephemeral_message", fake_send):
-                await _send_track_result(
-                    bot, message, "готовый пост", preview_url=None, reply_markup=None
-                )
+        with (
+            env_patch.dict(
+                os.environ,
+                {"EPHEMERAL_GROUP_REPLIES": "1"},
+                clear=False,
+            ),
+            env_patch.object(bot_module, "send_ephemeral_message", fake_send),
+        ):
+            await _send_track_result(
+                bot, message, "готовый пост", preview_url=None, reply_markup=None
+            )
 
         self.assertEqual(bot.sent_messages, [])  # nothing posted publicly
         self.assertFalse(message.deleted)  # poster's message left intact
@@ -1751,16 +1816,24 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         async def fake_send(*args, **kwargs):
             return False
 
-        with env_patch.dict(os.environ, {"EPHEMERAL_GROUP_REPLIES": "1"}, clear=False):
-            with env_patch.object(bot_module, "send_ephemeral_message", fake_send):
-                await _send_track_result(
-                    bot, message, "готовый пост", preview_url=None, reply_markup=None
-                )
+        with (
+            env_patch.dict(
+                os.environ,
+                {"EPHEMERAL_GROUP_REPLIES": "1"},
+                clear=False,
+            ),
+            env_patch.object(bot_module, "send_ephemeral_message", fake_send),
+        ):
+            await _send_track_result(
+                bot, message, "готовый пост", preview_url=None, reply_markup=None
+            )
 
         self.assertEqual(len(bot.sent_messages), 1)  # public post as usual
         self.assertTrue(message.deleted)
 
-    async def test_channel_posts_without_supported_urls_do_not_notify_admin(self) -> None:
+    async def test_channel_posts_without_supported_urls_do_not_notify_admin(
+        self,
+    ) -> None:
         message = ChannelMessageStub()
         context = ContextStub()
 
@@ -1845,9 +1918,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         context = ContextStub()
         kv = BlockingKV()
         context.application.bot_data["kv_store"] = kv
-        write = asyncio.create_task(
-            _store_draft(context, "durable", {"type": "track"})
-        )
+        write = asyncio.create_task(_store_draft(context, "durable", {"type": "track"}))
 
         await kv.started.wait()
         self.assertFalse(write.done())
@@ -1884,6 +1955,20 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             via_bot = ViaBotStub()
 
         message = ViaBotMessageStub()
+        context = ContextStub()
+
+        await track_lookup_message(UpdateStub(message), context)
+
+        self.assertEqual(message.replies, [])
+        self.assertEqual(context.bot.sent_messages, [])
+
+    async def test_unprompted_private_photo_without_caption_is_ignored(self) -> None:
+        class PhotoMessageStub(PrivateMessageStub):
+            text = None
+            caption = None
+            photo = [object()]
+
+        message = PhotoMessageStub()
         context = ContextStub()
 
         await track_lookup_message(UpdateStub(message), context)
@@ -1936,7 +2021,10 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             for button in row
             if button.callback_data
         ]
-        self.assertEqual(len([data for data in callback_data if data.startswith("v2|select|pick|")]), 2)
+        self.assertEqual(
+            len([data for data in callback_data if data.startswith("v2|select|pick|")]),
+            2,
+        )
 
     async def test_private_single_track_post_includes_editor_row(self) -> None:
         message = PrivateSpotifyTrackMessageStub()
@@ -1980,6 +2068,37 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         labels = [button.text for row in keyboard for button in row]
         self.assertEqual(labels, ["Открыть подборку", "Порядок"])
+
+    async def test_same_release_from_two_services_becomes_one_clean_card(self) -> None:
+        class CrossServiceLookupClient:
+            async def lookup_track(self, source_url: str) -> TrackMatch:
+                platform = (
+                    "apple_music" if "music.apple.com" in source_url else "spotify"
+                )
+                return TrackMatch(
+                    title="Kisses",
+                    artist="Slowdive",
+                    links={platform: source_url},
+                )
+
+        class CrossServiceMessage(PrivateMessageStub):
+            text = (
+                "https://open.spotify.com/track/abc123456789\n"
+                "https://music.apple.com/us/album/kisses/123?i=456"
+            )
+
+        message = CrossServiceMessage()
+        context = ContextStub(songlink_client=CrossServiceLookupClient())
+
+        await track_lookup_message(UpdateStub(message), context)
+
+        self.assertEqual(len(message.replies), 1)
+        self.assertIn("Slowdive", message.replies[0])
+        self.assertIn("Kisses", message.replies[0])
+        self.assertNotIn("open.spotify.com", message.replies[0])
+        self.assertNotIn("music.apple.com", message.replies[0])
+        self.assertNotIn("<blockquote>", message.replies[0])
+        self.assertEqual(len(context.application.bot_data["drafts"]), 1)
 
     async def test_collection_omits_note_and_source_links(self) -> None:
         class DistinctLookupClient:
@@ -2301,7 +2420,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(artists[0].title, "Spotify artist")
         self.assertEqual(artists[0].platform, "Spotify")
 
-    async def test_lookup_tracks_uses_podcast_fallback_when_songlink_is_down(self) -> None:
+    async def test_lookup_tracks_uses_podcast_fallback_when_songlink_is_down(
+        self,
+    ) -> None:
         tracks, unavailable_urls = await _lookup_tracks(
             FailingLookupClient(),
             ["https://open.spotify.com/episode/abc?si=123"],
@@ -2456,7 +2577,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             },
         )
 
-    async def test_lookup_tracks_keeps_generic_soundcloud_fallback_when_metadata_fails(self) -> None:
+    async def test_lookup_tracks_keeps_generic_soundcloud_fallback_when_metadata_fails(
+        self,
+    ) -> None:
         tracks, unavailable_urls = await _lookup_tracks(
             FailingLookupClient(),
             ["https://soundcloud.com/bondage-fairies/star-signs"],
@@ -2558,9 +2681,7 @@ class PublicationOverrideTests(unittest.TestCase):
         )
 
     def test_unknown_platform_selection_falls_back_to_default(self) -> None:
-        _, keyboard = _render_track_draft(
-            self._draft(platforms=["nope"]), None
-        )
+        _, keyboard = _render_track_draft(self._draft(platforms=["nope"]), None)
 
         urls = [
             button.url

@@ -9,6 +9,7 @@ from music_links_bot.bot_editor_state import draft_status
 from music_links_bot.bot_ui import editor_more_rows, editor_rows
 from music_links_bot.i18n import get_text
 from music_links_bot.models import TrackMatch
+from music_links_bot.publication_preflight import validate_publication
 from music_links_bot.publication_view import build_publication_view
 from music_links_bot.sharing import add_share_button, build_share_query, track_share_url
 from music_links_bot.telegram_buttons import url_button
@@ -39,6 +40,18 @@ def render_track_draft(
     lang = draft.get("lang") or "ru"
     if settings:
         status = draft_status(draft, track, lang=lang)
+        preflight = validate_publication(draft, track)
+        if not preflight.ready:
+            preflight_status = get_text(
+                lang,
+                f"ed_preflight_{preflight.blocking_code}",
+            )
+        elif preflight.warning_count:
+            preflight_status = get_text(lang, "ed_preflight_warnings").format(
+                count=preflight.warning_count
+            )
+        else:
+            preflight_status = ""
         intro_status = ""
         if view.intro.used:
             intro_status = "\n" + get_text(lang, "ed_intro_counter").format(
@@ -47,10 +60,14 @@ def render_track_draft(
             )
             if view.intro.truncated:
                 intro_status += "\n" + get_text(lang, "ed_intro_will_trim")
+        preflight_line = (
+            f"\n<b>{escape(preflight_status)}</b>" if preflight_status else ""
+        )
         text = (
             f"🎛 <b>{escape(get_text(lang, 'ed_constructor_title'))}</b>\n"
             f"<i>{escape(get_text(lang, 'ed_constructor_hint'))}</i>\n"
-            f"<i>{escape(status + intro_status)}</i>\n\n{text}"
+            f"<i>{escape(status + intro_status)}</i>"
+            f"{preflight_line}\n\n{text}"
         )
     elif show_status:
         text = f"{text}\n\n<i>{escape(draft_status(draft, track, lang=lang))}</i>"
@@ -67,17 +84,13 @@ def render_track_draft(
     # The editor uses one accent action per screen. Platform links remain
     # neutral here; their brand styling is kept in the finished publication.
     url_buttons = [
-        url_button(button.text, button.url)
-        if button.url
-        else button
+        url_button(button.text, button.url) if button.url else button
         for row in keyboard.inline_keyboard
         for button in list(row)
     ]
     rows = [url_buttons[:2]] if url_buttons else []
     rows.extend(
-        editor_more_rows(draft_id, draft)
-        if settings
-        else editor_rows(draft_id, draft)
+        editor_more_rows(draft_id, draft) if settings else editor_rows(draft_id, draft)
     )
     return text, InlineKeyboardMarkup(rows)
 

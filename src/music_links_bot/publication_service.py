@@ -15,6 +15,7 @@ from music_links_bot.bot_builder import (
 from music_links_bot.channel_templates import save_channel_template
 from music_links_bot.chat_access import PublishAccess, check_publish_access
 from music_links_bot.models import TrackMatch
+from music_links_bot.publication_preflight import validate_publication
 from music_links_bot.publication_view import (
     build_publication_view,
     draft_message_overrides,
@@ -63,6 +64,10 @@ class PublicationService:
         notify_failure: bool = True,
     ) -> Message | bool | None:
         track = TrackMatch(**draft["item"])
+        if not validate_publication(draft, track).ready:
+            self._record_publication(False)
+            await self._persist_metrics()
+            return None
         access = PublishAccess(True, False, checked=False)
         if channel_style:
             access = await check_publish_access(self.context, target)
@@ -152,10 +157,27 @@ class PublicationService:
         if include_hashtags and not hashtags:
             hashtags = build_auto_hashtags(track)
 
+        source_audio_file_id = draft.get("source_audio_file_id")
+        if isinstance(source_audio_file_id, str) and source_audio_file_id:
+            return await self.context.bot.send_audio(
+                chat_id=target,
+                audio=source_audio_file_id,
+                caption=fit_telegram_html(text, PHOTO_CAPTION_LIMIT),
+                parse_mode=ParseMode.HTML,
+                title=track.title[:64],
+                performer=track.artist[:64],
+                duration=int(draft.get("source_audio_duration") or 0) or None,
+                reply_markup=keyboard,
+            )
+
         rich_html = None
         # Explicit photo mode (including branded frames) remains authoritative.
         # Rich Messages upgrade the regular card without changing that choice.
-        if rich_messages_enabled() and not draft.get("as_photo"):
+        if (
+            rich_messages_enabled()
+            and draft.get("delivery_mode", "auto") != "classic"
+            and not draft.get("as_photo")
+        ):
             rich_html = (
                 build_rich_html(
                     draft,
@@ -210,9 +232,10 @@ class PublicationService:
                         reply_markup=keyboard,
                     )
 
-        if draft.get("as_photo") and track.thumbnail_url:
-            photo: Any = track.thumbnail_url
-            cacheable = True
+        cover = draft.get("custom_cover_file_id") or track.thumbnail_url
+        if draft.get("as_photo") and cover:
+            photo: Any = cover
+            cacheable = not bool(draft.get("custom_cover_file_id"))
             # Pillow and image networking are loaded only for explicit photo
             # posts, keeping normal bot cold starts light.
             if self.branding_hooks is None:
@@ -230,7 +253,7 @@ class PublicationService:
                     brand_logo_url,
                 ) = self.branding_hooks
 
-            if photo_branding_enabled():
+            if cacheable and track.thumbnail_url and photo_branding_enabled():
                 cacheable = False
                 branded = await build_branded_cover(
                     track.thumbnail_url,
@@ -239,7 +262,7 @@ class PublicationService:
                 )
                 if branded is not None:
                     photo = branded
-            if cacheable:
+            if cacheable and track.thumbnail_url:
                 from music_links_bot.telegram_media_cache import get_cached_file_id
 
                 photo = (
@@ -256,7 +279,7 @@ class PublicationService:
                 parse_mode=ParseMode.HTML,
                 reply_markup=keyboard,
             )
-            if cacheable:
+            if cacheable and track.thumbnail_url:
                 from music_links_bot.telegram_media_cache import remember_photo_file_id
 
                 await remember_photo_file_id(
@@ -313,7 +336,7 @@ class PublicationService:
                 chat_id=admin_chat_id,
                 text=text[:4000],
             )
-        except Exception:
+        except TelegramError:
             # Failure reporting is deliberately best-effort: an unexpected
             # transport/runtime error must not hide the original publish error.
             LOGGER.info("Could not notify the bot owner about publish failure")

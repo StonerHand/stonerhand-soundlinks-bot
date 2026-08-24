@@ -5,16 +5,16 @@ from unittest.mock import patch
 from music_links_bot import bot_lookup
 from music_links_bot.bot_lookup import LookupBundle
 from music_links_bot.bot_runtime import BotRuntime
+from music_links_bot.models import VideoMatch
 from music_links_bot.provider_runtime import (
     ProviderOutcome,
     ProviderTask,
     get_cached_lookup,
     lookup_cache_key,
     run_provider_tasks,
-    set_cached_negative_lookup,
     set_cached_lookup,
+    set_cached_negative_lookup,
 )
-from music_links_bot.models import VideoMatch
 
 
 class ProviderRuntimeTests(unittest.IsolatedAsyncioTestCase):
@@ -117,7 +117,22 @@ class ProviderRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(lookup_cache_key(first), lookup_cache_key(second))
         self.assertEqual(await get_cached_lookup({}, second), payload)
 
-    async def test_provider_statuses_match_urls_not_shortened_list_positions(self) -> None:
+    async def test_custom_client_bundles_do_not_share_process_cache(self) -> None:
+        urls = ["https://open.spotify.com/track/cache-isolation"]
+        first = {"songlink_client": object()}
+        second = {"songlink_client": object()}
+
+        await set_cached_lookup(first, urls, {"tracks": [{"title": "First"}]})
+
+        self.assertIsNone(await get_cached_lookup(second, urls))
+        self.assertEqual(
+            await get_cached_lookup(first, urls),
+            {"tracks": [{"title": "First"}]},
+        )
+
+    async def test_provider_statuses_match_urls_not_shortened_list_positions(
+        self,
+    ) -> None:
         urls = [
             "https://youtu.be/first",
             "https://youtu.be/missing",

@@ -142,6 +142,26 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
     },
     "home_recent": {RU: "История", EN: "History"},
+    "home_queue": {RU: "🕒 Очередь публикаций", EN: "🕒 Publication queue"},
+    "queue_title": {RU: "🕒 <b>Очередь · {count}</b>", EN: "🕒 <b>Queue · {count}</b>"},
+    "queue_empty": {
+        RU: "Пока пусто. Запланируй карточку через меню «Отправить».",
+        EN: "Nothing scheduled. Schedule a card from the Send menu.",
+    },
+    "queue_unknown": {RU: "Карточка без названия", EN: "Untitled card"},
+    "queue_cancel_item": {RU: "Убрать №{index}", EN: "Remove #{index}"},
+    "queue_refresh": {RU: "Обновить", EN: "Refresh"},
+    "queue_cancelled": {RU: "Убрано из очереди", EN: "Removed from queue"},
+    "queue_missing": {RU: "Этой записи уже нет", EN: "This item is already gone"},
+    "queue_unavailable": {
+        RU: "Очередь временно недоступна. Попробуй ещё раз.",
+        EN: "The queue is temporarily unavailable. Try again.",
+    },
+    "playlist_import": {RU: "＋ Собрать треки", EN: "＋ Import tracks"},
+    "playlist_import_started": {
+        RU: "Собираю треки в подборку",
+        EN: "Importing tracks into a crate",
+    },
     "recent_title": {RU: "<b>Недавние посты</b>", EN: "<b>Recent posts</b>"},
     "recent_empty": {
         RU: "<b>Недавних постов пока нет</b>\n\nСоздай первую карточку — она появится здесь.",
@@ -363,6 +383,20 @@ STRINGS: dict[str, dict[str, str]] = {
     "ed_hashtags_none": {RU: "# Без хэштегов", EN: "# No hashtags"},
     "ed_edit": {RU: "Изменить", EN: "Edit"},
     "ed_last_template": {RU: "↻ Как в прошлый раз", EN: "↻ Same as last time"},
+    "ed_templates": {RU: "Шаблоны", EN: "Templates"},
+    "ed_templates_title": {
+        RU: "🗂 <b>Шаблоны оформления</b>\n<i>Сохрани набор настроек и применяй его одним нажатием.</i>",
+        EN: "🗂 <b>Design templates</b>\n<i>Save a set of options and apply it with one tap.</i>",
+    },
+    "ed_template_save": {RU: "+ Сохранить текущий", EN: "+ Save current"},
+    "ed_template_prompt": {
+        RU: "<b>Название шаблона</b>\nНапример: <code>Альбом недели</code> или <code>Минимал</code>.\n<code>/cancel</code> — отменить",
+        EN: "<b>Template name</b>\nFor example: <code>Album of the week</code> or <code>Minimal</code>.\n<code>/cancel</code> — cancel",
+    },
+    "ed_template_saved": {RU: "Шаблон сохранён", EN: "Template saved"},
+    "ed_template_applied": {RU: "Шаблон применён", EN: "Template applied"},
+    "ed_template_deleted": {RU: "Шаблон удалён", EN: "Template deleted"},
+    "ed_template_unnamed": {RU: "Без названия", EN: "Untitled"},
     "ed_last_template_applied": {
         RU: "Прошлый формат восстановлен",
         EN: "Previous format restored",
@@ -371,6 +405,35 @@ STRINGS: dict[str, dict[str, str]] = {
     "ed_text_off": {RU: "Подводка · нет", EN: "Intro · none"},
     "ed_platforms_all_short": {RU: "все", EN: "all"},
     "ed_platforms_selected": {RU: "Площадки · {count}", EN: "Platforms · {count}"},
+    "ed_platforms_audio": {RU: "Площадки · не нужны", EN: "Platforms · not needed"},
+    "ed_delivery_auto": {RU: "Telegram · авто", EN: "Telegram · auto"},
+    "ed_delivery_classic": {RU: "Telegram · классика", EN: "Telegram · classic"},
+    "ed_delivery_title": {
+        RU: "📨 <b>Формат Telegram</b>\n<i>Авто использует новый формат и безопасно откатывается к обычному сообщению.</i>",
+        EN: "📨 <b>Telegram format</b>\n<i>Auto uses the new format and safely falls back to a classic message.</i>",
+    },
+    "ed_delivery_auto_name": {
+        RU: "Авто — современная карточка",
+        EN: "Auto — modern card",
+    },
+    "ed_delivery_classic_name": {
+        RU: "Классика — обычное сообщение",
+        EN: "Classic — regular message",
+    },
+    "ed_cover_auto": {RU: "Обложка · авто", EN: "Artwork · auto"},
+    "ed_cover_custom": {RU: "Обложка · своя", EN: "Artwork · custom"},
+    "ed_cover_prompt": {
+        RU: "<b>Пришли новую обложку</b>\nОтветь одной фотографией. Бот сохранит её только для этой карточки.\n<code>/cancel</code> — отменить",
+        EN: "<b>Send new artwork</b>\nReply with one photo. It will be used only for this card.\n<code>/cancel</code> — cancel",
+    },
+    "ed_cover_invalid": {
+        RU: "Нужна фотография. Отправь изображение без файла-документа.",
+        EN: "Send a photo, not a document.",
+    },
+    "ed_cover_saved": {RU: "Обложка сохранена", EN: "Artwork saved"},
+    "ed_cover_reset": {RU: "Вернуть обложку релиза", EN: "Restore release artwork"},
+    "uploaded_audio_title": {RU: "Аудиофайл", EN: "Audio file"},
+    "uploaded_audio_artist": {RU: "Исполнитель не указан", EN: "Unknown artist"},
     "ed_platforms_select_all": {RU: "Выбрать все", EN: "Select all"},
     "ed_preset_minimal": {RU: "Стиль · Минимал", EN: "Style · Minimal"},
     "ed_preset_cover": {RU: "Стиль · Обложка", EN: "Style · Cover"},
@@ -390,6 +453,26 @@ STRINGS: dict[str, dict[str, str]] = {
     "ed_status": {
         RU: "{preset} · площадок: {services} · сохранено",
         EN: "{preset} · platforms: {services} · saved",
+    },
+    "ed_status_audio": {
+        RU: "{preset} · аудио Telegram · сохранено",
+        EN: "{preset} · Telegram audio · saved",
+    },
+    "ed_preflight_warnings": {
+        RU: "⚠️ Проверка: замечаний — {count}",
+        EN: "⚠️ Check: {count} warning(s)",
+    },
+    "ed_preflight_no_platforms": {
+        RU: "⛔ Выбери хотя бы одну площадку",
+        EN: "⛔ Select at least one platform",
+    },
+    "ed_preflight_missing_links": {
+        RU: "⛔ У релиза нет рабочей ссылки для отправки",
+        EN: "⛔ This release has no working delivery link",
+    },
+    "ed_preflight_missing_title": {
+        RU: "⛔ Не удалось определить исполнителя или название",
+        EN: "⛔ Artist or title is missing",
     },
     "ed_intro_counter": {
         RU: "Подводка: {used}/{limit}",

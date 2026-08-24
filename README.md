@@ -19,24 +19,27 @@ opening a separate web interface.
 
 ## Features
 
-- accepts a music URL or an `artist — track` query;
+- accepts a music URL, an `artist — track` query or an uploaded audio file;
 - resolves release metadata, artwork and platform links;
 - builds a clean Telegram card with compact buttons;
 - uses Telegram Rich Messages for structured cards, native media groups and
   in-content actions, with an automatic classic-card fallback;
 - combines several links into one numbered collection;
+- merges links from different services into one release instead of duplicate cards;
+- imports discovered tracks from public Spotify and Apple Music playlists;
 - pairs a song and YouTube clip in one clickable Rich media post;
-- includes a native card builder with separate style, intro, hashtag and platform screens;
+- includes a native builder with style, intro, hashtag, platform and Telegram-format screens;
+- saves named design templates and accepts custom artwork per card;
 - keeps exactly one primary action on editor screens and edits the active message in place;
 - preserves bold, italic, links and other Telegram formatting in author intros;
 - calculates the available intro length for the exact card or photo caption;
-- reapplies the previous publication format with one tap;
+- reapplies saved publication formats and undoes up to five setting changes;
 - offers a clean final preview and returns to the active card by release name;
 - remembers card preferences and keeps timestamped recent posts;
 - names, previews, reorders and deduplicates collections;
 - sends to the user, another chat or a configured channel;
 - shows a compact final check before channel publication;
-- supports a durable scheduled-publishing queue;
+- includes an admin dashboard for the durable scheduled-publishing queue;
 - uses an explicit bot timezone for fixed and custom publication times;
 - lets the user cancel any native text input with `/cancel`;
 - works inline: `@StonerHandBot artist — track`.
@@ -64,11 +67,14 @@ flowchart LR
 Cards keep only useful information: artwork, artist, title, hashtags selected
 by the user, chosen services and the complete release hub. Secondary actions
 appear only in context. Multi-link inputs are not quoted back into the result.
-Style, intro, hashtags, platforms, preview and delivery have explicit screens;
-free-form intro and tags are entered through native Telegram replies. Intro
+Style, intro, hashtags, platforms, Telegram format, preview and delivery have
+explicit screens. A preflight check blocks delivery without a title, usable
+link or selected platform. Free-form intro, artwork and tags are entered through
+native Telegram replies. Intro
 formatting is preserved, while its live limit adapts to Telegram's regular
 message or photo-caption budget instead of silently cutting the release card.
-The editor remembers the previous format and can restore it with one action.
+The editor remembers previous and named formats. **Auto** uses Rich Messages
+with a safe fallback; **Classic** always sends a regular Telegram card.
 
 The primary **Create post** action opens a native input guide for all three
 input shapes: a release or artist link, an `artist — title` query, or several

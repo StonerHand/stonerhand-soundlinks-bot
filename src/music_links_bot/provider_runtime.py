@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import secrets
 from collections.abc import Awaitable
 from dataclasses import dataclass
 from time import monotonic
@@ -158,7 +159,11 @@ def _close_awaitable(awaitable: Awaitable[Any]) -> None:
         close()
 
 
-def lookup_cache_key(source_urls: list[str]) -> str:
+def lookup_cache_key(
+    source_urls: list[str],
+    *,
+    namespace: str = "global",
+) -> str:
     canonical = json.dumps(
         list(dict.fromkeys(cache_key_for_url(url) for url in source_urls)),
         ensure_ascii=True,
@@ -166,11 +171,33 @@ def lookup_cache_key(source_urls: list[str]) -> str:
     )
     # Version the aggregate key whenever completeness semantics change so an
     # old partial result cannot look like a complete collection after deploy.
-    return "lookup:v5:" + hashlib.sha256(canonical.encode()).hexdigest()
+    scoped = f"{namespace}\0{canonical}"
+    return "lookup:v6:" + hashlib.sha256(scoped.encode()).hexdigest()
+
+
+def _lookup_cache_namespace(bot_data: dict) -> str:
+    """Keep process-local test/custom clients from poisoning shared lookups.
+
+    Production explicitly opts into a stable namespace so Redis continues to
+    warm new instances. Ad-hoc client bundles receive an isolated namespace;
+    plain callers retain the historical global behavior.
+    """
+    configured = str(bot_data.get("lookup_cache_namespace") or "").strip()
+    if configured:
+        return configured
+    if "songlink_client" not in bot_data:
+        return "global"
+    return bot_data.setdefault(
+        "_lookup_cache_namespace",
+        f"local:{secrets.token_urlsafe(9)}",
+    )
 
 
 async def get_cached_lookup(bot_data: dict, source_urls: list[str]) -> dict | None:
-    key = lookup_cache_key(source_urls)
+    key = lookup_cache_key(
+        source_urls,
+        namespace=_lookup_cache_namespace(bot_data),
+    )
     cached = _LOOKUP_CACHE.get(key)
     if not isinstance(cached, dict):
         cached = _NEGATIVE_LOOKUP_CACHE.get(key)
@@ -194,7 +221,10 @@ async def set_cached_lookup(
     source_urls: list[str],
     payload: dict[str, Any],
 ) -> None:
-    key = lookup_cache_key(source_urls)
+    key = lookup_cache_key(
+        source_urls,
+        namespace=_lookup_cache_namespace(bot_data),
+    )
     _LOOKUP_CACHE.set(key, payload)
     kv: KVStore | None = bot_data.get("kv_store")
     if kv is not None:
@@ -206,7 +236,10 @@ async def set_cached_negative_lookup(
     source_urls: list[str],
     payload: dict[str, Any],
 ) -> None:
-    key = lookup_cache_key(source_urls)
+    key = lookup_cache_key(
+        source_urls,
+        namespace=_lookup_cache_namespace(bot_data),
+    )
     cached = {**payload, "_negative": True}
     _NEGATIVE_LOOKUP_CACHE.set(key, cached)
     kv: KVStore | None = bot_data.get("kv_store")
