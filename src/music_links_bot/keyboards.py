@@ -20,6 +20,7 @@ from music_links_bot.telegram_buttons import (
     button as InlineKeyboardButton,
     url_button,
 )
+from music_links_bot.url_utils import cache_key_for_url
 
 CHANNEL_USERNAME = "stonerhand"
 CHANNEL_URL = f"https://t.me/{CHANNEL_USERNAME}"
@@ -104,6 +105,7 @@ def _build_link_keyboard(
     platform_selection: list[str] | None = None,
     max_visible_platforms: int | None = None,
 ) -> InlineKeyboardMarkup:
+    release_hub_url = _distinct_release_hub_url(release_page_url, links)
     if platform_selection is not None:
         selected_platforms = [
             platform_key
@@ -134,7 +136,7 @@ def _build_link_keyboard(
     # quick chat cards while full deliveries keep the selected services.
     if max_visible_platforms is not None:
         final_platforms = final_platforms[: max(0, max_visible_platforms)]
-    elif release_page_url and not has_explicit_selection:
+    elif release_hub_url and not has_explicit_selection:
         final_platforms = final_platforms[:MAX_VISIBLE_PLATFORM_BUTTONS]
 
     buttons = []
@@ -147,17 +149,33 @@ def _build_link_keyboard(
             )
         )
     rows = _button_rows(buttons)
-    if release_page_url:
+    if release_hub_url:
         rows.append(
             [
                 _url_button(
                     _release_hub_button_label(release_kind, release_format, context),
-                    url=release_page_url,
+                    url=release_hub_url,
                 )
             ]
         )
 
     return _keyboard_with_optional_channel(rows, include_channel_button)
+
+
+def _distinct_release_hub_url(
+    release_page_url: str | None,
+    links: dict[str, str],
+) -> str | None:
+    """Hide a misleading hub action when it duplicates a platform button."""
+    if not release_page_url:
+        return None
+    hub_key = cache_key_for_url(release_page_url)
+    platform_keys = {
+        cache_key_for_url(url)
+        for url in links.values()
+        if isinstance(url, str) and url
+    }
+    return None if hub_key in platform_keys else release_page_url
 
 
 def _platform_button_label(
