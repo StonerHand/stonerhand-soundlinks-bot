@@ -1,3 +1,6 @@
+from music_links_bot import __version__
+
+
 SUPPORTED_INPUT_HOSTS = {
     "open.spotify.com",
     "spotify.com",
@@ -24,7 +27,7 @@ SUPPORTED_INPUT_HOSTS = {
     "www.nts.live",
 }
 
-HTTP_USER_AGENT = "StonerHandBot/1.1 (+https://t.me/stonerhand)"
+HTTP_USER_AGENT = f"StonerHandBot/{__version__} (+https://t.me/stonerhand)"
 # The native crate and a multi-link input share one explicit product limit.
 MAX_LINKS_PER_MESSAGE = 10
 

@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from dataclasses import asdict
+from html import unescape
 import unittest
 
 from music_links_bot.bot_builder import (
@@ -29,6 +30,7 @@ from music_links_bot.bot_ui import (
     editor_style_rows,
 )
 from music_links_bot.models import TrackMatch
+from music_links_bot.telegram_text import telegram_text_length
 
 
 class BuilderJourneyTests(unittest.TestCase):
@@ -125,8 +127,21 @@ class BuilderJourneyTests(unittest.TestCase):
             "15.08 · 19:30",
         )
         limited = fit_telegram_html("<b>" + "<&" * 5000 + "</b>", 1024)
-        self.assertLessEqual(len(limited), 1024)
+        self.assertLessEqual(telegram_text_length(unescape(limited)), 1024)
         self.assertTrue(limited.endswith("…"))
+
+    def test_telegram_html_limit_uses_rendered_utf16_length(self) -> None:
+        formatted = "<b>" + "🎧" * 10 + "</b>"
+        self.assertEqual(fit_telegram_html(formatted, 20), formatted)
+
+        limited = fit_telegram_html("<b>" + "🎧" * 11 + "</b>", 20)
+        self.assertLessEqual(telegram_text_length(limited), 20)
+        self.assertTrue(limited.endswith("…"))
+        self.assertNotIn("<b>", limited)
+
+        malformed = fit_telegram_html("<b>Sleep — Dragonaut", 100)
+        self.assertNotIn("<b>", malformed)
+        self.assertEqual(malformed, "Sleep — Dragonaut")
 
     def test_custom_schedule_is_bounded_to_operational_queue_window(self) -> None:
         now = datetime(2026, 8, 10, 10, 0, tzinfo=timezone.utc)

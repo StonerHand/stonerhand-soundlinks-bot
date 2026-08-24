@@ -17,10 +17,11 @@ SRC_PATH = PROJECT_ROOT / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
-from music_links_bot.bot import (
+from music_links_bot.bot_app import (
     BOT_DESCRIPTIONS,
     BOT_SHORT_DESCRIPTIONS,
     PUBLIC_BOT_COMMANDS,
+    PUBLIC_BOT_COMMANDS_EN,
 )
 from music_links_bot.config import Settings
 from music_links_bot.logging_config import quiet_transport_logs
@@ -66,7 +67,7 @@ class handler(BaseHTTPRequestHandler):
                 telegram_payload = json.loads(response.read().decode("utf-8"))
 
             commands_payload = _sync_commands(settings.bot_token)
-            _sync_menu_button(settings.bot_token)
+            menu_payload = _sync_menu_button(settings.bot_token)
         except Exception as exc:
             LOGGER.error("Webhook setup failed: %s", type(exc).__name__)
             self._send_json(
@@ -77,10 +78,15 @@ class handler(BaseHTTPRequestHandler):
 
         self._send_json(
             {
-                "ok": bool(telegram_payload.get("ok")),
+                "ok": bool(
+                    telegram_payload.get("ok")
+                    and commands_payload.get("ok")
+                    and menu_payload.get("ok")
+                ),
                 "webhook_url": webhook_url,
                 "telegram": telegram_payload,
                 "commands": commands_payload,
+                "menu": menu_payload,
             }
         )
 
@@ -93,6 +99,8 @@ class handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("content-type", "application/json; charset=utf-8")
         self.send_header("content-length", str(len(body)))
+        self.send_header("cache-control", "no-store")
+        self.send_header("x-content-type-options", "nosniff")
         self.end_headers()
         self.wfile.write(body)
 
@@ -117,44 +125,60 @@ def _telegram_set_webhook_url(
     return f"https://api.telegram.org/bot{bot_token}/setWebhook?{query}"
 
 
-def _telegram_set_commands_url(bot_token: str) -> str:
-    commands = [
+def _telegram_set_commands_url(
+    bot_token: str,
+    commands=PUBLIC_BOT_COMMANDS,
+    *,
+    language_code: str = "",
+) -> str:
+    commands_payload = [
         {"command": command.command, "description": command.description}
-        for command in PUBLIC_BOT_COMMANDS
+        for command in commands
     ]
-    query = urlencode({"commands": json.dumps(commands, ensure_ascii=False)})
+    params = {"commands": json.dumps(commands_payload, ensure_ascii=False)}
+    if language_code:
+        params["language_code"] = language_code
+    query = urlencode(params)
     return f"https://api.telegram.org/bot{bot_token}/setMyCommands?{query}"
 
 
 def _sync_commands(bot_token: str) -> dict[str, object]:
-    try:
-        commands_url = _telegram_set_commands_url(bot_token)
-        with urlopen(commands_url, timeout=20) as response:  # nosec B310
-            payload = json.loads(response.read().decode("utf-8"))
+    scopes: dict[str, dict[str, object]] = {}
+    for language_code, commands in (
+        ("", PUBLIC_BOT_COMMANDS),
+        ("en", PUBLIC_BOT_COMMANDS_EN),
+    ):
+        label = language_code or "default"
+        scopes[label] = _telegram_json_call(
+            _telegram_set_commands_url(
+                bot_token,
+                commands,
+                language_code=language_code,
+            ),
+            label=f"commands:{label}",
+        )
+    descriptions_ok = _sync_descriptions(bot_token)
+    return {
+        "ok": all(payload.get("ok") for payload in scopes.values())
+        and descriptions_ok,
+        "scopes": scopes,
+        "descriptions": descriptions_ok,
+    }
 
-        _sync_descriptions(bot_token)
-        return payload if isinstance(payload, dict) else {"ok": False}
-    except Exception as exc:
-        LOGGER.error("Command sync failed: %s", type(exc).__name__)
-        return {"ok": False, "error": "command sync failed"}
 
-
-def _sync_menu_button(bot_token: str) -> None:
+def _sync_menu_button(bot_token: str) -> dict[str, object]:
     menu_button = json.dumps({"type": "commands"})
     query = urlencode({"menu_button": menu_button})
     url = f"https://api.telegram.org/bot{bot_token}/setChatMenuButton?{query}"
-    try:
-        with urlopen(url, timeout=20):  # nosec B310
-            pass
-    except Exception as exc:
-        LOGGER.error("Menu button sync failed: %s", type(exc).__name__)
+    return _telegram_json_call(url, label="menu_button")
 
 
-def _sync_descriptions(bot_token: str) -> None:
+def _sync_descriptions(bot_token: str) -> bool:
     calls = [
         ("setMyDescription", "description", BOT_DESCRIPTIONS),
         ("setMyShortDescription", "short_description", BOT_SHORT_DESCRIPTIONS),
     ]
+    successful = True
     for method, field, texts in calls:
         for language_code, text in texts.items():
             params = {field: text}
@@ -163,11 +187,22 @@ def _sync_descriptions(bot_token: str) -> None:
 
             query = urlencode(params)
             url = f"https://api.telegram.org/bot{bot_token}/{method}?{query}"
-            try:
-                with urlopen(url, timeout=20):  # nosec B310
-                    pass
-            except Exception as exc:
-                LOGGER.error("%s sync failed: %s", method, type(exc).__name__)
+            payload = _telegram_json_call(
+                url,
+                label=f"{method}:{language_code or 'default'}",
+            )
+            successful = successful and bool(payload.get("ok"))
+    return successful
+
+
+def _telegram_json_call(url: str, *, label: str) -> dict[str, object]:
+    try:
+        with urlopen(url, timeout=20) as response:  # nosec B310
+            payload = json.loads(response.read().decode("utf-8"))
+        return payload if isinstance(payload, dict) else {"ok": False}
+    except Exception as exc:
+        LOGGER.error("Telegram profile sync failed for %s: %s", label, type(exc).__name__)
+        return {"ok": False, "error": "profile sync failed"}
 
 
 def _is_authorized(path: str, authorization_header: str | None) -> bool:

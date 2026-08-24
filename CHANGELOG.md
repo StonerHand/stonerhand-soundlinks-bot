@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.4.1 — 2026-08-25
+
+- Hardened durable draft migration: unknown future fields and unsafe URLs no
+  longer break strict release reconstruction after a Redis cold start.
+- Made Telegram text limits use the rendered UTF-16 length, including emoji,
+  and added a safe fallback for malformed HTML.
+- Paginated the complete admin queue while preserving item numbering and the
+  current page after refresh or cancellation.
+- Made localized commands, menu and profile descriptions synchronize
+  independently; fixed the English command scope using Russian descriptions.
+- Split audio, Rich Message, photo and classic-card delivery into isolated
+  paths without changing their fallback order.
+- Versioned provider requests, disabled caching on operational API responses
+  and added dependency vulnerability auditing to CI.
+- Updated runtime dependencies and expanded the release suite to 507 tests.
+
 ## 1.4.0 — 2026-08-24
 
 - Expanded the Telegram-native composer: uploaded audio becomes an editable

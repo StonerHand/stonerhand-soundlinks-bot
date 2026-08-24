@@ -39,10 +39,10 @@ opening a separate web interface.
 - names, previews, reorders and deduplicates collections;
 - sends to the user, another chat or a configured channel;
 - shows a compact final check before channel publication;
-- includes an admin dashboard for the durable scheduled-publishing queue;
+- includes a paginated admin dashboard for the durable scheduled-publishing queue;
 - uses an explicit bot timezone for fixed and custom publication times;
 - lets the user cancel any native text input with `/cancel`;
-- works inline: `@StonerHandBot artist — track`.
+- works inline: `@StonerHandBot artist — track`;
 - explains incomplete batches per source and lets the user replace a failed link by number;
 - can keep group replies visible only to the requesting user through opt-in
   ephemeral messages on Bot API 10.3.
@@ -88,8 +88,9 @@ siblings or starve later links. An incomplete result stays visibly marked as
 entire original collection in the same order.
 Each failed position also has a **Replace #N** action, so a mistyped or private
 URL can be corrected without reconstructing the rest of the batch.
-All output is checked against Telegram message and caption limits before
-delivery, with a safe fallback for oversized formatted text.
+All output is checked against Telegram's rendered UTF-16 message and caption
+limits before delivery, including emoji, with a safe fallback for oversized or
+malformed formatted text.
 Transient Song.link failures fall back to Spotify metadata for Spotify URLs;
 regional misses are checked against bounded secondary regions and stable
 public Spotify page metadata. The short fallback cache is automatically
@@ -138,6 +139,7 @@ python -m compileall -q src api tests
 python -m pyflakes src api tests
 python -m ruff check src api tests --select F,B,ASYNC,PERF
 python -m bandit -q -r src api -x tests
+python -m pip_audit -r requirements.txt --progress-spinner off
 python tests/check_dependency_pins.py
 python -m json.tool vercel.json >/dev/null
 ```

@@ -144,6 +144,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "home_recent": {RU: "История", EN: "History"},
     "home_queue": {RU: "🕒 Очередь публикаций", EN: "🕒 Publication queue"},
     "queue_title": {RU: "🕒 <b>Очередь · {count}</b>", EN: "🕒 <b>Queue · {count}</b>"},
+    "queue_page": {RU: "Страница {page} из {pages}", EN: "Page {page} of {pages}"},
     "queue_empty": {
         RU: "Пока пусто. Запланируй карточку через меню «Отправить».",
         EN: "Nothing scheduled. Schedule a card from the Send menu.",

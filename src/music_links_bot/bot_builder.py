@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from music_links_bot.constants import PLATFORM_LABELS
 from music_links_bot.models import TrackMatch
 from music_links_bot.release_presentation import PRESET_ORDER, apply_preset
+from music_links_bot.telegram_text import telegram_text_length
 from music_links_bot.text_utils import normalize_hashtag
 
 MESSAGE_TEXT_LIMIT = 4096
@@ -281,21 +282,40 @@ def _timezone(name: str) -> ZoneInfo:
 
 
 def fit_telegram_html(text: str, limit: int = MESSAGE_TEXT_LIMIT) -> str:
-    """Keep valid HTML; use a safe plain-text fallback only at Telegram's edge."""
+    """Fit rendered HTML to Telegram's UTF-16 limit without splitting emoji."""
     value = str(text or "")
     if limit <= 0:
         return ""
-    if len(value) <= limit:
+    tags = re.findall(r"</?([A-Za-z][A-Za-z0-9-]*)\b[^>]*>", value)
+    markup_is_well_formed_enough = (
+        value.count("<") == len(tags) and value.count(">") == len(tags)
+        and _balanced_html_tags(value)
+    )
+    plain = unescape(re.sub(r"</?[A-Za-z][^>]*>", "", value))
+    if markup_is_well_formed_enough and telegram_text_length(plain) <= limit:
         return value
-    plain = unescape(re.sub(r"<[^>]*>", "", value))
+    if telegram_text_length(plain) <= limit:
+        return escape(plain)
     suffix = "…"
     if limit == 1:
         return suffix
     low, high = 0, len(plain)
     while low < high:
         middle = (low + high + 1) // 2
-        if len(escape(plain[:middle])) + len(suffix) <= limit:
+        if telegram_text_length(plain[:middle] + suffix) <= limit:
             low = middle
         else:
             high = middle - 1
     return escape(plain[:low].rstrip()) + suffix
+
+
+def _balanced_html_tags(value: str) -> bool:
+    stack: list[str] = []
+    for match in re.finditer(r"<(/?)([A-Za-z][A-Za-z0-9-]*)\b[^>]*>", value):
+        closing, name = match.groups()
+        name = name.casefold()
+        if not closing:
+            stack.append(name)
+        elif not stack or stack.pop() != name:
+            return False
+    return not stack

@@ -10,6 +10,7 @@ from api.set_webhook import (
     _is_authorized,
     _resolve_webhook_url,
     _setup_secret_is_configured,
+    _telegram_set_commands_url,
     _telegram_set_webhook_url,
     _telegram_webhook_secret,
 )
@@ -140,6 +141,21 @@ class VercelWebhookTests(unittest.TestCase):
             parse_qs(urlparse(webhook_url).query)["drop_pending_updates"],
             ["true"],
         )
+
+    def test_english_command_scope_uses_english_descriptions(self) -> None:
+        from music_links_bot.bot_app import PUBLIC_BOT_COMMANDS_EN
+
+        command_url = _telegram_set_commands_url(
+            "bot-token",
+            PUBLIC_BOT_COMMANDS_EN,
+            language_code="en",
+        )
+        query = parse_qs(urlparse(command_url).query)
+        commands = json.loads(query["commands"][0])
+
+        self.assertEqual(query["language_code"], ["en"])
+        self.assertEqual(commands[0]["description"], PUBLIC_BOT_COMMANDS_EN[0].description)
+        self.assertNotEqual(commands[0]["description"], "Открыть главное меню")
 
     def test_telegram_secret_rejects_invalid_characters(self) -> None:
         with patch.dict(

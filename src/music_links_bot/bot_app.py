@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from telegram import BotCommand, MenuButtonCommands
 from telegram.error import TelegramError
@@ -18,6 +19,8 @@ from music_links_bot.config import Settings
 from music_links_bot.kvstore import KVStore
 from music_links_bot.lazy_client import LazyAsyncClient
 from music_links_bot.logging_config import quiet_transport_logs
+
+LOGGER = logging.getLogger(__name__)
 
 PUBLIC_BOT_COMMANDS = (
     BotCommand("start", "меню и быстрый старт"),
@@ -155,26 +158,43 @@ def build_application(settings: Settings) -> Application:
 
 
 async def sync_application_commands(application: Application) -> None:
-    try:
-        await application.bot.set_my_commands(PUBLIC_BOT_COMMANDS)
-        await application.bot.set_my_commands(
-            PUBLIC_BOT_COMMANDS_EN,
-            language_code="en",
-        )
-        await application.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
-        for language_code, description in BOT_DESCRIPTIONS.items():
-            await application.bot.set_my_description(
+    """Refresh every profile field independently after a cold start.
+
+    A temporary failure in one localized scope must not leave the command menu,
+    descriptions and remaining languages stale until the next deployment.
+    """
+
+    async def attempt(label: str, awaitable) -> None:
+        try:
+            await awaitable
+        except TelegramError:
+            LOGGER.warning("Telegram profile sync failed for %s", label, exc_info=True)
+
+    await attempt("commands:default", application.bot.set_my_commands(PUBLIC_BOT_COMMANDS))
+    await attempt(
+        "commands:en",
+        application.bot.set_my_commands(PUBLIC_BOT_COMMANDS_EN, language_code="en"),
+    )
+    await attempt(
+        "menu_button",
+        application.bot.set_chat_menu_button(menu_button=MenuButtonCommands()),
+    )
+    for language_code, description in BOT_DESCRIPTIONS.items():
+        await attempt(
+            f"description:{language_code or 'default'}",
+            application.bot.set_my_description(
                 description,
                 language_code=language_code or None,
-            )
-        for language_code, short_description in BOT_SHORT_DESCRIPTIONS.items():
-            await application.bot.set_my_short_description(
+            ),
+        )
+    for language_code, short_description in BOT_SHORT_DESCRIPTIONS.items():
+        await attempt(
+            f"short_description:{language_code or 'default'}",
+            application.bot.set_my_short_description(
                 short_description,
                 language_code=language_code or None,
-            )
-    except TelegramError:
-        # The webhook remains usable even if command synchronization fails.
-        return
+            ),
+        )
 
 
 async def close_application_resources(application: Application) -> None:

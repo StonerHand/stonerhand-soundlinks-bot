@@ -16,6 +16,8 @@ from music_links_bot.publish_queue import (
 )
 from music_links_bot.telegram_buttons import button as InlineKeyboardButton
 
+QUEUE_PAGE_SIZE = 8
+
 
 def _is_admin(context, user_id: int) -> bool:
     return bool(
@@ -23,7 +25,19 @@ def _is_admin(context, user_id: int) -> bool:
     )
 
 
-async def render_queue(context, *, lang: str) -> tuple[str, InlineKeyboardMarkup]:
+def _page_number(value: str | None) -> int:
+    try:
+        return max(0, int(value or 0))
+    except (TypeError, ValueError, OverflowError):
+        return 0
+
+
+async def render_queue(
+    context,
+    *,
+    lang: str,
+    page: int = 0,
+) -> tuple[str, InlineKeyboardMarkup]:
     try:
         jobs = await load_jobs(context)
     except QueueStorageError:
@@ -43,11 +57,19 @@ async def render_queue(context, *, lang: str) -> tuple[str, InlineKeyboardMarkup
     timezone_name = str(
         context.application.bot_data.get("timezone_name") or "Europe/Moscow"
     )
+    page_count = max(1, (len(jobs) + QUEUE_PAGE_SIZE - 1) // QUEUE_PAGE_SIZE)
+    page = min(max(0, page), page_count - 1)
+    page_start = page * QUEUE_PAGE_SIZE
+    visible_jobs = jobs[page_start : page_start + QUEUE_PAGE_SIZE]
     lines = [get_text(lang, "queue_title").format(count=len(jobs))]
+    if page_count > 1:
+        lines.append(
+            "\n" + get_text(lang, "queue_page").format(page=page + 1, pages=page_count)
+        )
     rows: list[list[InlineKeyboardButton]] = []
     if not jobs:
         lines.extend(["", get_text(lang, "queue_empty")])
-    for index, job in enumerate(jobs[:10], start=1):
+    for index, job in enumerate(visible_jobs, start=page_start + 1):
         draft = job.get("draft") if isinstance(job.get("draft"), dict) else {}
         item = draft.get("item") if isinstance(draft.get("item"), dict) else {}
         label = " — ".join(
@@ -72,17 +94,40 @@ async def render_queue(context, *, lang: str) -> tuple[str, InlineKeyboardMarkup
                 InlineKeyboardButton(
                     get_text(lang, "queue_cancel_item").format(index=index),
                     callback_data=encode_callback(
-                        "queue", "cancel", str(job.get("id") or "")
+                        "queue", "cancel", f"{page}:{job.get('id') or ''}"
                     ),
                 )
             ]
         )
+    if page_count > 1:
+        navigation: list[InlineKeyboardButton] = []
+        if page > 0:
+            navigation.append(
+                InlineKeyboardButton(
+                    "‹",
+                    callback_data=encode_callback("queue", "open", str(page - 1)),
+                )
+            )
+        navigation.append(
+            InlineKeyboardButton(
+                f"{page + 1} / {page_count}",
+                callback_data=encode_callback("queue", "open", str(page)),
+            )
+        )
+        if page + 1 < page_count:
+            navigation.append(
+                InlineKeyboardButton(
+                    "›",
+                    callback_data=encode_callback("queue", "open", str(page + 1)),
+                )
+            )
+        rows.append(navigation)
     rows.extend(
         [
             [
                 InlineKeyboardButton(
                     get_text(lang, "queue_refresh"),
-                    callback_data=encode_callback("queue", "open"),
+                    callback_data=encode_callback("queue", "open", str(page)),
                 )
             ],
             [
@@ -102,9 +147,15 @@ async def dispatch_queue_action(query, context, action: CallbackAction) -> None:
     if user is None or not _is_admin(context, user.id):
         await query.answer(get_text(lang, "ed_admin_only"), show_alert=True)
         return
+    page = _page_number(action.payload if action.action == "open" else None)
     if action.action == "cancel" and action.payload:
+        raw_page, separator, job_id = action.payload.partition(":")
+        if separator:
+            page = _page_number(raw_page)
+        else:
+            job_id = action.payload
         try:
-            removed = await remove_job(context, action.payload)
+            removed = await remove_job(context, job_id)
         except (QueueBusyError, QueueStorageError):
             await query.answer(get_text(lang, "queue_unavailable"), show_alert=True)
             return
@@ -113,7 +164,7 @@ async def dispatch_queue_action(query, context, action: CallbackAction) -> None:
         )
     else:
         await query.answer()
-    text, keyboard = await render_queue(context, lang=lang)
+    text, keyboard = await render_queue(context, lang=lang, page=page)
     await query.edit_message_text(
         text=text,
         parse_mode=ParseMode.HTML,
