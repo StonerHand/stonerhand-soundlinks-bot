@@ -23,6 +23,7 @@ jobs:
         run: |
           python -m pip check
           python tests/check_dependency_pins.py
+          python -m pip_audit -r requirements.txt --progress-spinner off
 
       - name: Public repository safety
         run: |

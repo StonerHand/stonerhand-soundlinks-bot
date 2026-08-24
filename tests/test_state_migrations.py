@@ -6,6 +6,7 @@ from music_links_bot.bot_progress import adopt_progress_message, update_progress
 from music_links_bot.bot_runtime import BotRuntime
 from music_links_bot.channel_templates import load_channel_template
 from music_links_bot.draft_model import CURRENT_DRAFT_VERSION, normalize_track_draft
+from music_links_bot.models import TrackMatch
 
 
 class KVStub:
@@ -92,6 +93,35 @@ class StateMigrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(draft["intro_length"], 0)
         self.assertEqual(draft["intro_limit"], 0)
         self.assertGreater(draft["created_at"], 0)
+
+    def test_durable_item_is_sanitized_for_strict_track_model(self) -> None:
+        draft = normalize_track_draft(
+            {
+                "v": 3,
+                "type": "track",
+                "chat_id": 7,
+                "item": {
+                    "artist": "Sleep",
+                    "title": "Dragonaut",
+                    "release_year": 1992,
+                    "links": {
+                        "Spotify": "https://open.spotify.com/track/abc",
+                        "unsafe": "javascript:alert(1)",
+                    },
+                    "unknown_future_field": "must not break old workers",
+                },
+            }
+        )
+
+        self.assertIsNotNone(draft)
+        assert draft is not None
+        self.assertNotIn("unknown_future_field", draft["item"])
+        self.assertEqual(draft["item"]["release_year"], "1992")
+        self.assertEqual(
+            draft["item"]["links"],
+            {"Spotify": "https://open.spotify.com/track/abc"},
+        )
+        self.assertEqual(TrackMatch(**draft["item"]).title, "Dragonaut")
 
 
 class ProgressContractTests(unittest.IsolatedAsyncioTestCase):

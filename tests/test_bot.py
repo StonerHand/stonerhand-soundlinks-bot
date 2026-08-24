@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.error import BadRequest
+from telegram.error import BadRequest, TelegramError
 from telegram.ext import CommandHandler
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -493,6 +493,29 @@ class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
             "menu_button"
         ]
         self.assertEqual(menu_button.to_dict(), {"type": "commands"})
+
+    async def test_profile_sync_continues_after_one_scope_fails(self) -> None:
+        application = type("ApplicationStub", (), {})()
+        application.bot = type("BotStub", (), {})()
+        application.bot.set_my_commands = AsyncMock(
+            side_effect=[TelegramError("temporary failure"), None]
+        )
+        application.bot.set_chat_menu_button = AsyncMock()
+        application.bot.set_my_description = AsyncMock()
+        application.bot.set_my_short_description = AsyncMock()
+
+        await sync_application_commands(application)
+
+        self.assertEqual(application.bot.set_my_commands.await_count, 2)
+        application.bot.set_chat_menu_button.assert_awaited_once()
+        self.assertEqual(
+            application.bot.set_my_description.await_count,
+            len(BOT_DESCRIPTIONS),
+        )
+        self.assertEqual(
+            application.bot.set_my_short_description.await_count,
+            len(BOT_SHORT_DESCRIPTIONS),
+        )
 
     async def test_repeated_start_is_debounced(self) -> None:
         message = PrivateMessageStub()

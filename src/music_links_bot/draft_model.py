@@ -3,12 +3,16 @@ from __future__ import annotations
 import time
 from dataclasses import asdict
 from typing import Any, TypedDict
+from urllib.parse import urlparse
 
 from music_links_bot.constants import PLATFORM_LABELS
 from music_links_bot.models import TrackMatch
 from music_links_bot.release_presentation import normalize_preset
 
 CURRENT_DRAFT_VERSION = 5
+MAX_TRACK_FIELD_LENGTH = 512
+MAX_TRACK_URL_LENGTH = 2_048
+MAX_TRACK_LINKS = 16
 
 
 def _safe_int(value: object, *, default: int = 0) -> int:
@@ -18,6 +22,54 @@ def _safe_int(value: object, *, default: int = 0) -> int:
         return default
 
 
+def _safe_http_url(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    clean = value.strip()[:MAX_TRACK_URL_LENGTH]
+    parsed = urlparse(clean)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+    return clean
+
+
+def _normalize_track_item(value: dict) -> DraftTrackItem:
+    """Keep durable drafts compatible with the strict TrackMatch constructor."""
+    links: dict[str, str] = {}
+    raw_links = value.get("links")
+    if isinstance(raw_links, dict):
+        for raw_key, raw_url in raw_links.items():
+            key = str(raw_key or "").strip()[:64]
+            url = _safe_http_url(raw_url)
+            if not key or url is None:
+                continue
+            links[key] = url
+            if len(links) >= MAX_TRACK_LINKS:
+                break
+
+    item: DraftTrackItem = {
+        "title": str(value.get("title") or "").strip()[:MAX_TRACK_FIELD_LENGTH],
+        "artist": str(value.get("artist") or "").strip()[:MAX_TRACK_FIELD_LENGTH],
+        "links": links,
+        "kind": str(value.get("kind") or "song").strip()[:32] or "song",
+    }
+    for key in ("page_url", "thumbnail_url"):
+        url = _safe_http_url(value.get(key))
+        if url is not None:
+            item[key] = url
+    for key, limit in (
+        ("release_year", 16),
+        ("release_format", 64),
+        ("genre", 128),
+    ):
+        raw = value.get(key)
+        if raw is None:
+            continue
+        clean = str(raw).strip()[:limit]
+        if clean:
+            item[key] = clean
+    return item
+
+
 class DraftTrackItem(TypedDict, total=False):
     title: str
     artist: str
@@ -25,8 +77,9 @@ class DraftTrackItem(TypedDict, total=False):
     page_url: str | None
     kind: str
     release_format: str | None
-    release_year: int | None
+    release_year: str | None
     thumbnail_url: str | None
+    genre: str | None
 
 
 class DraftUndoState(TypedDict, total=False):
@@ -87,7 +140,7 @@ def new_track_draft(
     return {
         "v": CURRENT_DRAFT_VERSION,
         "type": "track",
-        "item": asdict(track),
+        "item": _normalize_track_item(asdict(track)),
         "prefix": prefix,
         "hashtags": True,
         "quote": bool(prefix),
@@ -123,6 +176,7 @@ def normalize_track_draft(value: object) -> TrackDraft | None:
     draft: TrackDraft = dict(value)
     draft["v"] = CURRENT_DRAFT_VERSION
     draft["type"] = "track"
+    draft["item"] = _normalize_track_item(item)
     draft["prefix"] = str(value.get("prefix") or "")[:3500]
     draft["hashtags"] = bool(value.get("hashtags", True))
     draft["quote"] = bool(value.get("quote", bool(draft["prefix"])))
