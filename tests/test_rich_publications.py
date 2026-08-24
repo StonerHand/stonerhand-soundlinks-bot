@@ -5,19 +5,25 @@ import unittest
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import BadRequest
 
-from music_links_bot.models import TrackMatch
+from music_links_bot.models import TrackMatch, VideoMatch
 from music_links_bot.rich_publications import (
     MAX_FALLBACK_TEXT,
     MAX_LONGREAD_BLOCKS,
     MAX_RICH_HTML,
     build_fallback_html,
+    build_rich_card_html,
+    build_rich_collection_html,
     build_rich_html,
+    build_rich_track_video_html,
     default_longread,
     rich_api_unavailable,
+    rich_button_rows_html,
     sanitize_longread,
+    sanitize_rich_fragment,
     save_prepared_rich_publication,
     send_rich_publication,
 )
+from music_links_bot.telegram_gateway import reset_capabilities
 
 
 def _track() -> TrackMatch:
@@ -35,6 +41,81 @@ def _track() -> TrackMatch:
 
 
 class RichPublicationModelTests(unittest.TestCase):
+    def test_card_embeds_cover_platform_buttons_and_hashtags(self) -> None:
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        "Spotify",
+                        url="https://open.spotify.com/track/x",
+                        api_kwargs={"style": "success"},
+                    )
+                ]
+            ]
+        )
+
+        result = build_rich_card_html(
+            {"quote": True, "prefix": "<blockquote>Тяжело &amp; красиво</blockquote>"},
+            _track(),
+            hashtags="#stonerhand #track",
+            reply_markup=keyboard,
+        )
+
+        self.assertIn("<h1>Sleep — Dopesmoker</h1>", result)
+        self.assertIn("<img src=", result)
+        self.assertIn('type="url" style="success"', result)
+        self.assertIn("<footer>#stonerhand #track</footer>", result)
+
+    def test_track_video_and_collection_use_native_media_groups(self) -> None:
+        video = VideoMatch(
+            title="Dopesmoker live",
+            author="Sleep",
+            url="https://youtube.com/watch?v=x",
+            thumbnail_url="https://img.example/video.jpg",
+        )
+        pair = build_rich_track_video_html(
+            _track(),
+            video,
+            body_html="Песня и клип",
+            hashtags="#track #video",
+            reply_markup=None,
+        )
+        collection = build_rich_collection_html(
+            [_track(), _track()],
+            title="Подборка · 2 релиза",
+            hashtags="#collection",
+            reply_markup=None,
+        )
+
+        self.assertIn("<tg-collage>", pair)
+        self.assertIn("<tg-collage>", collection)
+        self.assertIn("<ol>", collection)
+
+    def test_rich_fragment_drops_scripts_and_unsafe_links(self) -> None:
+        result = sanitize_rich_fragment(
+            '<b>ok</b><script>alert(1)</script><a href="javascript:x">bad</a>'
+        )
+
+        self.assertEqual(result, "<b>ok</b>alert(1)bad")
+
+    def test_rich_media_rejects_non_http_sources(self) -> None:
+        track = _track()
+        track.thumbnail_url = "tg://user?id=7"
+
+        result = build_rich_card_html({}, track, hashtags=None, reply_markup=None)
+
+        self.assertNotIn("<img", result)
+
+    def test_regular_keyboard_converts_to_rich_button_rows(self) -> None:
+        keyboard = InlineKeyboardMarkup(
+            [[InlineKeyboardButton("Назад", callback_data="v2|menu|start")]]
+        )
+
+        result = rich_button_rows_html(keyboard)
+
+        self.assertIn('type="callback_data" style="link"', result)
+        self.assertIn('data="v2|menu|start"', result)
+
     def test_default_longread_does_not_repeat_release_metadata(self) -> None:
         self.assertEqual(
             default_longread(_track()),
@@ -74,9 +155,18 @@ class RichPublicationModelTests(unittest.TestCase):
                 "lead": "Loud",
                 "blocks": [
                     {"id": "h", "type": "heading", "text": "Context"},
-                    {"id": "p", "type": "paragraph", "text": "<script>alert(1)</script>"},
+                    {
+                        "id": "p",
+                        "type": "paragraph",
+                        "text": "<script>alert(1)</script>",
+                    },
                     {"id": "q", "type": "quote", "text": "Turn it up"},
-                    {"id": "l", "type": "list", "items": ["One", "Two"], "ordered": True},
+                    {
+                        "id": "l",
+                        "type": "list",
+                        "items": ["One", "Two"],
+                        "ordered": True,
+                    },
                     {
                         "id": "d",
                         "type": "details",
@@ -163,6 +253,9 @@ class _RawBot:
 
 
 class RichPublicationTransportTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self) -> None:
+        reset_capabilities()
+
     async def test_send_rich_message_keeps_keyboard(self) -> None:
         bot = _RawBot()
         keyboard = InlineKeyboardMarkup(
@@ -181,7 +274,9 @@ class RichPublicationTransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(endpoint, "sendRichMessage")
         self.assertEqual(data["chat_id"], "@stonerhand")
         self.assertEqual(data["rich_message"], {"html": "<h1>Test</h1>"})
-        self.assertEqual(data["reply_markup"]["inline_keyboard"][0][0]["text"], "Spotify")
+        self.assertEqual(
+            data["reply_markup"]["inline_keyboard"][0][0]["text"], "Spotify"
+        )
 
     async def test_prepared_rich_message_uses_native_share_contract(self) -> None:
         bot = _RawBot()

@@ -3,12 +3,11 @@ from __future__ import annotations
 import logging
 import os
 
-import httpx
+from telegram.error import TelegramError
 
-from music_links_bot.constants import HTTP_USER_AGENT
+from music_links_bot.telegram_gateway import TelegramApiGateway
 
 LOGGER = logging.getLogger(__name__)
-TELEGRAM_API_BASE = "https://api.telegram.org"
 
 
 def ephemeral_group_replies_enabled() -> bool:
@@ -37,6 +36,8 @@ async def send_ephemeral_message(
     reply_markup: object | None = None,
     link_preview_options: object | None = None,
     reply_to_message_id: int | None = None,
+    callback_query_id: str | None = None,
+    replace_callback_query_message: bool = False,
     timeout: float = 8.0,
 ) -> bool:
     """Reply in a group so only `receiver_user_id` sees it — Telegram's
@@ -47,36 +48,20 @@ async def send_ephemeral_message(
     if not bot_token or not receiver_user_id:
         return False
 
-    payload: dict[str, object] = {
-        "chat_id": chat_id,
-        "receiver_user_id": receiver_user_id,
-        "text": text,
-    }
-    if parse_mode is not None:
-        payload["parse_mode"] = str(parse_mode)
-    if reply_markup is not None:
-        payload["reply_markup"] = _as_dict(reply_markup)
-    if link_preview_options is not None:
-        payload["link_preview_options"] = _as_dict(link_preview_options)
-    if reply_to_message_id:
-        payload["reply_parameters"] = {"message_id": reply_to_message_id}
-
     try:
-        async with httpx.AsyncClient(
-            timeout=httpx.Timeout(timeout, connect=3.0),
-            headers={"User-Agent": HTTP_USER_AGENT},
-        ) as client:
-            response = await client.post(
-                f"{TELEGRAM_API_BASE}/bot{bot_token}/sendMessage",
-                json=payload,
-            )
-            data = response.json()
-        return bool(isinstance(data, dict) and data.get("ok"))
-    except Exception:
+        return await TelegramApiGateway(
+            token=bot_token, timeout=timeout
+        ).send_ephemeral_message(
+            chat_id=chat_id,
+            receiver_user_id=receiver_user_id,
+            text=text,
+            callback_query_id=callback_query_id,
+            replace_callback_query_message=replace_callback_query_message,
+            parse_mode=parse_mode,
+            reply_markup=reply_markup,
+            link_preview_options=link_preview_options,
+            reply_to_message_id=reply_to_message_id,
+        )
+    except TelegramError:
         LOGGER.debug("Ephemeral send failed", exc_info=True)
         return False
-
-
-def _as_dict(value: object) -> object:
-    to_dict = getattr(value, "to_dict", None)
-    return to_dict() if callable(to_dict) else value

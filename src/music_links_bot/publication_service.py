@@ -7,13 +7,13 @@ from telegram import Message
 from telegram.constants import ParseMode
 from telegram.error import TelegramError
 
-from music_links_bot.chat_access import PublishAccess, check_publish_access
 from music_links_bot.bot_builder import (
     MESSAGE_TEXT_LIMIT,
     PHOTO_CAPTION_LIMIT,
     fit_telegram_html,
 )
 from music_links_bot.channel_templates import save_channel_template
+from music_links_bot.chat_access import PublishAccess, check_publish_access
 from music_links_bot.models import TrackMatch
 from music_links_bot.publication_view import (
     build_publication_view,
@@ -124,9 +124,11 @@ class PublicationService:
         )
         from music_links_bot.rich_publications import (
             build_fallback_html,
+            build_rich_card_html,
             build_rich_html,
             is_longread,
             rich_api_unavailable,
+            rich_messages_enabled,
             send_rich_publication,
         )
 
@@ -146,51 +148,71 @@ class PublicationService:
         )
         text = view.text
         keyboard = view.keyboard
+        hashtags = overrides.get("hashtags")
+        if include_hashtags and not hashtags:
+            hashtags = build_auto_hashtags(track)
 
-        if is_longread(draft):
-            hashtags = overrides.get("hashtags")
-            if include_hashtags and not hashtags:
-                hashtags = build_auto_hashtags(track)
-            rich_html = build_rich_html(
-                draft,
-                track,
-                hashtags=hashtags if include_hashtags else None,
+        rich_html = None
+        # Explicit photo mode (including branded frames) remains authoritative.
+        # Rich Messages upgrade the regular card without changing that choice.
+        if rich_messages_enabled() and not draft.get("as_photo"):
+            rich_html = (
+                build_rich_html(
+                    draft,
+                    track,
+                    hashtags=hashtags if include_hashtags else None,
+                    reply_markup=keyboard,
+                )
+                if is_longread(draft)
+                else build_rich_card_html(
+                    draft,
+                    track,
+                    hashtags=hashtags if include_hashtags else None,
+                    reply_markup=keyboard,
+                )
             )
+
+        if rich_html:
             try:
-                return await send_rich_publication(
+                sent = await send_rich_publication(
                     self.context.bot,
                     chat_id=target,
                     rich_html=rich_html,
-                    reply_markup=keyboard,
                 )
+                self._record_rich(ok=True)
+                return sent
             except TelegramError as exc:
-                if not rich_api_unavailable(exc):
-                    raise
+                self._record_rich(ok=False, fallback=True)
                 LOGGER.info(
-                    "Rich Messages unavailable for %s; using HTML fallback",
+                    "Rich Messages failed for %s; using HTML fallback",
                     target,
+                    exc_info=not rich_api_unavailable(exc),
                 )
-                return await self.context.bot.send_message(
-                    chat_id=target,
-                    text=fit_telegram_html(
-                        build_fallback_html(
-                            draft,
-                            track,
-                            hashtags=hashtags if include_hashtags else None,
+                if not is_longread(draft):
+                    rich_html = None
+                else:
+                    return await self.context.bot.send_message(
+                        chat_id=target,
+                        text=fit_telegram_html(
+                            build_fallback_html(
+                                draft,
+                                track,
+                                hashtags=hashtags if include_hashtags else None,
+                            ),
+                            MESSAGE_TEXT_LIMIT,
                         ),
-                        MESSAGE_TEXT_LIMIT,
-                    ),
-                    parse_mode=ParseMode.HTML,
-                    link_preview_options=_build_link_preview_options(
-                        _select_preview_url(track.links, self.context)
-                        or track.thumbnail_url,
-                        prefer_large_media=True,
-                    ),
-                    reply_markup=keyboard,
-                )
+                        parse_mode=ParseMode.HTML,
+                        link_preview_options=_build_link_preview_options(
+                            _select_preview_url(track.links, self.context)
+                            or track.thumbnail_url,
+                            prefer_large_media=True,
+                        ),
+                        reply_markup=keyboard,
+                    )
 
         if draft.get("as_photo") and track.thumbnail_url:
             photo: Any = track.thumbnail_url
+            cacheable = True
             # Pillow and image networking are loaded only for explicit photo
             # posts, keeping normal bot cold starts light.
             if self.branding_hooks is None:
@@ -209,6 +231,7 @@ class PublicationService:
                 ) = self.branding_hooks
 
             if photo_branding_enabled():
+                cacheable = False
                 branded = await build_branded_cover(
                     track.thumbnail_url,
                     label=brand_label(f"@{self.channel_username}"),
@@ -216,13 +239,32 @@ class PublicationService:
                 )
                 if branded is not None:
                     photo = branded
-            return await self.context.bot.send_photo(
+            if cacheable:
+                from music_links_bot.telegram_media_cache import get_cached_file_id
+
+                photo = (
+                    await get_cached_file_id(
+                        self.context,
+                        track.thumbnail_url,
+                    )
+                    or photo
+                )
+            sent = await self.context.bot.send_photo(
                 chat_id=target,
                 photo=photo,
                 caption=fit_telegram_html(text, PHOTO_CAPTION_LIMIT),
                 parse_mode=ParseMode.HTML,
                 reply_markup=keyboard,
             )
+            if cacheable:
+                from music_links_bot.telegram_media_cache import remember_photo_file_id
+
+                await remember_photo_file_id(
+                    self.context,
+                    track.thumbnail_url,
+                    sent,
+                )
+            return sent
 
         return await self.context.bot.send_message(
             chat_id=target,
@@ -239,6 +281,11 @@ class PublicationService:
         runtime = self.context.application.bot_data.get("runtime")
         if runtime is not None and hasattr(runtime, "record_publication"):
             runtime.record_publication(ok=ok)
+
+    def _record_rich(self, *, ok: bool, fallback: bool = False) -> None:
+        runtime = self.context.application.bot_data.get("runtime")
+        if runtime is not None and hasattr(runtime, "record_rich_message"):
+            runtime.record_rich_message(ok=ok, fallback=fallback)
 
     async def _persist_metrics(self) -> None:
         runtime = self.context.application.bot_data.get("runtime")
@@ -267,4 +314,6 @@ class PublicationService:
                 text=text[:4000],
             )
         except Exception:
+            # Failure reporting is deliberately best-effort: an unexpected
+            # transport/runtime error must not hide the original publish error.
             LOGGER.info("Could not notify the bot owner about publish failure")

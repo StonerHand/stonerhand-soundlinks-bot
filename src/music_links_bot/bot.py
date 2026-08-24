@@ -263,6 +263,12 @@ from music_links_bot.publish_queue import (
     QueueStorageError,
     add_job,
 )
+from music_links_bot.rich_publications import (
+    build_rich_collection_html,
+    rich_api_unavailable,
+    rich_messages_enabled,
+    send_rich_publication,
+)
 from music_links_bot.search import (
     SearchClient,
     SearchLookupError,
@@ -1724,6 +1730,41 @@ async def _send_track_matches(
             include_hashtags=include_hashtags,
             title=title,
         )
+        if not is_private and rich_messages_enabled():
+            rich_html = build_rich_collection_html(
+                tracks,
+                title=title,
+                hashtags=(
+                    "#stonerhand #track #collection" if include_hashtags else None
+                ),
+                reply_markup=collection_keyboard,
+            )
+            placeholder = _take_placeholder(message.chat_id)
+            if placeholder is not None:
+                await _try_delete_message(placeholder)
+            try:
+                await send_rich_publication(
+                    context.bot,
+                    chat_id=message.chat_id,
+                    rich_html=rich_html,
+                )
+                await _try_delete_message(message)
+                _record_matches_safely(tracks, message, context=context)
+                runtime = context.application.bot_data.get("runtime")
+                if runtime is not None and hasattr(runtime, "record_rich_message"):
+                    runtime.record_rich_message(ok=True)
+                return
+            except TelegramError as exc:
+                runtime = context.application.bot_data.get("runtime")
+                if runtime is not None and hasattr(runtime, "record_rich_message"):
+                    runtime.record_rich_message(
+                        ok=False,
+                        fallback=rich_api_unavailable(exc),
+                    )
+                LOGGER.info(
+                    "Rich collection unavailable; using classic collection",
+                    exc_info=not rich_api_unavailable(exc),
+                )
         await _send_track_result(
             context.bot,
             message,
@@ -1813,8 +1854,7 @@ async def _consume_pending_input(
         payload = await _load_retry_sources(context, retry_id)
         original_urls = (
             [str(url) for url in payload.get("urls", []) if isinstance(url, str)]
-            if isinstance(payload, dict)
-            and int(payload.get("user_id") or 0) == user.id
+            if isinstance(payload, dict) and int(payload.get("user_id") or 0) == user.id
             else []
         )
         if len(replacement_urls) != 1 or not 0 <= source_index < len(original_urls):

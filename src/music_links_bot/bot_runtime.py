@@ -205,6 +205,9 @@ class BotRuntime:
             "cache_misses": 0,
             "publications": 0,
             "publication_errors": 0,
+            "rich_messages": 0,
+            "rich_message_errors": 0,
+            "rich_message_fallbacks": 0,
         }
         self._metrics_persisted_at = 0.0
 
@@ -366,7 +369,11 @@ class BotRuntime:
             diagnostic.partials += 1
         if "timeout" in error_key:
             diagnostic.timeouts += 1
-        if "ratelimit" in error_key or "too many requests" in error_key or "429" in error_key:
+        if (
+            "ratelimit" in error_key
+            or "too many requests" in error_key
+            or "429" in error_key
+        ):
             diagnostic.rate_limits += 1
         if ok:
             diagnostic.successes += 1
@@ -424,6 +431,14 @@ class BotRuntime:
         self.metrics["publications"] += 1
         if not ok:
             self.metrics["publication_errors"] += 1
+
+    def record_rich_message(self, *, ok: bool, fallback: bool = False) -> None:
+        """Record Rich Message delivery and automatic classic fallback."""
+        self.metrics["rich_messages"] += 1
+        if not ok:
+            self.metrics["rich_message_errors"] += 1
+        if fallback:
+            self.metrics["rich_message_fallbacks"] += 1
 
     def metrics_snapshot(self) -> dict[str, Any]:
         snapshot = dict(self.metrics)
