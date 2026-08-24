@@ -5,10 +5,10 @@ import json
 import logging
 import os
 import re
+import sys
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
-import sys
 from urllib.parse import parse_qs, urlencode, urlparse
 from urllib.request import urlopen
 
@@ -25,7 +25,13 @@ from music_links_bot.bot import (
 from music_links_bot.config import Settings
 from music_links_bot.logging_config import quiet_transport_logs
 
-ALLOWED_UPDATES = ("message", "channel_post", "callback_query", "inline_query")
+ALLOWED_UPDATES = (
+    "message",
+    "channel_post",
+    "callback_query",
+    "inline_query",
+    "stopped_message_generation",
+)
 LOGGER = logging.getLogger(__name__)
 quiet_transport_logs()
 WEBHOOK_SECRET_RE = re.compile(r"^[A-Za-z0-9_-]{1,256}$")

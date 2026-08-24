@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.3.0 — 2026-08-24
+
+- Added a Bot API 10.3 compatibility gateway for Rich Messages, Rich drafts,
+  in-place Rich edits and the new ephemeral-message parameter contract.
+- Upgraded finished cards, collections and song + video posts to structured
+  Rich HTML with artwork groups and platform actions inside the publication.
+- Added automatic capability cooldown and a lossless fallback to the existing
+  HTML/photo delivery path for unsupported methods, old nodes and media errors.
+- Added native disabled progress buttons with a classic-client fallback.
+- Added a transport-neutral music publication model, strict rich-fragment and
+  action URL sanitization, and bounded Rich Message output.
+- Added Redis-backed Telegram cover `file_id` reuse to avoid downloading and
+  uploading the same artwork repeatedly.
+- Added Rich delivery/fallback metrics and regression coverage for the 10.3
+  payloads, builders, editing, media cache and sanitization.
+- Extended the release suite to 479 automated tests.
+
 ## 1.2.0 — 2026-08-20
 
 - Rebuilt the native card actions around one unmistakable primary button and

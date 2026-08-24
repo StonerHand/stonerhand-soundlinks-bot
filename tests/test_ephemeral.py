@@ -1,19 +1,20 @@
 import asyncio
 import os
-import unittest
-from typing import ClassVar
-from pathlib import Path
-from unittest.mock import patch
 import sys
+import unittest
+from pathlib import Path
+from typing import ClassVar
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from music_links_bot import ephemeral
+from music_links_bot import ephemeral, telegram_gateway
 
 
 class _FakeResponse:
     def __init__(self, payload):
         self._payload = payload
+        self.status_code = 200 if payload.get("ok") else 400
 
     def json(self):
         return self._payload
@@ -60,7 +61,7 @@ class SendEphemeralTests(unittest.TestCase):
             def to_dict(self):
                 return {"inline_keyboard": []}
 
-        with patch.object(ephemeral.httpx, "AsyncClient", _FakeClient):
+        with patch.object(telegram_gateway.httpx, "AsyncClient", _FakeClient):
             ok = asyncio.run(
                 ephemeral.send_ephemeral_message(
                     "token123",
@@ -77,14 +78,17 @@ class SendEphemeralTests(unittest.TestCase):
         sent = _FakeClient.posts[0]
         self.assertIn("/bottoken123/sendMessage", sent["url"])
         body = sent["json"]
-        self.assertEqual(body["receiver_user_id"], 777)
+        self.assertEqual(
+            body["ephemeral_message_parameters"],
+            {"receiver_user_id": 777},
+        )
         self.assertEqual(body["chat_id"], -100500)
         self.assertEqual(body["parse_mode"], "HTML")
         self.assertEqual(body["reply_markup"], {"inline_keyboard": []})
         self.assertEqual(body["reply_parameters"], {"message_id": 42})
 
     def test_missing_token_or_receiver_short_circuits(self) -> None:
-        with patch.object(ephemeral.httpx, "AsyncClient", _FakeClient):
+        with patch.object(telegram_gateway.httpx, "AsyncClient", _FakeClient):
             self.assertFalse(
                 asyncio.run(ephemeral.send_ephemeral_message("", 1, 2, "x"))
             )
@@ -95,7 +99,7 @@ class SendEphemeralTests(unittest.TestCase):
 
     def test_telegram_error_reports_failure(self) -> None:
         _FakeClient.reply = {"ok": False, "description": "not supported"}
-        with patch.object(ephemeral.httpx, "AsyncClient", _FakeClient):
+        with patch.object(telegram_gateway.httpx, "AsyncClient", _FakeClient):
             ok = asyncio.run(ephemeral.send_ephemeral_message("t", 1, 2, "x"))
         self.assertFalse(ok)
 

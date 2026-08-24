@@ -53,7 +53,9 @@ async def stats_text(context, *, include_private: bool) -> str:
         "\n\nRuntime\n"
         f"Запросы: {metrics['requests']} · "
         f"среднее: {metrics['request_ms_avg']} ms · "
-        f"кэш: {metrics['cache_hits']}/{metrics['cache_misses']}"
+        f"кэш: {metrics['cache_hits']}/{metrics['cache_misses']}\n"
+        f"Rich: {metrics['rich_messages']} · "
+        f"fallback: {metrics['rich_message_fallbacks']}"
     )
     diagnostics = runtime.provider_snapshot()
     if diagnostics:
@@ -177,6 +179,11 @@ async def build_status_text(context) -> str:
                 (
                     f"Публикации: <code>{int(metrics.get('publications') or 0)}</code> · "
                     f"ошибки: <code>{int(metrics.get('publication_errors') or 0)}</code>"
+                ),
+                (
+                    f"Rich: <code>{int(metrics.get('rich_messages') or 0)}</code> · "
+                    f"fallback: "
+                    f"<code>{int(metrics.get('rich_message_fallbacks') or 0)}</code>"
                 ),
             ]
         )

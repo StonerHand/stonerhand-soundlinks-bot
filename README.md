@@ -22,8 +22,10 @@ opening a separate web interface.
 - accepts a music URL or an `artist — track` query;
 - resolves release metadata, artwork and platform links;
 - builds a clean Telegram card with compact buttons;
+- uses Telegram Rich Messages for structured cards, native media groups and
+  in-content actions, with an automatic classic-card fallback;
 - combines several links into one numbered collection;
-- pairs a song and YouTube clip in one media post;
+- pairs a song and YouTube clip in one clickable Rich media post;
 - includes a native card builder with separate style, intro, hashtag and platform screens;
 - keeps exactly one primary action on editor screens and edits the active message in place;
 - preserves bold, italic, links and other Telegram formatting in author intros;
@@ -38,7 +40,9 @@ opening a separate web interface.
 - uses an explicit bot timezone for fixed and custom publication times;
 - lets the user cancel any native text input with `/cancel`;
 - works inline: `@StonerHandBot artist — track`.
-- explains incomplete batches per source and lets the user replace a failed link by number.
+- explains incomplete batches per source and lets the user replace a failed link by number;
+- can keep group replies visible only to the requesting user through opt-in
+  ephemeral messages on Bot API 10.3.
 
 A single message accepts up to 10 unique sources — the same explicit limit as
 the editable crate. Duplicate and tracking variants are removed before lookup.
@@ -114,6 +118,12 @@ worker calls derive an isolated credential from `BOT_TOKEN`. Fixed
 schedule choices use `BOT_TIMEZONE` (`Europe/Moscow` by default); custom dates
 can be scheduled up to 90 days ahead.
 
+`RICH_MESSAGES_ENABLED=1` enables the Bot API 10.3 presentation layer. It is
+safe to leave enabled: unsupported methods, old nodes and media failures fall
+back to the existing HTML/photo card automatically. `RICH_DRAFTS_ENABLED=0`
+keeps experimental streamed drafts off by default. `EPHEMERAL_GROUP_REPLIES=1`
+enables private-to-requester group results.
+
 ## Validation
 
 ```bash
@@ -139,7 +149,7 @@ vercel.json             production routes and cron jobs
 
 Production runs on Vercel using a Telegram webhook. The webhook only processes
 Telegram updates; scheduled posts are leased by the protected queue worker.
-Redis stores caches,
+Redis stores caches, reusable Telegram cover `file_id` values,
 sessions, drafts, collections, history, the publishing queue and deduplication
 claims. Stored state is versioned and automatically migrates legacy records.
 Non-critical flows have a bounded in-memory fallback.
@@ -148,6 +158,7 @@ Non-critical flows have a bounded in-memory fallback.
 runtime metrics and the exact deployed version/commit. The production canary
 rejects stale deployments, a failed worker and an overdue durable queue.
 Provider diagnostics include request volume, success rate, average latency,
-fallbacks, timeouts and rate limits.
+fallbacks, timeouts and rate limits. Runtime metrics also expose Rich Message
+attempts, failures and automatic fallbacks.
 
 License: [MIT](LICENSE).

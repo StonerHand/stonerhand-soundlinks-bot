@@ -57,6 +57,17 @@ def share_button(text: str, query: str) -> TelegramInlineKeyboardButton:
     return TelegramInlineKeyboardButton(text=text, switch_inline_query=query)
 
 
+def disabled_button(
+    text: str,
+    *,
+    tone: ButtonTone | None = None,
+) -> TelegramInlineKeyboardButton:
+    """Render a native Bot API 10.3 disabled state."""
+    api_kwargs = dict(_style_kwargs(tone).get("api_kwargs") or {})
+    api_kwargs["disabled"] = {}
+    return TelegramInlineKeyboardButton(text=text, api_kwargs=api_kwargs)
+
+
 def button(
     text: str,
     *,

@@ -1,5 +1,7 @@
 import asyncio
 import unittest
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 from music_links_bot.bot_crate import (
     add_many_to_crate,
@@ -14,7 +16,9 @@ from music_links_bot.bot_crate import (
 from music_links_bot.bot_progress import (
     adopt_progress_message,
     cancel_progress,
+    start_progress,
     take_progress,
+    update_progress,
 )
 from music_links_bot.bot_runtime import (
     BotRuntime,
@@ -71,6 +75,27 @@ class CallbackContractTests(unittest.TestCase):
 
 
 class RuntimeSafetyTests(unittest.IsolatedAsyncioTestCase):
+    async def test_private_progress_can_use_rich_streaming_draft(self) -> None:
+        rich = AsyncMock(return_value=True)
+
+        class Incoming:
+            chat_id = 17
+            message_id = 23
+            chat = SimpleNamespace(type="private")
+
+            def get_bot(self):
+                return object()
+
+        with patch(
+            "music_links_bot.bot_progress.send_rich_progress_draft",
+            rich,
+        ):
+            await start_progress(Incoming())
+            await update_progress("ru", "progress_links")
+
+        self.assertEqual(rich.await_count, 2)
+        self.assertIsNone(take_progress(17))
+
     async def test_cancelled_lookup_retires_progress_message(self) -> None:
         class ProgressMessage:
             chat_id = 17
@@ -156,7 +181,9 @@ class RuntimeSafetyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(snapshot[0]["avg_latency_ms"], 250)
         self.assertEqual(snapshot[0]["success_rate_percent"], 0.0)
 
-    async def test_provider_metrics_aggregate_success_latency_and_fallbacks(self) -> None:
+    async def test_provider_metrics_aggregate_success_latency_and_fallbacks(
+        self,
+    ) -> None:
         runtime = BotRuntime()
         runtime.record_provider("songlink", ok=True, latency_ms=100)
         runtime.record_provider(
@@ -177,6 +204,16 @@ class RuntimeSafetyTests(unittest.IsolatedAsyncioTestCase):
             runtime.metrics_snapshot()["providers"]["songlink"]["requests"],
             2,
         )
+
+    async def test_rich_message_metrics_track_fallbacks(self) -> None:
+        runtime = BotRuntime()
+        runtime.record_rich_message(ok=True)
+        runtime.record_rich_message(ok=False, fallback=True)
+
+        snapshot = runtime.metrics_snapshot()
+        self.assertEqual(snapshot["rich_messages"], 2)
+        self.assertEqual(snapshot["rich_message_errors"], 1)
+        self.assertEqual(snapshot["rich_message_fallbacks"], 1)
 
 
 class BotCrateTests(unittest.IsolatedAsyncioTestCase):

@@ -4,18 +4,23 @@ import contextvars
 import logging
 from dataclasses import dataclass
 
-from telegram import Message
+from telegram import InlineKeyboardMarkup, Message
 from telegram.error import TelegramError
 
 from music_links_bot.i18n import get_text
+from music_links_bot.rich_publications import send_rich_progress_draft
+from music_links_bot.telegram_buttons import ButtonTone, disabled_button
 
 LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
 class ProgressState:
-    message: Message
+    message: Message | None
+    chat_id: int
     stage: int = 0
+    bot: object | None = None
+    draft_id: int = 0
 
 
 _STAGES = {
@@ -29,9 +34,30 @@ _PLACEHOLDER: contextvars.ContextVar[ProgressState | None] = contextvars.Context
 )
 
 
+def _progress_keyboard(text: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[disabled_button(text[:64], tone=ButtonTone.PRIMARY)]])
+
+
+async def _send_progress_message(message: Message, text: str) -> Message:
+    """Prefer the native disabled state and degrade on older Bot API nodes."""
+    try:
+        return await message.reply_text(text, reply_markup=_progress_keyboard(text))
+    except (TelegramError, TypeError):
+        return await message.reply_text(text)
+
+
+async def _edit_progress_message(message: Message, text: str) -> None:
+    try:
+        await message.edit_text(text, reply_markup=_progress_keyboard(text))
+    except (TelegramError, TypeError):
+        await message.edit_text(text)
+
+
 def adopt_progress_message(message: Message | None) -> None:
     """Reuse an existing bot message when a callback starts a new action."""
-    _PLACEHOLDER.set(ProgressState(message) if message is not None else None)
+    _PLACEHOLDER.set(
+        ProgressState(message, chat_id=message.chat_id) if message is not None else None
+    )
 
 
 async def start_progress(
@@ -49,11 +75,41 @@ async def start_progress(
             if total > 1
             else get_text(lang, "progress_search")
         )
-        placeholder = await message.reply_text(text)
+        chat = getattr(message, "chat", None)
+        get_bot = getattr(message, "get_bot", None)
+        try:
+            bot = get_bot() if callable(get_bot) else None
+        except RuntimeError:
+            # Hand-built Message objects and lightweight test doubles are not
+            # necessarily bound to a Bot. The classic progress message still
+            # works and remains the lossless fallback.
+            bot = None
+        draft_id = max(1, int(getattr(message, "message_id", 0) or 1))
+        if (
+            getattr(chat, "type", None) == "private"
+            and bot is not None
+            and await send_rich_progress_draft(
+                bot,
+                chat_id=message.chat_id,
+                draft_id=draft_id,
+                text=text,
+            )
+        ):
+            _PLACEHOLDER.set(
+                ProgressState(
+                    None,
+                    chat_id=message.chat_id,
+                    stage=1,
+                    bot=bot,
+                    draft_id=draft_id,
+                )
+            )
+            return
+        placeholder = await _send_progress_message(message, text)
     except TelegramError:
         LOGGER.debug("Could not send progress message", exc_info=True)
         return
-    _PLACEHOLDER.set(ProgressState(placeholder, stage=1))
+    _PLACEHOLDER.set(ProgressState(placeholder, chat_id=message.chat_id, stage=1))
 
 
 async def update_progress(lang: str, key: str) -> None:
@@ -64,7 +120,16 @@ async def update_progress(lang: str, key: str) -> None:
     if next_stage <= state.stage:
         return
     try:
-        await state.message.edit_text(get_text(lang, key))
+        text = get_text(lang, key)
+        if state.message is not None:
+            await _edit_progress_message(state.message, text)
+        elif state.bot is not None:
+            await send_rich_progress_draft(
+                state.bot,
+                chat_id=state.chat_id,
+                draft_id=state.draft_id,
+                text=text,
+            )
         state.stage = next_stage
     except TelegramError:
         LOGGER.debug("Could not update progress message", exc_info=True)
@@ -75,7 +140,15 @@ async def update_progress_text(text: str, *, stage: int = 3) -> None:
     if state is None or stage <= state.stage:
         return
     try:
-        await state.message.edit_text(text)
+        if state.message is not None:
+            await _edit_progress_message(state.message, text)
+        elif state.bot is not None:
+            await send_rich_progress_draft(
+                state.bot,
+                chat_id=state.chat_id,
+                draft_id=state.draft_id,
+                text=text,
+            )
         state.stage = stage
     except TelegramError:
         LOGGER.debug("Could not update custom progress message", exc_info=True)
@@ -84,7 +157,7 @@ async def update_progress_text(text: str, *, stage: int = 3) -> None:
 def take_progress(chat_id: int) -> Message | None:
     """Detach the progress message so the final result can replace it."""
     state = _PLACEHOLDER.get()
-    if state is None or state.message.chat_id != chat_id:
+    if state is None or state.chat_id != chat_id:
         return None
     _PLACEHOLDER.set(None)
     return state.message

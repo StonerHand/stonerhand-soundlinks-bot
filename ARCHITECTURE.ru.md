@@ -11,7 +11,8 @@ flowchart LR
     BOT --> RESOLVE["Resolver и провайдеры"]
     BOT --> EDIT["Черновики и редактор"]
     BOT --> PUB["PublicationService"]
-    PUB --> TG
+    PUB --> GW["Telegram API Gateway"]
+    GW --> TG
     CRON["Vercel Cron"] --> WORKER["api/queue_worker.py"]
     WORKER --> PUB
     BOT <--> REDIS["Upstash Redis"]
@@ -41,6 +42,10 @@ webhook `/api/telegram`. Polling используется исключитель
 - `lookup_models.py` — типизированный bundle, статусы источников и cache-сериализация;
 - `provider_runtime.py` — параллельные провайдеры, timeout, short negative cache и partial result;
 - `publication_service.py` — отправка себе и публикация в канал;
+- `publication_model.py` — независимая от Telegram модель готовой публикации;
+- `rich_publications.py` — безопасный Rich HTML, карточки, медиагруппы и fallback;
+- `telegram_gateway.py` — изолированный контракт новых методов Bot API 10.3;
+- `telegram_media_cache.py` — повторное использование Telegram `file_id` обложек;
 - `publication_view.py` — единый HTML и клавиатура карточки для preview и delivery;
 - `publication_budget.py` — динамический лимит подводки для сообщения и photo caption;
 - `draft_model.py` — типизированный черновик и миграция схемы;
@@ -102,6 +107,7 @@ Telegram-entities подводки преобразуются в безопас�
 | история | `hist:<id>` | 90 дней / bounded memory |
 | очередь | `queue:v1` | постоянная / memory fallback |
 | антидубли публикаций | `posted:<hash>` | постоянная |
+| Telegram media cache | `telegram-media:v1:<hash>` | 30 дней / bounded memory |
 
 Владение черновиком проверяется по положительному `chat_id`. Callback и update
 имеют дедупликацию, а publish/send используют lease, поэтому повторный тап или
@@ -128,8 +134,13 @@ Telegram-entities подводки преобразуются в безопас�
 `PublicationService` проверяет права и отправляет подготовленное представление.
 `publication_view` одинаково формирует HTML и клавиатуру для редактора, отправки
 себе, канала и очереди, поэтому preview не расходится с итоговым постом. Сервис
-отправляет
-сообщение или фото и записывает метрики. Для канала сохраняется компактный
+сначала собирает Rich Message с обложкой, структурированным текстом и кнопками
+площадок внутри публикации. Песня и клип используют collage, а подборка —
+collage или slideshow. Если новый метод, клиент или конкретное медиа недоступны,
+тот же вызов без потери данных переходит на проверенную HTML/photo-карточку.
+Capability cooldown не повторяет заведомо неподдерживаемый запрос на каждом
+update, но успешная проба сразу восстанавливает Rich-режим. Сервис записывает
+отдельные метрики Rich delivery/error/fallback. Для канала сохраняется компактный
 шаблон оформления. Очередь использует статусы `pending` и `processing`, lease,
 ограниченные повторы и уведомление владельца при окончательной ошибке.
 
@@ -157,6 +168,12 @@ Webhook worker не запускает: пользовательский update 
 - этапы прогресса монотонны и не откатываются при повторных callback;
 - Telegram-клавиатуры строятся общей семантической фабрикой и проверяются
   контрактными, golden- и snapshot-тестами;
+- прогресс использует нативную disabled-кнопку Bot API 10.3 и повторяет отправку
+  без неё, если Telegram ещё не поддерживает новый объект;
+- ephemeral replies используют вложенный `ephemeral_message_parameters` и
+  никогда не мешают публичному fallback;
+- повторная photo-публикация использует сохранённый Telegram `file_id`, не
+  скачивая неизменившуюся обложку заново;
 - runtime агрегирует по каждому провайдеру success rate, среднюю задержку,
   fallback, timeout и rate limit;
 - webhook удаляет claim после ошибки, чтобы Telegram мог повторить update;

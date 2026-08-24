@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import AsyncMock, patch
 from urllib.parse import parse_qs, urlparse
 
+import api.telegram as telegram_api
 from api.set_webhook import (
     ALLOWED_UPDATES,
     _is_authorized,
@@ -12,7 +13,6 @@ from api.set_webhook import (
     _telegram_set_webhook_url,
     _telegram_webhook_secret,
 )
-import api.telegram as telegram_api
 from api.telegram import (
     _decode_update_payload,
     _is_telegram_request_authorized,
@@ -42,6 +42,7 @@ class VercelWebhookTests(unittest.TestCase):
 
     def test_webhook_accepts_inline_queries(self) -> None:
         self.assertIn("inline_query", ALLOWED_UPDATES)
+        self.assertIn("stopped_message_generation", ALLOWED_UPDATES)
 
     def test_telegram_secret_is_optional_and_compared_safely(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
@@ -145,9 +146,8 @@ class VercelWebhookTests(unittest.TestCase):
             os.environ,
             {"TELEGRAM_WEBHOOK_SECRET": "not valid"},
             clear=True,
-        ):
-            with self.assertRaises(ValueError):
-                _telegram_webhook_secret()
+        ), self.assertRaises(ValueError):
+            _telegram_webhook_secret()
 
     def test_webhook_reuses_application_across_warm_invocations(self) -> None:
         class ApplicationStub:
