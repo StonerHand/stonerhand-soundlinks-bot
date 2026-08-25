@@ -22,6 +22,8 @@ opening a separate web interface.
 - accepts a music URL, an `artist — track` query or an uploaded audio file;
 - resolves release metadata, artwork and platform links;
 - builds a clean Telegram card with compact buttons;
+- keeps a canonical **All platforms** Songlink/Odesli hub even when metadata
+  temporarily falls back to Spotify;
 - uses Telegram Rich Messages for structured cards, native media groups and
   in-content actions, with an automatic classic-card fallback;
 - combines several links into one numbered collection;
@@ -92,6 +94,9 @@ All output is checked against Telegram's rendered UTF-16 message and caption
 limits before delivery, including emoji, with a safe fallback for oversized or
 malformed formatted text.
 Transient Song.link failures fall back to Spotify metadata for Spotify URLs;
+the **All platforms** action still opens a canonical `song.link/s/<id>` page
+instead of disappearing or duplicating the Spotify destination. Albums and
+podcasts use their matching `album.link` and `pods.link` hubs.
 regional misses are checked against bounded secondary regions and stable
 public Spotify page metadata. The short fallback cache is automatically
 replaced by the complete platform result after the provider recovers.
@@ -125,9 +130,12 @@ worker calls derive an isolated credential from `BOT_TOKEN`. Fixed
 schedule choices use `BOT_TIMEZONE` (`Europe/Moscow` by default); custom dates
 can be scheduled up to 90 days ahead.
 
-`RICH_MESSAGES_ENABLED=1` enables the Bot API 10.3 presentation layer. It is
-safe to leave enabled: unsupported methods, old nodes and media failures fall
-back to the existing HTML/photo card automatically. `RICH_DRAFTS_ENABLED=0`
+`RICH_MESSAGES_ENABLED=1` enables the Bot API 10.3 presentation layer and is
+on by default. Single-release inline shares use Rich Message content and native
+button rows. Inline artwork is embedded only when Telegram has a reusable
+`file_id`, as required by the API; unsupported methods, old nodes and media
+failures retry as the existing HTML/photo card automatically.
+`RICH_DRAFTS_ENABLED=0`
 keeps experimental streamed drafts off by default. `EPHEMERAL_GROUP_REPLIES=1`
 enables private-to-requester group results.
 

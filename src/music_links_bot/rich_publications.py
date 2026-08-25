@@ -428,6 +428,37 @@ def build_rich_card_html(
     return build_music_publication_html(publication, reply_markup=reply_markup)
 
 
+def build_rich_inline_card_html(
+    track: TrackMatch,
+    *,
+    hashtags: str | None,
+    reply_markup: InlineKeyboardMarkup | object | None,
+    media_id: str | None = None,
+) -> str:
+    """Build an inline-safe rich card.
+
+    Inline rich results may reference only files already uploaded to Telegram.
+    A remote artwork URL must therefore never leak into this payload.
+    """
+    title = MusicPublication.track_title(track)
+    pieces = [f"<h1>{html.escape(title)}</h1>"]
+    if media_id:
+        safe_media_id = re.sub(r"[^A-Za-z0-9_-]", "", media_id)[:64]
+        if safe_media_id:
+            pieces.append(
+                "<figure>"
+                f'<img src="tg://photo?id={safe_media_id}"/>'
+                f"<figcaption>{html.escape(title)}</figcaption>"
+                "</figure>"
+            )
+    buttons = rich_button_rows_html(reply_markup)
+    if buttons:
+        pieces.append(buttons)
+    if hashtags:
+        pieces.append(f"<footer>{html.escape(hashtags)}</footer>")
+    return _bounded_rich_html(pieces)
+
+
 def build_rich_track_video_html(
     track: TrackMatch,
     video: VideoMatch,

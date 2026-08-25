@@ -14,6 +14,7 @@ from music_links_bot.rich_publications import (
     build_rich_card_html,
     build_rich_collection_html,
     build_rich_html,
+    build_rich_inline_card_html,
     build_rich_track_video_html,
     default_longread,
     rich_api_unavailable,
@@ -65,6 +66,27 @@ class RichPublicationModelTests(unittest.TestCase):
         self.assertIn("<img src=", result)
         self.assertIn('type="url" style="success"', result)
         self.assertIn("<footer>#stonerhand #track</footer>", result)
+
+    def test_inline_card_never_embeds_remote_artwork(self) -> None:
+        result = build_rich_inline_card_html(
+            _track(),
+            hashtags="#stonerhand #track",
+            reply_markup=None,
+        )
+
+        self.assertIn("<h1>Sleep — Dopesmoker</h1>", result)
+        self.assertNotIn("https://img.example", result)
+        self.assertNotIn("<img", result)
+
+    def test_inline_card_can_reference_cached_telegram_artwork(self) -> None:
+        result = build_rich_inline_card_html(
+            _track(),
+            hashtags=None,
+            reply_markup=None,
+            media_id="cover",
+        )
+
+        self.assertIn('src="tg://photo?id=cover"', result)
 
     def test_track_video_and_collection_use_native_media_groups(self) -> None:
         video = VideoMatch(

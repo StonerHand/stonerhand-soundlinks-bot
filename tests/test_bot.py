@@ -4,7 +4,11 @@ import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    InputTextMessageContent,
+)
 from telegram.error import BadRequest, TelegramError
 from telegram.ext import CommandHandler
 
@@ -88,6 +92,7 @@ from music_links_bot.sharing import (
 )
 from music_links_bot.songlink import SonglinkError, SonglinkLookupError
 from music_links_bot.soundcloud import SoundCloudLookupError
+from music_links_bot.telegram_gateway import reset_capabilities
 from music_links_bot.youtube import YouTubeLookupError
 
 
@@ -723,7 +728,7 @@ class BotKeyboardTests(unittest.TestCase):
         button_texts = [
             button.text for row in keyboard.inline_keyboard for button in row
         ]
-        self.assertEqual(button_texts, ["🟢 Spotify"])
+        self.assertEqual(button_texts, ["🟢 Spotify", "🪩 Все платформы"])
         self.assertEqual(
             keyboard.inline_keyboard[0][0].api_kwargs, {"style": "primary"}
         )
@@ -738,6 +743,13 @@ class BotKeyboardTests(unittest.TestCase):
                 "tidal": "https://tidal.example/track/1",
             },
             include_channel_button=False,
+            platform_selection=[
+                "spotify",
+                "appleMusic",
+                "soundcloud",
+                "deezer",
+                "tidal",
+            ],
         )
 
         rows = keyboard.inline_keyboard
@@ -768,7 +780,7 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[1][0].url, "https://song.link/transitions")
         self.assertFalse(rows[1][0].api_kwargs)
 
-    def test_release_keyboard_hides_hub_when_it_duplicates_spotify(self) -> None:
+    def test_release_keyboard_repairs_spotify_fallback_to_songlink(self) -> None:
         keyboard = _build_link_keyboard(
             {"spotify": "https://open.spotify.com/track/1?si=tracking"},
             include_channel_button=False,
@@ -776,9 +788,11 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(len(rows), 1)
+        self.assertEqual(len(rows), 2)
         self.assertEqual(rows[0][0].text, "🟢 Spotify")
         self.assertEqual(rows[0][0].url, "https://open.spotify.com/track/1?si=tracking")
+        self.assertEqual(rows[1][0].text, "🪩 Все платформы")
+        self.assertEqual(rows[1][0].url, "https://song.link/s/1")
 
     def test_minimal_ui_mode_strips_platform_button_emoji(self) -> None:
         keyboard = _build_link_keyboard(
@@ -1254,7 +1268,7 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(track.artist, "Spotify")
         self.assertEqual(track.title, "Podcast episode")
         self.assertEqual(track.links, {"spotify": source_url})
-        self.assertEqual(track.page_url, f"https://song.link/{source_url}")
+        self.assertEqual(track.page_url, "https://pods.link/s/abc")
 
     def test_spotify_show_fallback_marks_show_format(self) -> None:
         source_url = "https://open.spotify.com/show/abc?si=123"
@@ -1347,11 +1361,99 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.title, "Youth Code — Transitions")
         self.assertEqual(result.description, "Пост с кнопками всех площадок")
         self.assertEqual(len(result.id), 32)
+        self.assertIsInstance(result.input_message_content, dict)
+        rich_html = result.input_message_content["rich_message"]["html"]
+        self.assertIn("<h1>Youth Code — Transitions</h1>", rich_html)
+        self.assertIn("🟢 Spotify", rich_html)
+        self.assertIn("🪩 Все платформы", rich_html)
+        self.assertIn("↗ Поделиться", rich_html)
+        self.assertIsNone(result.reply_markup)
+        self.assertEqual(
+            result.to_dict()["input_message_content"]["rich_message"]["html"],
+            rich_html,
+        )
+
+    async def test_inline_track_result_can_fall_back_to_classic_post(self) -> None:
+        result = await _build_inline_result(
+            "https://open.spotify.com/track/abc",
+            ContextStub(),
+            force_classic=True,
+        )
+
+        self.assertIsNotNone(result)
         self.assertIn("<b>Youth Code</b>", result.input_message_content.message_text)
         keyboard = result.reply_markup.inline_keyboard
         self.assertEqual(keyboard[0][0].text, "🟢 Spotify")
         self.assertEqual(keyboard[-1][0].text, "↗ Поделиться")
         self.assertTrue(keyboard[-1][0].switch_inline_query.startswith("sh2|"))
+
+    async def test_inline_rich_result_uses_cached_telegram_cover(self) -> None:
+        with patch(
+            "music_links_bot.bot_inline.get_cached_file_id",
+            AsyncMock(return_value="telegram-cover-file-id"),
+        ):
+            result = await _build_inline_result(
+                "https://open.spotify.com/track/abc",
+                ContextStub(),
+            )
+
+        self.assertIsNotNone(result)
+        rich_message = result.input_message_content["rich_message"]
+        self.assertIn('src="tg://photo?id=cover"', rich_message["html"])
+        self.assertEqual(
+            rich_message["media"],
+            [
+                {
+                    "id": "cover",
+                    "media": {
+                        "type": "photo",
+                        "media": "telegram-cover-file-id",
+                    },
+                }
+            ],
+        )
+
+    async def test_inline_handler_retries_classic_when_rich_is_rejected(self) -> None:
+        from music_links_bot.bot import inline_query_handler
+
+        class InlineQueryStub:
+            query = "https://open.spotify.com/track/abc"
+            from_user = None
+
+            def __init__(self) -> None:
+                self.answers: list[list] = []
+
+            async def answer(self, results, **_kwargs) -> None:
+                self.answers.append(list(results))
+                if len(self.answers) == 1:
+                    raise BadRequest("can't parse rich message")
+
+        inline_query = InlineQueryStub()
+        update = type("InlineUpdateStub", (), {"inline_query": inline_query})()
+        reset_capabilities()
+        try:
+            await inline_query_handler(update, ContextStub())
+        finally:
+            reset_capabilities()
+
+        self.assertEqual(len(inline_query.answers), 2)
+        self.assertIsInstance(
+            inline_query.answers[0][0].input_message_content,
+            dict,
+        )
+        classic_result = inline_query.answers[1][0]
+        self.assertIsInstance(
+            classic_result.input_message_content,
+            InputTextMessageContent,
+        )
+        self.assertIn(
+            "🪩 Все платформы",
+            [
+                button.text
+                for row in classic_result.reply_markup.inline_keyboard
+                for button in row
+            ],
+        )
 
     async def test_inline_result_localizes_english_description(self) -> None:
         result = await _build_inline_result(

@@ -69,6 +69,7 @@ from music_links_bot.provider_runtime import (
     set_cached_lookup,
     set_cached_negative_lookup,
 )
+from music_links_bot.release_hubs import canonical_release_hub_url
 from music_links_bot.search import SearchClient
 from music_links_bot.sharing import (
     add_share_button,
@@ -1252,8 +1253,8 @@ async def _build_lookup_fallback(
     return generic_soundcloud_fallback
 
 
-def _songlink_page_url(source_url: str) -> str:
-    return f"https://song.link/{source_url}"
+def _songlink_page_url(source_url: str) -> str | None:
+    return canonical_release_hub_url(source_url)
 
 
 def _build_podcast_fallback(source_url: str) -> TrackMatch | None:

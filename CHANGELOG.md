@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.4.3 — 2026-08-25
+
+- Restored the **All platforms** action and made Spotify tracks resolve to a
+  real canonical `song.link/s/<id>` page even while metadata uses the Spotify
+  fallback; albums and podcasts use their matching Odesli hubs.
+- Removed invalid nested Song.link URLs and centralized release-hub resolution
+  for lookup results, keyboards and provider fallbacks.
+- Upgraded single-release inline shares to Bot API 10.3 Rich Message content
+  with in-message button rows, semantic styles and an automatic classic retry.
+- Made inline Rich media spec-compliant: cached Telegram `file_id` artwork is
+  reused when available, while remote artwork is never sent in an invalid
+  inline Rich payload.
+- Added regressions for the reported Lime Garden release, canonical hubs,
+  cached Rich artwork and Telegram's Rich-to-classic fallback.
+
 ## 1.4.2 — 2026-08-25
 
 - Hid the misleading release-hub action when its destination duplicates a

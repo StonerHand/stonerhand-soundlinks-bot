@@ -9,6 +9,7 @@ import httpx
 from music_links_bot.cache import TTLCache
 from music_links_bot.constants import HTTP_USER_AGENT
 from music_links_bot.models import TrackMatch
+from music_links_bot.release_hubs import canonical_release_hub_url
 from music_links_bot.url_utils import cache_key_for_url, spotify_url_type
 
 SPOTIFY_EMBED_BASE_URL = "https://open.spotify.com/embed"
@@ -166,7 +167,7 @@ def parse_spotify_page(source_url: str, html: str) -> TrackMatch:
         title=title,
         artist=artist,
         links={"spotify": clean_url},
-        page_url=clean_url,
+        page_url=canonical_release_hub_url(clean_url),
         release_year=release_year,
         kind=normalized_kind,
         release_format="album" if normalized_kind == "album" else None,
@@ -207,7 +208,10 @@ def parse_spotify_embed(source_url: str, html: str) -> TrackMatch:
         title=title,
         artist=artist,
         links={"spotify": cache_key_for_url(source_url)},
-        page_url=cache_key_for_url(source_url),
+        page_url=canonical_release_hub_url(
+            source_url,
+            release_kind=normalized_kind,
+        ),
         release_year=release_year,
         kind=normalized_kind,
         release_format="album" if normalized_kind == "album" else None,
