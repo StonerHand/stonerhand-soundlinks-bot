@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
-from music_links_bot.telegram_gateway import TelegramApiGateway
+from music_links_bot.telegram_gateway import TelegramApiGateway, feature_enabled
 
 
 class _Bot:
@@ -15,6 +16,15 @@ class _Bot:
 
 
 class TelegramGatewayTests(unittest.IsolatedAsyncioTestCase):
+    async def test_safe_mode_disables_optional_capabilities(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {"BOT_SAFE_MODE": "1", "RICH_MESSAGES_ENABLED": "1"},
+            clear=True,
+        ):
+            self.assertFalse(feature_enabled("RICH_MESSAGES_ENABLED"))
+            self.assertTrue(feature_enabled("BOT_SAFE_MODE", default=False))
+
     async def test_ephemeral_parameters_use_bot_api_10_3_shape(self) -> None:
         bot = _Bot()
         gateway = TelegramApiGateway(bot=bot)

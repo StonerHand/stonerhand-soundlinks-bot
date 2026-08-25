@@ -39,6 +39,7 @@ ACTION_SPECS = tuple(
         ("menu", "platforms", "services", ActionKind.NAVIGATION),
         ("menu", "demo", "demo", ActionKind.NAVIGATION),
         ("menu", "more", "more", ActionKind.NAVIGATION),
+        ("menu", "privacy", "privacy", ActionKind.NAVIGATION),
         ("menu", "stats", "stats", ActionKind.NAVIGATION),
         ("editor", "b", "card", ActionKind.NAVIGATION),
         ("editor", "m", "settings", ActionKind.NAVIGATION),
@@ -105,6 +106,9 @@ ACTION_SPECS = tuple(
         ("retry", "replace", "replace_failed_source", ActionKind.INPUT),
         ("select", "pick", "pick_search_result", ActionKind.NAVIGATION),
         ("noop", "busy", "busy", ActionKind.NAVIGATION),
+        ("progress", "cancel", "cancel_search", ActionKind.DESTRUCTIVE),
+        ("privacy", "confirm", "confirm_delete_data", ActionKind.NAVIGATION),
+        ("privacy", "delete", "delete_data", ActionKind.DESTRUCTIVE),
         ("queue", "open", "open_queue", ActionKind.NAVIGATION),
         ("playlist", "import", "import_playlist", ActionKind.DELIVERY),
     )

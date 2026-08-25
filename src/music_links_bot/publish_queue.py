@@ -193,6 +193,24 @@ async def remove_job(context, job_id: str) -> bool:
     return await _locked_mutate(context, mutate)
 
 
+async def remove_user_jobs(context, user_id: int) -> int:
+    """Delete scheduled drafts created in the user's private chat."""
+
+    def mutate(jobs: list[dict]):
+        remaining: list[dict] = []
+        removed = 0
+        for job in jobs:
+            draft = job.get("draft")
+            owner_id = int(draft.get("chat_id") or 0) if isinstance(draft, dict) else 0
+            if owner_id == user_id:
+                removed += 1
+            else:
+                remaining.append(job)
+        return removed, remaining
+
+    return await _locked_mutate(context, mutate)
+
+
 async def reschedule_job(context, job_id: str, publish_at: int) -> bool:
     def mutate(jobs: list[dict]):
         found = False

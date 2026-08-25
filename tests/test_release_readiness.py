@@ -53,6 +53,15 @@ class ReleaseReadinessTests(unittest.TestCase):
         self.assertIn("python -m bandit -q -r src api -x tests", workflow)
         self.assertIn("python -m pip_audit", workflow)
 
+    def test_production_canary_has_guarded_instant_rollback(self) -> None:
+        workflow = (ROOT / ".github/workflows/production-canary.yml").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("rollback_guard.py", workflow)
+        self.assertIn("vercel@59.5.0 rollback", workflow)
+        self.assertIn("VERCEL_TOKEN", workflow)
+
 
 if __name__ == "__main__":
     unittest.main()

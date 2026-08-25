@@ -23,14 +23,19 @@ class CapabilityState:
 
 
 _CAPABILITIES: dict[str, CapabilityState] = {}
+_TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
 
 
 def feature_enabled(name: str, *, default: bool = True) -> bool:
-    """Read a boolean feature flag without requiring production env changes."""
+    """Read a boolean feature flag with one global emergency kill switch."""
+    if name != "BOT_SAFE_MODE":
+        safe_mode = os.getenv("BOT_SAFE_MODE", "").strip().casefold()
+        if safe_mode in _TRUE_VALUES:
+            return False
     raw = os.getenv(name)
     if raw is None:
         return default
-    return raw.strip().casefold() in {"1", "true", "yes", "on"}
+    return raw.strip().casefold() in _TRUE_VALUES
 
 
 def capability_available(name: str) -> bool:

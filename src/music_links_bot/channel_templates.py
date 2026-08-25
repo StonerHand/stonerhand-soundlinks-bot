@@ -128,3 +128,12 @@ async def save_channel_template(context, target: int | str, draft: dict) -> None
             {"v": TEMPLATE_SCHEMA_VERSION, "template": template},
             ttl_seconds=CHANNEL_TEMPLATE_TTL_SECONDS,
         )
+
+
+async def clear_channel_template(context, target: int | str) -> None:
+    key = _template_key(target)
+    context.application.bot_data.setdefault("channel_templates", {}).pop(key, None)
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    if kv is not None:
+        await kv.delete(key)
+        await kv.delete(_template_key(target, version=1))

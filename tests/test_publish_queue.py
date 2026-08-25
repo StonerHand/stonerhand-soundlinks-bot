@@ -168,6 +168,24 @@ class PublishQueueTests(unittest.TestCase):
         self.assertFalse(missing)
         self.assertEqual(jobs, [])
 
+    def test_remove_user_jobs_keeps_other_users_schedule(self) -> None:
+        context = make_context()
+
+        async def scenario():
+            own = make_draft()
+            own["chat_id"] = 7
+            other = make_draft()
+            other["chat_id"] = 8
+            await publish_queue.add_job(context, own, 1000)
+            await publish_queue.add_job(context, other, 2000)
+            removed = await publish_queue.remove_user_jobs(context, 7)
+            return removed, await publish_queue.load_jobs(context)
+
+        removed, jobs = asyncio.run(scenario())
+        self.assertEqual(removed, 1)
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(jobs[0]["draft"]["chat_id"], 8)
+
     def test_process_due_jobs_publishes_and_keeps_future(self) -> None:
         context = make_context()
 

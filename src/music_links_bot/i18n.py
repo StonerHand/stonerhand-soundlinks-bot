@@ -183,6 +183,68 @@ STRINGS: dict[str, dict[str, str]] = {
     "tab_platforms": {RU: "🎛 Сервисы", EN: "🎛 Services"},
     "tab_guide": {RU: "📣 Для каналов", EN: "📣 For channels"},
     "tab_demo": {RU: "🧪 Пример поста", EN: "🧪 Example post"},
+    "tab_privacy": {RU: "🔐 Данные и приватность", EN: "🔐 Data and privacy"},
+    "privacy_title": {
+        RU: (
+            "🔐 <b>Данные и приватность</b>\n\n"
+            "Бот хранит только состояние, нужное для работы: черновики, подборку, "
+            "историю, настройки оформления и запланированные публикации. "
+            "Срок хранения ограничен, а статистика продукта считается без текста "
+            "постов и музыкальных ссылок.\n\n"
+            "<blockquote>После удаления временные токены поиска могут существовать "
+            "не более 30 минут, затем исчезают автоматически.</blockquote>"
+        ),
+        EN: (
+            "🔐 <b>Data and privacy</b>\n\n"
+            "The bot stores only working state: drafts, your crate, history, design "
+            "settings and scheduled publications. Retention is limited, while product "
+            "metrics contain no post text or music links.\n\n"
+            "<blockquote>After deletion, temporary search tokens may remain for up to "
+            "30 minutes and then expire automatically.</blockquote>"
+        ),
+    },
+    "privacy_delete": {RU: "Удалить мои данные", EN: "Delete my data"},
+    "privacy_confirm": {
+        RU: (
+            "⚠️ <b>Удалить данные без возможности восстановления?</b>\n\n"
+            "Будут удалены черновики, история, подборка, шаблоны, настройки и "
+            "запланированные тобой публикации. Уже опубликованные сообщения в "
+            "Telegram останутся на месте."
+        ),
+        EN: (
+            "⚠️ <b>Delete data permanently?</b>\n\n"
+            "Drafts, history, crate, templates, settings and your scheduled posts will "
+            "be removed. Messages already published to Telegram will remain."
+        ),
+    },
+    "privacy_delete_confirm": {
+        RU: "Удалить безвозвратно",
+        EN: "Delete permanently",
+    },
+    "privacy_deleted": {
+        RU: (
+            "✅ <b>Данные удалены</b>\n\n"
+            "Удалено черновиков: <b>{drafts}</b>\n"
+            "Снято с очереди: <b>{scheduled}</b>\n\n"
+            "Можешь начать заново — просто пришли музыкальную ссылку."
+        ),
+        EN: (
+            "✅ <b>Data deleted</b>\n\n"
+            "Drafts removed: <b>{drafts}</b>\n"
+            "Scheduled posts removed: <b>{scheduled}</b>\n\n"
+            "You can start over by sending a music link."
+        ),
+    },
+    "privacy_deleted_queue_warning": {
+        RU: (
+            "\n\n⚠️ Очередь публикаций временно недоступна. Остальные данные удалены; "
+            "проверь очередь позже через владельца бота."
+        ),
+        EN: (
+            "\n\n⚠️ The publishing queue is temporarily unavailable. Other data was "
+            "deleted; ask the bot owner to check the queue later."
+        ),
+    },
     "share_post": {
         RU: "↗ Поделиться",
         EN: "↗ Share",
@@ -632,6 +694,12 @@ STRINGS: dict[str, dict[str, str]] = {
         RU: "Уже готово — повторно ничего не отправлял.",
         EN: "Already done — nothing was sent twice.",
     },
+    "request_cancel": {RU: "Отменить поиск", EN: "Cancel search"},
+    "request_cancelled": {RU: "Поиск отменён", EN: "Search cancelled"},
+    "request_not_running": {
+        RU: "Этот поиск уже завершён",
+        EN: "This search has already finished",
+    },
     "retry": {RU: "Повторить", EN: "Retry"},
     "retry_failed": {
         RU: "Проверить все ссылки",
@@ -713,6 +781,16 @@ STRINGS: dict[str, dict[str, str]] = {
             "tap Retry."
         ),
     },
+    "error_rate_limit": {
+        RU: (
+            "Слишком много запросов подряд. Подожди примерно "
+            "<b>{seconds} сек.</b> — уже собранные карточки останутся на месте."
+        ),
+        EN: (
+            "Too many requests in a short time. Wait about "
+            "<b>{seconds} sec.</b> — completed cards will stay in place."
+        ),
+    },
     "search_choose": {
         RU: "<b>Выбери релиз</b>\n\nНашёл несколько вариантов по запросу «{query}»:",
         EN: "<b>Choose a release</b>\n\nI found several matches for “{query}”:",
@@ -742,8 +820,8 @@ STRINGS: dict[str, dict[str, str]] = {
         EN: "{done}/{total} · Building the result and marking failed links…",
     },
     "progress_cancelled": {
-        RU: "Поиск отменён — обрабатываю новый запрос.",
-        EN: "Search cancelled — processing the new request.",
+        RU: "Поиск отменён.",
+        EN: "Search cancelled.",
     },
     "crate_empty": {
         RU: (

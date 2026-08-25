@@ -153,6 +153,14 @@ def build_section_keyboard(
             ]
             for action_row in (("help", "platforms"), ("guide", "demo"))
         )
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "tab_privacy"),
+                    callback_data=encode_callback("menu", "privacy"),
+                )
+            ]
+        )
     rows.append(
         [
             InlineKeyboardButton(
@@ -177,6 +185,25 @@ def build_create_keyboard(*, lang: str) -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     get_text(lang, "home_back"),
                     callback_data=encode_callback("menu", "start"),
+                )
+            ],
+        ]
+    )
+
+
+def build_privacy_keyboard(*, lang: str, confirm: bool = False) -> InlineKeyboardMarkup:
+    primary = callback_button(
+        get_text(lang, "privacy_delete_confirm" if confirm else "privacy_delete"),
+        encode_callback("privacy", "delete" if confirm else "confirm"),
+        tone=ButtonTone.DANGER if confirm else None,
+    )
+    return InlineKeyboardMarkup(
+        [
+            [primary],
+            [
+                callback_button(
+                    get_text(lang, "home_back"),
+                    encode_callback("menu", "start"),
                 )
             ],
         ]

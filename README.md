@@ -44,6 +44,10 @@ opening a separate web interface.
 - includes a paginated admin dashboard for the durable scheduled-publishing queue;
 - uses an explicit bot timezone for fixed and custom publication times;
 - lets the user cancel any native text input with `/cancel`;
+- lets the user cancel a long lookup from its progress message;
+- rate-limits accidental request bursts without losing finished cards;
+- exposes `/privacy` with confirmed deletion of drafts, history, crates,
+  templates, personal labels and user-owned scheduled posts;
 - works inline: `@StonerHandBot artist — track`;
 - explains incomplete batches per source and lets the user replace a failed link by number;
 - can keep group replies visible only to the requesting user through opt-in
@@ -138,6 +142,9 @@ nodes and media failures use the same lossless fallback automatically.
 `RICH_DRAFTS_ENABLED=0`
 keeps experimental streamed drafts off by default. `EPHEMERAL_GROUP_REPLIES=1`
 enables private-to-requester group results.
+`INLINE_RICH_MEDIA_ENABLED=0` disables Rich media only for inline results.
+`BOT_SAFE_MODE=1` is the emergency switch: it disables all optional Bot API
+10.3 presentation paths while preserving complete classic cards and publishing.
 
 ## Release quality
 
@@ -148,7 +155,10 @@ Every pull request passes the complete release gate:
 - Pyflakes, Bandit and known-vulnerability auditing for production dependencies;
 - version, changelog and Vercel route/build/cron consistency contracts;
 - a preview deployment, followed after merge by a production canary that checks
-  the exact commit, Telegram webhook, Redis and the publishing-queue worker.
+  the exact commit, Telegram webhook, Redis and the publishing-queue worker;
+- a guarded Vercel rollback that can run only when the canary proves the exact
+  newly deployed commit is unhealthy. It never rolls back an unreadable,
+  healthy or unrelated deployment.
 
 Local pre-release validation:
 
@@ -164,7 +174,11 @@ python tests/check_dependency_pins.py
 python -m json.tool vercel.json >/dev/null
 ```
 
-See [CHANGELOG.md](CHANGELOG.md) for release notes.
+See [CHANGELOG.md](CHANGELOG.md) for release notes. The final real-client pass
+is documented in [RELEASE_CHECKLIST.ru.md](RELEASE_CHECKLIST.ru.md).
+Automatic rollback requires the repository secrets `VERCEL_TOKEN`,
+`VERCEL_ORG_ID` and `VERCEL_PROJECT_ID`; the workflow fails safely without
+changing production when any of them is absent.
 
 ## Layout
 
@@ -187,6 +201,8 @@ runtime metrics and the exact deployed version/commit. The production canary
 rejects stale deployments, a failed worker and an overdue durable queue.
 Provider diagnostics include request volume, success rate, average latency,
 fallbacks, timeouts and rate limits. Runtime metrics also expose Rich Message
-attempts, failures and automatic fallbacks.
+attempts, failures, automatic fallbacks and an anonymous
+request → resolve → edit → publish funnel. Provider degradation is reported as
+a warning without taking the otherwise healthy bot offline.
 
 License: [MIT](LICENSE).

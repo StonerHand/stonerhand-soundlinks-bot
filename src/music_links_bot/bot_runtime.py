@@ -22,6 +22,9 @@ CALLBACK_VERSION = "v2"
 CALLBACK_TTL_SECONDS = 15 * 60
 ACTION_LOCK_SECONDS = 45
 INTENT_TTL_SECONDS = 4
+RATE_LIMIT_WINDOW_SECONDS = 60
+RATE_LIMIT_MAX_REQUESTS = 12
+ACTIVE_REQUEST_TTL_SECONDS = 5 * 60
 SESSION_TTL_SECONDS = 30 * 24 * 3600
 SESSION_SCHEMA_VERSION = 4
 MAX_MEMORY_SESSIONS = 500
@@ -196,6 +199,8 @@ class BotRuntime:
         self.seen_callbacks: dict[str, float] = {}
         self.action_locks: dict[str, float] = {}
         self.recent_intents: dict[str, float] = {}
+        self.request_windows: dict[int, tuple[int, float]] = {}
+        self.request_tokens: dict[int, str] = {}
         self.active_tasks: dict[int, asyncio.Task[Any]] = {}
         self.diagnostics: dict[str, ProviderDiagnostic] = {}
         self.metrics: dict[str, int] = {
@@ -210,6 +215,11 @@ class BotRuntime:
             "rich_messages": 0,
             "rich_message_errors": 0,
             "rich_message_fallbacks": 0,
+            "rate_limited": 0,
+            "funnel_started": 0,
+            "funnel_resolved": 0,
+            "funnel_edited": 0,
+            "funnel_published": 0,
         }
         self._metrics_persisted_at = 0.0
 
@@ -335,6 +345,41 @@ class BotRuntime:
         self.recent_intents[key] = now + ttl
         return True
 
+    async def allow_user_request(
+        self,
+        user_id: int,
+        *,
+        max_requests: int = RATE_LIMIT_MAX_REQUESTS,
+        window_seconds: int = RATE_LIMIT_WINDOW_SECONDS,
+    ) -> tuple[bool, int]:
+        """Apply a small per-user fixed window without storing request content."""
+        limit = max(1, int(max_requests))
+        window = max(1, int(window_seconds))
+        wall_now = int(time())
+        retry_after = window - wall_now % window
+        if self.kv is not None:
+            counter = await self.kv.increment_window(
+                f"rate:v1:{user_id}:{wall_now // window}",
+                ttl_seconds=window + 1,
+            )
+            if counter is not None:
+                allowed = counter <= limit
+                if not allowed:
+                    self.metrics["rate_limited"] += 1
+                return allowed, retry_after
+
+        now = monotonic()
+        count, expires_at = self.request_windows.get(user_id, (0, now + window))
+        if expires_at <= now:
+            count, expires_at = 0, now + window
+        count += 1
+        self._cap(self.request_windows, MAX_MEMORY_SESSIONS)
+        self.request_windows[user_id] = (count, expires_at)
+        allowed = count <= limit
+        if not allowed:
+            self.metrics["rate_limited"] += 1
+        return allowed, max(1, int(expires_at - now))
+
     def register_request(self, user_id: int) -> asyncio.Task[Any] | None:
         current = asyncio.current_task()
         previous = self.active_tasks.get(user_id)
@@ -344,10 +389,80 @@ class BotRuntime:
             self.active_tasks[user_id] = current
         return previous
 
+    async def begin_request(self, user_id: int) -> str:
+        """Register a lookup and make it the only current cross-instance request."""
+        self.register_request(user_id)
+        token = secrets.token_hex(12)
+        self.request_tokens[user_id] = token
+        if self.kv is not None:
+            await self.kv.set(
+                f"active-request:v1:{user_id}",
+                token,
+                ttl_seconds=ACTIVE_REQUEST_TTL_SECONDS,
+            )
+        return token
+
+    async def request_is_current(self, user_id: int, token: str) -> bool:
+        if self.kv is not None:
+            stored = await self.kv.get(f"active-request:v1:{user_id}")
+            if stored is not None:
+                return stored == token
+        return self.request_tokens.get(user_id) == token
+
     def finish_request(self, user_id: int) -> None:
         current = asyncio.current_task()
         if self.active_tasks.get(user_id) is current:
             self.active_tasks.pop(user_id, None)
+
+    def cancel_request(self, user_id: int) -> bool:
+        task = self.active_tasks.get(user_id)
+        if task is None or task is asyncio.current_task() or task.done():
+            return False
+        task.cancel()
+        return True
+
+    async def cancel_request_durable(self, user_id: int) -> bool:
+        cancelled = self.cancel_request(user_id)
+        if self.kv is None:
+            return cancelled
+        key = f"active-request:v1:{user_id}"
+        active = await self.kv.get(key)
+        if active is None:
+            return cancelled
+        marked = await self.kv.set(
+            key,
+            f"cancelled:{secrets.token_hex(6)}",
+            ttl_seconds=ACTIVE_REQUEST_TTL_SECONDS,
+        )
+        return cancelled or marked
+
+    async def finish_request_durable(self, user_id: int) -> None:
+        current = asyncio.current_task()
+        if self.active_tasks.get(user_id) is not current:
+            return
+        token = self.request_tokens.pop(user_id, "")
+        self.finish_request(user_id)
+        if token and self.kv is not None:
+            await self.kv.delete_if_value(f"active-request:v1:{user_id}", token)
+
+    async def forget_session(self, user_id: int) -> None:
+        task = self.active_tasks.get(user_id)
+        current = asyncio.current_task()
+        if task is not None and task is not current and not task.done():
+            task.cancel()
+        self.sessions.pop(user_id, None)
+        self.request_windows.pop(user_id, None)
+        self.request_tokens.pop(user_id, None)
+        self.active_tasks.pop(user_id, None)
+        if self.kv is not None:
+            wall_window = int(time()) // RATE_LIMIT_WINDOW_SECONDS
+            await asyncio.gather(
+                self.kv.delete(f"session:v2:{user_id}"),
+                self.kv.delete(f"session:v1:{user_id}"),
+                self.kv.delete(f"rate:v1:{user_id}:{wall_window}"),
+                self.kv.delete(f"rate:v1:{user_id}:{wall_window - 1}"),
+                self.kv.delete(f"active-request:v1:{user_id}"),
+            )
 
     def record_provider(
         self,
@@ -433,6 +548,13 @@ class BotRuntime:
         self.metrics["publications"] += 1
         if not ok:
             self.metrics["publication_errors"] += 1
+        else:
+            self.record_funnel("published")
+
+    def record_funnel(self, stage: str) -> None:
+        key = f"funnel_{stage}"
+        if key in self.metrics:
+            self.metrics[key] += 1
 
     def record_rich_message(self, *, ok: bool, fallback: bool = False) -> None:
         """Record Rich Message delivery and automatic classic fallback."""
@@ -457,6 +579,10 @@ class BotRuntime:
                 "partials": item["partials"],
                 "timeouts": item["timeouts"],
                 "rate_limits": item["rate_limits"],
+                "consecutive_failures": item["consecutive_failures"],
+                "circuit_open": item["circuit_open"],
+                "last_error": item["last_error"],
+                "checked_at": item["checked_at"],
             }
             for item in self.provider_snapshot()
         }

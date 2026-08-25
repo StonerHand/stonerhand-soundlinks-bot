@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from api.health import (
     describe_failures,
+    evaluate_provider_metrics,
     evaluate_webhook_info,
     overall_ok,
     overall_service_ok,
@@ -61,6 +62,40 @@ class WebhookEvaluationTests(unittest.TestCase):
 
 
 class OverallHealthTests(unittest.TestCase):
+    def test_provider_metrics_warn_without_failing_the_bot(self) -> None:
+        result = evaluate_provider_metrics(
+            {
+                "providers": {
+                    "songlink": {
+                        "requests": 4,
+                        "success_rate_percent": 25,
+                    },
+                    "spotify": {
+                        "requests": 4,
+                        "success_rate_percent": 100,
+                    },
+                }
+            }
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["degraded"], ["songlink"])
+
+    def test_provider_metrics_tolerate_malformed_persisted_data(self) -> None:
+        result = evaluate_provider_metrics(
+            {
+                "providers": {
+                    "songlink": {
+                        "requests": "broken",
+                        "success_rate_percent": object(),
+                        "consecutive_failures": None,
+                    }
+                }
+            }
+        )
+
+        self.assertEqual(result["degraded"], [])
+
     def _checks(
         self,
         telegram=True,

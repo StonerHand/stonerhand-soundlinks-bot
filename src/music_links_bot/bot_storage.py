@@ -85,6 +85,15 @@ async def load_draft(context, draft_id: str) -> dict | None:
     return None
 
 
+async def delete_draft(context, draft_id: str) -> None:
+    if not valid_state_id(draft_id):
+        return
+    context.application.bot_data.setdefault("drafts", {}).pop(draft_id, None)
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    if kv is not None:
+        await kv.delete(f"draft:{draft_id}")
+
+
 async def store_search_selection(
     context,
     *,
