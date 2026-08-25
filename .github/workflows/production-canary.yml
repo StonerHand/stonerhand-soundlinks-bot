@@ -21,15 +21,40 @@ jobs:
       github.event_name != 'workflow_run' ||
       github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v7
       - name: Verify bot, webhook and Redis
+        id: canary
+        continue-on-error: true
         env:
           CANARY_EXPECT_COMMIT: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
         run: |
-          for attempt in 1 2 3 4 5 6; do
+          for attempt in 1 2 3 4 5 6 7 8 9; do
             python tests/e2e/production_canary.py && exit 0
             sleep 20
           done
           exit 1
+      - name: Confirm the failed build is the new production build
+        id: rollback_guard
+        if: steps.canary.outcome == 'failure' && github.event_name == 'workflow_run'
+        continue-on-error: true
+        env:
+          CANARY_EXPECT_COMMIT: ${{ github.event.workflow_run.head_sha }}
+        run: python tests/e2e/rollback_guard.py
+      - name: Instant rollback of the unhealthy release
+        if: steps.rollback_guard.outcome == 'success'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          test -n "$VERCEL_TOKEN"
+          test -n "$VERCEL_ORG_ID"
+          test -n "$VERCEL_PROJECT_ID"
+          npx --yes vercel@59.5.0 project inspect --non-interactive
+          npx --yes vercel@59.5.0 rollback --yes --non-interactive --timeout 60s
+          CANARY_EXPECT_COMMIT= python tests/e2e/production_canary.py
+      - name: Keep the failed release visible
+        if: steps.canary.outcome == 'failure'
+        run: exit 1

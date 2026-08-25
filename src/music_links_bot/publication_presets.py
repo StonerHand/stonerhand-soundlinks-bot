@@ -116,3 +116,11 @@ async def delete_named_preset(context, user_id: int, index: int) -> bool:
     presets.pop(index)
     await _save_all(context, user_id, presets)
     return True
+
+
+async def clear_presets(context, user_id: int) -> None:
+    key = _key(user_id)
+    context.application.bot_data.setdefault("publication_presets", {}).pop(key, None)
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    if kv is not None:
+        await kv.delete(key)

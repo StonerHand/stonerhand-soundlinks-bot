@@ -178,6 +178,62 @@ class RuntimeSafetyTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(asyncio.CancelledError):
             await task
 
+    async def test_user_rate_limit_is_bounded_and_reports_retry(self) -> None:
+        runtime = BotRuntime()
+
+        first = await runtime.allow_user_request(7, max_requests=2)
+        second = await runtime.allow_user_request(7, max_requests=2)
+        limited = await runtime.allow_user_request(7, max_requests=2)
+
+        self.assertTrue(first[0])
+        self.assertTrue(second[0])
+        self.assertFalse(limited[0])
+        self.assertGreaterEqual(limited[1], 1)
+        self.assertEqual(runtime.metrics_snapshot()["rate_limited"], 1)
+
+    async def test_funnel_metrics_are_anonymous_counters(self) -> None:
+        runtime = BotRuntime()
+        for stage in ("started", "resolved", "edited"):
+            runtime.record_funnel(stage)
+        runtime.record_publication(ok=True)
+
+        snapshot = runtime.metrics_snapshot()
+        self.assertEqual(snapshot["funnel_started"], 1)
+        self.assertEqual(snapshot["funnel_resolved"], 1)
+        self.assertEqual(snapshot["funnel_edited"], 1)
+        self.assertEqual(snapshot["funnel_published"], 1)
+
+    async def test_request_generation_cancels_stale_cross_instance_result(self) -> None:
+        class SharedKV:
+            def __init__(self) -> None:
+                self.values: dict[str, str] = {}
+
+            async def set(self, key, value, **kwargs):
+                del kwargs
+                self.values[key] = value
+                return True
+
+            async def get(self, key):
+                return self.values.get(key)
+
+            async def delete_if_value(self, key, value):
+                if self.values.get(key) != value:
+                    return False
+                self.values.pop(key, None)
+                return True
+
+        kv = SharedKV()
+        first = BotRuntime(kv)  # type: ignore[arg-type]
+        second = BotRuntime(kv)  # type: ignore[arg-type]
+
+        first_token = await first.begin_request(7)
+        second_token = await second.begin_request(7)
+
+        self.assertFalse(await first.request_is_current(7, first_token))
+        self.assertTrue(await second.request_is_current(7, second_token))
+        self.assertTrue(await first.cancel_request_durable(7))
+        self.assertFalse(await second.request_is_current(7, second_token))
+
     async def test_session_remembers_retry_action(self) -> None:
         runtime = BotRuntime()
         await runtime.remember_action(7, kind="search", value="Youth Code", lang="ru")

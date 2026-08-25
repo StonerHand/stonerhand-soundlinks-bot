@@ -26,11 +26,13 @@ PUBLIC_BOT_COMMANDS = (
     BotCommand("start", "меню и быстрый старт"),
     BotCommand("help", "как пользоваться"),
     BotCommand("crate", "моя подборка"),
+    BotCommand("privacy", "данные и приватность"),
 )
 PUBLIC_BOT_COMMANDS_EN = (
     BotCommand("start", "menu and quick start"),
     BotCommand("help", "how to use the bot"),
     BotCommand("crate", "my music crate"),
+    BotCommand("privacy", "data and privacy"),
 )
 BOT_DESCRIPTIONS = {
     "": (
@@ -135,6 +137,7 @@ def build_application(settings: Settings) -> Application:
     application.add_handler(CommandHandler("stats", handlers.stats_command))
     application.add_handler(CommandHandler("crate", handlers.crate_command))
     application.add_handler(CommandHandler("cancel", handlers.cancel_command))
+    application.add_handler(CommandHandler("privacy", handlers.privacy_command))
     application.add_handler(CommandHandler("status", handlers.status_command))
     application.add_handler(
         CallbackQueryHandler(handlers.bot_callback, pattern=r"^v2\|")

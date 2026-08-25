@@ -60,6 +60,7 @@ from music_links_bot.sharing import (
     render_inline_share_card,
 )
 from music_links_bot.telegram_gateway import (
+    feature_enabled,
     record_capability_failure,
     record_capability_success,
 )
@@ -625,6 +626,7 @@ def _inline_article(
         bool(rich_html)
         and bool(rich_media)
         and rich_messages_enabled()
+        and feature_enabled("INLINE_RICH_MEDIA_ENABLED", default=True)
         and not channel_safe
         and not force_classic
     )

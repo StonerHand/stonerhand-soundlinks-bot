@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.6.0 — 2026-08-25
+
+- Added cancellable lookup progress with a Classic-client fallback and
+  cross-instance request generations, so a cancelled or superseded search can
+  no longer publish a stale result after another Vercel invocation wins.
+- Added a Redis-backed per-user burst limit with a clear retry time instead of
+  letting accidental request storms overload music providers.
+- Added `/privacy` with a two-step destructive confirmation and deletion of
+  sessions, drafts, crates, history, templates, inline history, personal stats
+  labels and user-owned scheduled posts while retaining anonymous totals.
+- Added an anonymous `request → resolve → edit → publish` funnel and persisted
+  provider circuit state; `/status`, `/stats` and health now distinguish a
+  degraded music provider from a complete bot outage.
+- Added `BOT_SAFE_MODE` plus a dedicated inline Rich-media flag, providing one
+  emergency switch back to complete Classic Telegram cards without disabling
+  lookup or publishing.
+- Added a guarded production rollback path: only the exact newly deployed
+  unhealthy commit can trigger Vercel Instant Rollback, never a stale build or
+  an unreadable external health endpoint.
+- Added a real-client release matrix for Telegram iOS, Android, Desktop and Web,
+  and refreshed English, Russian and architecture documentation for the new
+  safety, privacy and operations controls.
+- Expanded regression coverage for rate limiting, stale cross-instance
+  requests, provider degradation, privacy deletion, queue ownership, feature
+  flags, anonymous stats and rollback eligibility.
+
 ## 1.5.0 — 2026-08-25
 
 - Hardened the release pipeline: CI now runs the complete configured Ruff

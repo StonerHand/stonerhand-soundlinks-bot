@@ -51,7 +51,10 @@ async def stats_text(context, *, include_private: bool) -> str:
         f"среднее: {metrics['request_ms_avg']} ms · "
         f"кэш: {metrics['cache_hits']}/{metrics['cache_misses']}\n"
         f"Rich: {metrics['rich_messages']} · "
-        f"fallback: {metrics['rich_message_fallbacks']}"
+        f"fallback: {metrics['rich_message_fallbacks']}\n"
+        f"Воронка: {metrics['funnel_started']} → {metrics['funnel_resolved']} → "
+        f"{metrics['funnel_edited']} → {metrics['funnel_published']} · "
+        f"лимит: {metrics['rate_limited']}"
     )
     diagnostics = runtime.provider_snapshot()
     if diagnostics:
@@ -177,6 +180,14 @@ async def build_status_text(context) -> str:
                     f"fallback: "
                     f"<code>{int(metrics.get('rich_message_fallbacks') or 0)}</code>"
                 ),
+                (
+                    "Воронка: "
+                    f"<code>{int(metrics.get('funnel_started') or 0)}</code> → "
+                    f"<code>{int(metrics.get('funnel_resolved') or 0)}</code> → "
+                    f"<code>{int(metrics.get('funnel_edited') or 0)}</code> → "
+                    f"<code>{int(metrics.get('funnel_published') or 0)}</code>"
+                ),
+                (f"Rate limit: <code>{int(metrics.get('rate_limited') or 0)}</code>"),
             ]
         )
 

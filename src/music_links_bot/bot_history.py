@@ -75,3 +75,11 @@ async def load_history_items(context, user_id: int) -> list[dict]:
             ]
     histories: dict = context.application.bot_data.setdefault("bot_history", {})
     return list(histories.get(user_id) or [])
+
+
+async def clear_history(context, user_id: int) -> None:
+    context.application.bot_data.setdefault("bot_history", {}).pop(user_id, None)
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    if kv is not None:
+        await kv.delete(f"hist:{user_id}")
+        await kv.delete(f"hist:lock:{user_id}")

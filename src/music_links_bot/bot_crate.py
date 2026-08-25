@@ -95,6 +95,16 @@ async def save_crate(bot_data: dict, user_id: int, items: list[dict[str, Any]]) 
         )
 
 
+async def clear_crate(bot_data: dict, user_id: int) -> None:
+    _memory_crates(bot_data).pop(user_id, None)
+    _memory_titles(bot_data).pop(user_id, None)
+    kv: KVStore | None = bot_data.get("kv_store")
+    if kv is not None:
+        await kv.delete(f"bot-crate:v2:{user_id}")
+        await kv.delete(f"bot-crate:v1:{user_id}")
+        await kv.delete(f"bot-crate-title:v1:{user_id}")
+
+
 async def add_to_crate(
     bot_data: dict, user_id: int, *, draft_id: str, item: dict[str, Any]
 ) -> tuple[list[dict[str, Any]], bool]:

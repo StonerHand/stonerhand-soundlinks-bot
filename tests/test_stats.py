@@ -21,10 +21,27 @@ from music_links_bot.stats import (
     record_playlists,
     record_radios,
     record_videos,
+    remove_identity,
 )
 
 
 class StatsTests(unittest.TestCase):
+    def test_remove_identity_keeps_anonymous_totals(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "stats.json"
+            before = record_matches(
+                [TrackMatch(title="Song", artist="Artist", links={})],
+                path=path,
+                user={"id": 7, "label": "listener"},
+                chat={"id": 7, "label": "private"},
+            )
+
+            after = remove_identity(7, path=path)
+
+            self.assertEqual(after["posts"], before["posts"])
+            self.assertNotIn("7", after["users"])
+            self.assertNotIn("7", after["chats"])
+
     def test_record_matches_counts_posts_and_release_types(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "stats.json"

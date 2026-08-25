@@ -174,11 +174,13 @@ from music_links_bot.bot_menu import (
     cancel_command,
     channel_command,
     dispatch_menu_action as _dispatch_menu_action,
+    dispatch_privacy_action as _dispatch_privacy_action,
     guide_command,
     help_command,
     legacy_menu_callback as menu_callback,
     menu_text as _menu_text,
     platforms_command,
+    privacy_command,
     reply_with_menu as _reply_with_menu,
     runtime_for as _runtime,
     start_command,
@@ -336,6 +338,7 @@ __all__ = [
     "menu_callback",
     "normalize_hashtag",
     "platforms_command",
+    "privacy_command",
     "start_command",
     "stats_command",
     "status_command",
@@ -452,6 +455,8 @@ async def bot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "crate": _dispatch_crate_action,
         "retry": _dispatch_retry_action,
         "noop": _dispatch_noop_action,
+        "progress": _dispatch_progress_action,
+        "privacy": _dispatch_privacy_action,
         "queue": dispatch_queue_action,
         "playlist": _dispatch_playlist_action,
     }
@@ -465,6 +470,19 @@ async def bot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def _dispatch_noop_action(query, context, action: CallbackAction) -> None:
     del context, action
     await query.answer()
+
+
+async def _dispatch_progress_action(query, context, action: CallbackAction) -> None:
+    del action
+    if query.from_user is None:
+        await query.answer()
+        return
+    lang = resolve_lang(query.from_user.language_code)
+    runtime = _runtime(context)
+    cancelled = await runtime.cancel_request_durable(query.from_user.id)
+    await query.answer(
+        get_text(lang, "request_cancelled" if cancelled else "request_not_running")
+    )
 
 
 async def _send_track_draft(
@@ -913,6 +931,9 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
     if query.from_user is not None and not _draft_owned_by(draft, query.from_user.id):
         await query.answer(get_text(lang, "ed_owner_only"), show_alert=True)
         return
+    spec = action_spec("editor", action)
+    if spec is not None and spec.mutating:
+        _runtime(context).record_funnel("edited")
 
     if await _handle_editor_navigation(
         query,
@@ -1549,8 +1570,11 @@ async def _reply_with_flow_error(
         BotErrorCode.SEARCH_NOT_FOUND: "error_search",
         BotErrorCode.RELEASE_NOT_FOUND: "error_search",
         BotErrorCode.PROVIDER_UNAVAILABLE: "error_provider",
+        BotErrorCode.RATE_LIMITED: "error_rate_limit",
     }.get(error.code, "no_url_hint")
     detail = get_text(lang, detail_key)
+    if error.code == BotErrorCode.RATE_LIMITED:
+        detail = detail.format(seconds=escape(error.detail or "60"))
     if error.code == BotErrorCode.PROVIDER_UNAVAILABLE and error.provider:
         provider_labels = {
             "songlink": "Song.link",
@@ -1737,6 +1761,7 @@ async def track_lookup_message(
         # A newer private-chat request superseded this one. Treat cancellation
         # as an expected UX event, not a failed Telegram webhook delivery.
         LOGGER.debug("Stale lookup cancelled in favor of a newer request")
+        completed = True
         if message is not None:
             await _cancel_progress(message.chat_id, _update_lang(update))
     except TelegramError as exc:
@@ -1762,7 +1787,7 @@ async def track_lookup_message(
         )
         await runtime.persist_metrics()
         if private_user_id is not None:
-            runtime.finish_request(private_user_id)
+            await runtime.finish_request_durable(private_user_id)
 
 
 async def _handle_empty_lookup(
@@ -2348,6 +2373,18 @@ async def _track_lookup_message_impl(
     search_query = request.search_query
     if is_private:
         action_kind = detect_action(message_text or "", source_urls, is_private=True)
+        allowed, retry_after = await runtime.allow_user_request(user_id)
+        if not allowed:
+            await _reply_with_flow_error(
+                message,
+                context,
+                BotFlowError(
+                    BotErrorCode.RATE_LIMITED,
+                    detail=str(retry_after),
+                ),
+                lang=lang,
+            )
+            return
         intent_value = (
             "\n".join(sorted(cache_key_for_url(url) for url in source_urls))
             if source_urls
@@ -2362,7 +2399,8 @@ async def _track_lookup_message_impl(
         if action_kind == "help":
             await _reply_with_menu(message, context, MENU_HELP, lang=lang)
             return
-        runtime.register_request(user_id)
+        request_token = await runtime.begin_request(user_id)
+        runtime.record_funnel("started")
         remembered_value = search_query or message_text or ""
         if not search_query and len(source_urls) == 1:
             remembered_value = source_urls[0]
@@ -2390,6 +2428,9 @@ async def _track_lookup_message_impl(
         request.source_urls = source_urls
         request.found_via_search = found_via_search
         request.search_query = search_query
+
+    if is_private and not await runtime.request_is_current(user_id, request_token):
+        raise asyncio.CancelledError
 
     if message.chat.type == "channel":
         access = await check_publish_access(context, message.chat_id)
@@ -2423,6 +2464,7 @@ async def _track_lookup_message_impl(
                     total=len(source_urls),
                 ),
                 stage=2,
+                lang=lang,
             )
         else:
             await _update_loading_placeholder(lang, "progress_links")
@@ -2432,6 +2474,10 @@ async def _track_lookup_message_impl(
     bundle = await _bot_lookup.resolve_sources(
         context.application.bot_data, source_urls
     )
+    if is_private and not await runtime.request_is_current(user_id, request_token):
+        raise asyncio.CancelledError
+    if is_private and bundle.item_count:
+        runtime.record_funnel("resolved")
     if is_private:
         if len(source_urls) > 1:
             await _update_progress_text(
@@ -2443,7 +2489,8 @@ async def _track_lookup_message_impl(
                 ).format(
                     done=bundle.item_count,
                     total=len(source_urls),
-                )
+                ),
+                lang=lang,
             )
         else:
             await _update_loading_placeholder(lang, "progress_card")

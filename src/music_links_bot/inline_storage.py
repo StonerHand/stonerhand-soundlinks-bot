@@ -107,3 +107,10 @@ async def load_inline_history(bot_data: dict, user_id: int) -> list[str]:
         max_size=MAX_INLINE_HISTORY_USERS,
     )
     return urls
+
+
+async def clear_inline_history(bot_data: dict, user_id: int) -> None:
+    bot_data.setdefault("inline_history", {}).pop(user_id, None)
+    kv: KVStore | None = bot_data.get("kv_store")
+    if kv is not None:
+        await kv.delete(f"inline:history:v1:{user_id}")

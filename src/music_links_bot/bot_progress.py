@@ -7,9 +7,14 @@ from dataclasses import dataclass
 from telegram import InlineKeyboardMarkup, Message
 from telegram.error import TelegramError
 
+from music_links_bot.bot_runtime import encode_callback
 from music_links_bot.i18n import get_text
 from music_links_bot.rich_publications import send_rich_progress_draft
-from music_links_bot.telegram_buttons import ButtonTone, disabled_button
+from music_links_bot.telegram_buttons import (
+    ButtonTone,
+    callback_button,
+    disabled_button,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -34,23 +39,61 @@ _PLACEHOLDER: contextvars.ContextVar[ProgressState | None] = contextvars.Context
 )
 
 
-def _progress_keyboard(text: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[disabled_button(text[:64], tone=ButtonTone.PRIMARY)]])
+def _progress_keyboard(text: str, lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [disabled_button(text[:64], tone=ButtonTone.PRIMARY)],
+            [
+                callback_button(
+                    get_text(lang, "request_cancel"),
+                    encode_callback("progress", "cancel"),
+                )
+            ],
+        ]
+    )
 
 
-async def _send_progress_message(message: Message, text: str) -> Message:
+def _progress_fallback_keyboard(lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [
+                callback_button(
+                    get_text(lang, "request_cancel"),
+                    encode_callback("progress", "cancel"),
+                )
+            ]
+        ]
+    )
+
+
+async def _send_progress_message(message: Message, text: str, lang: str) -> Message:
     """Prefer the native disabled state and degrade on older Bot API nodes."""
     try:
-        return await message.reply_text(text, reply_markup=_progress_keyboard(text))
+        return await message.reply_text(
+            text,
+            reply_markup=_progress_keyboard(text, lang),
+        )
     except (TelegramError, TypeError):
-        return await message.reply_text(text)
+        try:
+            return await message.reply_text(
+                text,
+                reply_markup=_progress_fallback_keyboard(lang),
+            )
+        except TypeError:
+            return await message.reply_text(text)
 
 
-async def _edit_progress_message(message: Message, text: str) -> None:
+async def _edit_progress_message(message: Message, text: str, lang: str) -> None:
     try:
-        await message.edit_text(text, reply_markup=_progress_keyboard(text))
+        await message.edit_text(text, reply_markup=_progress_keyboard(text, lang))
     except (TelegramError, TypeError):
-        await message.edit_text(text)
+        try:
+            await message.edit_text(
+                text,
+                reply_markup=_progress_fallback_keyboard(lang),
+            )
+        except TypeError:
+            await message.edit_text(text)
 
 
 def adopt_progress_message(message: Message | None) -> None:
@@ -105,7 +148,7 @@ async def start_progress(
                 )
             )
             return
-        placeholder = await _send_progress_message(message, text)
+        placeholder = await _send_progress_message(message, text, lang)
     except TelegramError:
         LOGGER.debug("Could not send progress message", exc_info=True)
         return
@@ -122,7 +165,7 @@ async def update_progress(lang: str, key: str) -> None:
     try:
         text = get_text(lang, key)
         if state.message is not None:
-            await _edit_progress_message(state.message, text)
+            await _edit_progress_message(state.message, text, lang)
         elif state.bot is not None:
             await send_rich_progress_draft(
                 state.bot,
@@ -135,13 +178,13 @@ async def update_progress(lang: str, key: str) -> None:
         LOGGER.debug("Could not update progress message", exc_info=True)
 
 
-async def update_progress_text(text: str, *, stage: int = 3) -> None:
+async def update_progress_text(text: str, *, stage: int = 3, lang: str = "ru") -> None:
     state = _PLACEHOLDER.get()
     if state is None or stage <= state.stage:
         return
     try:
         if state.message is not None:
-            await _edit_progress_message(state.message, text)
+            await _edit_progress_message(state.message, text, lang)
         elif state.bot is not None:
             await send_rich_progress_draft(
                 state.bot,

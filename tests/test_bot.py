@@ -652,6 +652,7 @@ class BotKeyboardTests(unittest.TestCase):
                 "stats",
                 "crate",
                 "cancel",
+                "privacy",
                 "status",
             },
         )
@@ -691,6 +692,7 @@ class BotKeyboardTests(unittest.TestCase):
                 ("start", "меню и быстрый старт"),
                 ("help", "как пользоваться"),
                 ("crate", "моя подборка"),
+                ("privacy", "данные и приватность"),
             ],
         )
 

@@ -18,11 +18,13 @@ from music_links_bot.bot_ui import (
     build_create_keyboard,
     build_home_text,
     build_onboarding_keyboard,
+    build_privacy_keyboard,
     build_section_keyboard,
     build_start_keyboard,
 )
 from music_links_bot.i18n import get_text, resolve_lang
 from music_links_bot.keyboards import _channel_button
+from music_links_bot.privacy import delete_user_data
 
 LOGGER = logging.getLogger(__name__)
 
@@ -33,6 +35,7 @@ MENU_PLATFORMS = "menu:platforms"
 MENU_DEMO = "menu:demo"
 MENU_MORE = "menu:more"
 MENU_RECENT = "menu:recent"
+MENU_PRIVACY = "menu:privacy"
 MENU_KEYS = frozenset(
     {
         MENU_START,
@@ -42,6 +45,7 @@ MENU_KEYS = frozenset(
         MENU_DEMO,
         MENU_MORE,
         MENU_RECENT,
+        MENU_PRIVACY,
     }
 )
 
@@ -202,7 +206,10 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     session = await runtime.get_session(user.id, lang=lang)
     pending = dict(session.pending_input)
     if not pending:
-        await message.reply_text(get_text(lang, "input_nothing"))
+        cancelled = await runtime.cancel_request_durable(user.id)
+        await message.reply_text(
+            get_text(lang, "request_cancelled" if cancelled else "input_nothing")
+        )
         return
     session.pending_input = {}
     await runtime.save_session(session)
@@ -254,6 +261,53 @@ async def platforms_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             MENU_PLATFORMS,
             lang=update_lang(update),
         )
+
+
+async def privacy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    if message is None:
+        return
+    lang = update_lang(update)
+    await message.reply_text(
+        get_text(lang, "privacy_title"),
+        parse_mode=ParseMode.HTML,
+        reply_markup=build_privacy_keyboard(lang=lang),
+    )
+
+
+async def dispatch_privacy_action(query, context, action: CallbackAction) -> None:
+    user = query.from_user
+    if user is None:
+        await query.answer()
+        return
+    lang = resolve_lang(user.language_code)
+    if action.action == "confirm":
+        await query.answer()
+        await safe_edit(
+            query,
+            get_text(lang, "privacy_confirm"),
+            build_privacy_keyboard(lang=lang, confirm=True),
+        )
+        return
+
+    await query.answer()
+    result = await delete_user_data(context, user.id)
+    text = get_text(lang, "privacy_deleted").format(
+        drafts=result.drafts,
+        scheduled=result.scheduled_posts,
+    )
+    if not result.queue_available:
+        text += get_text(lang, "privacy_deleted_queue_warning")
+    await safe_edit(
+        query,
+        text,
+        build_section_keyboard(
+            context.bot.username,
+            lang=lang,
+            crate_count=0,
+            active=None,
+        ),
+    )
 
 
 async def channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -336,6 +390,11 @@ async def dispatch_menu_action(query, context, action: CallbackAction) -> None:
             get_text(lang, "create_prompt"),
             build_create_keyboard(lang=lang),
         )
+    elif action.action == "privacy":
+        text, keyboard = (
+            get_text(lang, "privacy_title"),
+            build_privacy_keyboard(lang=lang),
+        )
     else:
         menu_key = {
             "help": MENU_HELP,
@@ -343,6 +402,7 @@ async def dispatch_menu_action(query, context, action: CallbackAction) -> None:
             "platforms": MENU_PLATFORMS,
             "demo": MENU_DEMO,
             "more": MENU_MORE,
+            "privacy": MENU_PRIVACY,
         }.get(action.action, MENU_START)
         user_id = query.from_user.id if query.from_user else 0
         crate_count, _is_admin = await home_state(context, user_id)
@@ -425,5 +485,6 @@ def menu_text(menu_key: str, *, lang: str = "ru") -> str:
             MENU_GUIDE: "menu_guide",
             MENU_PLATFORMS: "menu_platforms",
             MENU_MORE: "menu_more",
+            MENU_PRIVACY: "privacy_title",
         }.get(menu_key, "menu_start"),
     )

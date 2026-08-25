@@ -264,6 +264,20 @@ def merge_stats(base: StatsData, other: object) -> StatsData:
     return merged
 
 
+def remove_identity(
+    user_id: int,
+    path: Path = STATS_PATH,
+) -> StatsData:
+    """Remove user/chat labels while retaining anonymous aggregate counters."""
+    identifier = str(int(user_id))
+    with STATS_LOCK:
+        stats = load_stats(path)
+        stats["users"].pop(identifier, None)
+        stats["chats"].pop(identifier, None)
+        _write_stats(path, stats)
+        return stats
+
+
 def format_stats_message(stats: StatsData, *, include_private: bool = False) -> str:
     lines = [
         "StonerHand stats",

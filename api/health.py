@@ -52,11 +52,13 @@ class handler(BaseHTTPRequestHandler):
             telegram = telegram_check.result()
             queue_worker = queue_tick.result()
         redis, queue, metrics = _storage_snapshot()
+        providers = evaluate_provider_metrics(metrics)
         checks: dict[str, dict] = {
             "telegram": telegram,
             "webhook": webhook,
             "redis": redis,
             "queue_worker": queue_worker,
+            "providers": providers,
         }
         healthy = overall_ok(checks)
         service_healthy = overall_service_ok(checks, queue)
@@ -72,6 +74,13 @@ class handler(BaseHTTPRequestHandler):
                 f"Очередь не разгружается: {queue['overdue']} просроченных из "
                 f"{queue['size']}. Проверь права бота и логи Vercel.",
                 dedup_key="queue-stuck",
+            )
+        if providers.get("degraded"):
+            send_admin_alert(
+                "Музыкальные площадки работают нестабильно: "
+                f"{', '.join(providers['degraded'])}. Основной бот и резервные "
+                "сценарии остаются доступны.",
+                dedup_key=f"providers:{','.join(providers['degraded'])}",
             )
 
         body = json.dumps(
@@ -129,6 +138,47 @@ def describe_failures(checks: dict[str, dict]) -> list[str]:
             failures.append(name)
 
     return failures
+
+
+def evaluate_provider_metrics(metrics: object) -> dict[str, object]:
+    """Turn anonymous runtime counters into a low-noise provider warning."""
+    providers = metrics.get("providers") if isinstance(metrics, dict) else None
+    if not isinstance(providers, dict) or not providers:
+        return {"ok": True, "degraded": [], "detail": "awaiting traffic"}
+
+    degraded: list[str] = []
+    for name, raw in providers.items():
+        if not isinstance(raw, dict):
+            continue
+        requests = max(0, _safe_int(raw.get("requests")))
+        success_rate = _safe_float(raw.get("success_rate_percent"))
+        consecutive_failures = max(0, _safe_int(raw.get("consecutive_failures")))
+        if raw.get("circuit_open") is True or consecutive_failures >= 3:
+            degraded.append(str(name))
+        elif requests >= 3 and success_rate < 50:
+            degraded.append(str(name))
+
+    return {
+        # Provider failure is degraded rather than fatal: classic cards and
+        # other services can still complete a user request.
+        "ok": True,
+        "degraded": sorted(set(degraded)),
+        "detail": "healthy" if not degraded else "degraded",
+    }
+
+
+def _safe_int(value: object) -> int:
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError, OverflowError):
+        return 0
+
+
+def _safe_float(value: object) -> float:
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError, OverflowError):
+        return 0.0
 
 
 def release_info() -> dict[str, str]:

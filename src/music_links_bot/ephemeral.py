@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import logging
-import os
 
 from telegram.error import TelegramError
 
-from music_links_bot.telegram_gateway import TelegramApiGateway
+from music_links_bot.telegram_gateway import TelegramApiGateway, feature_enabled
 
 LOGGER = logging.getLogger(__name__)
 
@@ -18,12 +17,7 @@ def ephemeral_group_replies_enabled() -> bool:
     actually supports it for the bot. When it can't deliver, the caller falls
     back to the normal public reply.
     """
-    return os.getenv("EPHEMERAL_GROUP_REPLIES", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+    return feature_enabled("EPHEMERAL_GROUP_REPLIES", default=False)
 
 
 async def send_ephemeral_message(

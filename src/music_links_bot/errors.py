@@ -9,6 +9,7 @@ class BotErrorCode(str, Enum):
     SEARCH_NOT_FOUND = "search_not_found"
     RELEASE_NOT_FOUND = "release_not_found"
     PROVIDER_UNAVAILABLE = "provider_unavailable"
+    RATE_LIMITED = "rate_limited"
     DRAFT_EXPIRED = "draft_expired"
     ACTION_BUSY = "action_busy"
     ACTION_DUPLICATE = "action_duplicate"
