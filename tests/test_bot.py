@@ -1351,7 +1351,7 @@ class BotKeyboardTests(unittest.TestCase):
 
 
 class InlineModeTests(unittest.IsolatedAsyncioTestCase):
-    async def test_inline_track_result_builds_full_post_with_buttons(self) -> None:
+    async def test_inline_track_result_keeps_cover_without_cached_media(self) -> None:
         result = await _build_inline_result(
             "https://open.spotify.com/track/abc",
             ContextStub(),
@@ -1361,17 +1361,20 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.title, "Youth Code — Transitions")
         self.assertEqual(result.description, "Пост с кнопками всех площадок")
         self.assertEqual(len(result.id), 32)
-        self.assertIsInstance(result.input_message_content, dict)
-        rich_html = result.input_message_content["rich_message"]["html"]
-        self.assertIn("<h1>Youth Code — Transitions</h1>", rich_html)
-        self.assertIn("🟢 Spotify", rich_html)
-        self.assertIn("🪩 Все платформы", rich_html)
-        self.assertIn("↗ Поделиться", rich_html)
-        self.assertIsNone(result.reply_markup)
-        self.assertEqual(
-            result.to_dict()["input_message_content"]["rich_message"]["html"],
-            rich_html,
+        self.assertIsInstance(result.input_message_content, InputTextMessageContent)
+        self.assertIn("<b>Youth Code</b>", result.input_message_content.message_text)
+        preview = result.input_message_content.link_preview_options
+        self.assertIsNotNone(preview)
+        self.assertFalse(preview.is_disabled)
+        self.assertTrue(preview.prefer_large_media)
+        keyboard = result.reply_markup.inline_keyboard
+        self.assertEqual(keyboard[0][0].text, "🟢 Spotify")
+        self.assertIn(
+            "🪩 Все платформы",
+            [button.text for row in keyboard for button in row],
         )
+        self.assertEqual(keyboard[-1][0].text, "↗ Поделиться")
+        self.assertTrue(keyboard[-1][0].switch_inline_query.startswith("sh4|"))
 
     async def test_inline_track_result_can_fall_back_to_classic_post(self) -> None:
         result = await _build_inline_result(
@@ -1385,7 +1388,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         keyboard = result.reply_markup.inline_keyboard
         self.assertEqual(keyboard[0][0].text, "🟢 Spotify")
         self.assertEqual(keyboard[-1][0].text, "↗ Поделиться")
-        self.assertTrue(keyboard[-1][0].switch_inline_query.startswith("sh3|"))
+        self.assertTrue(keyboard[-1][0].switch_inline_query.startswith("sh4|"))
 
     async def test_inline_rich_result_uses_cached_telegram_cover(self) -> None:
         with patch(
@@ -1432,7 +1435,11 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         update = type("InlineUpdateStub", (), {"inline_query": inline_query})()
         reset_capabilities()
         try:
-            await inline_query_handler(update, ContextStub())
+            with patch(
+                "music_links_bot.bot_inline.get_cached_file_id",
+                AsyncMock(return_value="telegram-cover-file-id"),
+            ):
+                await inline_query_handler(update, ContextStub())
         finally:
             reset_capabilities()
 

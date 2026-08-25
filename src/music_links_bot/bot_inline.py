@@ -624,6 +624,7 @@ def _inline_article(
         keyboard = make_channel_safe_keyboard(keyboard)
     use_rich = (
         bool(rich_html)
+        and bool(rich_media)
         and rich_messages_enabled()
         and not channel_safe
         and not force_classic

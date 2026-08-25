@@ -29,8 +29,8 @@ from music_links_bot.models import TrackMatch
 from music_links_bot.telegram_buttons import button as InlineKeyboardButton
 from music_links_bot.url_utils import cache_key_for_url, is_supported_music_url
 
-SHARE_QUERY_PREFIX = "sh3|"
-LEGACY_SHARE_QUERY_PREFIXES = ("sh2|", "sh|")
+SHARE_QUERY_PREFIX = "sh4|"
+LEGACY_SHARE_QUERY_PREFIXES = ("sh3|", "sh2|", "sh|")
 MAX_SHARE_QUERY_LENGTH = 256
 MAX_SHARE_ITEMS = 12
 _SPOTIFY_KINDS = {
