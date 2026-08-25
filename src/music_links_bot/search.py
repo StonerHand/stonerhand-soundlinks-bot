@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
 
 import httpx
 
@@ -148,9 +148,7 @@ class SearchClient:
         if pending is not None:
             return await asyncio.shield(pending)
 
-        task = asyncio.create_task(
-            self._search_and_cache(normalized_query, cache_key)
-        )
+        task = asyncio.create_task(self._search_and_cache(normalized_query, cache_key))
         self._inflight[cache_key] = task
         task.add_done_callback(
             lambda completed, key=cache_key: self._finish_inflight(key, completed)
@@ -274,7 +272,9 @@ def _extract_release_candidates(payload: object) -> list[SearchCandidate]:
         candidates.append(
             SearchCandidate(
                 url=url,
-                title=str(result.get("trackName") or result.get("collectionName") or ""),
+                title=str(
+                    result.get("trackName") or result.get("collectionName") or ""
+                ),
                 artist=str(result.get("artistName") or ""),
                 artwork_url=artwork if isinstance(artwork, str) else None,
                 preview_url=preview if isinstance(preview, str) else None,

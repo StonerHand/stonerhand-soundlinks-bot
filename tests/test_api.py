@@ -26,7 +26,7 @@ class VercelWebhookTests(unittest.TestCase):
         self.assertEqual(_decode_update_payload(b'{"update_id": 1}'), {"update_id": 1})
 
     def test_decode_update_payload_rejects_non_object_json(self) -> None:
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             _decode_update_payload(b"[]")
 
     def test_decode_update_payload_rejects_invalid_json(self) -> None:
@@ -92,7 +92,9 @@ class VercelWebhookTests(unittest.TestCase):
             clear=True,
         ):
             self.assertTrue(_setup_secret_is_configured())
-            self.assertTrue(_is_authorized("/api/set_webhook?secret=setup-secret", None))
+            self.assertTrue(
+                _is_authorized("/api/set_webhook?secret=setup-secret", None)
+            )
             self.assertFalse(_is_authorized("/api/set_webhook?secret=wrong", None))
 
     def test_setup_endpoint_accepts_vercel_cron_bearer_secret(self) -> None:
@@ -101,12 +103,8 @@ class VercelWebhookTests(unittest.TestCase):
             {"SET_WEBHOOK_SECRET": "setup-secret", "CRON_SECRET": "cron-secret"},
             clear=True,
         ):
-            self.assertTrue(
-                _is_authorized("/api/set_webhook", "Bearer cron-secret")
-            )
-            self.assertFalse(
-                _is_authorized("/api/set_webhook", "Bearer wrong-secret")
-            )
+            self.assertTrue(_is_authorized("/api/set_webhook", "Bearer cron-secret"))
+            self.assertFalse(_is_authorized("/api/set_webhook", "Bearer wrong-secret"))
             self.assertFalse(_is_authorized("/api/set_webhook", None))
 
         with patch.dict(
@@ -114,9 +112,7 @@ class VercelWebhookTests(unittest.TestCase):
             {"SET_WEBHOOK_SECRET": "setup-secret"},
             clear=True,
         ):
-            self.assertFalse(
-                _is_authorized("/api/set_webhook", "Bearer cron-secret")
-            )
+            self.assertFalse(_is_authorized("/api/set_webhook", "Bearer cron-secret"))
 
     def test_set_webhook_url_includes_telegram_secret(self) -> None:
         webhook_url = _telegram_set_webhook_url(
@@ -154,15 +150,20 @@ class VercelWebhookTests(unittest.TestCase):
         commands = json.loads(query["commands"][0])
 
         self.assertEqual(query["language_code"], ["en"])
-        self.assertEqual(commands[0]["description"], PUBLIC_BOT_COMMANDS_EN[0].description)
+        self.assertEqual(
+            commands[0]["description"], PUBLIC_BOT_COMMANDS_EN[0].description
+        )
         self.assertNotEqual(commands[0]["description"], "Открыть главное меню")
 
     def test_telegram_secret_rejects_invalid_characters(self) -> None:
-        with patch.dict(
-            os.environ,
-            {"TELEGRAM_WEBHOOK_SECRET": "not valid"},
-            clear=True,
-        ), self.assertRaises(ValueError):
+        with (
+            patch.dict(
+                os.environ,
+                {"TELEGRAM_WEBHOOK_SECRET": "not valid"},
+                clear=True,
+            ),
+            self.assertRaises(ValueError),
+        ):
             _telegram_webhook_secret()
 
     def test_webhook_reuses_application_across_warm_invocations(self) -> None:

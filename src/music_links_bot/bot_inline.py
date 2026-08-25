@@ -97,7 +97,9 @@ async def inline_query_handler(
     collection_urls = (
         shared_urls
         if shared_urls is not None
-        else source_urls if is_direct_collection else None
+        else source_urls
+        if is_direct_collection
+        else None
     )
     if collection_urls is not None:
         await _answer_inline_collection(
@@ -255,11 +257,8 @@ async def _answer_inline_collection(
             lang=lang,
             channel_safe=channel_safe,
         )
-    except Exception as exc:
-        LOGGER.error(
-            "Inline collection lookup failed",
-            exc_info=(type(exc), exc, exc.__traceback__),
-        )
+    except Exception:
+        LOGGER.exception("Inline collection lookup failed")
         result = None
 
     if result is None:

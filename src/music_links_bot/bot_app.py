@@ -170,7 +170,9 @@ async def sync_application_commands(application: Application) -> None:
         except TelegramError:
             LOGGER.warning("Telegram profile sync failed for %s", label, exc_info=True)
 
-    await attempt("commands:default", application.bot.set_my_commands(PUBLIC_BOT_COMMANDS))
+    await attempt(
+        "commands:default", application.bot.set_my_commands(PUBLIC_BOT_COMMANDS)
+    )
     await attempt(
         "commands:en",
         application.bot.set_my_commands(PUBLIC_BOT_COMMANDS_EN, language_code="en"),

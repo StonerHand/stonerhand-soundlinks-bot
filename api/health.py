@@ -174,7 +174,7 @@ def _telegram_api(method: str) -> dict | None:
         with urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # nosec B310
             payload = json.loads(response.read().decode("utf-8"))
         return payload if isinstance(payload, dict) else None
-    except Exception:  # noqa: BLE001 — health must degrade to JSON, never crash.
+    except (OSError, ValueError):
         LOGGER.warning("Health call %s failed", method, exc_info=True)
         return None
 
@@ -230,7 +230,9 @@ def _storage_snapshot() -> tuple[dict, dict, dict]:
 
     try:
         ping, jobs, metrics = asyncio.run(read())
-    except Exception:
+    # Health must degrade to structured JSON even if an unexpected Redis
+    # adapter or event-loop failure escapes the soft KV methods.
+    except Exception:  # noqa: BLE001
         return (
             {"ok": False, "configured": True, "detail": "unreachable"},
             {"configured": True, "size": 0, "overdue": 0, "detail": "unreachable"},

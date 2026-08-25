@@ -1,6 +1,6 @@
+import sys
 import unittest
 from pathlib import Path
-import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -12,9 +12,9 @@ from music_links_bot.url_utils import (
     is_apple_music_playlist_url,
     is_nts_url,
     is_playlist_url,
+    is_soundcloud_url,
     is_spotify_artist_url,
     is_spotify_playlist_url,
-    is_soundcloud_url,
     is_supported_music_url,
     is_youtube_video_url,
     spotify_url_type,
@@ -28,19 +28,29 @@ class UrlUtilsTests(unittest.TestCase):
         self.assertTrue(is_supported_music_url("https://open.spotify.com/track/123"))
         self.assertTrue(is_supported_music_url("https://open.spotify.com/playlist/abc"))
         self.assertTrue(is_supported_music_url("https://open.spotify.com/artist/abc"))
-        self.assertTrue(is_supported_music_url("https://open.spotify.com:443/track/123"))
-        self.assertTrue(is_supported_music_url("https://podcasts.apple.com/us/podcast/apple-events/id1473854035"))
+        self.assertTrue(
+            is_supported_music_url("https://open.spotify.com:443/track/123")
+        )
+        self.assertTrue(
+            is_supported_music_url(
+                "https://podcasts.apple.com/us/podcast/apple-events/id1473854035"
+            )
+        )
         self.assertTrue(is_supported_music_url("https://music.youtube.com/watch?v=abc"))
         self.assertTrue(is_supported_music_url("https://www.youtube.com/watch?v=abc"))
         self.assertTrue(is_supported_music_url("https://youtu.be/abc"))
-        self.assertTrue(is_supported_music_url("https://music.yandex.ru/album/1/track/2"))
+        self.assertTrue(
+            is_supported_music_url("https://music.yandex.ru/album/1/track/2")
+        )
         self.assertTrue(is_supported_music_url("https://soundcloud.com/artist/track"))
         self.assertTrue(is_supported_music_url("https://m.soundcloud.com/artist/track"))
         self.assertTrue(is_supported_music_url("https://on.soundcloud.com/abc123"))
         self.assertTrue(is_supported_music_url("https://www.nts.live/shows/example"))
         self.assertTrue(is_supported_music_url("https://nts.live/episodes/example"))
         self.assertTrue(is_supported_music_url("https://bandcamp.com/track/x"))
-        self.assertTrue(is_supported_music_url("https://sleep.bandcamp.com/album/dopesmoker"))
+        self.assertTrue(
+            is_supported_music_url("https://sleep.bandcamp.com/album/dopesmoker")
+        )
 
     def test_is_supported_music_url_rejects_other_hosts(self) -> None:
         self.assertFalse(is_supported_music_url("https://example.com/track/123"))
@@ -203,12 +213,16 @@ class UrlUtilsTests(unittest.TestCase):
             "episode",
         )
         self.assertEqual(
-            apple_podcasts_url_type("https://podcasts.apple.com/us/podcast/apple-events/id1473854035"),
+            apple_podcasts_url_type(
+                "https://podcasts.apple.com/us/podcast/apple-events/id1473854035"
+            ),
             "show",
         )
 
     def test_apple_podcasts_url_type_ignores_other_hosts(self) -> None:
-        self.assertIsNone(apple_podcasts_url_type("https://music.apple.com/us/album/abc"))
+        self.assertIsNone(
+            apple_podcasts_url_type("https://music.apple.com/us/album/abc")
+        )
 
     def test_is_youtube_video_url_detects_regular_video_links(self) -> None:
         self.assertTrue(is_youtube_video_url("https://www.youtube.com/watch?v=abc"))

@@ -142,13 +142,25 @@ fallback.
 `RICH_DRAFTS_ENABLED=0` оставляет экспериментальный streaming-черновик
 выключенным. `EPHEMERAL_GROUP_REPLIES=1` включает персональные ответы в группах.
 
-## Проверка
+## Качество релиза
+
+Каждый pull request проходит полный набор релизных ворот:
+
+- все unit-, интеграционные, UI-контрактные и regression-тесты через `pytest`;
+- полный настроенный Ruff lint и единый автоматический формат;
+- Pyflakes, Bandit и аудит известных уязвимостей production-зависимостей;
+- проверку совпадения версии, changelog и Vercel routes/builds/cron;
+- preview deployment, а после слияния — production canary с проверкой точного
+  commit, Telegram webhook, Redis и worker очереди.
+
+Локальный предрелизный прогон:
 
 ```bash
-PYTHONPATH=src python -m unittest discover -s tests -v
+python -m pytest -q
 python -m compileall -q src api tests
 python -m pyflakes src api tests
-python -m ruff check src api tests --select F,B,ASYNC,PERF
+python -m ruff check src api tests
+python -m ruff format --check src api tests
 python -m bandit -q -r src api -x tests
 python -m pip_audit -r requirements.txt --progress-spinner off
 python tests/check_dependency_pins.py

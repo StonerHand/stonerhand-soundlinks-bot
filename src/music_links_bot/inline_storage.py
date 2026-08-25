@@ -66,11 +66,9 @@ async def remember_inline_urls(
     if user_id <= 0:
         return
     history = await load_inline_history(bot_data, user_id)
-    clean = list(
-        dict.fromkeys(
-            [*(str(url) for url in urls if url), *history]
-        )
-    )[:MAX_INLINE_HISTORY]
+    clean = list(dict.fromkeys([*(str(url) for url in urls if url), *history]))[
+        :MAX_INLINE_HISTORY
+    ]
     remember_bounded(
         bot_data.setdefault("inline_history", {}),
         user_id,

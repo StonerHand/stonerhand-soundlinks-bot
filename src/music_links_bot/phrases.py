@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 
-
 PHRASES = {
     "no_url": (
         "Пришли музыкальную ссылку или напиши артист — название.",

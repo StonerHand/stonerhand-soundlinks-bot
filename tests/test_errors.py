@@ -5,9 +5,7 @@ from music_links_bot.errors import normalize_api_response
 
 class ApiErrorContractTests(unittest.TestCase):
     def test_legacy_error_gets_stable_code_and_retryability(self) -> None:
-        result = normalize_api_response(
-            {"ok": False, "error": "draft not found"}
-        )
+        result = normalize_api_response({"ok": False, "error": "draft not found"})
         self.assertEqual(result["error_code"], "draft_expired")
         self.assertFalse(result["retryable"])
 
@@ -17,9 +15,7 @@ class ApiErrorContractTests(unittest.TestCase):
         self.assertTrue(result["retryable"])
 
     def test_durable_storage_error_is_distinct_and_retryable(self) -> None:
-        result = normalize_api_response(
-            {"ok": False, "error": "storage_unavailable"}
-        )
+        result = normalize_api_response({"ok": False, "error": "storage_unavailable"})
         self.assertEqual(result["error_code"], "storage_unavailable")
         self.assertTrue(result["retryable"])
 

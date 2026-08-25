@@ -1,8 +1,8 @@
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 import sys
 import unittest
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -16,6 +16,7 @@ from music_links_bot.loop_runner import (
 class LoopRunnerTests(unittest.TestCase):
     def test_two_request_threads_can_await_concurrently(self) -> None:
         loop, thread = start_background_loop("test-runtime")
+
         async def make_state():
             return {"active": 0, "both_started": asyncio.Event()}
 

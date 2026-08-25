@@ -65,11 +65,15 @@ class handler(BaseHTTPRequestHandler):
             # `_telegram_set_webhook_url` always returns the Telegram HTTPS API.
             with urlopen(telegram_url, timeout=20) as response:  # nosec B310
                 telegram_payload = json.loads(response.read().decode("utf-8"))
+            if not isinstance(telegram_payload, dict):
+                raise TypeError("Telegram returned an invalid webhook response")
 
             commands_payload = _sync_commands(settings.bot_token)
             menu_payload = _sync_menu_button(settings.bot_token)
+        # This HTTP boundary must always return structured JSON, including for
+        # unexpected third-party client failures.
         except Exception as exc:
-            LOGGER.error("Webhook setup failed: %s", type(exc).__name__)
+            LOGGER.exception("Webhook setup failed: %s", type(exc).__name__)
             self._send_json(
                 {"ok": False, "error": "webhook setup failed"},
                 HTTPStatus.INTERNAL_SERVER_ERROR,
@@ -159,8 +163,7 @@ def _sync_commands(bot_token: str) -> dict[str, object]:
         )
     descriptions_ok = _sync_descriptions(bot_token)
     return {
-        "ok": all(payload.get("ok") for payload in scopes.values())
-        and descriptions_ok,
+        "ok": all(payload.get("ok") for payload in scopes.values()) and descriptions_ok,
         "scopes": scopes,
         "descriptions": descriptions_ok,
     }
@@ -200,8 +203,10 @@ def _telegram_json_call(url: str, *, label: str) -> dict[str, object]:
         with urlopen(url, timeout=20) as response:  # nosec B310
             payload = json.loads(response.read().decode("utf-8"))
         return payload if isinstance(payload, dict) else {"ok": False}
-    except Exception as exc:
-        LOGGER.error("Telegram profile sync failed for %s: %s", label, type(exc).__name__)
+    except (OSError, ValueError) as exc:
+        LOGGER.exception(
+            "Telegram profile sync failed for %s: %s", label, type(exc).__name__
+        )
         return {"ok": False, "error": "profile sync failed"}
 
 

@@ -3,8 +3,8 @@ from __future__ import annotations
 import re
 import secrets
 
-from music_links_bot.kvstore import KVStore
 from music_links_bot.draft_model import normalize_track_draft
+from music_links_bot.kvstore import KVStore
 
 DRAFT_TTL_SECONDS = 48 * 3600
 MAX_MEMORY_DRAFTS = 300
@@ -94,9 +94,7 @@ async def store_search_selection(
 ) -> str:
     selection_id = secrets.token_hex(5)
     payload = {"user_id": user_id, "query": query, "urls": urls}
-    selections: dict = context.application.bot_data.setdefault(
-        "search_selections", {}
-    )
+    selections: dict = context.application.bot_data.setdefault("search_selections", {})
     remember_bounded(
         selections,
         selection_id,
@@ -116,9 +114,7 @@ async def store_search_selection(
 async def load_search_selection(context, selection_id: str) -> dict | None:
     if not valid_state_id(selection_id):
         return None
-    selections: dict = context.application.bot_data.setdefault(
-        "search_selections", {}
-    )
+    selections: dict = context.application.bot_data.setdefault("search_selections", {})
     payload = selections.get(selection_id)
     if isinstance(payload, dict):
         return payload

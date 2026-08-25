@@ -1,18 +1,18 @@
 import asyncio
+import sys
 import unittest
 from pathlib import Path
-import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from music_links_bot.models import TrackMatch
-from music_links_bot.spotify import SpotifyLookupError
 from music_links_bot.songlink import (
     SonglinkClient,
     SonglinkError,
     SonglinkLookupError,
     _is_transient_status,
 )
+from music_links_bot.spotify import SpotifyLookupError
 
 
 class FakeSonglinkClient(SonglinkClient):
@@ -31,7 +31,9 @@ class FakeSonglinkClient(SonglinkClient):
         self._outcomes = outcomes
         self.calls = 0
 
-    async def _lookup_track_for_country(self, source_url: str, user_country: str) -> TrackMatch:
+    async def _lookup_track_for_country(
+        self, source_url: str, user_country: str
+    ) -> TrackMatch:
         del source_url
         self.calls += 1
         outcome = self._outcomes[user_country]
@@ -48,7 +50,10 @@ class SonglinkClientTests(unittest.TestCase):
             TrackMatch(
                 title="Song",
                 artist="Artist",
-                links={"spotify": "https://spotify.example", "yandexMusic": "https://yandex.example"},
+                links={
+                    "spotify": "https://spotify.example",
+                    "yandexMusic": "https://yandex.example",
+                },
                 page_url="https://song.link/song",
                 release_format="single",
                 kind="song",
@@ -56,7 +61,10 @@ class SonglinkClientTests(unittest.TestCase):
             TrackMatch(
                 title="Song",
                 artist="Artist",
-                links={"appleMusic": "https://apple.example", "youtubeMusic": "https://youtube.example"},
+                links={
+                    "appleMusic": "https://apple.example",
+                    "youtubeMusic": "https://youtube.example",
+                },
                 page_url="https://song.link/song-us",
                 release_year="2006",
                 kind="song",
@@ -199,7 +207,9 @@ class SonglinkClientTests(unittest.TestCase):
 
 
 class SonglinkClientAsyncTests(unittest.IsolatedAsyncioTestCase):
-    async def test_default_region_fallback_recovers_release_missing_in_primary_region(self) -> None:
+    async def test_default_region_fallback_recovers_release_missing_in_primary_region(
+        self,
+    ) -> None:
         class MissingSpotifyClient:
             async def lookup_release(self, _source_url: str) -> TrackMatch:
                 raise SpotifyLookupError("not needed")
@@ -218,9 +228,7 @@ class SonglinkClientAsyncTests(unittest.IsolatedAsyncioTestCase):
             spotify_client=MissingSpotifyClient(),
         )
         try:
-            track = await client.lookup_track(
-                "https://open.spotify.com/track/dove"
-            )
+            track = await client.lookup_track("https://open.spotify.com/track/dove")
         finally:
             await client.aclose()
 
@@ -284,11 +292,15 @@ class SonglinkClientAsyncTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(first, second)
         self.assertEqual(client.calls, 1)
 
-    async def test_lookup_track_skips_extra_regions_when_primary_is_complete(self) -> None:
+    async def test_lookup_track_skips_extra_regions_when_primary_is_complete(
+        self,
+    ) -> None:
         client = FakeSonglinkClient(
             {
                 "RU": TrackMatch(
-                    title="Song", artist="Artist", kind="song",
+                    title="Song",
+                    artist="Artist",
+                    kind="song",
                     links={
                         "spotify": "https://spotify.example",
                         "appleMusic": "https://apple.example",
@@ -297,7 +309,9 @@ class SonglinkClientAsyncTests(unittest.IsolatedAsyncioTestCase):
                     },
                 ),
                 "US": TrackMatch(
-                    title="Song", artist="Artist", kind="song",
+                    title="Song",
+                    artist="Artist",
+                    kind="song",
                     links={"deezer": "https://deezer.example"},
                 ),
             }
@@ -361,7 +375,9 @@ class SonglinkClientAsyncTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(first, second)
         self.assertEqual(client.calls, 1)
 
-    async def test_lookup_track_reuses_cache_across_tracking_query_variants(self) -> None:
+    async def test_lookup_track_reuses_cache_across_tracking_query_variants(
+        self,
+    ) -> None:
         client = FakeSonglinkClient(
             {
                 "US": TrackMatch(
@@ -375,14 +391,18 @@ class SonglinkClientAsyncTests(unittest.IsolatedAsyncioTestCase):
 
         try:
             first = await client.lookup_track("https://open.spotify.com/track/1?si=one")
-            second = await client.lookup_track("https://open.spotify.com/track/1?si=two")
+            second = await client.lookup_track(
+                "https://open.spotify.com/track/1?si=two"
+            )
         finally:
             await client.aclose()
 
         self.assertIs(first, second)
         self.assertEqual(client.calls, 1)
 
-    async def test_lookup_track_prefers_service_error_when_all_countries_fail(self) -> None:
+    async def test_lookup_track_prefers_service_error_when_all_countries_fail(
+        self,
+    ) -> None:
         class FailingSpotifyClient:
             async def lookup_release(self, _source_url: str) -> TrackMatch:
                 from music_links_bot.spotify import SpotifyLookupError
@@ -405,7 +425,9 @@ class SonglinkClientAsyncTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertNotIsInstance(context.exception, SonglinkLookupError)
 
-    async def test_transient_primary_failure_does_not_fan_out_to_every_region(self) -> None:
+    async def test_transient_primary_failure_does_not_fan_out_to_every_region(
+        self,
+    ) -> None:
         class FailingSpotifyClient:
             async def lookup_release(self, _source_url: str) -> TrackMatch:
                 raise SpotifyLookupError("spotify down")
@@ -428,7 +450,9 @@ class SonglinkClientAsyncTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(client.calls, 1)
 
-    async def test_spotify_fallback_survives_songlink_outage_and_is_shared_cached(self) -> None:
+    async def test_spotify_fallback_survives_songlink_outage_and_is_shared_cached(
+        self,
+    ) -> None:
         class SpotifyFallback:
             calls = 0
 

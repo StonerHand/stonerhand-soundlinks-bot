@@ -52,9 +52,7 @@ class BotQueueUiTests(unittest.IsolatedAsyncioTestCase):
                 "id": f"job{index}",
                 "status": "pending",
                 "publish_at": 1_800_000_000 + index,
-                "draft": {
-                    "item": {"artist": "Artist", "title": f"Track {index}"}
-                },
+                "draft": {"item": {"artist": "Artist", "title": f"Track {index}"}},
             }
             for index in range(1, 12)
         ]
@@ -70,9 +68,7 @@ class BotQueueUiTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("9. Artist — Track 9", text)
         self.assertNotIn("Track 1</b>", text)
         callbacks = [
-            button.callback_data
-            for row in keyboard.inline_keyboard
-            for button in row
+            button.callback_data for row in keyboard.inline_keyboard for button in row
         ]
         self.assertIn("v2|queue|cancel|1:job9", callbacks)
         self.assertIn("v2|queue|open|0", callbacks)

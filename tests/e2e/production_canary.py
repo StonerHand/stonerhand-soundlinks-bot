@@ -51,7 +51,9 @@ def main() -> int:
                 f"production commit={deployed_commit or 'missing'} "
                 f"expected={EXPECTED_COMMIT[:12]}"
             )
-    except Exception as exc:
+    # A canary must report every failure as a concise non-zero result instead
+    # of losing the diagnostic in a traceback.
+    except Exception as exc:  # noqa: BLE001
         failures.append(f"health request failed: {type(exc).__name__}")
 
     if failures:

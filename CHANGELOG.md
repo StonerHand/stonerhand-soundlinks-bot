@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.5.0 — 2026-08-25
+
+- Hardened the release pipeline: CI now runs the complete configured Ruff
+  ruleset, verifies deterministic formatting and executes the full pytest
+  collection instead of relying on a narrower lint/test subset.
+- Normalized the entire Python codebase and removed all full-lint findings,
+  including stale suppressions, ambiguous exception boundaries and inconsistent
+  imports.
+- Tightened exception handling and documented the few deliberate broad catches
+  at HTTP, alerting and best-effort media boundaries so fallback guarantees
+  remain explicit and testable.
+- Added release contracts for Vercel route/build/cron alignment and CI quality
+  gates so deployment configuration cannot silently drift from the code.
+- Refreshed public documentation and architecture for the adaptive Bot API 10.3
+  inline path: Rich Messages require reusable Telegram artwork, while classic
+  shares retain the large cover and complete keyboard.
+
 ## 1.4.4 — 2026-08-25
 
 - Restored large artwork in shared track cards: inline delivery now selects

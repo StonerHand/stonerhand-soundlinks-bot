@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 import tempfile
+from pathlib import Path
 from threading import Lock
 from typing import Any
 
@@ -204,11 +204,7 @@ def _record_activity(
         stats["artists"] += artist_count
 
         item_count = (
-            len(matches)
-            + video_count
-            + radio_count
-            + playlist_count
-            + artist_count
+            len(matches) + video_count + radio_count + playlist_count + artist_count
         )
         if item_count > 1:
             stats["collections"] += 1
@@ -270,16 +266,17 @@ def merge_stats(base: StatsData, other: object) -> StatsData:
 
 def format_stats_message(stats: StatsData, *, include_private: bool = False) -> str:
     lines = [
-        "StonerHand stats\n\n"
-        f"постов обработано: {stats.get('posts', 0)}\n"
-        f"треков: {stats.get('song', 0)}\n"
-        f"альбомов: {stats.get('album', 0)}\n"
-        f"подкастов: {stats.get('podcast', 0)}\n"
-        f"видео: {stats.get('videos', 0)}\n"
-        f"радио: {stats.get('radios', 0)}\n"
-        f"плейлистов: {stats.get('playlists', 0)}\n"
-        f"артистов: {stats.get('artists', 0)}\n"
-        f"подборок: {stats.get('collections', 0)}"
+        "StonerHand stats",
+        "",
+        f"постов обработано: {stats.get('posts', 0)}",
+        f"треков: {stats.get('song', 0)}",
+        f"альбомов: {stats.get('album', 0)}",
+        f"подкастов: {stats.get('podcast', 0)}",
+        f"видео: {stats.get('videos', 0)}",
+        f"радио: {stats.get('radios', 0)}",
+        f"плейлистов: {stats.get('playlists', 0)}",
+        f"артистов: {stats.get('artists', 0)}",
+        f"подборок: {stats.get('collections', 0)}",
     ]
 
     if include_private:
@@ -333,7 +330,9 @@ def _clean_counter_map(value: object) -> dict[str, dict[str, object]]:
     return cleaned
 
 
-def _record_counter(counter: dict[str, dict[str, object]], entry: dict[str, object]) -> None:
+def _record_counter(
+    counter: dict[str, dict[str, object]], entry: dict[str, object]
+) -> None:
     entry_id = str(entry.get("id") or "").strip()
     if not entry_id:
         return
@@ -354,7 +353,9 @@ def _record_counter(counter: dict[str, dict[str, object]], entry: dict[str, obje
 def _write_stats(path: Path, stats: StatsData) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temp_path = path.with_suffix(f"{path.suffix}.tmp")
-    temp_path.write_text(json.dumps(stats, ensure_ascii=False, indent=2), encoding="utf-8")
+    temp_path.write_text(
+        json.dumps(stats, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     temp_path.replace(path)
 
 

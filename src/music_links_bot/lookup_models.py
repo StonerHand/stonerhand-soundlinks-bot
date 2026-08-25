@@ -114,18 +114,12 @@ def bundle_from_cache(payload: dict) -> LookupBundle | None:
     try:
         return LookupBundle(
             tracks=[TrackMatch(**item) for item in payload.get("tracks", [])],
-            unavailable_urls=[
-                str(url) for url in payload.get("unavailable_urls", [])
-            ],
+            unavailable_urls=[str(url) for url in payload.get("unavailable_urls", [])],
             videos=[VideoMatch(**item) for item in payload.get("videos", [])],
             radios=[RadioMatch(**item) for item in payload.get("radios", [])],
-            playlists=[
-                PlaylistMatch(**item) for item in payload.get("playlists", [])
-            ],
+            playlists=[PlaylistMatch(**item) for item in payload.get("playlists", [])],
             artists=[ArtistMatch(**item) for item in payload.get("artists", [])],
-            statuses=[
-                SourceStatus(**item) for item in payload.get("statuses", [])
-            ],
+            statuses=[SourceStatus(**item) for item in payload.get("statuses", [])],
         )
     except (TypeError, ValueError):
         return None
@@ -151,9 +145,7 @@ def ensure_source_accounting(
         for source_url in source_urls
     ]
     bundle.unavailable_urls = [
-        status.source_url
-        for status in bundle.statuses
-        if status.state == "unavailable"
+        status.source_url for status in bundle.statuses if status.state == "unavailable"
     ]
     return bundle
 
@@ -175,9 +167,7 @@ def sort_statuses(
     statuses: list[SourceStatus],
     source_urls: list[str],
 ) -> list[SourceStatus]:
-    positions = {
-        cache_key_for_url(url): index for index, url in enumerate(source_urls)
-    }
+    positions = {cache_key_for_url(url): index for index, url in enumerate(source_urls)}
     return sorted(
         statuses,
         key=lambda item: positions.get(cache_key_for_url(item.source_url), 10_000),

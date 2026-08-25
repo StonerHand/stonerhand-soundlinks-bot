@@ -1,7 +1,7 @@
+import sys
 import tempfile
 import unittest
 from pathlib import Path
-import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -84,8 +84,16 @@ class StatsTests(unittest.TestCase):
                     VideoMatch(title="Second", author="Two", url="https://youtu.be/2"),
                 ],
                 path=path,
-                user={"id": 123, "label": "@viewer", "last_seen": "2026-04-23 16:00 UTC"},
-                chat={"id": 456, "label": "private", "last_seen": "2026-04-23 16:00 UTC"},
+                user={
+                    "id": 123,
+                    "label": "@viewer",
+                    "last_seen": "2026-04-23 16:00 UTC",
+                },
+                chat={
+                    "id": 456,
+                    "label": "private",
+                    "last_seen": "2026-04-23 16:00 UTC",
+                },
             )
 
             self.assertEqual(stats["posts"], 1)

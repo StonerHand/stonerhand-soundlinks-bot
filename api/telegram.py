@@ -4,13 +4,13 @@ import asyncio
 import hmac
 import json
 import logging
+import sys
 import threading
 import time
 from collections import OrderedDict
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
-import sys
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_PATH = PROJECT_ROOT / "src"
@@ -24,12 +24,13 @@ from music_links_bot.bot_app import (
     close_application_resources,
 )
 from music_links_bot.config import Settings
+from music_links_bot.logging_config import quiet_transport_logs
 from music_links_bot.loop_runner import (
     run_on_loop,
     start_background_loop,
     stop_background_loop,
 )
-from music_links_bot.logging_config import quiet_transport_logs
+
 LOGGER = logging.getLogger(__name__)
 MAX_UPDATE_BYTES = 1024 * 1024
 
@@ -81,7 +82,9 @@ class handler(BaseHTTPRequestHandler):
             return
 
         if content_length <= 0:
-            self._send_json({"ok": False, "error": "empty body"}, HTTPStatus.BAD_REQUEST)
+            self._send_json(
+                {"ok": False, "error": "empty body"}, HTTPStatus.BAD_REQUEST
+            )
             return
 
         if content_length > MAX_UPDATE_BYTES:
@@ -94,9 +97,11 @@ class handler(BaseHTTPRequestHandler):
         try:
             payload = self.rfile.read(content_length)
             update_payload = _decode_update_payload(payload)
-        except (json.JSONDecodeError, ValueError):
+        except (json.JSONDecodeError, TypeError, ValueError):
             LOGGER.exception("Invalid Telegram update payload")
-            self._send_json({"ok": False, "error": "invalid json"}, HTTPStatus.BAD_REQUEST)
+            self._send_json(
+                {"ok": False, "error": "invalid json"}, HTTPStatus.BAD_REQUEST
+            )
             return
 
         try:
@@ -135,7 +140,9 @@ def _process_telegram_update(update_payload: dict[str, object]) -> None:
             _dispose_application_locked()
 
 
-def _process_claimed_update(loop, application, update_payload: dict[str, object]) -> None:
+def _process_claimed_update(
+    loop, application, update_payload: dict[str, object]
+) -> None:
     update_id = update_payload.get("update_id")
     if isinstance(update_id, int) and not run_on_loop(
         loop, _claim_update(application, update_id), timeout=5
@@ -154,9 +161,7 @@ def _process_claimed_update(loop, application, update_payload: dict[str, object]
     except Exception as exc:
         if isinstance(update_id, int):
             try:
-                run_on_loop(
-                    loop, _release_update(application, update_id), timeout=5
-                )
+                run_on_loop(loop, _release_update(application, update_id), timeout=5)
             except Exception:
                 LOGGER.debug("Could not release update claim", exc_info=True)
         _note_failure_locked(exc)
@@ -174,9 +179,7 @@ async def _claim_update(application, update_id: int) -> bool:
     kv = application.bot_data.get("kv_store")
     if kv is not None:
         key = f"seen_update:{update_id}"
-        if await kv.set(
-            key, "1", ttl_seconds=UPDATE_DEDUP_TTL_SECONDS, nx=True
-        ):
+        if await kv.set(key, "1", ttl_seconds=UPDATE_DEDUP_TTL_SECONDS, nx=True):
             return True
         # KVStore deliberately swallows transport errors. Distinguish a real
         # duplicate from an unavailable Redis instance so an outage cannot
@@ -303,7 +306,9 @@ def _dispose_application_locked() -> None:
     try:
         run_on_loop(loop, application.shutdown(), timeout=10)
         run_on_loop(loop, close_application_resources(application), timeout=10)
-    except Exception:
+    # Cleanup is best-effort at the serverless lifecycle boundary. Third-party
+    # clients may surface transport-specific exception types here.
+    except Exception:  # noqa: BLE001
         LOGGER.warning("Could not dispose Telegram application cleanly")
     finally:
         stop_background_loop(loop, thread)
@@ -312,7 +317,7 @@ def _dispose_application_locked() -> None:
 def _decode_update_payload(payload: bytes) -> dict[str, object]:
     update_payload = json.loads(payload)
     if not isinstance(update_payload, dict):
-        raise ValueError("Telegram update payload must be a JSON object.")
+        raise TypeError("Telegram update payload must be a JSON object.")
 
     return update_payload
 

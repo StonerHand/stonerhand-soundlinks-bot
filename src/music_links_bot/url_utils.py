@@ -154,9 +154,7 @@ def strip_supported_urls_with_mapping(
             current_line.append(pair)
     segments.append((current_line, None))
 
-    normalized_segments: list[
-        tuple[list[tuple[str, int]], tuple[str, int] | None]
-    ] = []
+    normalized_segments: list[tuple[list[tuple[str, int]], tuple[str, int] | None]] = []
     for line, separator in segments:
         while line and line[-1][0] in " \t":
             line.pop()

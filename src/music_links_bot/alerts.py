@@ -36,6 +36,7 @@ def send_admin_alert(text: str, *, dedup_key: str | None = None) -> bool:
         )
         payload = response.json()
         return bool(isinstance(payload, dict) and payload.get("ok"))
+    # Alerting is deliberately best-effort and must never break its caller.
     except Exception:
         LOGGER.warning("Admin alert failed", exc_info=True)
         return False
@@ -60,11 +61,21 @@ def _acquire_dedup_slot(digest: str) -> bool:
     try:
         response = httpx.post(
             base_url.rstrip("/") + "/",
-            json=["SET", f"alert:{digest}", "1", "NX", "EX", str(ALERT_DEDUP_TTL_SECONDS)],
+            json=[
+                "SET",
+                f"alert:{digest}",
+                "1",
+                "NX",
+                "EX",
+                str(ALERT_DEDUP_TTL_SECONDS),
+            ],
             headers={"Authorization": f"Bearer {token}", "User-Agent": HTTP_USER_AGENT},
             timeout=4.0,
         )
         payload = response.json()
         return isinstance(payload, dict) and payload.get("result") == "OK"
+    # Deduplication failure must prefer one extra alert over suppressing an
+    # operational incident.
     except Exception:
+        LOGGER.debug("Admin alert deduplication unavailable", exc_info=True)
         return True

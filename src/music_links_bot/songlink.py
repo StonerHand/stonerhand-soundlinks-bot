@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import asdict, fields
 import re
 from collections.abc import Mapping
+from dataclasses import asdict, fields
 
 import httpx
 
@@ -87,9 +87,7 @@ class SonglinkClient:
             if task.done():
                 self._finish_inflight(cache_key, task)
 
-    def _finish_inflight(
-        self, cache_key: str, task: asyncio.Task[TrackMatch]
-    ) -> None:
+    def _finish_inflight(self, cache_key: str, task: asyncio.Task[TrackMatch]) -> None:
         """Forget completed single-flight tasks even if their waiter timed out."""
         if self._inflight.get(cache_key) is task:
             self._inflight.pop(cache_key, None)
@@ -122,7 +120,10 @@ class SonglinkClient:
                 )
                 if country != countries[0]
             )
-        elif isinstance(primary_match, TrackMatch) and len(primary_match.links) < MIN_COMPLETE_PLATFORM_COUNT:
+        elif (
+            isinstance(primary_match, TrackMatch)
+            and len(primary_match.links) < MIN_COMPLETE_PLATFORM_COUNT
+        ):
             secondary_countries = countries[1:]
         else:
             # A 429/5xx is service-wide, not regional. Fan-out would multiply
@@ -155,14 +156,20 @@ class SonglinkClient:
                 None,
             )
             lookup_error = next(
-                (result for result in results if isinstance(result, SonglinkLookupError)),
+                (
+                    result
+                    for result in results
+                    if isinstance(result, SonglinkLookupError)
+                ),
                 None,
             )
             try:
                 match = await self._spotify_client.lookup_release(source_url)
             except SpotifyLookupError as exc:
-                raise service_error or lookup_error or SonglinkLookupError(
-                    "Song.link could not resolve the URL."
+                raise (
+                    service_error
+                    or lookup_error
+                    or SonglinkLookupError("Song.link could not resolve the URL.")
                 ) from exc
             self._fallback_cache.set(cache_key, match)
             await self._set_shared_cache(cache_key, match, fallback=True)
@@ -173,9 +180,7 @@ class SonglinkClient:
         await self._set_shared_cache(cache_key, match)
         return match
 
-    async def _get_shared_cache(
-        self, cache_key: str
-    ) -> tuple[TrackMatch, bool] | None:
+    async def _get_shared_cache(self, cache_key: str) -> tuple[TrackMatch, bool] | None:
         if self._kv is None:
             return None
 
@@ -216,7 +221,9 @@ class SonglinkClient:
             ttl_seconds=FALLBACK_TTL_SECONDS if fallback else KV_TTL_SECONDS,
         )
 
-    async def _lookup_track_for_country(self, source_url: str, user_country: str) -> TrackMatch:
+    async def _lookup_track_for_country(
+        self, source_url: str, user_country: str
+    ) -> TrackMatch:
         params = {
             "url": source_url,
             "userCountry": user_country,
@@ -238,22 +245,32 @@ class SonglinkClient:
         try:
             payload = response.json()
         except ValueError as exc:
-            raise SonglinkLookupError("Song.link returned an invalid response.") from exc
+            raise SonglinkLookupError(
+                "Song.link returned an invalid response."
+            ) from exc
 
         entity_id = payload.get("entityUniqueId")
         entities = payload.get("entitiesByUniqueId")
         links = payload.get("linksByPlatform")
 
-        if not entity_id or not isinstance(entities, Mapping) or not isinstance(links, Mapping):
+        if (
+            not entity_id
+            or not isinstance(entities, Mapping)
+            or not isinstance(links, Mapping)
+        ):
             raise SonglinkLookupError("Song.link returned an unexpected response.")
 
         entity = entities.get(entity_id)
         if not isinstance(entity, Mapping):
-            raise SonglinkLookupError("Track metadata is missing in Song.link response.")
+            raise SonglinkLookupError(
+                "Track metadata is missing in Song.link response."
+            )
 
         entity_type = self._normalize_entity_type(entity.get("type"))
         if entity_type not in {"song", "album", "podcast"}:
-            raise SonglinkLookupError("The provided link does not point to a track, album or podcast.")
+            raise SonglinkLookupError(
+                "The provided link does not point to a track, album or podcast."
+            )
 
         title = str(entity.get("title", "")).strip()
         artist = str(
@@ -264,14 +281,18 @@ class SonglinkClient:
         ).strip()
 
         if not title or not artist:
-            raise SonglinkLookupError("Track title or artist is missing in Song.link response.")
+            raise SonglinkLookupError(
+                "Track title or artist is missing in Song.link response."
+            )
 
         resolved_links = self._extract_links(links)
         page_url = str(payload.get("pageUrl", "")).strip() or canonical_release_hub_url(
             source_url,
             release_kind=entity_type,
         )
-        release_year = self._extract_release_year(entity) or self._extract_release_year_from_entities(
+        release_year = self._extract_release_year(
+            entity
+        ) or self._extract_release_year_from_entities(
             entities,
             entity_type,
         )
@@ -299,20 +320,24 @@ class SonglinkClient:
             title=primary.title,
             artist=primary.artist,
             links=merged_links,
-            page_url=primary.page_url or next(
+            page_url=primary.page_url
+            or next(
                 (match.page_url for match in matches if match.page_url),
                 None,
             ),
-            release_year=primary.release_year or next(
+            release_year=primary.release_year
+            or next(
                 (match.release_year for match in matches if match.release_year),
                 None,
             ),
             kind=primary.kind,
-            release_format=primary.release_format or next(
+            release_format=primary.release_format
+            or next(
                 (match.release_format for match in matches if match.release_format),
                 None,
             ),
-            thumbnail_url=primary.thumbnail_url or next(
+            thumbnail_url=primary.thumbnail_url
+            or next(
                 (match.thumbnail_url for match in matches if match.thumbnail_url),
                 None,
             ),

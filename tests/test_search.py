@@ -1,7 +1,7 @@
 import asyncio
+import sys
 import unittest
 from pathlib import Path
-import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -123,7 +123,9 @@ class SearchCacheTests(unittest.IsolatedAsyncioTestCase):
         fake = ClientStub()
         search._client = fake
         first = asyncio.create_task(search.search_release_candidates("Sleep Dragonaut"))
-        second = asyncio.create_task(search.search_release_candidates(" sleep  dragonaut "))
+        second = asyncio.create_task(
+            search.search_release_candidates(" sleep  dragonaut ")
+        )
         await asyncio.sleep(0)
         fake.release.set()
         try:
@@ -226,9 +228,7 @@ class KVStoreShapeTests(unittest.TestCase):
         from unittest.mock import AsyncMock
 
         store = KVStore("https://kv.example", "token")
-        store._command_or_raise = AsyncMock(
-            side_effect=KVUnavailableError("offline")
-        )
+        store._command_or_raise = AsyncMock(side_effect=KVUnavailableError("offline"))
         try:
             with self.assertRaises(KVUnavailableError):
                 asyncio.run(store.set_json_required("queue", [{"id": "1"}]))

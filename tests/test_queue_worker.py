@@ -17,7 +17,9 @@ class QueueWorkerAuthTests(unittest.TestCase):
         with patch.dict(os.environ, {}, clear=True):
             self.assertFalse(is_authorized(None))
 
-    def test_worker_uses_separate_derived_secret_when_cron_secret_is_empty(self) -> None:
+    def test_worker_uses_separate_derived_secret_when_cron_secret_is_empty(
+        self,
+    ) -> None:
         with patch.dict(
             os.environ,
             {"BOT_TOKEN": "123456:test", "CRON_SECRET": ""},

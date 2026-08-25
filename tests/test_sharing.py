@@ -116,12 +116,21 @@ class SharingTests(unittest.TestCase):
             parse_share_query(query),
             [
                 f"https://open.spotify.com/track/{item_id}"
-                for item_id in ("abc123", "def456", "ghi789", "jkl012", "mno345", "pqr678")
+                for item_id in (
+                    "abc123",
+                    "def456",
+                    "ghi789",
+                    "jkl012",
+                    "mno345",
+                    "pqr678",
+                )
             ],
         )
 
     def test_youtube_url_round_trips(self) -> None:
-        query = build_share_query(["https://www.youtube.com/watch?v=abc123&feature=share"])
+        query = build_share_query(
+            ["https://www.youtube.com/watch?v=abc123&feature=share"]
+        )
 
         self.assertEqual(query, "sh4|yabc123")
         self.assertEqual(parse_share_query(query), ["https://youtu.be/abc123"])
@@ -134,10 +143,7 @@ class SharingTests(unittest.TestCase):
 
     def test_ten_spotify_tracks_fit_telegram_query_limit(self) -> None:
         query = build_share_query(
-            [
-                f"https://open.spotify.com/track/{index:022d}"
-                for index in range(10)
-            ]
+            [f"https://open.spotify.com/track/{index:022d}" for index in range(10)]
         )
 
         self.assertIsNotNone(query)
@@ -191,7 +197,13 @@ class SharingTests(unittest.TestCase):
 
     def test_share_button_preserves_existing_keyboard(self) -> None:
         keyboard = InlineKeyboardMarkup(
-            [[InlineKeyboardButton("Spotify", url="https://open.spotify.com/track/abc")]]
+            [
+                [
+                    InlineKeyboardButton(
+                        "Spotify", url="https://open.spotify.com/track/abc"
+                    )
+                ]
+            ]
         )
 
         result = add_share_button(
@@ -206,7 +218,13 @@ class SharingTests(unittest.TestCase):
     def test_channel_keyboard_keeps_urls_and_removes_inline_switches(self) -> None:
         keyboard = add_share_button(
             InlineKeyboardMarkup(
-                [[InlineKeyboardButton("Spotify", url="https://open.spotify.com/track/abc")]]
+                [
+                    [
+                        InlineKeyboardButton(
+                            "Spotify", url="https://open.spotify.com/track/abc"
+                        )
+                    ]
+                ]
             ),
             share_query="sh2|tabc",
             label="↗️ Поделиться с кнопками",
