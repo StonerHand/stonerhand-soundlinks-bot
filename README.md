@@ -139,13 +139,25 @@ nodes and media failures use the same lossless fallback automatically.
 keeps experimental streamed drafts off by default. `EPHEMERAL_GROUP_REPLIES=1`
 enables private-to-requester group results.
 
-## Validation
+## Release quality
+
+Every pull request passes the complete release gate:
+
+- all unit, integration, UI-contract and regression tests through `pytest`;
+- the complete configured Ruff ruleset and deterministic formatting;
+- Pyflakes, Bandit and known-vulnerability auditing for production dependencies;
+- version, changelog and Vercel route/build/cron consistency contracts;
+- a preview deployment, followed after merge by a production canary that checks
+  the exact commit, Telegram webhook, Redis and the publishing-queue worker.
+
+Local pre-release validation:
 
 ```bash
-PYTHONPATH=src python -m unittest discover -s tests -v
+python -m pytest -q
 python -m compileall -q src api tests
 python -m pyflakes src api tests
-python -m ruff check src api tests --select F,B,ASYNC,PERF
+python -m ruff check src api tests
+python -m ruff format --check src api tests
 python -m bandit -q -r src api -x tests
 python -m pip_audit -r requirements.txt --progress-spinner off
 python tests/check_dependency_pins.py

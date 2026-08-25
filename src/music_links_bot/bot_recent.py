@@ -75,8 +75,8 @@ def _append_recent_line(lines: list[str], index: int, item: dict, *, lang: str) 
     if isinstance(timestamp, (int, float)) and timestamp > 0:
         # Preserve the deployment's local presentation timezone. Runtime
         # timestamps are only a compact relative hint, never schedule input.
-        moment = datetime.fromtimestamp(timestamp)  # noqa: DTZ006
-        today = datetime.now().date()  # noqa: DTZ005
+        moment = datetime.fromtimestamp(timestamp)
+        today = datetime.now().date()
         when = (
             moment.strftime(("today" if lang == "en" else "сегодня") + " · %H:%M")
             if moment.date() == today

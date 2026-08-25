@@ -1369,10 +1369,13 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(preview.prefer_large_media)
         keyboard = result.reply_markup.inline_keyboard
         self.assertEqual(keyboard[0][0].text, "🟢 Spotify")
-        self.assertIn(
-            "🪩 Все платформы",
-            [button.text for row in keyboard for button in row],
+        all_platforms_button = next(
+            button
+            for row in keyboard
+            for button in row
+            if button.text == "🪩 Все платформы"
         )
+        self.assertEqual(all_platforms_button.url, "https://song.link/transitions")
         self.assertEqual(keyboard[-1][0].text, "↗ Поделиться")
         self.assertTrue(keyboard[-1][0].switch_inline_query.startswith("sh4|"))
 
@@ -1403,6 +1406,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(result)
         rich_message = result.input_message_content["rich_message"]
         self.assertIn('src="tg://photo?id=cover"', rich_message["html"])
+        self.assertIn('url="https://song.link/transitions"', rich_message["html"])
         self.assertEqual(
             rich_message["media"],
             [
@@ -2108,9 +2112,11 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_unprompted_private_photo_without_caption_is_ignored(self) -> None:
         class PhotoMessageStub(PrivateMessageStub):
-            text = None
-            caption = None
-            photo = [object()]
+            def __init__(self) -> None:
+                super().__init__()
+                self.text = None
+                self.caption = None
+                self.photo = [object()]
 
         message = PhotoMessageStub()
         context = ContextStub()

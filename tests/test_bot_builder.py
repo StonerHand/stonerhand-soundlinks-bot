@@ -1,7 +1,7 @@
-from datetime import datetime, timezone
-from dataclasses import asdict
-from html import unescape
 import unittest
+from dataclasses import asdict
+from datetime import datetime, timezone
+from html import unescape
 
 from music_links_bot.bot_builder import (
     BuilderScreen,

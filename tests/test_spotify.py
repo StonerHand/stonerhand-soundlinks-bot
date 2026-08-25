@@ -124,7 +124,9 @@ class SpotifyClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(track.artist, "Karmanjakah")
         self.assertEqual(client._client.get.await_count, 1)
 
-    async def test_client_falls_back_to_embed_when_page_metadata_is_incomplete(self) -> None:
+    async def test_client_falls_back_to_embed_when_page_metadata_is_incomplete(
+        self,
+    ) -> None:
         client = SpotifyClient()
         page_response = httpx.Response(
             200,

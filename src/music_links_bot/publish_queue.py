@@ -272,16 +272,17 @@ async def _finish_job(
             attempts = int(job.get("attempts") or 0) + 1
             if attempts >= MAX_JOB_ATTEMPTS:
                 outcome = "exhausted"
-                failed_draft = job.get("draft") if isinstance(job.get("draft"), dict) else None
+                failed_draft = (
+                    job.get("draft") if isinstance(job.get("draft"), dict) else None
+                )
                 continue
 
             retry = dict(job)
             retry.update(
                 status=JOB_PENDING,
                 attempts=attempts,
-                publish_at=now + RETRY_BACKOFF_SECONDS[
-                    min(attempts, len(RETRY_BACKOFF_SECONDS)) - 1
-                ],
+                publish_at=now
+                + RETRY_BACKOFF_SECONDS[min(attempts, len(RETRY_BACKOFF_SECONDS)) - 1],
             )
             retry.pop("lease_owner", None)
             retry.pop("lease_until", None)
@@ -339,14 +340,15 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
                 now=now_ts,
             )
         except (QueueBusyError, QueueStorageError):
-            LOGGER.warning("Could not finalize queue job %s; lease will recover it", job.get("id"))
+            LOGGER.warning(
+                "Could not finalize queue job %s; lease will recover it", job.get("id")
+            )
             continue
 
         if outcome == "published" and valid:
             published += 1
             target = (
-                context.application.bot_data.get("publish_chat_id")
-                or "@stonerhand"
+                context.application.bot_data.get("publish_chat_id") or "@stonerhand"
             )
             await mark_posted(
                 context,

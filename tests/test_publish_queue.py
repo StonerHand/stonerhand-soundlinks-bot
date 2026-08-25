@@ -1,8 +1,8 @@
 import asyncio
+import sys
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -206,9 +206,7 @@ class PublishQueueTests(unittest.TestCase):
         published, jobs = asyncio.run(scenario())
         self.assertEqual(published, publish_queue.MAX_JOBS_PER_TICK)
         self.assertEqual(len(jobs), 2)
-        self.assertTrue(
-            all(job["status"] == publish_queue.JOB_PENDING for job in jobs)
-        )
+        self.assertTrue(all(job["status"] == publish_queue.JOB_PENDING for job in jobs))
 
     def test_queue_caps_job_count(self) -> None:
         context = make_context()
@@ -259,7 +257,9 @@ class RetryTests(unittest.TestCase):
         # the post is NOT lost — it is put back with an attempt count and backoff
         self.assertEqual(len(jobs), 1)
         self.assertEqual(jobs[0]["attempts"], 1)
-        self.assertEqual(jobs[0]["publish_at"], 200 + publish_queue.RETRY_BACKOFF_SECONDS[0])
+        self.assertEqual(
+            jobs[0]["publish_at"], 200 + publish_queue.RETRY_BACKOFF_SECONDS[0]
+        )
 
     def test_dropped_and_alerted_after_max_attempts(self) -> None:
         context = self._context(admin_id=42)

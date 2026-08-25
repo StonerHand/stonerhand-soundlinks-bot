@@ -1,8 +1,8 @@
 import io
 import os
+import sys
 import unittest
 from pathlib import Path
-import sys
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -27,7 +27,9 @@ class BrandingTests(unittest.TestCase):
         with patch.dict(os.environ, {}, clear=True):
             self.assertFalse(photo_branding_enabled())
             self.assertEqual(brand_label("@stonerhand"), "@stonerhand")
-        with patch.dict(os.environ, {"BRAND_PHOTO_FRAME": "1", "BRAND_LABEL": "My Channel"}):
+        with patch.dict(
+            os.environ, {"BRAND_PHOTO_FRAME": "1", "BRAND_LABEL": "My Channel"}
+        ):
             self.assertTrue(photo_branding_enabled())
             self.assertEqual(brand_label("@stonerhand"), "My Channel")
 
@@ -42,7 +44,10 @@ class BrandingTests(unittest.TestCase):
 
     def test_compose_cover_with_logo(self) -> None:
         out = compose_cover(
-            _png_bytes(), label="стонерхенд", logo_bytes=_png_bytes((255, 120, 0), (64, 64)), size=512
+            _png_bytes(),
+            label="стонерхенд",
+            logo_bytes=_png_bytes((255, 120, 0), (64, 64)),
+            size=512,
         )
         self.assertIsNotNone(out)
 
@@ -83,8 +88,11 @@ class BrandingPublishTests(unittest.TestCase):
             "hashtags": True,
         }
 
-        with patch.object(bot, "photo_branding_enabled", return_value=True), patch.object(
-            bot, "build_branded_cover", new=AsyncMock(return_value=b"BRANDEDJPEG")
+        with (
+            patch.object(bot, "photo_branding_enabled", return_value=True),
+            patch.object(
+                bot, "build_branded_cover", new=AsyncMock(return_value=b"BRANDEDJPEG")
+            ),
         ):
             asyncio.run(bot._publish_draft(context, draft))
 

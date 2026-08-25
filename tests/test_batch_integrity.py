@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from types import SimpleNamespace
 import unittest
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from telegram import MessageEntity
@@ -26,7 +26,9 @@ class _UnusedSoundCloud:
 
 class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
     async def test_ten_sources_can_all_start_within_provider_budget(self) -> None:
-        urls = [f"https://open.spotify.com/track/capacity-{index}" for index in range(10)]
+        urls = [
+            f"https://open.spotify.com/track/capacity-{index}" for index in range(10)
+        ]
 
         class Client:
             async def lookup_track(self, source_url: str) -> TrackMatch:
@@ -54,7 +56,9 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(bundle.is_complete_for(urls))
 
     async def test_one_slow_source_does_not_cancel_completed_siblings(self) -> None:
-        urls = [f"https://open.spotify.com/track/integrity-{index}" for index in range(10)]
+        urls = [
+            f"https://open.spotify.com/track/integrity-{index}" for index in range(10)
+        ]
 
         class Client:
             async def lookup_track(self, source_url: str) -> TrackMatch:
@@ -119,7 +123,9 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
             ["unavailable", "unavailable", *("success" for _ in range(8))],
         )
 
-    async def test_open_songlink_circuit_still_allows_spotify_fallback_path(self) -> None:
+    async def test_open_songlink_circuit_still_allows_spotify_fallback_path(
+        self,
+    ) -> None:
         url = "https://open.spotify.com/track/circuit-fallback"
 
         class Client:
@@ -264,7 +270,9 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(bundle.item_count, 2)
         self.assertTrue(bundle.is_complete_for(urls))
 
-    async def test_partial_public_collection_has_no_incomplete_share_action(self) -> None:
+    async def test_partial_public_collection_has_no_incomplete_share_action(
+        self,
+    ) -> None:
         tracks = [
             TrackMatch(
                 title=f"Track {index}",
@@ -278,7 +286,9 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
             chat_id=-100,
             from_user=None,
         )
-        context = SimpleNamespace(bot=object(), application=SimpleNamespace(bot_data={}))
+        context = SimpleNamespace(
+            bot=object(), application=SimpleNamespace(bot_data={})
+        )
 
         with patch("music_links_bot.bot._send_track_result", new=AsyncMock()) as sender:
             await _send_track_matches(
@@ -315,7 +325,9 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
             chat_id=-100,
             from_user=None,
         )
-        context = SimpleNamespace(bot=object(), application=SimpleNamespace(bot_data={}))
+        context = SimpleNamespace(
+            bot=object(), application=SimpleNamespace(bot_data={})
+        )
 
         with patch("music_links_bot.bot._send_track_result", new=AsyncMock()) as sender:
             await _send_track_matches(

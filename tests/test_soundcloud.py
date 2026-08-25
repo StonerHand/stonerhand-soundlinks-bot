@@ -1,10 +1,13 @@
+import sys
 import unittest
 from pathlib import Path
-import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from music_links_bot.soundcloud import build_soundcloud_fallback, parse_soundcloud_metadata
+from music_links_bot.soundcloud import (
+    build_soundcloud_fallback,
+    parse_soundcloud_metadata,
+)
 
 
 class SoundCloudTests(unittest.TestCase):
@@ -48,7 +51,9 @@ class SoundCloudTests(unittest.TestCase):
         assert track is not None
         self.assertEqual(track.artist, "SoundCloud")
         self.assertEqual(track.title, "SoundCloud")
-        self.assertEqual(track.links, {"soundcloud": "https://on.soundcloud.com/abc123"})
+        self.assertEqual(
+            track.links, {"soundcloud": "https://on.soundcloud.com/abc123"}
+        )
 
 
 if __name__ == "__main__":

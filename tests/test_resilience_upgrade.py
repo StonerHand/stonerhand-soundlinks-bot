@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from types import SimpleNamespace
 import unittest
+from types import SimpleNamespace
 
 from music_links_bot.bot import (
     _duplicate_post_keyboard,
@@ -12,13 +12,13 @@ from music_links_bot.bot_lookup import LookupBundle, SourceStatus
 from music_links_bot.bot_runtime import BotRuntime
 from music_links_bot.bot_storage import load_retry_sources
 from music_links_bot.chat_access import check_publish_access
-from music_links_bot.models import TrackMatch
 from music_links_bot.inline_storage import (
     load_cached_search,
     load_inline_history,
     remember_inline_urls,
     store_cached_search,
 )
+from music_links_bot.models import TrackMatch
 from music_links_bot.provider_registry import DEFAULT_PROVIDER_REGISTRY
 from music_links_bot.provider_runtime import (
     ProviderTask,
@@ -152,11 +152,7 @@ class PublicationStateTests(unittest.IsolatedAsyncioTestCase):
             },
             lang="ru",
         )
-        labels = [
-            button.text
-            for row in keyboard.inline_keyboard
-            for button in row
-        ]
+        labels = [button.text for row in keyboard.inline_keyboard for button in row]
         self.assertIn("Опубликовать снова", labels)
         self.assertIn("Заменить старый пост", labels)
         self.assertIn("Открыть старый пост", labels)
@@ -261,7 +257,12 @@ class PartialBatchJourneyTests(unittest.IsolatedAsyncioTestCase):
         context = SimpleNamespace(application=SimpleNamespace(bot_data={}))
         url = "https://open.spotify.com/track/retry-not-found"
         bundle = LookupBundle(
-            tracks=[], unavailable_urls=[], videos=[], radios=[], playlists=[], artists=[],
+            tracks=[],
+            unavailable_urls=[],
+            videos=[],
+            radios=[],
+            playlists=[],
+            artists=[],
             statuses=[SourceStatus(url, "songlink", "not_found", retryable=True)],
         )
 
@@ -269,7 +270,9 @@ class PartialBatchJourneyTests(unittest.IsolatedAsyncioTestCase):
             message, context, bundle, user_id=7, lang="ru"
         )
 
-        callback = message.sent[0][1]["reply_markup"].inline_keyboard[0][0].callback_data
+        callback = (
+            message.sent[0][1]["reply_markup"].inline_keyboard[0][0].callback_data
+        )
         stored = await load_retry_sources(context, callback.rsplit("|", 1)[-1])
         self.assertEqual(stored["urls"], [url])
 

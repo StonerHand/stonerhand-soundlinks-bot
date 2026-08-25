@@ -90,9 +90,7 @@ class OverallHealthTests(unittest.TestCase):
 
     def test_configured_queue_worker_is_critical(self) -> None:
         self.assertFalse(overall_ok(self._checks(worker_ok=False)))
-        self.assertTrue(
-            overall_ok(self._checks(worker_ok=False, worker_conf=False))
-        )
+        self.assertTrue(overall_ok(self._checks(worker_ok=False, worker_conf=False)))
 
     def test_overdue_queue_fails_whole_service_health(self) -> None:
         self.assertTrue(
@@ -127,7 +125,9 @@ class OverallHealthTests(unittest.TestCase):
         self.assertRegex(release["version"], r"^\d+\.\d+\.\d+$")
 
     def test_describe_failures_skips_unconfigured_redis(self) -> None:
-        failures = describe_failures(self._checks(webhook=False, redis_ok=False, redis_conf=False))
+        failures = describe_failures(
+            self._checks(webhook=False, redis_ok=False, redis_conf=False)
+        )
         self.assertEqual(failures, ["webhook"])
 
     def test_storage_snapshot_without_redis_is_empty(self) -> None:
@@ -237,7 +237,9 @@ class OverallHealthTests(unittest.TestCase):
         request = open_mock.call_args.args[0]
         self.assertEqual(request.full_url, "https://bot.example/api/queue_worker")
 
-    def test_queue_tick_uses_derived_worker_secret_when_cron_value_is_empty(self) -> None:
+    def test_queue_tick_uses_derived_worker_secret_when_cron_value_is_empty(
+        self,
+    ) -> None:
         import os
         from unittest.mock import MagicMock, patch
 

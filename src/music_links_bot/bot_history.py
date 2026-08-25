@@ -59,9 +59,7 @@ async def record_history(
         histories: dict = context.application.bot_data.setdefault("bot_history", {})
         remember_bounded(histories, user_id, items, max_size=MAX_MEMORY_USERS)
         if kv is not None:
-            await kv.set_json(
-                f"hist:{user_id}", items, ttl_seconds=HISTORY_TTL_SECONDS
-            )
+            await kv.set_json(f"hist:{user_id}", items, ttl_seconds=HISTORY_TTL_SECONDS)
     finally:
         if lock_owner is not None and kv is not None:
             await kv.delete_if_value(lock_key, lock_owner)

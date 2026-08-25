@@ -64,7 +64,7 @@ def compose_cover(
     """Pure-image compositing (no network) so it is easy to test."""
     try:
         from PIL import Image, ImageDraw
-    except Exception:
+    except ImportError:
         return None
 
     try:

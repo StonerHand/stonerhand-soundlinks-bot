@@ -152,7 +152,10 @@ def _sanitize_entity(entity: MessageEntity) -> MessageEntity | None:
         return None
 
     if entity.type == MessageEntity.TEXT_LINK:
-        if not entity.url or urlparse(entity.url).scheme.lower() not in SAFE_LINK_SCHEMES:
+        if (
+            not entity.url
+            or urlparse(entity.url).scheme.lower() not in SAFE_LINK_SCHEMES
+        ):
             return None
         safe_url = escape(entity.url, quote=True)
     else:

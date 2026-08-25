@@ -57,11 +57,7 @@ async def check_publish_access(context, target: int | str) -> PublishAccess:
         result = PublishAccess(
             allowed=can_post,
             can_delete=can_delete,
-            detail=(
-                "ok"
-                if can_post
-                else "боту не выдано право публиковать сообщения"
-            ),
+            detail=("ok" if can_post else "боту не выдано право публиковать сообщения"),
         )
     except TelegramError as exc:
         result = PublishAccess(
@@ -69,7 +65,7 @@ async def check_publish_access(context, target: int | str) -> PublishAccess:
             False,
             f"{type(exc).__name__}: {str(exc)[:160]}",
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         # Test transports and old Telegram client stubs may expose only part
         # of the Bot API. Do not block a working send on an unknown preflight.
         result = PublishAccess(

@@ -104,9 +104,7 @@ class KVStore:
             "if redis.call('get', KEYS[1]) == ARGV[1] then "
             "return redis.call('del', KEYS[1]) else return 0 end"
         )
-        result = await self._command(
-            ["EVAL", script, "1", key, expected_value]
-        )
+        result = await self._command(["EVAL", script, "1", key, expected_value])
         return result == 1
 
     async def increment_window(self, key: str, *, ttl_seconds: int) -> int | None:

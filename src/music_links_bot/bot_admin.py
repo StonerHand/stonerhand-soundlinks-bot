@@ -27,12 +27,8 @@ async def stats_command(update, context) -> None:
     if message is None:
         return
     admin_chat_id = context.application.bot_data.get("admin_chat_id")
-    include_private = (
-        admin_chat_id is not None and message.chat_id == admin_chat_id
-    )
-    await message.reply_text(
-        await stats_text(context, include_private=include_private)
-    )
+    include_private = admin_chat_id is not None and message.chat_id == admin_chat_id
+    await message.reply_text(await stats_text(context, include_private=include_private))
 
 
 async def stats_text(context, *, include_private: bool) -> str:
@@ -61,11 +57,7 @@ async def stats_text(context, *, include_private: bool) -> str:
     if diagnostics:
         lines = ["", "Провайдеры"]
         for item in diagnostics:
-            marker = (
-                "⛔"
-                if item.get("circuit_open")
-                else "✅" if item["ok"] else "⚠️"
-            )
+            marker = "⛔" if item.get("circuit_open") else "✅" if item["ok"] else "⚠️"
             lines.append(
                 f"{marker} {item['provider']} · {item['avg_latency_ms']} ms avg · "
                 f"{item['success_rate_percent']}% · {item['requests']} запросов"
@@ -192,8 +184,8 @@ async def build_status_text(context) -> str:
     if diagnostics:
         lines.extend(["", "<b>Провайдеры</b>"])
         for item in diagnostics:
-            marker = "⛔" if item.get("circuit_open") else (
-                "✅" if item.get("ok") else "⚠️"
+            marker = (
+                "⛔" if item.get("circuit_open") else ("✅" if item.get("ok") else "⚠️")
             )
             detail = (
                 f"{item.get('avg_latency_ms', 0)} ms avg, "

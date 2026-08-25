@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stonerhand-soundlinks-bot"
-version = "1.4.4"
-description = "Telegram music publishing bot with universal links, collections, scheduling and channel delivery."
+version = "1.5.0"
+description = "Telegram-native music publishing bot with universal release cards, collections, scheduling and channel delivery."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -33,6 +33,24 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+
+[tool.ruff]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+  "ASYNC",
+  "B",
+  "BLE",
+  "F",
+  "I",
+  "ISC004",
+  "PERF",
+  "RUF012",
+  "RUF100",
+  "TRY004",
+  "TRY400",
+]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true

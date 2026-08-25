@@ -288,7 +288,8 @@ def fit_telegram_html(text: str, limit: int = MESSAGE_TEXT_LIMIT) -> str:
         return ""
     tags = re.findall(r"</?([A-Za-z][A-Za-z0-9-]*)\b[^>]*>", value)
     markup_is_well_formed_enough = (
-        value.count("<") == len(tags) and value.count(">") == len(tags)
+        value.count("<") == len(tags)
+        and value.count(">") == len(tags)
         and _balanced_html_tags(value)
     )
     plain = unescape(re.sub(r"</?[A-Za-z][^>]*>", "", value))

@@ -157,7 +157,9 @@ def parse_spotify_page(source_url: str, html: str) -> TrackMatch:
 
     kind = spotify_url_type(source_url) or "track"
     page_type = parser.first("og:type").casefold()
-    normalized_kind = "album" if kind == "album" or page_type == "music.album" else "song"
+    normalized_kind = (
+        "album" if kind == "album" or page_type == "music.album" else "song"
+    )
     release_year = parser.first("music:release_date")[:4]
     if not release_year.isdigit():
         release_year = None

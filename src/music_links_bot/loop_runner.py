@@ -9,7 +9,9 @@ from typing import TypeVar
 T = TypeVar("T")
 
 
-def start_background_loop(name: str) -> tuple[asyncio.AbstractEventLoop, threading.Thread]:
+def start_background_loop(
+    name: str,
+) -> tuple[asyncio.AbstractEventLoop, threading.Thread]:
     loop = asyncio.new_event_loop()
     ready = threading.Event()
 

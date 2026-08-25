@@ -69,9 +69,7 @@ def track_share_url(track: TrackMatch) -> str | None:
 
 
 def build_share_query(urls: list[str]) -> str | None:
-    unique_urls = list(
-        dict.fromkeys(cache_key_for_url(url) for url in urls if url)
-    )
+    unique_urls = list(dict.fromkeys(cache_key_for_url(url) for url in urls if url))
     if not unique_urls or len(unique_urls) > MAX_SHARE_ITEMS:
         return None
 

@@ -57,7 +57,9 @@ class StateMigrationTests(unittest.IsolatedAsyncioTestCase):
         template = await load_channel_template(context, "@stonerhand")
 
         self.assertEqual(template, {"hashtags": False})
-        self.assertTrue(any(key.startswith("channel:template:v2:") for key, _ in kv.writes))
+        self.assertTrue(
+            any(key.startswith("channel:template:v2:") for key, _ in kv.writes)
+        )
 
     def test_legacy_draft_gets_safe_defaults(self) -> None:
         draft = normalize_track_draft(

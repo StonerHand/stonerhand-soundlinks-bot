@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from html import escape
 import re
+from html import escape
 
 from music_links_bot.models import (
     ArtistMatch,
@@ -58,7 +58,9 @@ def format_video_message(video: VideoMatch, *, include_hashtags: bool = True) ->
         f"📺 · <b>{_display_text(video.title)}</b>",
         f"канал: {_display_text(video.author)}",
     ]
-    return _with_hashtags(lines, "#stonerhand #video", include_hashtags=include_hashtags)
+    return _with_hashtags(
+        lines, "#stonerhand #video", include_hashtags=include_hashtags
+    )
 
 
 def format_radio_message(radio: RadioMatch, *, include_hashtags: bool = True) -> str:
@@ -66,7 +68,9 @@ def format_radio_message(radio: RadioMatch, *, include_hashtags: bool = True) ->
         f"📡 · <b>{_display_text(radio.title)}</b>",
         f"станция: {_display_text(radio.station)}",
     ]
-    return _with_hashtags(lines, "#stonerhand #radio", include_hashtags=include_hashtags)
+    return _with_hashtags(
+        lines, "#stonerhand #radio", include_hashtags=include_hashtags
+    )
 
 
 def format_playlist_message(
@@ -78,7 +82,9 @@ def format_playlist_message(
         f"🎛 · <b>{_display_text(playlist.title)}</b>",
         f"платформа: {_display_text(playlist.platform)}",
     ]
-    return _with_hashtags(lines, "#stonerhand #playlist", include_hashtags=include_hashtags)
+    return _with_hashtags(
+        lines, "#stonerhand #playlist", include_hashtags=include_hashtags
+    )
 
 
 def format_artist_message(
@@ -90,7 +96,9 @@ def format_artist_message(
         f"🧬 · <b>{_display_text(artist.title)}</b>",
         f"профиль: {_display_text(artist.platform)}",
     ]
-    return _with_hashtags(lines, "#stonerhand #artist", include_hashtags=include_hashtags)
+    return _with_hashtags(
+        lines, "#stonerhand #artist", include_hashtags=include_hashtags
+    )
 
 
 def format_artist_collection_message(
@@ -104,7 +112,9 @@ def format_artist_collection_message(
         heading = f"<b>{_display_text(artist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
         lines.append(f"{index}. 🧬 · {heading}")
 
-    return _with_hashtags(lines, "#stonerhand #collection #artist", include_hashtags=include_hashtags)
+    return _with_hashtags(
+        lines, "#stonerhand #collection #artist", include_hashtags=include_hashtags
+    )
 
 
 def format_playlist_collection_message(
@@ -118,7 +128,9 @@ def format_playlist_collection_message(
         heading = f"<b>{_display_text(playlist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
         lines.append(f"{index}. 🎛 · {heading}")
 
-    return _with_hashtags(lines, "#stonerhand #collection #playlist", include_hashtags=include_hashtags)
+    return _with_hashtags(
+        lines, "#stonerhand #collection #playlist", include_hashtags=include_hashtags
+    )
 
 
 def format_video_collection_message(
@@ -132,7 +144,9 @@ def format_video_collection_message(
         heading = f"<b>{_display_text(video.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
         lines.append(f"{index}. 📺 · {heading}")
 
-    return _with_hashtags(lines, "#stonerhand #collection #video", include_hashtags=include_hashtags)
+    return _with_hashtags(
+        lines, "#stonerhand #collection #video", include_hashtags=include_hashtags
+    )
 
 
 def format_radio_collection_message(
@@ -146,7 +160,9 @@ def format_radio_collection_message(
         heading = f"<b>{_display_text(radio.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
         lines.append(f"{index}. 📡 · {heading}")
 
-    return _with_hashtags(lines, "#stonerhand #collection #radio", include_hashtags=include_hashtags)
+    return _with_hashtags(
+        lines, "#stonerhand #collection #radio", include_hashtags=include_hashtags
+    )
 
 
 def format_mixed_collection_message(
@@ -181,9 +197,7 @@ def format_mixed_collection_message(
     index = 1
     for track in tracks:
         emoji = pick_track_emoji(track)
-        lines.append(
-            f"{index}. {emoji} · {format_track_heading(track)}"
-        )
+        lines.append(f"{index}. {emoji} · {format_track_heading(track)}")
         index += 1
 
     for playlist in playlists:
@@ -235,7 +249,9 @@ def format_track_video_pair_message(
         f"📺 · {video_heading}",
     ]
     if video.author:
-        lines.append(f"   <i>{_display_text(video.author, MAX_COLLECTION_TEXT_LENGTH)}</i>")
+        lines.append(
+            f"   <i>{_display_text(video.author, MAX_COLLECTION_TEXT_LENGTH)}</i>"
+        )
     return _with_hashtags(
         lines,
         build_mixed_collection_hashtags([track], has_videos=True),
@@ -293,9 +309,7 @@ def format_collection_message(
             lines.append(f"<b>{escape(section)}</b>")
             active_section = section
         emoji = pick_track_emoji(track)
-        lines.append(
-            f"{index}. {emoji} · {format_track_heading(track)}"
-        )
+        lines.append(f"{index}. {emoji} · {format_track_heading(track)}")
         note = (
             item_notes[index - 1].strip()
             if item_notes and index <= len(item_notes)
@@ -320,10 +334,7 @@ def prepend_user_text(message_text: str, *, author_label: str | None = None) -> 
         return ""
 
     if author_label:
-        return (
-            f"<blockquote>{escape(author_label)}:\n"
-            f"{escape(header)}</blockquote>\n\n"
-        )
+        return f"<blockquote>{escape(author_label)}:\n{escape(header)}</blockquote>\n\n"
 
     return f"<blockquote>{escape(header)}</blockquote>\n\n"
 
@@ -334,10 +345,7 @@ def prepend_user_html(message_html: str, *, author_label: str | None = None) -> 
         return ""
 
     if author_label:
-        return (
-            f"<blockquote>{escape(author_label)}:\n"
-            f"{header}</blockquote>\n\n"
-        )
+        return f"<blockquote>{escape(author_label)}:\n{header}</blockquote>\n\n"
 
     return f"<blockquote>{header}</blockquote>\n\n"
 

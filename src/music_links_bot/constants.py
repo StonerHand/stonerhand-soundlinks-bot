@@ -1,6 +1,5 @@
 from music_links_bot import __version__
 
-
 SUPPORTED_INPUT_HOSTS = {
     "open.spotify.com",
     "spotify.com",
