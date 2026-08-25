@@ -18,6 +18,7 @@ from telegram.ext import ContextTypes
 from music_links_bot import bot_lookup
 from music_links_bot.constants import MAX_LINKS_PER_MESSAGE
 from music_links_bot.formatter import (
+    build_auto_hashtags,
     format_artist_message,
     format_playlist_message,
     format_radio_message,
@@ -40,7 +41,17 @@ from music_links_bot.keyboards import (
     _build_youtube_keyboard,
     _select_preview_url,
 )
-from music_links_bot.search import SearchClient, SearchLookupError, normalize_search_query
+from music_links_bot.rich_publications import (
+    RICH_MESSAGE_CAPABILITY,
+    build_rich_inline_card_html,
+    rich_api_unavailable,
+    rich_messages_enabled,
+)
+from music_links_bot.search import (
+    SearchClient,
+    SearchLookupError,
+    normalize_search_query,
+)
 from music_links_bot.sharing import (
     add_share_button,
     build_share_query,
@@ -48,6 +59,11 @@ from music_links_bot.sharing import (
     parse_share_query,
     render_inline_share_card,
 )
+from music_links_bot.telegram_gateway import (
+    record_capability_failure,
+    record_capability_success,
+)
+from music_links_bot.telegram_media_cache import get_cached_file_id
 from music_links_bot.url_utils import (
     extract_supported_urls,
     is_nts_url,
@@ -174,7 +190,45 @@ async def inline_query_handler(
             is_personal=personal_results,
             next_offset=next_offset,
         )
-    except TelegramError:
+        if any(_result_uses_rich(result) for result in results):
+            record_capability_success(RICH_MESSAGE_CAPABILITY)
+    except TelegramError as exc:
+        if any(_result_uses_rich(result) for result in results):
+            record_capability_failure(
+                RICH_MESSAGE_CAPABILITY,
+                exc,
+                unsupported=rich_api_unavailable(exc),
+            )
+            classic_outcomes = await asyncio.gather(
+                *(
+                    _build_inline_result(
+                        source_url,
+                        context,
+                        lang=lang,
+                        channel_safe=channel_safe,
+                        history=history_mode,
+                        force_classic=True,
+                    )
+                    for source_url in page_urls
+                ),
+                return_exceptions=True,
+            )
+            classic_results = [
+                outcome
+                for outcome in classic_outcomes
+                if isinstance(outcome, InlineQueryResultArticle)
+            ]
+            if classic_results:
+                try:
+                    await inline_query.answer(
+                        classic_results,
+                        cache_time=0 if channel_safe else INLINE_CACHE_SECONDS,
+                        is_personal=personal_results,
+                        next_offset=next_offset,
+                    )
+                    return
+                except TelegramError:
+                    pass
         LOGGER.debug("Could not answer inline query", exc_info=True)
 
 
@@ -224,7 +278,36 @@ async def _answer_inline_collection(
             ),
             is_personal=is_direct or channel_safe or partial,
         )
-    except TelegramError:
+        if _result_uses_rich(result):
+            record_capability_success(RICH_MESSAGE_CAPABILITY)
+    except TelegramError as exc:
+        if _result_uses_rich(result):
+            record_capability_failure(
+                RICH_MESSAGE_CAPABILITY,
+                exc,
+                unsupported=rich_api_unavailable(exc),
+            )
+            classic_result = await _build_inline_collection_result(
+                source_urls,
+                context,
+                lang=lang,
+                channel_safe=channel_safe,
+                force_classic=True,
+            )
+            if classic_result is not None:
+                try:
+                    await inline_query.answer(
+                        [classic_result],
+                        cache_time=(
+                            0
+                            if (is_direct or channel_safe or partial)
+                            else INLINE_CACHE_SECONDS
+                        ),
+                        is_personal=is_direct or channel_safe or partial,
+                    )
+                    return
+                except TelegramError:
+                    pass
         LOGGER.debug("Could not answer inline collection query", exc_info=True)
 
 
@@ -286,6 +369,7 @@ async def _build_inline_result(
     lang: str = "ru",
     channel_safe: bool = False,
     history: bool = False,
+    force_classic: bool = False,
 ) -> InlineQueryResultArticle | None:
     bot_data = context.application.bot_data
     share_query = build_share_query([source_url])
@@ -417,6 +501,37 @@ async def _build_inline_result(
         return None
 
     track = tracks[0]
+    keyboard = add_share_button(
+        _build_link_keyboard(
+            track.links,
+            context=context,
+            release_page_url=track.page_url,
+            release_kind=track.kind,
+            release_format=track.release_format,
+        ),
+        share_query=share_query,
+        label=share_label,
+    )
+    cached_cover_file_id = await get_cached_file_id(context, track.thumbnail_url)
+    rich_html = build_rich_inline_card_html(
+        track,
+        hashtags=build_auto_hashtags(track),
+        reply_markup=keyboard,
+        media_id="cover" if cached_cover_file_id else None,
+    )
+    rich_media = (
+        [
+            {
+                "id": "cover",
+                "media": {
+                    "type": "photo",
+                    "media": cached_cover_file_id,
+                },
+            }
+        ]
+        if cached_cover_file_id
+        else None
+    )
     return _inline_article(
         source_url,
         title=f"{track.artist} — {track.title}",
@@ -430,20 +545,13 @@ async def _build_inline_result(
             history=history,
         ),
         text=format_track_message(track, include_hashtags=True),
-        keyboard=add_share_button(
-            _build_link_keyboard(
-                track.links,
-                context=context,
-                release_page_url=track.page_url,
-                release_kind=track.kind,
-                release_format=track.release_format,
-            ),
-            share_query=share_query,
-            label=share_label,
-        ),
+        keyboard=keyboard,
         preview_url=_select_preview_url(track.links, context) or track.thumbnail_url,
         thumbnail_url=track.thumbnail_url,
         channel_safe=channel_safe,
+        rich_html=rich_html,
+        rich_media=rich_media,
+        force_classic=force_classic,
     )
 
 
@@ -460,10 +568,15 @@ async def _build_inline_collection_result(
     *,
     lang: str,
     channel_safe: bool = False,
+    force_classic: bool = False,
 ) -> InlineQueryResultArticle | None:
     if len(source_urls) == 1:
         return await _build_inline_result(
-            source_urls[0], context, lang=lang, channel_safe=channel_safe
+            source_urls[0],
+            context,
+            lang=lang,
+            channel_safe=channel_safe,
+            force_classic=force_classic,
         )
 
     bundle = await bot_lookup.resolve_sources(
@@ -503,21 +616,43 @@ def _inline_article(
     preview_url: str | None,
     thumbnail_url: str | None = None,
     channel_safe: bool = False,
+    rich_html: str | None = None,
+    rich_media: list[dict[str, object]] | None = None,
+    force_classic: bool = False,
 ) -> InlineQueryResultArticle:
     if channel_safe:
         keyboard = make_channel_safe_keyboard(keyboard)
-    return InlineQueryResultArticle(
-        id=hashlib.sha256(source_url.encode("utf-8")).hexdigest()[:32],
-        title=title,
-        description=description,
-        thumbnail_url=thumbnail_url,
-        input_message_content=InputTextMessageContent(
+    use_rich = (
+        bool(rich_html)
+        and rich_messages_enabled()
+        and not channel_safe
+        and not force_classic
+    )
+    rich_message: dict[str, object] = {"html": rich_html or ""}
+    if rich_media:
+        rich_message["media"] = rich_media
+    input_message_content = (
+        {"rich_message": rich_message}
+        if use_rich
+        else InputTextMessageContent(
             message_text=text,
             parse_mode=ParseMode.HTML,
             link_preview_options=_build_link_preview_options(
                 preview_url,
                 prefer_large_media=True,
             ),
-        ),
-        reply_markup=keyboard,
+        )
     )
+    return InlineQueryResultArticle(
+        id=hashlib.sha256(source_url.encode("utf-8")).hexdigest()[:32],
+        title=title,
+        description=description,
+        thumbnail_url=thumbnail_url,
+        input_message_content=input_message_content,
+        reply_markup=None if use_rich else keyboard,
+    )
+
+
+def _result_uses_rich(result: InlineQueryResultArticle) -> bool:
+    content = getattr(result, "input_message_content", None)
+    return isinstance(content, dict) and isinstance(content.get("rich_message"), dict)

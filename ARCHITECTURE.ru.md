@@ -48,6 +48,8 @@ webhook `/api/telegram`. Polling используется исключитель
 - `publication_presets.py` — именованные пользовательские шаблоны оформления;
 - `publication_model.py` — независимая от Telegram модель готовой публикации;
 - `rich_publications.py` — безопасный Rich HTML, карточки, медиагруппы и fallback;
+- `release_hubs.py` — канонические Songlink/Odesli URL для треков, альбомов и
+  подкастов независимо от источника метаданных;
 - `telegram_gateway.py` — изолированный контракт новых методов Bot API 10.3;
 - `telegram_media_cache.py` — повторное использование Telegram `file_id` обложек;
 - `publication_view.py` — единый HTML и клавиатура карточки для preview и delivery;

@@ -50,6 +50,7 @@ class SpotifyFallbackTests(unittest.TestCase):
         self.assertEqual(track.release_year, "2026")
         self.assertEqual(track.thumbnail_url, "https://i.scdn.co/image/cover")
         self.assertEqual(track.links, {"spotify": "https://open.spotify.com/track/abc"})
+        self.assertEqual(track.page_url, "https://song.link/s/abc")
 
     def test_public_page_uses_description_when_artist_meta_is_missing(self) -> None:
         track = parse_spotify_page(
@@ -93,7 +94,7 @@ class SpotifyFallbackTests(unittest.TestCase):
         self.assertEqual(track.title, "Heartsink")
         self.assertEqual(track.release_year, "2010")
         self.assertEqual(track.links, {"spotify": "https://open.spotify.com/track/abc"})
-        self.assertEqual(track.page_url, "https://open.spotify.com/track/abc")
+        self.assertEqual(track.page_url, "https://song.link/s/abc")
         self.assertEqual(track.thumbnail_url, "https://i.scdn.co/image/cover")
 
     def test_removed_release_is_not_invented(self) -> None:

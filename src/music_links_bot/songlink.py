@@ -11,6 +11,7 @@ from music_links_bot.cache import TTLCache
 from music_links_bot.constants import HTTP_USER_AGENT, PLATFORM_ALIASES
 from music_links_bot.kvstore import KVStore
 from music_links_bot.models import TrackMatch
+from music_links_bot.release_hubs import canonical_release_hub_url
 from music_links_bot.spotify import SpotifyClient, SpotifyLookupError
 from music_links_bot.url_utils import cache_key_for_url
 
@@ -266,7 +267,10 @@ class SonglinkClient:
             raise SonglinkLookupError("Track title or artist is missing in Song.link response.")
 
         resolved_links = self._extract_links(links)
-        page_url = str(payload.get("pageUrl", "")).strip() or source_url
+        page_url = str(payload.get("pageUrl", "")).strip() or canonical_release_hub_url(
+            source_url,
+            release_kind=entity_type,
+        )
         release_year = self._extract_release_year(entity) or self._extract_release_year_from_entities(
             entities,
             entity_type,
