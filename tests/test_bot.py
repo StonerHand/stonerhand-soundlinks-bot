@@ -1385,7 +1385,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         keyboard = result.reply_markup.inline_keyboard
         self.assertEqual(keyboard[0][0].text, "🟢 Spotify")
         self.assertEqual(keyboard[-1][0].text, "↗ Поделиться")
-        self.assertTrue(keyboard[-1][0].switch_inline_query.startswith("sh2|"))
+        self.assertTrue(keyboard[-1][0].switch_inline_query.startswith("sh3|"))
 
     async def test_inline_rich_result_uses_cached_telegram_cover(self) -> None:
         with patch(

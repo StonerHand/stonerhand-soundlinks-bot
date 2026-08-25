@@ -123,7 +123,7 @@ class SharingTests(unittest.TestCase):
     def test_youtube_url_round_trips(self) -> None:
         query = build_share_query(["https://www.youtube.com/watch?v=abc123&feature=share"])
 
-        self.assertEqual(query, "sh2|yabc123")
+        self.assertEqual(query, "sh3|yabc123")
         self.assertEqual(parse_share_query(query), ["https://youtu.be/abc123"])
 
     def test_legacy_share_query_still_opens_existing_posts(self) -> None:
@@ -163,9 +163,15 @@ class SharingTests(unittest.TestCase):
             ]
         )
 
-        self.assertEqual(query, "sh2|tabc")
+        self.assertEqual(query, "sh3|tabc")
         self.assertEqual(
             parse_share_query(query or ""),
+            ["https://open.spotify.com/track/abc"],
+        )
+
+    def test_previous_compact_share_query_stays_supported(self) -> None:
+        self.assertEqual(
+            parse_share_query("sh2|tabc"),
             ["https://open.spotify.com/track/abc"],
         )
 

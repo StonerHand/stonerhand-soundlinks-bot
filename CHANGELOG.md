@@ -14,6 +14,8 @@
   inline Rich payload.
 - Added regressions for the reported Lime Garden release, canonical hubs,
   cached Rich artwork and Telegram's Rich-to-classic fallback.
+- Versioned new share queries to bypass Telegram's cached pre-fix inline cards
+  immediately while keeping older share buttons backward-compatible.
 
 ## 1.4.2 — 2026-08-25
 
