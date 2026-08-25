@@ -132,9 +132,9 @@ can be scheduled up to 90 days ahead.
 
 `RICH_MESSAGES_ENABLED=1` enables the Bot API 10.3 presentation layer and is
 on by default. Single-release inline shares use Rich Message content and native
-button rows. Inline artwork is embedded only when Telegram has a reusable
-`file_id`, as required by the API; unsupported methods, old nodes and media
-failures retry as the existing HTML/photo card automatically.
+button rows when Telegram has a reusable artwork `file_id`, as required by the
+API. Otherwise the bot deliberately keeps the classic large-cover card; old
+nodes and media failures use the same lossless fallback automatically.
 `RICH_DRAFTS_ENABLED=0`
 keeps experimental streamed drafts off by default. `EPHEMERAL_GROUP_REPLIES=1`
 enables private-to-requester group results.

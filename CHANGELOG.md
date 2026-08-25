@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.4 — 2026-08-25
+
+- Restored large artwork in shared track cards: inline delivery now selects
+  Rich Message only when a reusable Telegram cover `file_id` is available and
+  otherwise uses the classic large-preview card instead of dropping artwork.
+- Versioned fresh share queries again so Telegram cannot reuse the cached
+  no-artwork result; all previous compact and legacy share buttons still parse.
+
 ## 1.4.3 — 2026-08-25
 
 - Restored the **All platforms** action and made Spotify tracks resolve to a
