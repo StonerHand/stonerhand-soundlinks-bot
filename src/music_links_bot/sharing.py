@@ -29,8 +29,8 @@ from music_links_bot.models import TrackMatch
 from music_links_bot.telegram_buttons import button as InlineKeyboardButton
 from music_links_bot.url_utils import cache_key_for_url, is_supported_music_url
 
-SHARE_QUERY_PREFIX = "sh2|"
-LEGACY_SHARE_QUERY_PREFIX = "sh|"
+SHARE_QUERY_PREFIX = "sh3|"
+LEGACY_SHARE_QUERY_PREFIXES = ("sh2|", "sh|")
 MAX_SHARE_QUERY_LENGTH = 256
 MAX_SHARE_ITEMS = 12
 _SPOTIFY_KINDS = {
@@ -90,7 +90,7 @@ def parse_share_query(query: str) -> list[str] | None:
     prefix = next(
         (
             candidate
-            for candidate in (SHARE_QUERY_PREFIX, LEGACY_SHARE_QUERY_PREFIX)
+            for candidate in (SHARE_QUERY_PREFIX, *LEGACY_SHARE_QUERY_PREFIXES)
             if query.startswith(candidate)
         ),
         None,
