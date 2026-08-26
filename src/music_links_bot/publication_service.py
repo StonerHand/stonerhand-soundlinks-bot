@@ -14,6 +14,7 @@ from music_links_bot.bot_builder import (
 )
 from music_links_bot.channel_templates import save_channel_template
 from music_links_bot.chat_access import PublishAccess, check_publish_access
+from music_links_bot.draft_model import prepare_publication_draft
 from music_links_bot.models import TrackMatch
 from music_links_bot.publication_preflight import validate_publication
 from music_links_bot.publication_view import build_publication_view
@@ -60,7 +61,13 @@ class PublicationService:
         channel_style: bool,
         notify_failure: bool = True,
     ) -> Message | bool | None:
-        track = TrackMatch(**draft["item"])
+        prepared = prepare_publication_draft(draft)
+        if prepared is None:
+            self._record_publication(False)
+            await self._persist_metrics()
+            return None
+        draft = prepared.data
+        track = prepared.track
         if not validate_publication(draft, track).ready:
             self._record_publication(False)
             await self._persist_metrics()
@@ -131,12 +138,12 @@ class PublicationService:
         text = view.text
         keyboard = view.keyboard
 
-        source_audio_file_id = draft.get("source_audio_file_id")
-        if isinstance(source_audio_file_id, str) and source_audio_file_id:
+        if view.source_audio_file_id:
             return await self._send_audio(
                 draft,
                 track,
                 target=target,
+                audio_file_id=view.source_audio_file_id,
                 text=text,
                 keyboard=keyboard,
             )
@@ -147,33 +154,44 @@ class PublicationService:
             target=target,
             keyboard=keyboard,
             hashtags=view.hashtags,
+            preview_url=view.preview_url,
+            delivery_mode=view.delivery_mode,
+            as_photo=view.as_photo,
         )
         if handled:
             return sent
 
-        cover = draft.get("custom_cover_file_id") or track.thumbnail_url
-        if draft.get("as_photo") and cover:
+        if view.as_photo and view.cover:
             return await self._send_photo(
                 draft,
                 track,
                 target=target,
-                cover=cover,
+                cover=view.cover,
                 text=text,
                 keyboard=keyboard,
             )
 
         return await self._send_classic_message(
-            draft,
-            track,
             target=target,
             text=text,
             keyboard=keyboard,
+            preview_url=view.preview_url,
+            prefer_large_preview=view.prefer_large_preview,
         )
 
-    async def _send_audio(self, draft, track, *, target, text, keyboard):
+    async def _send_audio(
+        self,
+        draft,
+        track,
+        *,
+        target,
+        audio_file_id,
+        text,
+        keyboard,
+    ):
         return await self.context.bot.send_audio(
             chat_id=target,
-            audio=draft["source_audio_file_id"],
+            audio=audio_file_id,
             caption=fit_telegram_html(text, PHOTO_CAPTION_LIMIT),
             parse_mode=ParseMode.HTML,
             title=track.title[:64],
@@ -190,10 +208,12 @@ class PublicationService:
         target,
         keyboard,
         hashtags: str | None,
+        preview_url: str | None,
+        delivery_mode: str,
+        as_photo: bool,
     ) -> tuple[bool, Any]:
         from music_links_bot.keyboards import (
             _build_link_preview_options,
-            _select_preview_url,
         )
         from music_links_bot.rich_publications import (
             build_fallback_html,
@@ -206,11 +226,7 @@ class PublicationService:
         )
 
         # Explicit photo mode (including branded frames) remains authoritative.
-        if (
-            not rich_messages_enabled()
-            or draft.get("delivery_mode", "auto") == "classic"
-            or draft.get("as_photo")
-        ):
+        if not rich_messages_enabled() or delivery_mode == "classic" or as_photo:
             return False, None
         longread = is_longread(draft)
         rich_html = (
@@ -255,8 +271,7 @@ class PublicationService:
                 ),
                 parse_mode=ParseMode.HTML,
                 link_preview_options=_build_link_preview_options(
-                    _select_preview_url(track.links, self.context)
-                    or track.thumbnail_url,
+                    preview_url,
                     prefer_large_media=True,
                 ),
                 reply_markup=keyboard,
@@ -308,19 +323,24 @@ class PublicationService:
             await remember_photo_file_id(self.context, track.thumbnail_url, sent)
         return sent
 
-    async def _send_classic_message(self, draft, track, *, target, text, keyboard):
-        from music_links_bot.keyboards import (
-            _build_link_preview_options,
-            _select_preview_url,
-        )
+    async def _send_classic_message(
+        self,
+        *,
+        target,
+        text,
+        keyboard,
+        preview_url,
+        prefer_large_preview,
+    ):
+        from music_links_bot.keyboards import _build_link_preview_options
 
         return await self.context.bot.send_message(
             chat_id=target,
             text=fit_telegram_html(text, MESSAGE_TEXT_LIMIT),
             parse_mode=ParseMode.HTML,
             link_preview_options=_build_link_preview_options(
-                _select_preview_url(track.links, self.context) or track.thumbnail_url,
-                prefer_large_media=bool(draft.get("large_preview")),
+                preview_url,
+                prefer_large_media=prefer_large_preview,
             ),
             reply_markup=keyboard,
         )

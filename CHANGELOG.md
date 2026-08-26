@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- Split provider resolution from Telegram result delivery while preserving the
+  existing bot-facing compatibility surface, reducing the largest lookup
+  module and making provider changes safer to review.
+- Added one immutable publication plan shared by preview and every delivery
+  path, plus strict normalization of current and legacy durable drafts before
+  any Telegram call.
+- Batched current and legacy session restoration into one Redis request, with
+  compatibility fallback for mixed-version workers and local adapters.
+- Prevented duplicate progress edits and added release contracts for complete
+  RU/EN localization with identical formatting placeholders.
+- Added bounded request p95 and cache-hit telemetry without retaining request
+  content or growing per-process memory over time.
+
 ## 1.7.0 — 2026-08-26
 
 - Fixed the publication pipeline so the editor's hashtag choice is respected

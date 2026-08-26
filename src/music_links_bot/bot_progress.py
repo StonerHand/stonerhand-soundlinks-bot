@@ -24,6 +24,7 @@ class ProgressState:
     message: Message | None
     chat_id: int
     stage: int = 0
+    last_text: str = ""
     bot: object | None = None
     draft_id: int = 0
 
@@ -143,6 +144,7 @@ async def start_progress(
                     None,
                     chat_id=message.chat_id,
                     stage=1,
+                    last_text=text,
                     bot=bot,
                     draft_id=draft_id,
                 )
@@ -152,7 +154,14 @@ async def start_progress(
     except TelegramError:
         LOGGER.debug("Could not send progress message", exc_info=True)
         return
-    _PLACEHOLDER.set(ProgressState(placeholder, chat_id=message.chat_id, stage=1))
+    _PLACEHOLDER.set(
+        ProgressState(
+            placeholder,
+            chat_id=message.chat_id,
+            stage=1,
+            last_text=text,
+        )
+    )
 
 
 async def update_progress(lang: str, key: str) -> None:
@@ -164,6 +173,9 @@ async def update_progress(lang: str, key: str) -> None:
         return
     try:
         text = get_text(lang, key)
+        if text == state.last_text:
+            state.stage = next_stage
+            return
         if state.message is not None:
             await _edit_progress_message(state.message, text, lang)
         elif state.bot is not None:
@@ -174,6 +186,7 @@ async def update_progress(lang: str, key: str) -> None:
                 text=text,
             )
         state.stage = next_stage
+        state.last_text = text
     except TelegramError:
         LOGGER.debug("Could not update progress message", exc_info=True)
 
@@ -183,6 +196,9 @@ async def update_progress_text(text: str, *, stage: int = 3, lang: str = "ru") -
     if state is None or stage <= state.stage:
         return
     try:
+        if text == state.last_text:
+            state.stage = stage
+            return
         if state.message is not None:
             await _edit_progress_message(state.message, text, lang)
         elif state.bot is not None:
@@ -193,6 +209,7 @@ async def update_progress_text(text: str, *, stage: int = 3, lang: str = "ru") -
                 text=text,
             )
         state.stage = stage
+        state.last_text = text
     except TelegramError:
         LOGGER.debug("Could not update custom progress message", exc_info=True)
 

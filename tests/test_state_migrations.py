@@ -5,7 +5,11 @@ from music_links_bot.bot_crate import load_crate
 from music_links_bot.bot_progress import adopt_progress_message, update_progress
 from music_links_bot.bot_runtime import BotRuntime
 from music_links_bot.channel_templates import load_channel_template
-from music_links_bot.draft_model import CURRENT_DRAFT_VERSION, normalize_track_draft
+from music_links_bot.draft_model import (
+    CURRENT_DRAFT_VERSION,
+    normalize_track_draft,
+    prepare_publication_draft,
+)
 from music_links_bot.models import TrackMatch
 
 
@@ -25,6 +29,29 @@ class KVStub:
 
 
 class StateMigrationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_session_versions_are_loaded_in_one_batch_when_supported(
+        self,
+    ) -> None:
+        class BatchKV(KVStub):
+            def __init__(self, values: dict) -> None:
+                super().__init__(values)
+                self.batch_reads: list[list[str]] = []
+
+            async def mget_json(self, keys: list[str]):
+                self.batch_reads.append(keys)
+                return [self.values.get(key) for key in keys]
+
+        kv = BatchKV({"session:v2:7": {"session": {"user_id": 7}}})
+        runtime = BotRuntime(kv)
+
+        session = await runtime.get_session(7)
+
+        self.assertEqual(session.user_id, 7)
+        self.assertEqual(
+            kv.batch_reads,
+            [["session:v2:7", "session:v1:7"]],
+        )
+
     async def test_session_v1_is_read_and_written_as_v2(self) -> None:
         kv = KVStub({"session:v1:7": {"user_id": 7, "last_query": "Sleep"}})
         runtime = BotRuntime(kv)
@@ -124,6 +151,25 @@ class StateMigrationTests(unittest.IsolatedAsyncioTestCase):
             {"Spotify": "https://open.spotify.com/track/abc"},
         )
         self.assertEqual(TrackMatch(**draft["item"]).title, "Dragonaut")
+
+    def test_legacy_delivery_payload_becomes_a_strict_snapshot(self) -> None:
+        prepared = prepare_publication_draft(
+            {
+                "item": {
+                    "artist": "Sleep",
+                    "title": "Dragonaut",
+                    "links": {"spotify": "https://open.spotify.com/track/abc"},
+                    "future_field": "ignored",
+                },
+                "delivery_mode": "classic",
+            }
+        )
+
+        self.assertIsNotNone(prepared)
+        assert prepared is not None
+        self.assertEqual(prepared.track.title, "Dragonaut")
+        self.assertNotIn("future_field", prepared.data["item"])
+        self.assertEqual(prepared.data["delivery_mode"], "classic")
 
 
 class ProgressContractTests(unittest.IsolatedAsyncioTestCase):

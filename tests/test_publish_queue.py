@@ -7,6 +7,7 @@ from types import SimpleNamespace
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from music_links_bot import publish_queue
+from music_links_bot.draft_model import CURRENT_DRAFT_VERSION
 
 
 class BotStub:
@@ -153,6 +154,29 @@ class PublishQueueTests(unittest.TestCase):
         self.assertEqual(len(jobs), 2)
         self.assertEqual(jobs[0]["publish_at"], 1000)
         self.assertEqual(jobs[1]["publish_at"], 2000)
+
+    def test_queue_stores_only_normalized_publication_drafts(self) -> None:
+        context = make_context()
+        draft = make_draft()
+        draft["item"]["unknown_future_field"] = "ignored"
+
+        async def scenario():
+            job = await publish_queue.add_job(context, draft, 1000)
+            return job["draft"]
+
+        stored = asyncio.run(scenario())
+        self.assertEqual(stored["v"], CURRENT_DRAFT_VERSION)
+        self.assertNotIn("unknown_future_field", stored["item"])
+
+    def test_queue_rejects_invalid_draft_before_storage(self) -> None:
+        context = make_context()
+
+        async def scenario():
+            with self.assertRaises(ValueError):
+                await publish_queue.add_job(context, {"item": {}}, 1000)
+
+        asyncio.run(scenario())
+        self.assertNotIn(publish_queue.QUEUE_MEMORY_KEY, context.application.bot_data)
 
     def test_remove_job(self) -> None:
         context = make_context()

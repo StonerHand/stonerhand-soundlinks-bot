@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from string import Formatter
+
 RU = "ru"
 EN = "en"
 _RU_FAMILY_PREFIXES = ("ru", "uk", "be", "kk")
@@ -17,6 +19,35 @@ def resolve_lang(language_code: str | None) -> str:
 def get_text(lang: str, key: str) -> str:
     entry = STRINGS[key]
     return entry.get(lang) or entry[RU]
+
+
+def validate_catalog() -> tuple[str, ...]:
+    """Return deterministic errors for incomplete or incompatible locales."""
+    formatter = Formatter()
+    errors: list[str] = []
+    for key, entry in sorted(STRINGS.items()):
+        missing_languages = [
+            lang
+            for lang in (RU, EN)
+            if not isinstance(entry.get(lang), str) or not entry[lang]
+        ]
+        errors.extend(f"{key}: missing {lang}" for lang in missing_languages)
+        if missing_languages:
+            continue
+        fields = {
+            lang: {
+                field
+                for _, field, _, _ in formatter.parse(entry[lang])
+                if field is not None
+            }
+            for lang in (RU, EN)
+        }
+        if fields[RU] != fields[EN]:
+            errors.append(
+                f"{key}: placeholders differ "
+                f"({sorted(fields[RU])!r} != {sorted(fields[EN])!r})"
+            )
+    return tuple(errors)
 
 
 STRINGS: dict[str, dict[str, str]] = {

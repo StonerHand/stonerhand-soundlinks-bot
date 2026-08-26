@@ -127,6 +127,24 @@ class KVStore:
 
         return [value if isinstance(value, str) else None for value in result]
 
+    async def mget_json(self, keys: list[str]) -> list[Any | None]:
+        """Read several JSON values with one Redis round trip.
+
+        Invalid or absent values remain isolated to their own slot so a stale
+        session cannot prevent the remaining keys from being restored.
+        """
+        values = await self.mget(keys)
+        decoded: list[Any | None] = []
+        for value in values:
+            if value is None:
+                decoded.append(None)
+                continue
+            try:
+                decoded.append(json.loads(value))
+            except ValueError:
+                decoded.append(None)
+        return decoded
+
     async def get_json(self, key: str) -> Any | None:
         raw_value = await self.get(key)
         if raw_value is None:

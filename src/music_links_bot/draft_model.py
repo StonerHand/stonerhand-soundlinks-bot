@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from typing import Any, TypedDict
 from urllib.parse import urlparse
 
@@ -126,6 +126,31 @@ class TrackDraft(TypedDict, total=False):
     last_template_available: bool
     last_template_applied: bool
     last_template: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedPublicationDraft:
+    """Validated snapshot used after the mutable editor boundary."""
+
+    data: TrackDraft
+    track: TrackMatch
+
+
+def prepare_publication_draft(value: object) -> PreparedPublicationDraft | None:
+    """Normalize current and legacy queue payloads before Telegram delivery."""
+    if not isinstance(value, dict):
+        return None
+    candidate = dict(value)
+    candidate.setdefault("type", "track")
+    candidate.setdefault("v", CURRENT_DRAFT_VERSION)
+    normalized = normalize_track_draft(candidate)
+    if normalized is None:
+        return None
+    try:
+        track = TrackMatch(**normalized["item"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    return PreparedPublicationDraft(data=normalized, track=track)
 
 
 def new_track_draft(

@@ -290,6 +290,20 @@ class RuntimeSafetyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(snapshot["rich_message_errors"], 1)
         self.assertEqual(snapshot["rich_message_fallbacks"], 1)
 
+    async def test_request_metrics_expose_bounded_p95_and_cache_ratio(self) -> None:
+        runtime = BotRuntime()
+        for latency in (100, 200, 300, 700, 1_500, 3_000, 21_000):
+            runtime.record_request(latency_ms=latency, ok=True)
+        runtime.record_cache(hit=True)
+        runtime.record_cache(hit=True)
+        runtime.record_cache(hit=False)
+
+        snapshot = runtime.metrics_snapshot()
+
+        self.assertEqual(snapshot["request_ms_p95"], 21_000)
+        self.assertEqual(snapshot["request_latency_overflow"], 1)
+        self.assertEqual(snapshot["cache_hit_rate_percent"], 66.7)
+
 
 class BotCrateTests(unittest.IsolatedAsyncioTestCase):
     async def test_crate_title_round_trips_in_memory(self) -> None:

@@ -121,6 +121,31 @@ class PublicationGoldenTests(unittest.TestCase):
         self.assertIn("<i>Outbreak</i>", view.text)
         self.assertFalse(view.intro.truncated)
 
+    def test_publication_plan_freezes_delivery_decisions(self) -> None:
+        draft = new_track_draft(_track(), chat_id=7, lang="ru")
+        draft.update(
+            {
+                "custom_cover_file_id": "telegram-cover",
+                "source_audio_file_id": "telegram-audio",
+                "as_photo": True,
+                "large_preview": False,
+                "delivery_mode": "classic",
+            }
+        )
+
+        view = build_publication_view(
+            draft,
+            _track(),
+            context=SimpleNamespace(application=SimpleNamespace(bot_data={})),
+            include_channel_button=False,
+        )
+
+        self.assertEqual(view.cover, "telegram-cover")
+        self.assertEqual(view.source_audio_file_id, "telegram-audio")
+        self.assertTrue(view.as_photo)
+        self.assertFalse(view.prefer_large_preview)
+        self.assertEqual(view.delivery_mode, "classic")
+
     def test_publish_confirmation_is_one_clear_primary_action(self) -> None:
         draft = new_track_draft(_track(), chat_id=7, lang="ru", can_publish=True)
         text, keyboard = build_publish_confirmation(

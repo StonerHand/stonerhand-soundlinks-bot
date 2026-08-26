@@ -5,6 +5,7 @@ import hashlib
 import logging
 import secrets
 from dataclasses import asdict, dataclass, field
+from math import ceil
 from time import monotonic, time
 from typing import Any
 
@@ -32,6 +33,7 @@ MAX_MEMORY_KEYS = 2_000
 CIRCUIT_FAILURE_THRESHOLD = 3
 CIRCUIT_COOLDOWN_SECONDS = 45
 METRICS_KV_KEY = "runtime:metrics:v1"
+REQUEST_LATENCY_BUCKETS_MS = (250, 500, 1_000, 2_000, 5_000, 10_000, 20_000)
 LOGGER = logging.getLogger(__name__)
 
 
@@ -203,6 +205,10 @@ class BotRuntime:
         self.request_tokens: dict[int, str] = {}
         self.active_tasks: dict[int, asyncio.Task[Any]] = {}
         self.diagnostics: dict[str, ProviderDiagnostic] = {}
+        self.request_latency_buckets = {
+            upper_bound: 0 for upper_bound in REQUEST_LATENCY_BUCKETS_MS
+        }
+        self.request_latency_overflow = 0
         self.metrics: dict[str, int] = {
             "requests": 0,
             "request_errors": 0,
@@ -230,12 +236,30 @@ class BotRuntime:
                 cached.lang = lang
             return cached
 
-        payload = await self.kv.get_json(f"session:v2:{user_id}") if self.kv else None
+        payload = None
+        legacy_payload = None
+        if self.kv is not None:
+            current_key = f"session:v2:{user_id}"
+            legacy_key = f"session:v1:{user_id}"
+            batch_reader = getattr(self.kv, "mget_json", None)
+            if callable(batch_reader):
+                values = await batch_reader([current_key, legacy_key])
+                if isinstance(values, list) and len(values) == 2:
+                    payload, legacy_payload = values
+                else:
+                    payload = await self.kv.get_json(current_key)
+                    legacy_payload = await self.kv.get_json(legacy_key)
+            else:
+                # Compatibility with lightweight storage adapters and old
+                # workers during a rolling deployment.
+                payload = await self.kv.get_json(current_key)
+                if payload is None:
+                    legacy_payload = await self.kv.get_json(legacy_key)
         if isinstance(payload, dict) and isinstance(payload.get("session"), dict):
             payload = payload["session"]
         migrated = False
-        if payload is None and self.kv is not None:
-            payload = await self.kv.get_json(f"session:v1:{user_id}")
+        if payload is None:
+            payload = legacy_payload
             migrated = isinstance(payload, dict)
         session = UserSession.from_dict(payload) if isinstance(payload, dict) else None
         if session is None:
@@ -541,6 +565,12 @@ class BotRuntime:
             self.metrics["request_ms_max"],
             latency,
         )
+        for upper_bound in REQUEST_LATENCY_BUCKETS_MS:
+            if latency <= upper_bound:
+                self.request_latency_buckets[upper_bound] += 1
+                break
+        else:
+            self.request_latency_overflow += 1
         if not ok:
             self.metrics["request_errors"] += 1
 
@@ -569,6 +599,24 @@ class BotRuntime:
         requests = snapshot["requests"]
         snapshot["request_ms_avg"] = (
             snapshot["request_ms_total"] // requests if requests else 0
+        )
+        target = ceil(requests * 0.95)
+        seen = 0
+        p95 = 0
+        for upper_bound in REQUEST_LATENCY_BUCKETS_MS:
+            seen += self.request_latency_buckets[upper_bound]
+            if target and seen >= target:
+                p95 = upper_bound
+                break
+        if target and not p95:
+            p95 = snapshot["request_ms_max"]
+        snapshot["request_ms_p95"] = p95
+        snapshot["request_latency_overflow"] = self.request_latency_overflow
+        cache_requests = snapshot["cache_hits"] + snapshot["cache_misses"]
+        snapshot["cache_hit_rate_percent"] = (
+            round(snapshot["cache_hits"] * 100 / cache_requests, 1)
+            if cache_requests
+            else 0.0
         )
         snapshot["updated_at"] = int(time())
         snapshot["providers"] = {

@@ -98,11 +98,12 @@ flowchart LR
     Q --> V
 ```
 
-One canonical publication view is shared by preview, direct send, channel
-publishing and the queue. That keeps text, hashtags and keyboards identical in
-every delivery path. Redis stores durable sessions, drafts, history, templates,
-deduplication claims and queue state; bounded memory remains a development and
-degraded-mode fallback.
+One immutable publication plan is shared by preview, direct send, channel
+publishing and the queue. It freezes text, hashtags, keyboard, artwork, link
+preview and delivery mode before Telegram is called. Durable drafts are
+normalized before queue storage and delivery. Redis stores sessions, history,
+templates, deduplication claims and queue state; bounded memory remains a
+development and degraded-mode fallback.
 
 See [Architecture](ARCHITECTURE.ru.md) for the complete data and failure model.
 

@@ -25,6 +25,7 @@ htmlcov/
 
 # Runtime and temporary files
 data/*.json
+graphify-out/
 *.log
 *.tmp
 *.bak

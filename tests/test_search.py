@@ -344,3 +344,17 @@ class KVStoreShapeTests(unittest.TestCase):
             self.assertEqual(asyncio.run(store.mget([])), [])
         finally:
             asyncio.run(store.aclose())
+
+    def test_mget_json_decodes_each_slot_independently(self) -> None:
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        store = KVStore("https://kv.example", "token")
+        store.mget = AsyncMock(return_value=['{"ok": true}', "broken", None])
+        try:
+            self.assertEqual(
+                asyncio.run(store.mget_json(["one", "two", "three"])),
+                [{"ok": True}, None, None],
+            )
+        finally:
+            asyncio.run(store.aclose())

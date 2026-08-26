@@ -7,6 +7,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
+from music_links_bot.draft_model import prepare_publication_draft
 from music_links_bot.kvstore import KVStore, KVUnavailableError
 
 LOGGER = logging.getLogger(__name__)
@@ -166,13 +167,16 @@ async def save_jobs(context, jobs: list[dict]) -> None:
 
 
 async def add_job(context, draft: dict, publish_at: int) -> dict:
+    prepared = prepare_publication_draft(draft)
+    if prepared is None:
+        raise ValueError("invalid publication draft")
     job = {
         "id": secrets.token_hex(6),
         "status": JOB_PENDING,
         "publish_at": int(publish_at),
         "created_at": int(time.time()),
         "attempts": 0,
-        "draft": draft,
+        "draft": prepared.data,
     }
 
     def mutate(jobs: list[dict]):
@@ -317,7 +321,6 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
     A process crash leaves the job in ``processing`` instead of deleting it;
     another worker can safely reclaim it when ``lease_until`` expires.
     """
-    from music_links_bot.models import TrackMatch
     from music_links_bot.publication_service import PublicationService
     from music_links_bot.publication_state import mark_posted
 
@@ -338,9 +341,11 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
             break
         job = claimed[0]
         draft = job.get("draft")
-        valid = isinstance(draft, dict) and isinstance(draft.get("item"), dict)
+        prepared = prepare_publication_draft(draft)
+        valid = prepared is not None
         delivered = None
-        if valid:
+        if prepared is not None:
+            draft = prepared.data
             try:
                 delivered = await PublicationService(
                     context,
@@ -370,7 +375,7 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
             )
             await mark_posted(
                 context,
-                TrackMatch(**draft["item"]),
+                prepared.track,
                 message=delivered,
                 target=target,
             )
