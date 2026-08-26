@@ -2,6 +2,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
+from music_links_bot.models import TrackMatch
 from music_links_bot.publication_service import PublicationService
 
 
@@ -108,6 +109,37 @@ class PublicationServiceTests(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertIsNone(result)
+
+    async def test_channel_delivery_respects_hashtags_disabled_in_editor(self) -> None:
+        sent = SimpleNamespace()
+        bot = SimpleNamespace(send_message=AsyncMock(return_value=sent))
+        context = SimpleNamespace(
+            application=SimpleNamespace(bot_data={}),
+            bot=bot,
+        )
+        service = PublicationService(context, channel_username="stonerhand")
+        draft = {
+            "item": {
+                "artist": "Knocked Loose",
+                "title": "Don't Reach For Me",
+                "kind": "song",
+                "links": {"spotify": "https://open.spotify.com/track/abc"},
+            },
+            "hashtags": False,
+            "delivery_mode": "classic",
+        }
+
+        result = await service._send(
+            draft,
+            TrackMatch(**draft["item"]),
+            target="@stonerhand",
+            channel_style=True,
+        )
+
+        self.assertIs(result, sent)
+        text = bot.send_message.await_args.kwargs["text"]
+        self.assertNotIn("#stonerhand", text)
+        self.assertNotIn("#track", text)
 
 
 if __name__ == "__main__":

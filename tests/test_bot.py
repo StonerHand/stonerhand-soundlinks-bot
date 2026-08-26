@@ -660,7 +660,7 @@ class BotKeyboardTests(unittest.TestCase):
     def test_profile_descriptions_are_current_and_fit_telegram_limits(self) -> None:
         self.assertIn("Несколько ссылок", BOT_DESCRIPTIONS[""])
         self.assertIn("точный релиз", BOT_DESCRIPTIONS[""])
-        self.assertIn("несколько треков", BOT_SHORT_DESCRIPTIONS[""])
+        self.assertIn("подборка", BOT_SHORT_DESCRIPTIONS[""])
         self.assertTrue(all(len(value) <= 512 for value in BOT_DESCRIPTIONS.values()))
         self.assertTrue(
             all(len(value) <= 120 for value in BOT_SHORT_DESCRIPTIONS.values())
@@ -731,9 +731,7 @@ class BotKeyboardTests(unittest.TestCase):
             button.text for row in keyboard.inline_keyboard for button in row
         ]
         self.assertEqual(button_texts, ["🟢 Spotify", "🪩 Все платформы"])
-        self.assertEqual(
-            keyboard.inline_keyboard[0][0].api_kwargs, {"style": "primary"}
-        )
+        self.assertEqual(keyboard.inline_keyboard[0][0].style, "primary")
 
     def test_release_keyboard_uses_two_columns(self) -> None:
         keyboard = _build_link_keyboard(
@@ -760,11 +758,11 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[1][0].text, "🟠 SoundCloud")
         self.assertEqual(rows[1][1].text, "🟦 Deezer")
         self.assertEqual(rows[2][0].text, "⚫ Tidal")
-        self.assertEqual(rows[0][0].api_kwargs, {"style": "primary"})
-        self.assertFalse(rows[0][1].api_kwargs)
-        self.assertFalse(rows[1][0].api_kwargs)
-        self.assertFalse(rows[1][1].api_kwargs)
-        self.assertFalse(rows[2][0].api_kwargs)
+        self.assertEqual(rows[0][0].style, "primary")
+        self.assertIsNone(rows[0][1].style)
+        self.assertIsNone(rows[1][0].style)
+        self.assertIsNone(rows[1][1].style)
+        self.assertIsNone(rows[2][0].style)
 
     def test_release_keyboard_adds_songlink_hub_button(self) -> None:
         keyboard = _build_link_keyboard(
@@ -884,9 +882,7 @@ class BotKeyboardTests(unittest.TestCase):
             button.text for row in keyboard.inline_keyboard for button in row
         ]
         self.assertEqual(button_texts, ["📺 Смотреть на YouTube"])
-        self.assertEqual(
-            keyboard.inline_keyboard[0][0].api_kwargs, {"style": "primary"}
-        )
+        self.assertEqual(keyboard.inline_keyboard[0][0].style, "primary")
 
     def test_nts_keyboard_can_hide_channel_button(self) -> None:
         keyboard = _build_nts_keyboard(
@@ -898,9 +894,7 @@ class BotKeyboardTests(unittest.TestCase):
             button.text for row in keyboard.inline_keyboard for button in row
         ]
         self.assertEqual(button_texts, ["📡 Открыть на NTS"])
-        self.assertEqual(
-            keyboard.inline_keyboard[0][0].api_kwargs, {"style": "primary"}
-        )
+        self.assertEqual(keyboard.inline_keyboard[0][0].style, "primary")
 
     def test_playlist_keyboard_can_hide_channel_button(self) -> None:
         keyboard = _build_playlist_keyboard(
@@ -912,9 +906,7 @@ class BotKeyboardTests(unittest.TestCase):
             button.text for row in keyboard.inline_keyboard for button in row
         ]
         self.assertEqual(button_texts, ["🎛 Открыть плейлист"])
-        self.assertEqual(
-            keyboard.inline_keyboard[0][0].api_kwargs, {"style": "primary"}
-        )
+        self.assertEqual(keyboard.inline_keyboard[0][0].style, "primary")
 
     def test_artist_keyboard_can_hide_channel_button(self) -> None:
         keyboard = _build_artist_keyboard(
@@ -926,9 +918,7 @@ class BotKeyboardTests(unittest.TestCase):
             button.text for row in keyboard.inline_keyboard for button in row
         ]
         self.assertEqual(button_texts, ["🧬 Открыть артиста"])
-        self.assertEqual(
-            keyboard.inline_keyboard[0][0].api_kwargs, {"style": "primary"}
-        )
+        self.assertEqual(keyboard.inline_keyboard[0][0].style, "primary")
 
     def test_mixed_collection_keyboard_lists_music_and_video_buttons(self) -> None:
         keyboard = _build_mixed_collection_keyboard(
@@ -950,10 +940,10 @@ class BotKeyboardTests(unittest.TestCase):
         rows = keyboard.inline_keyboard
         self.assertEqual(rows[0][0].text, "🎧 Слушать песню")
         self.assertEqual(rows[0][0].url, "https://song.link/transitions")
-        self.assertEqual(rows[0][0].api_kwargs, {"style": "primary"})
+        self.assertEqual(rows[0][0].style, "primary")
         self.assertEqual(rows[0][1].text, "📺 Смотреть клип")
         self.assertEqual(rows[0][1].url, "https://youtu.be/1")
-        self.assertFalse(rows[0][1].api_kwargs)
+        self.assertIsNone(rows[0][1].style)
 
     def test_mixed_collection_keyboard_lists_radio_buttons(self) -> None:
         keyboard = _build_mixed_collection_keyboard(
@@ -976,9 +966,9 @@ class BotKeyboardTests(unittest.TestCase):
         rows = keyboard.inline_keyboard
         self.assertEqual(rows[0][0].text, "📡 1. Dark Energy")
         self.assertEqual(rows[0][0].url, "https://www.nts.live/shows/example")
-        self.assertFalse(rows[0][0].api_kwargs)
+        self.assertIsNone(rows[0][0].style)
         self.assertEqual(rows[0][1].text, "📺 2. Live Session")
-        self.assertFalse(rows[0][1].api_kwargs)
+        self.assertIsNone(rows[0][1].style)
 
     def test_publication_cards_do_not_repeat_channel_navigation(self) -> None:
         self.assertFalse(_should_include_channel_button(ChannelMessageStub()))
@@ -997,7 +987,7 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[1][0].text, "🧺 Подборка · 0")
         self.assertEqual(rows[1][1].text, "••• Ещё")
         self.assertEqual(rows[2][0].text, "← Главное меню")
-        self.assertEqual(rows[0][0].api_kwargs, {"style": "primary"})
+        self.assertEqual(rows[0][0].style, "primary")
 
     def test_section_keyboard_offers_related_pages_and_back_last(self) -> None:
         keyboard = _build_section_keyboard(
@@ -1056,10 +1046,7 @@ class BotKeyboardTests(unittest.TestCase):
             keyboard.inline_keyboard[0][0].callback_data,
             "v2|crate|clear_confirm",
         )
-        self.assertEqual(
-            keyboard.inline_keyboard[0][0].api_kwargs,
-            {"style": "danger"},
-        )
+        self.assertEqual(keyboard.inline_keyboard[0][0].style, "danger")
 
         delete_keyboard = _delete_confirmation_keyboard("abc123", lang="ru")
         self.assertEqual(
@@ -1091,14 +1078,15 @@ class BotKeyboardTests(unittest.TestCase):
 
         rows = keyboard.inline_keyboard
         self.assertEqual(rows[0][0].text, "＋ Создать пост")
-        self.assertEqual(rows[0][0].api_kwargs, {"style": "primary"})
+        self.assertEqual(rows[0][0].style, "primary")
         self.assertEqual(rows[1][0].text, "🧺 Подборка · 3")
-        self.assertEqual(rows[1][0].api_kwargs, {"style": "success"})
+        self.assertEqual(rows[1][0].style, "success")
         self.assertEqual(rows[1][1].text, "История")
         self.assertEqual(rows[2][0].text, "Как это работает?")
-        self.assertEqual(rows[2][0].api_kwargs, {})
-        self.assertEqual(rows[3][0].text, "🕒 Очередь публикаций")
-        self.assertEqual(len(rows), 4)
+        self.assertIsNone(rows[2][0].style)
+        self.assertEqual(rows[3][0].text, "••• Ещё")
+        self.assertEqual(rows[4][0].text, "🕒 Очередь публикаций")
+        self.assertEqual(len(rows), 5)
 
     def test_home_keeps_new_search_primary_when_a_card_can_be_restored(self) -> None:
         keyboard = _build_start_keyboard(
@@ -1109,9 +1097,9 @@ class BotKeyboardTests(unittest.TestCase):
 
         rows = keyboard.inline_keyboard
         self.assertEqual(rows[0][0].text, "＋ Создать пост")
-        self.assertEqual(rows[0][0].api_kwargs, {"style": "primary"})
+        self.assertEqual(rows[0][0].style, "primary")
         self.assertEqual(rows[1][0].text, "↩ Вернуться к карточке")
-        self.assertEqual(rows[1][0].api_kwargs, {})
+        self.assertIsNone(rows[1][0].style)
 
     def test_home_text_is_personal_and_escapes_telegram_html(self) -> None:
         text = _build_home_text(
@@ -1125,7 +1113,7 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertNotIn("Подборка · 4/10", text)
         self.assertIn("ссылку на трек, альбом, плейлист или артиста", text)
         self.assertIn("<code>артист — название</code>", text)
-        self.assertIn("Обложку, хэштеги и кнопки площадок", text)
+        self.assertIn("Обложку, кнопки и точные хэштеги", text)
 
     def test_first_visit_home_explains_every_supported_input_shape(self) -> None:
         text = _build_home_text(
@@ -1740,7 +1728,7 @@ class PostEditorTests(unittest.TestCase):
 
         labels = [button.text for row in rows for button in row]
         self.assertEqual(labels, ["📤 В канал", "Изменить", "+ В подборку"])
-        self.assertEqual(rows[0][0].api_kwargs, {"style": "success"})
+        self.assertEqual(rows[0][0].style, "success")
 
     def test_editor_rows_turn_added_item_into_crate_shortcut(self) -> None:
         rows = _editor_rows(
@@ -2799,14 +2787,14 @@ class PublicationOverrideTests(unittest.TestCase):
         self.assertNotIn("#stonerhand", text)
 
     def test_empty_custom_tags_suppress_hashtags_even_on_publish_path(self) -> None:
-        from music_links_bot.bot import _draft_message_overrides
+        from music_links_bot.publication_view import resolve_draft_hashtags
 
-        include, overrides = _draft_message_overrides(
-            self._draft(custom_tags=[]), include_hashtags=True
+        hashtags = resolve_draft_hashtags(
+            self._draft(custom_tags=[]),
+            TrackMatch(**self._draft()["item"]),
         )
 
-        self.assertFalse(include)
-        self.assertEqual(overrides, {})
+        self.assertIsNone(hashtags)
 
     def test_normalize_hashtag_slugs_and_rejects_junk(self) -> None:
         from music_links_bot.bot import normalize_hashtag

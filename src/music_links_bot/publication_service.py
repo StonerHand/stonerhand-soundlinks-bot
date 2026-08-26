@@ -16,10 +16,7 @@ from music_links_bot.channel_templates import save_channel_template
 from music_links_bot.chat_access import PublishAccess, check_publish_access
 from music_links_bot.models import TrackMatch
 from music_links_bot.publication_preflight import validate_publication
-from music_links_bot.publication_view import (
-    build_publication_view,
-    draft_message_overrides,
-)
+from music_links_bot.publication_view import build_publication_view
 
 LOGGER = logging.getLogger(__name__)
 
@@ -122,12 +119,6 @@ class PublicationService:
         target: int | str,
         channel_style: bool,
     ):
-        from music_links_bot.formatter import build_auto_hashtags
-
-        include_hashtags, overrides = draft_message_overrides(
-            draft,
-            include_hashtags=(True if channel_style else bool(draft.get("hashtags"))),
-        )
         include_channel_button = (
             str(target).lstrip("@").casefold() != self.channel_username.casefold()
         )
@@ -136,13 +127,9 @@ class PublicationService:
             track,
             context=self.context,
             include_channel_button=include_channel_button,
-            channel_style=channel_style,
         )
         text = view.text
         keyboard = view.keyboard
-        hashtags = overrides.get("hashtags")
-        if include_hashtags and not hashtags:
-            hashtags = build_auto_hashtags(track)
 
         source_audio_file_id = draft.get("source_audio_file_id")
         if isinstance(source_audio_file_id, str) and source_audio_file_id:
@@ -159,7 +146,7 @@ class PublicationService:
             track,
             target=target,
             keyboard=keyboard,
-            hashtags=hashtags if include_hashtags else None,
+            hashtags=view.hashtags,
         )
         if handled:
             return sent

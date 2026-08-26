@@ -4,16 +4,32 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stonerhand-soundlinks-bot"
-version = "1.6.1"
+version = "1.7.0"
 description = "Telegram-native music publishing bot with universal release cards, collections, scheduling and channel delivery."
 readme = "README.md"
 requires-python = ">=3.10"
+license = "MIT"
+keywords = ["telegram", "music", "bot", "songlink", "publishing"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Communications :: Chat",
+]
 dependencies = [
   "python-telegram-bot==22.8",
   "httpx==0.28.1",
   "python-dotenv==1.2.3",
   "Pillow==12.3.0",
 ]
+
+[project.urls]
+Homepage = "https://t.me/StonerHandBot"
+Repository = "https://github.com/StonerHand/stonerhand-soundlinks-bot"
+Issues = "https://github.com/StonerHand/stonerhand-soundlinks-bot/issues"
+Changelog = "https://github.com/StonerHand/stonerhand-soundlinks-bot/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [
@@ -33,6 +49,8 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+addopts = ["--strict-config", "--strict-markers"]
+xfail_strict = true
 
 [tool.ruff]
 target-version = "py310"

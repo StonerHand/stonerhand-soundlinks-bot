@@ -169,6 +169,7 @@ from music_links_bot.bot_editor_state import (
     remember_setting_state,
     restore_setting_state,
 )
+from music_links_bot.bot_history import record_history as _record_recent_item
 from music_links_bot.bot_menu import (
     MENU_HELP,
     cancel_command,
@@ -265,11 +266,7 @@ from music_links_bot.publication_state import (
     mark_posted as _schedule_mark_posted,
     release_fingerprint as _release_fingerprint,
 )
-from music_links_bot.publication_view import (
-    build_publication_view,
-    draft_message_overrides,
-    draft_platform_selection,
-)
+from music_links_bot.publication_view import build_publication_view
 from music_links_bot.publish_queue import (
     QueueBusyError,
     QueueFullError,
@@ -287,11 +284,6 @@ from music_links_bot.search import (
     SearchLookupError,
     normalize_search_query,
 )
-from music_links_bot.track_merge import coalesce_equivalent_tracks
-
-_draft_message_overrides = draft_message_overrides
-_draft_platform_selection = draft_platform_selection
-from music_links_bot.bot_history import record_history as _record_recent_item
 from music_links_bot.sharing import (
     add_share_button,
     build_share_query,
@@ -307,6 +299,7 @@ from music_links_bot.telegram_buttons import (
 )
 from music_links_bot.telegram_text import format_user_note_html, telegram_text_length
 from music_links_bot.text_utils import normalize_hashtag
+from music_links_bot.track_merge import coalesce_equivalent_tracks
 from music_links_bot.url_utils import (
     cache_key_for_url,
     extract_supported_urls,
@@ -1434,7 +1427,7 @@ async def _run_primary_editor_action(
                 InlineKeyboardButton(
                     get_text(lang, "ed_create_more"),
                     callback_data=encode_callback("menu", "create"),
-                    api_kwargs={"style": "primary"},
+                    style="primary",
                 )
             ]
         )
@@ -1928,7 +1921,7 @@ async def _send_track_matches(
                     InlineKeyboardButton(
                         get_text(lang, "crate_view"),
                         callback_data=encode_callback("crate", "open"),
-                        api_kwargs={"style": "primary"},
+                        style="primary",
                     )
                 ],
                 [

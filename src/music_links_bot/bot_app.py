@@ -37,34 +37,32 @@ PUBLIC_BOT_COMMANDS_EN = (
 BOT_DESCRIPTIONS = {
     "": (
         "Музыкальный редактор для Telegram.\n\n"
-        "• Ссылка, название или аудио → точный релиз и готовая карточка\n"
-        "• Несколько ссылок или плейлист → одна редактируемая подборка\n"
-        "• Стиль, подводка, шаблоны, обложка и площадки — в конструкторе\n"
-        "• Превью, история и подборки без дублей\n"
-        "• Нативная отправка поста с кнопками в любой чат\n"
+        "• Ссылка или «артист — трек» → обложка, точный релиз и кнопки площадок\n"
+        "• Несколько ссылок → одна подборка без дублей\n"
+        "• Свой текст над ссылкой → подводка к посту\n"
+        "• Стиль, хэштеги, площадки и обложка — в конструкторе\n"
+        "• Отправка себе, в чат, очередь или канал\n"
         "• Inline: @StonerHandBot + запрос прямо в переписке\n"
-        "• Отправка, управляемая очередь и публикация прямо в боте\n\n"
+        "• История, шаблоны и управление данными — прямо в боте\n\n"
         "Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
         "Yandex Music, NTS Radio."
     ),
     "en": (
         "A music post editor for Telegram.\n\n"
-        "• A link, title or audio file → a finished card\n"
-        "• Several links or a playlist → one editable crate\n"
-        "• Explicit style, intro, template, artwork and platform controls\n"
-        "• Clean preview, history and named duplicate-free crates\n"
-        "• Native sharing that preserves buttons in any chat\n"
-        "• Inline: @StonerHandBot + a query inside any conversation\n"
-        "• Sending, queue management and publishing inside the bot\n\n"
+        "• A link or artist — track → artwork, the exact release and platform buttons\n"
+        "• Several links → one duplicate-free collection\n"
+        "• Your text above a link → the post intro\n"
+        "• Style, hashtags, platforms and artwork stay editable\n"
+        "• Send to yourself, another chat, the queue or a channel\n"
+        "• Inline: @StonerHandBot + query anywhere\n"
+        "• History, templates and data controls live inside the bot\n\n"
         "Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
         "Yandex Music and NTS Radio."
     ),
 }
 BOT_SHORT_DESCRIPTIONS = {
-    "": (
-        "Ссылка, название, аудио или несколько треков → готовая карточка или подборка."
-    ),
-    "en": ("A link, title, audio or several tracks → a finished card or collection."),
+    "": "Ссылка или «артист — трек» → готовый пост. Несколько ссылок → подборка.",
+    "en": "A link or artist — track → a finished post. Several links → a collection.",
 }
 
 

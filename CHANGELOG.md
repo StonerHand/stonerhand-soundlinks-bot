@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.7.0 — 2026-08-26
+
+- Fixed the publication pipeline so the editor's hashtag choice is respected
+  identically in preview, direct send, channel publishing and queued delivery;
+  channel mode can no longer silently re-enable disabled hashtags.
+- Centralized final hashtag resolution in the canonical publication view,
+  removing duplicate formatting logic from the delivery service.
+- Updated semantic buttons to use the native typed `style` field in
+  python-telegram-bot 22.8 with central validation and focused Bot API fallbacks.
+- Restored discoverability of Help, Services, Channels, Demo and Privacy from
+  the main screen under one compact **More** action.
+- Made independent home-state reads concurrent and clarified first-run,
+  creation, hashtag and profile guidance without adding interface levels.
+- Added channel-publication regressions for disabled hashtags and tightened
+  release-readiness contracts for package metadata and the public repository.
+- Removed unused Docker configuration, internal assistant instructions and a
+  local statistics artifact from the product tree.
+- Rebuilt the English and Russian README files as concise product, operations
+  and release documentation; refreshed package metadata, CI concurrency,
+  dependency grouping and production environment guidance.
+
 ## 1.6.1 — 2026-08-26
 
 - Fixed incorrect automatic genre hashtags caused by trusting the first

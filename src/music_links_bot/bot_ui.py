@@ -21,7 +21,7 @@ from music_links_bot.telegram_buttons import (
 def _crate_button(lang: str, crate_count: int) -> InlineKeyboardButton:
     """Make a non-empty collection visible without adding another menu row."""
     safe_count = max(0, min(10, crate_count))
-    kwargs = {"api_kwargs": {"style": "success"}} if safe_count else {}
+    kwargs = {"style": "success"} if safe_count else {}
     return InlineKeyboardButton(
         get_text(lang, "home_crate").format(count=safe_count),
         callback_data=encode_callback("crate", "open"),
@@ -67,7 +67,7 @@ def build_start_keyboard(
     create_button = InlineKeyboardButton(
         get_text(lang, "home_create"),
         callback_data=encode_callback("menu", "create"),
-        api_kwargs={"style": "primary"},
+        style="primary",
     )
     rows.append([create_button])
     if active_draft_id:
@@ -102,6 +102,14 @@ def build_start_keyboard(
                 )
             ]
         )
+    rows.append(
+        [
+            InlineKeyboardButton(
+                get_text(lang, "home_more"),
+                callback_data=encode_callback("menu", "more"),
+            )
+        ]
+    )
     if is_admin:
         rows.append(
             [
@@ -128,7 +136,7 @@ def build_section_keyboard(
             InlineKeyboardButton(
                 get_text(lang, "quick_search"),
                 callback_data=encode_callback("menu", "create"),
-                api_kwargs={"style": "primary"},
+                style="primary",
             )
         ]
     )
@@ -223,13 +231,13 @@ def build_error_keyboard(
         primary = InlineKeyboardButton(
             get_text(lang, "retry"),
             callback_data=encode_callback("retry", "last"),
-            api_kwargs={"style": "primary"},
+            style="primary",
         )
     else:
         primary = InlineKeyboardButton(
             get_text(lang, "quick_search"),
             callback_data=encode_callback("menu", "create"),
-            api_kwargs={"style": "primary"},
+            style="primary",
         )
     rows = [[primary]]
     secondary_row: list[InlineKeyboardButton] = []
@@ -306,7 +314,7 @@ def build_duplicate_post_keyboard(
             InlineKeyboardButton(
                 get_text(lang, "duplicate_repeat"),
                 callback_data=encode_callback("editor", "r", draft_id),
-                api_kwargs={"style": "primary"},
+                style="primary",
             )
         ]
     ]
@@ -316,7 +324,7 @@ def build_duplicate_post_keyboard(
                 InlineKeyboardButton(
                     get_text(lang, "duplicate_replace"),
                     callback_data=encode_callback("editor", "x", draft_id),
-                    api_kwargs={"style": "danger"},
+                    style="danger",
                 )
             ]
         )
@@ -347,7 +355,7 @@ def build_onboarding_keyboard(step: int, lang: str) -> InlineKeyboardMarkup:
             InlineKeyboardButton(
                 get_text(lang, "next"),
                 callback_data=encode_callback("menu", f"onboard{step + 1}"),
-                api_kwargs={"style": "primary"},
+                style="primary",
             )
         ]
         row.insert(
@@ -370,7 +378,7 @@ def build_onboarding_keyboard(step: int, lang: str) -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     get_text(lang, "start_using"),
                     callback_data=encode_callback("menu", "onboarddone"),
-                    api_kwargs={"style": "success"},
+                    style="success",
                 ),
             ]
         )
@@ -397,13 +405,13 @@ def editor_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
         primary = InlineKeyboardButton(
             get_text(lang, "ed_publish"),
             callback_data=encode_callback("editor", "p", draft_id),
-            api_kwargs={"style": "success"},
+            style="success",
         )
     else:
         primary = InlineKeyboardButton(
             get_text(lang, "ed_send_self"),
             callback_data=encode_callback("editor", "s", draft_id),
-            api_kwargs={"style": "primary"},
+            style="primary",
         )
     return [
         [primary],
@@ -484,7 +492,7 @@ def editor_more_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButt
             InlineKeyboardButton(
                 get_text(lang, "ed_done"),
                 callback_data=encode_callback("editor", "f", draft_id),
-                api_kwargs={"style": "primary"},
+                style="primary",
             ),
             InlineKeyboardButton(
                 get_text(lang, "ed_more"),
@@ -533,7 +541,7 @@ def editor_delivery_rows(
                 InlineKeyboardButton(
                     get_text(lang, "ed_cover_reset"),
                     callback_data=encode_callback("editor", "cr", draft_id),
-                    api_kwargs={"style": "danger"},
+                    style="danger",
                 )
             ]
         )
@@ -573,7 +581,7 @@ def editor_template_rows(
                 InlineKeyboardButton(
                     "×",
                     callback_data=encode_callback("editor", f"td{index}", draft_id),
-                    api_kwargs={"style": "danger"},
+                    style="danger",
                 ),
             ]
         )
@@ -582,7 +590,7 @@ def editor_template_rows(
             InlineKeyboardButton(
                 get_text(lang, "ed_template_save"),
                 callback_data=encode_callback("editor", "tn", draft_id),
-                api_kwargs={"style": "primary"},
+                style="primary",
             )
         ]
     )
@@ -666,7 +674,7 @@ def editor_intro_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardBut
                     lang, "ed_intro_change" if draft.get("quote") else "ed_intro_add"
                 ),
                 callback_data=encode_callback("editor", "ti", draft_id),
-                api_kwargs={"style": "primary"},
+                style="primary",
             )
         ]
     ]
@@ -676,7 +684,7 @@ def editor_intro_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardBut
                 InlineKeyboardButton(
                     get_text(lang, "ed_intro_remove"),
                     callback_data=encode_callback("editor", "t0", draft_id),
-                    api_kwargs={"style": "danger"},
+                    style="danger",
                 )
             ]
         )
@@ -732,7 +740,7 @@ def editor_preview_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardB
             InlineKeyboardButton(
                 get_text(lang, "ed_more"),
                 callback_data=encode_callback("editor", "o", draft_id),
-                api_kwargs={"style": "primary"},
+                style="primary",
             )
         ],
         [
@@ -770,7 +778,7 @@ def editor_schedule_rows(
             InlineKeyboardButton(
                 get_text(lang, "schedule_custom"),
                 callback_data=encode_callback("editor", "qi", draft_id),
-                api_kwargs={"style": "primary"},
+                style="primary",
             )
         ],
         [
@@ -813,11 +821,7 @@ def editor_overflow_rows(
             InlineKeyboardButton(
                 get_text(lang, "ed_send_self"),
                 callback_data=encode_callback("editor", "s", draft_id),
-                **(
-                    {}
-                    if draft.get("can_publish")
-                    else {"api_kwargs": {"style": "primary"}}
-                ),
+                **({} if draft.get("can_publish") else {"style": "primary"}),
             )
         ]
     ]
@@ -827,7 +831,7 @@ def editor_overflow_rows(
                 InlineKeyboardButton(
                     get_text(lang, "ed_publish"),
                     callback_data=encode_callback("editor", "p", draft_id),
-                    api_kwargs={"style": "success"},
+                    style="success",
                 )
             ]
         )
@@ -867,7 +871,7 @@ def editor_overflow_rows(
                 InlineKeyboardButton(
                     get_text(lang, "ed_delete"),
                     callback_data=encode_callback("editor", "d", draft_id),
-                    api_kwargs={"style": "danger"},
+                    style="danger",
                 )
             ],
             [
@@ -888,7 +892,7 @@ def build_deleted_draft_keyboard(draft_id: str, *, lang: str) -> InlineKeyboardM
                 InlineKeyboardButton(
                     get_text(lang, "ed_undo_delete"),
                     callback_data=encode_callback("editor", "du", draft_id),
-                    api_kwargs={"style": "primary"},
+                    style="primary",
                 )
             ]
         ]
@@ -904,7 +908,7 @@ def build_delete_confirmation_keyboard(
                 InlineKeyboardButton(
                     get_text(lang, "ed_delete_confirm_button"),
                     callback_data=encode_callback("editor", "dc", draft_id),
-                    api_kwargs={"style": "danger"},
+                    style="danger",
                 )
             ],
             [
@@ -943,7 +947,7 @@ def render_crate(
                     InlineKeyboardButton(
                         get_text(lang, "crate_clear_confirm_button"),
                         callback_data=encode_callback("crate", "clear_confirm"),
-                        api_kwargs={"style": "danger"},
+                        style="danger",
                     )
                 ],
                 [
@@ -1015,7 +1019,7 @@ def render_crate(
                     callback_data=encode_callback(
                         "crate", "remove", str(selected_index)
                     ),
-                    api_kwargs={"style": "danger"},
+                    style="danger",
                 )
             ]
         )
@@ -1031,7 +1035,7 @@ def render_crate(
             InlineKeyboardButton(
                 get_text(lang, "crate_clear"),
                 callback_data=encode_callback("crate", "clear"),
-                api_kwargs={"style": "danger"},
+                style="danger",
             )
         )
         rows.append(footer)
@@ -1044,7 +1048,7 @@ def render_crate(
                 InlineKeyboardButton(
                     get_text(lang, "crate_preview"),
                     callback_data=encode_callback("crate", "preview"),
-                    api_kwargs={"style": "primary"},
+                    style="primary",
                 ),
             ]
         )
@@ -1055,7 +1059,7 @@ def render_crate(
                     InlineKeyboardButton(
                         get_text(lang, "crate_undo"),
                         callback_data=encode_callback("crate", "undo"),
-                        api_kwargs={"style": "primary"},
+                        style="primary",
                     )
                 ]
             )
@@ -1064,7 +1068,7 @@ def render_crate(
                 InlineKeyboardButton(
                     get_text(lang, "crate_find"),
                     callback_data=encode_callback("menu", "create"),
-                    api_kwargs={"style": "primary"},
+                    style="primary",
                 )
             ]
         )

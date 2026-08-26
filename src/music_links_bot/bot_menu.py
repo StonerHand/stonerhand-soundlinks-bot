@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from html import escape
 
@@ -124,9 +125,11 @@ async def remember_fresh_home_message(
 async def home_view(query, context, *, lang: str) -> tuple[str, InlineKeyboardMarkup]:
     user = query.from_user
     user_id = user.id if user else 0
-    crate_count, is_admin = await home_state(context, user_id)
     runtime = runtime_for(context)
-    session = await runtime.get_session(user_id, lang=lang)
+    (crate_count, is_admin), session = await asyncio.gather(
+        home_state(context, user_id),
+        runtime.get_session(user_id, lang=lang),
+    )
     active_draft_id, active_draft_label = await _active_home_card(
         context, runtime, session, lang=lang
     )
@@ -157,11 +160,13 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     runtime = runtime_for(context)
     if not await runtime.claim_intent(user_id, kind="command", value="start"):
         return
-    session = await runtime.get_session(user_id, lang=lang)
+    session, (crate_count, is_admin) = await asyncio.gather(
+        runtime.get_session(user_id, lang=lang),
+        home_state(context, user_id),
+    )
     active_draft_id, active_draft_label = await _active_home_card(
         context, runtime, session, lang=lang
     )
-    crate_count, is_admin = await home_state(context, user_id)
     sent = await message.reply_text(
         build_home_text(
             lang=lang,
