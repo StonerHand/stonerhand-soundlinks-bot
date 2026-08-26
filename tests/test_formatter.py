@@ -50,6 +50,18 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(build_auto_hashtags(track), "#stonerhand #track #heavymetal")
 
+    def test_unverified_genre_falls_back_to_structural_tags(self) -> None:
+        from music_links_bot.formatter import build_auto_hashtags
+
+        track = TrackMatch(
+            title="Don't Reach For Me",
+            artist="Knocked Loose",
+            links={},
+            genre=None,
+        )
+
+        self.assertEqual(build_auto_hashtags(track), "#stonerhand #track")
+
     def test_track_genre_is_a_hashtag_not_visible_metadata(self) -> None:
         track = TrackMatch(
             title="Rickets",

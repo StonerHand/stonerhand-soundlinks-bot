@@ -9,6 +9,7 @@ from music_links_bot.kvstore import KVStore, KVUnavailableError
 from music_links_bot.search import (
     SearchClient,
     SearchLookupError,
+    _extract_matching_genre,
     _extract_release_candidates,
     normalize_search_query,
 )
@@ -84,6 +85,76 @@ class SearchQueryTests(unittest.TestCase):
         self.assertEqual(
             _extract_release_candidates({"results": [{"trackViewUrl": 5}]}),
             [],
+        )
+
+    def test_genre_requires_matching_artist_and_release(self) -> None:
+        payload = {
+            "results": [
+                {
+                    "artistName": "Donell Jones",
+                    "trackName": "Knocks Me Off My Feet",
+                    "primaryGenreName": "R&B/Soul",
+                },
+                {
+                    "artistName": "Knocked Loose",
+                    "trackName": "Don't Reach for Me",
+                    "primaryGenreName": "Metal",
+                },
+            ]
+        }
+
+        self.assertEqual(
+            _extract_matching_genre(
+                payload,
+                artist="Knocked Loose",
+                title="Don’t Reach For Me",
+            ),
+            "Metal",
+        )
+
+    def test_genre_is_omitted_when_only_artist_or_title_matches(self) -> None:
+        payload = {
+            "results": [
+                {
+                    "artistName": "Knocked Loose",
+                    "trackName": "Take Me Home",
+                    "primaryGenreName": "Metal",
+                },
+                {
+                    "artistName": "Someone Else",
+                    "trackName": "Don't Reach For Me",
+                    "primaryGenreName": "R&B/Soul",
+                },
+            ]
+        }
+
+        self.assertIsNone(
+            _extract_matching_genre(
+                payload,
+                artist="Knocked Loose",
+                title="Don't Reach For Me",
+            )
+        )
+
+    def test_album_genre_can_match_collection_name(self) -> None:
+        payload = {
+            "results": [
+                {
+                    "artistName": "Black Sabbath",
+                    "trackName": "War Pigs",
+                    "collectionName": "Paranoid",
+                    "primaryGenreName": "Heavy Metal",
+                }
+            ]
+        }
+
+        self.assertEqual(
+            _extract_matching_genre(
+                payload,
+                artist="Black Sabbath",
+                title="Paranoid",
+            ),
+            "Heavy Metal",
         )
 
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.6.1 — 2026-08-26
+
+- Fixed incorrect automatic genre hashtags caused by trusting the first
+  relevance-ranked Apple Search result without verifying its artist or title.
+- Genre enrichment now requires an exact punctuation-normalized artist and
+  track/collection match; uncertain metadata produces no genre tag instead of
+  publishing a confidently wrong one.
+- Versioned the aggregate lookup cache so previously cached false tags such as
+  `#rnb` on Knocked Loose disappear immediately after deployment.
+- Added regressions for wrong-artist results, Unicode apostrophes, album-title
+  matching and the safe structural-tag fallback.
+
 ## 1.6.0 — 2026-08-25
 
 - Added cancellable lookup progress with a Classic-client fallback and

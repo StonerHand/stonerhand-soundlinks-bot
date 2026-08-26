@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import unicodedata
 from dataclasses import dataclass
 
 import httpx
@@ -13,6 +14,7 @@ LOGGER = logging.getLogger(__name__)
 MIN_QUERY_LENGTH = 2
 MAX_QUERY_LENGTH = 120
 MAX_CANDIDATES = 3
+GENRE_SEARCH_LIMIT = 12
 
 
 class SearchLookupError(RuntimeError):
@@ -67,8 +69,14 @@ class SearchClient:
         return candidates[0].url
 
     async def lookup_genre(self, artist: str, title: str) -> str | None:
-        """Best-effort genre for a release; empty-string cache entries mark
-        known misses so they are not retried on every post."""
+        """Return a genre only for an exact artist/release match.
+
+        iTunes search is relevance-ranked and can put an unrelated release
+        first when punctuation changes (for example ``Don't`` vs ``Don’t``).
+        A wrong genre is worse than no genre tag, so enrichment is accepted
+        only after both the artist and track/collection title match.
+        Empty cache entries mark safe misses and avoid repeated lookups.
+        """
         query = normalize_search_query(f"{artist} {title}")
         if query is None:
             return None
@@ -85,7 +93,7 @@ class SearchClient:
                     "term": query,
                     "media": "music",
                     "entity": "song,album",
-                    "limit": 1,
+                    "limit": GENRE_SEARCH_LIMIT,
                     "country": self._country,
                 },
             )
@@ -95,7 +103,7 @@ class SearchClient:
             LOGGER.debug("Genre lookup failed for %s", query, exc_info=True)
             return None
 
-        genre = _extract_genre(payload)
+        genre = _extract_matching_genre(payload, artist=artist, title=title)
         self._genre_cache.set(cache_key, genre or "")
         return genre
 
@@ -225,7 +233,12 @@ def _extract_preview_url(payload: object) -> str | None:
     return None
 
 
-def _extract_genre(payload: object) -> str | None:
+def _extract_matching_genre(
+    payload: object,
+    *,
+    artist: str,
+    title: str,
+) -> str | None:
     if not isinstance(payload, dict):
         return None
 
@@ -233,13 +246,41 @@ def _extract_genre(payload: object) -> str | None:
     if not isinstance(results, list):
         return None
 
+    artist_key = _metadata_match_key(artist)
+    title_key = _metadata_match_key(title)
+    if not artist_key or not title_key:
+        return None
+
     for result in results:
-        if isinstance(result, dict):
-            genre = result.get("primaryGenreName")
-            if isinstance(genre, str) and genre.strip():
-                return genre.strip()
+        if not isinstance(result, dict):
+            continue
+        if _metadata_match_key(result.get("artistName")) != artist_key:
+            continue
+        candidate_titles = (
+            result.get("trackName"),
+            result.get("collectionName"),
+        )
+        if title_key not in {
+            key for value in candidate_titles if (key := _metadata_match_key(value))
+        }:
+            continue
+        genre = result.get("primaryGenreName")
+        if isinstance(genre, str) and genre.strip():
+            return genre.strip()
 
     return None
+
+
+def _metadata_match_key(value: object) -> str:
+    """Compare metadata across punctuation and Unicode accent variants."""
+    if not isinstance(value, str):
+        return ""
+    normalized = unicodedata.normalize("NFKD", value).casefold()
+    return "".join(
+        character
+        for character in normalized
+        if character.isalnum() and not unicodedata.combining(character)
+    )
 
 
 def _extract_release_candidates(payload: object) -> list[SearchCandidate]:

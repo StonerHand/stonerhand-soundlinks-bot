@@ -21,6 +21,8 @@ opening a separate web interface.
 
 - accepts a music URL, an `artist — track` query or an uploaded audio file;
 - resolves release metadata, artwork and platform links;
+- adds a genre hashtag only when the provider result matches both artist and
+  release; uncertain genre metadata is omitted instead of guessed;
 - builds a clean Telegram card with compact buttons;
 - keeps a canonical **All platforms** Songlink/Odesli hub even when metadata
   temporarily falls back to Spotify;
