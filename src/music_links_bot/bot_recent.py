@@ -37,7 +37,7 @@ async def render_recent_view(
                 InlineKeyboardButton(
                     f"↻ {index} · {get_text(lang, 'recent_repeat')}",
                     callback_data=encode_callback("editor", "b", draft_id),
-                    api_kwargs={"style": "primary"},
+                    style="primary",
                 ),
                 InlineKeyboardButton(
                     f"{index} · {get_text(lang, 'recent_add')}",
@@ -59,7 +59,7 @@ async def render_recent_view(
                         switch_inline_query_current_chat=str(
                             item.get("source_url") or ""
                         )[:256],
-                        api_kwargs={"style": "primary"},
+                        style="primary",
                     )
                 ]
             )
@@ -96,7 +96,7 @@ def _empty_recent_view(lang: str) -> tuple[str, InlineKeyboardMarkup]:
                 InlineKeyboardButton(
                     get_text(lang, "home_create"),
                     callback_data=encode_callback("menu", "create"),
-                    api_kwargs={"style": "primary"},
+                    style="primary",
                 )
             ],
             [_home_button(lang)],

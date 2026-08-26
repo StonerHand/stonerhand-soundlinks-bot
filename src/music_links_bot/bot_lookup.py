@@ -726,7 +726,7 @@ async def _send_playlist_result(
                             callback_data=encode_callback(
                                 "playlist", "import", import_id
                             ),
-                            api_kwargs={"style": "success"},
+                            style="success",
                         )
                     ],
                 ]

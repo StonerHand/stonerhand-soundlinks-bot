@@ -49,7 +49,7 @@ class RichPublicationModelTests(unittest.TestCase):
                     InlineKeyboardButton(
                         "Spotify",
                         url="https://open.spotify.com/track/x",
-                        api_kwargs={"style": "success"},
+                        style="success",
                     )
                 ]
             ]

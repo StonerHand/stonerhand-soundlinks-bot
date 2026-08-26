@@ -32,6 +32,22 @@ class ReleaseReadinessTests(unittest.TestCase):
         self.assertNotIn("mini app", docs)
         self.assertNotIn("webapp", docs)
 
+    def test_public_tree_contains_only_product_assets(self) -> None:
+        self.assertFalse((ROOT / "skills").exists())
+        self.assertFalse((ROOT / ".dockerignore").exists())
+        self.assertIn("data/*.json", (ROOT / ".gitignore").read_text(encoding="utf-8"))
+
+    def test_package_metadata_is_release_ready(self) -> None:
+        project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))[
+            "project"
+        ]
+
+        self.assertEqual(project["license"], "MIT")
+        self.assertEqual(
+            project["urls"]["Repository"],
+            "https://github.com/StonerHand/stonerhand-soundlinks-bot",
+        )
+
     def test_vercel_routes_builds_and_crons_stay_aligned(self) -> None:
         config = json.loads((ROOT / "vercel.json").read_text(encoding="utf-8"))
         builds = {entry["src"] for entry in config["builds"]}

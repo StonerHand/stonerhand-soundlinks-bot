@@ -34,23 +34,25 @@ STRINGS: dict[str, dict[str, str]] = {
             "<b>Просто отправь сообщением:</b>\n"
             "• ссылку на трек, альбом, плейлист или артиста\n"
             "• <code>артист — название</code>\n"
-            "• несколько ссылок — для подборки\n\n"
-            "<i>Обложку, хэштеги и кнопки площадок соберу автоматически.</i>"
+            "• несколько ссылок — для подборки\n"
+            "• свой текст над ссылкой — для подводки\n\n"
+            "<i>Обложку, кнопки и точные хэштеги соберу автоматически.</i>"
         ),
         EN: (
             "{greeting}\n\n"
             "<b>Just send a message with:</b>\n"
             "• a track, album, playlist or artist link\n"
             "• <code>artist — title</code>\n"
-            "• several links for a collection\n\n"
-            "<i>I will add artwork, hashtags and platform buttons automatically.</i>"
+            "• several links for a collection\n"
+            "• your own text above a link for the intro\n\n"
+            "<i>I will add artwork, platform buttons and verified hashtags automatically.</i>"
         ),
     },
     "home_body_new": {
         RU: (
             "{greeting}\n\n"
             "Я найду релиз и подготовлю готовый Telegram-пост: "
-            "<b>обложку, название, хэштеги и кнопки площадок.</b>\n\n"
+            "<b>обложку, название, точные хэштеги и кнопки площадок.</b>\n\n"
             "<b>Что можно прислать</b>\n"
             "• ссылку на трек, альбом, плейлист или артиста\n"
             "• <code>Deftones — Rickets</code>\n"
@@ -61,7 +63,7 @@ STRINGS: dict[str, dict[str, str]] = {
         EN: (
             "{greeting}\n\n"
             "I will find the release and prepare a finished Telegram post with "
-            "<b>artwork, title, hashtags and platform buttons.</b>\n\n"
+            "<b>artwork, title, verified hashtags and platform buttons.</b>\n\n"
             "<b>What you can send</b>\n"
             "• a track, album, playlist or artist link\n"
             "• <code>Deftones — Rickets</code>\n"
@@ -130,7 +132,8 @@ STRINGS: dict[str, dict[str, str]] = {
             "• ссылку на трек, альбом, плейлист или артиста\n"
             "• название в формате <code>артист — трек</code>\n"
             "• несколько ссылок, каждую с новой строки — для подборки\n\n"
-            "<blockquote><code>Deftones — Rickets</code></blockquote>"
+            "<blockquote><code>Deftones — Rickets</code></blockquote>\n"
+            "Свой текст над ссылкой станет подводкой к посту."
         ),
         EN: (
             "🔎 <b>New card</b>\n\n"
@@ -138,7 +141,8 @@ STRINGS: dict[str, dict[str, str]] = {
             "• a track, album, playlist or artist link\n"
             "• a title as <code>artist — track</code>\n"
             "• several links, one per line, for a collection\n\n"
-            "<blockquote><code>Deftones — Rickets</code></blockquote>"
+            "<blockquote><code>Deftones — Rickets</code></blockquote>\n"
+            "Text above a link becomes the post intro."
         ),
     },
     "home_recent": {RU: "История", EN: "History"},
@@ -408,7 +412,8 @@ STRINGS: dict[str, dict[str, str]] = {
             "<blockquote><b>Помощь</b> — короткая инструкция\n"
             "<b>Сервисы</b> — поддерживаемые площадки\n"
             "<b>Для каналов</b> — автозамена ссылок\n"
-            "<b>Пример</b> — как выглядит готовый пост</blockquote>"
+            "<b>Пример</b> — как выглядит готовый пост\n"
+            "<b>Приватность</b> — данные и их удаление</blockquote>"
         ),
         EN: (
             "••• <b>More tools</b>\n"
@@ -416,7 +421,8 @@ STRINGS: dict[str, dict[str, str]] = {
             "<blockquote><b>Help</b> — a short guide\n"
             "<b>Services</b> — supported platforms\n"
             "<b>For channels</b> — automatic link replacement\n"
-            "<b>Example</b> — a finished post preview</blockquote>"
+            "<b>Example</b> — a finished post preview\n"
+            "<b>Privacy</b> — stored data and deletion controls</blockquote>"
         ),
     },
     "no_url_hint": {
@@ -563,8 +569,16 @@ STRINGS: dict[str, dict[str, str]] = {
         EN: "✍️ <b>Intro</b>\n<i>A short personal note before the release.</i>",
     },
     "ed_hashtags_title": {
-        RU: "#️⃣ <b>Хэштеги</b>\n<i>Автоматические, свои или без них.</i>",
-        EN: "#️⃣ <b>Hashtags</b>\n<i>Automatic, custom or none.</i>",
+        RU: (
+            "#️⃣ <b>Хэштеги</b>\n"
+            "<i>Авто добавляет тип релиза и только подтверждённый жанр. "
+            "Сомнительный жанр будет пропущен.</i>"
+        ),
+        EN: (
+            "#️⃣ <b>Hashtags</b>\n"
+            "<i>Auto adds the release type and only a verified genre. "
+            "Uncertain genres are omitted.</i>"
+        ),
     },
     "ed_actions_title": {
         RU: "🚀 <b>Что сделать с постом?</b>\n<i>Отправить себе, запланировать или опубликовать.</i>",

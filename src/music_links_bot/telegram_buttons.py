@@ -15,7 +15,7 @@ class ButtonTone(str, Enum):
 def _style_kwargs(tone: ButtonTone | None) -> dict:
     if tone is None or tone is ButtonTone.NEUTRAL:
         return {}
-    return {"api_kwargs": {"style": tone.value}}
+    return {"style": tone.value}
 
 
 def callback_button(
@@ -63,9 +63,11 @@ def disabled_button(
     tone: ButtonTone | None = None,
 ) -> TelegramInlineKeyboardButton:
     """Render a native Bot API 10.3 disabled state."""
-    api_kwargs = dict(_style_kwargs(tone).get("api_kwargs") or {})
-    api_kwargs["disabled"] = {}
-    return TelegramInlineKeyboardButton(text=text, api_kwargs=api_kwargs)
+    return TelegramInlineKeyboardButton(
+        text=text,
+        api_kwargs={"disabled": {}},
+        **_style_kwargs(tone),
+    )
 
 
 def button(
@@ -74,16 +76,14 @@ def button(
     tone: ButtonTone | None = None,
     **kwargs,
 ) -> TelegramInlineKeyboardButton:
-    """Compatibility factory that validates semantic Bot API styles centrally."""
-    api_kwargs = kwargs.pop("api_kwargs", None)
-    if api_kwargs:
-        style = api_kwargs.get("style")
-        try:
-            legacy_tone = ButtonTone(style) if style else None
-        except ValueError as exc:
-            raise ValueError(f"Unknown Telegram button style: {style}") from exc
-        if tone is not None and legacy_tone is not None and tone is not legacy_tone:
-            raise ValueError("Conflicting Telegram button styles")
-        tone = tone or legacy_tone
+    """Validate semantic Bot API styles at the shared construction boundary."""
+    native_style = kwargs.pop("style", None)
+    try:
+        native_tone = ButtonTone(native_style) if native_style else None
+    except ValueError as exc:
+        raise ValueError(f"Unknown Telegram button style: {native_style}") from exc
+    if tone is not None and native_tone is not None and tone is not native_tone:
+        raise ValueError("Conflicting Telegram button styles")
+    tone = tone or native_tone
     kwargs.update(_style_kwargs(tone))
     return TelegramInlineKeyboardButton(text=text, **kwargs)

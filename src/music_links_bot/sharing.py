@@ -137,7 +137,7 @@ def add_share_button(
                 InlineKeyboardButton(
                     label,
                     switch_inline_query=share_query,
-                    api_kwargs={"style": "primary"},
+                    style="primary",
                 )
             ],
         ]
@@ -313,7 +313,7 @@ def _add_inline_retry_button(
                 InlineKeyboardButton(
                     label,
                     switch_inline_query_current_chat=share_query,
-                    api_kwargs={"style": "primary"},
+                    style="primary",
                 )
             ],
         ]

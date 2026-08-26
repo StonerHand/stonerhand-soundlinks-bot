@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from telegram import InlineKeyboardMarkup
 
 from music_links_bot.constants import PLATFORM_LABELS
-from music_links_bot.formatter import format_track_message
+from music_links_bot.formatter import build_auto_hashtags, format_track_message
 from music_links_bot.keyboards import _build_link_keyboard
 from music_links_bot.models import TrackMatch
 from music_links_bot.publication_budget import IntroBudget, compose_with_intro
@@ -17,25 +17,23 @@ class PublicationView:
     text: str
     keyboard: InlineKeyboardMarkup
     intro: IntroBudget
+    hashtags: str | None
 
 
-def draft_message_overrides(
-    draft: dict,
-    *,
-    include_hashtags: bool,
-) -> tuple[bool, dict]:
-    """Custom draft tags replace generated house tags."""
-    overrides: dict = {}
+def resolve_draft_hashtags(draft: dict, track: TrackMatch) -> str | None:
+    """Return the one hashtag string shared by preview and every delivery path."""
+    if not bool(draft.get("hashtags", True)):
+        return None
+
     custom_tags = draft.get("custom_tags")
     if isinstance(custom_tags, list):
         tags = [
             tag for tag in (normalize_hashtag(value) for value in custom_tags) if tag
         ]
         if tags:
-            overrides["hashtags"] = " ".join(tags)
-        else:
-            include_hashtags = False
-    return include_hashtags, overrides
+            return " ".join(tags)
+        return None
+    return build_auto_hashtags(track)
 
 
 def draft_platform_selection(draft: dict) -> list[str] | None:
@@ -56,18 +54,14 @@ def build_publication_view(
     *,
     context,
     include_channel_button: bool,
-    channel_style: bool = False,
     max_visible_platforms: int | None = None,
 ) -> PublicationView:
-    include_hashtags, overrides = draft_message_overrides(
-        draft,
-        include_hashtags=(True if channel_style else bool(draft.get("hashtags", True))),
-    )
+    hashtags = resolve_draft_hashtags(draft, track)
     prefix = str(draft.get("prefix") or "")
     body = format_track_message(
         track,
-        include_hashtags=include_hashtags,
-        **overrides,
+        include_hashtags=hashtags is not None,
+        hashtags=hashtags,
     )
     text, intro = compose_with_intro(
         draft,
@@ -84,4 +78,9 @@ def build_publication_view(
         platform_selection=draft_platform_selection(draft),
         max_visible_platforms=max_visible_platforms,
     )
-    return PublicationView(text=text, keyboard=keyboard, intro=intro)
+    return PublicationView(
+        text=text,
+        keyboard=keyboard,
+        intro=intro,
+        hashtags=hashtags,
+    )

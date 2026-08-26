@@ -82,7 +82,7 @@ class PublicationGoldenTests(unittest.TestCase):
                             button.text,
                             button.callback_data,
                             button.url,
-                            dict(button.api_kwargs or {}).get("style"),
+                            button.style,
                         ]
                         for button in row
                     ]
