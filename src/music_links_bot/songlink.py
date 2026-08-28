@@ -8,14 +8,13 @@ from dataclasses import asdict, fields
 import httpx
 
 from music_links_bot.cache import TTLCache
-from music_links_bot.constants import HTTP_USER_AGENT, PLATFORM_ALIASES
+from music_links_bot.constants import HTTP_HEADERS, PLATFORM_ALIASES
 from music_links_bot.kvstore import KVStore
 from music_links_bot.models import TrackMatch
 from music_links_bot.release_hubs import canonical_release_hub_url
 from music_links_bot.spotify import SpotifyClient, SpotifyLookupError
 from music_links_bot.url_utils import cache_key_for_url
 
-HTTP_HEADERS = {"User-Agent": HTTP_USER_AGENT}
 KV_TTL_SECONDS = 7 * 24 * 3600
 FALLBACK_TTL_SECONDS = 15 * 60
 MIN_COMPLETE_PLATFORM_COUNT = 4

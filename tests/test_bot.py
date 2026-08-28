@@ -17,32 +17,28 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from music_links_bot.artist import ArtistLookupError
 from music_links_bot.bot import (
+    _build_error_keyboard,
+    _build_intro_keyboard,
+    _delete_confirmation_keyboard,
+    _editor_overflow_rows,
+    _send_track_result,
+    track_lookup_message,
+)
+from music_links_bot.bot_admin import id_command, stats_command, status_command
+from music_links_bot.bot_app import (
     BOT_DESCRIPTIONS,
     BOT_SHORT_DESCRIPTIONS,
-    MAX_BUTTON_TEXT_LENGTH,
-    MAX_MEMORY_DRAFTS,
     PUBLIC_BOT_COMMANDS,
-    _build_artist_keyboard,
-    _build_collection_keyboard,
-    _build_error_keyboard,
-    _build_home_text,
+    build_application,
+    sync_application_commands,
+)
+from music_links_bot.bot_crate_handlers import crate_command
+from music_links_bot.bot_inline import (
     _build_inline_collection_result,
     _build_inline_result,
-    _build_intro_keyboard,
-    _build_link_keyboard,
-    _build_mixed_collection_keyboard,
-    _build_nts_keyboard,
-    _build_onboarding_keyboard,
-    _build_platform_order,
-    _build_playlist_keyboard,
+)
+from music_links_bot.bot_lookup import (
     _build_podcast_fallback,
-    _build_section_keyboard,
-    _build_start_keyboard,
-    _build_youtube_keyboard,
-    _delete_confirmation_keyboard,
-    _editor_more_rows,
-    _editor_overflow_rows,
-    _editor_rows,
     _format_not_found_message,
     _format_service_unavailable_message,
     _lookup_artists,
@@ -50,32 +46,47 @@ from music_links_bot.bot import (
     _lookup_playlists,
     _lookup_tracks,
     _lookup_youtube_videos,
-    _menu_text,
-    _message_text,
-    _release_fingerprint,
-    _render_bot_crate,
-    _render_track_draft,
-    _send_track_result,
-    _should_include_channel_button,
-    _should_include_hashtags,
     _split_source_urls,
-    _store_draft,
     _strip_bot_mention,
-    build_application,
+)
+from music_links_bot.bot_menu import (
     channel_command,
-    crate_command,
     guide_command,
     help_command,
-    id_command,
+    menu_text as _menu_text,
     platforms_command,
     start_command,
-    stats_command,
-    status_command,
-    sync_application_commands,
-    track_lookup_message,
+)
+from music_links_bot.bot_stats import message_text as _message_text
+from music_links_bot.bot_storage import (
+    MAX_MEMORY_DRAFTS,
+    store_draft as _store_draft,
+)
+from music_links_bot.bot_ui import (
+    build_home_text as _build_home_text,
+    build_onboarding_keyboard as _build_onboarding_keyboard,
+    build_section_keyboard as _build_section_keyboard,
+    build_start_keyboard as _build_start_keyboard,
+    editor_more_rows as _editor_more_rows,
+    editor_rows as _editor_rows,
+    render_crate as _render_bot_crate,
 )
 from music_links_bot.config import Settings
+from music_links_bot.editor_view import render_track_draft as _render_track_draft
 from music_links_bot.i18n import get_text
+from music_links_bot.keyboards import (
+    MAX_BUTTON_TEXT_LENGTH,
+    _build_artist_keyboard,
+    _build_collection_keyboard,
+    _build_link_keyboard,
+    _build_mixed_collection_keyboard,
+    _build_nts_keyboard,
+    _build_platform_order,
+    _build_playlist_keyboard,
+    _build_youtube_keyboard,
+    _should_include_channel_button,
+    _should_include_hashtags,
+)
 from music_links_bot.models import (
     ArtistMatch,
     PlaylistMatch,
@@ -85,6 +96,9 @@ from music_links_bot.models import (
 )
 from music_links_bot.nts import NTSLookupError
 from music_links_bot.playlist import PlaylistLookupError
+from music_links_bot.publication_state import (
+    release_fingerprint as _release_fingerprint,
+)
 from music_links_bot.search import SearchCandidate, SearchLookupError
 from music_links_bot.sharing import (
     add_share_button,
@@ -1437,7 +1451,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_inline_handler_retries_classic_when_rich_is_rejected(self) -> None:
-        from music_links_bot.bot import inline_query_handler
+        from music_links_bot.bot_inline import inline_query_handler
 
         class InlineQueryStub:
             query = "https://open.spotify.com/track/abc"
@@ -1509,7 +1523,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(any(button.switch_inline_query for button in buttons))
 
     async def test_inline_channel_handler_disables_cross_chat_cache(self) -> None:
-        from music_links_bot.bot import inline_query_handler
+        from music_links_bot.bot_inline import inline_query_handler
 
         class InlineQueryStub:
             query = "https://open.spotify.com/track/abc"
@@ -1589,7 +1603,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(preview.prefer_large_media)
 
     async def test_inline_share_handler_returns_one_collection_card(self) -> None:
-        from music_links_bot.bot import inline_query_handler
+        from music_links_bot.bot_inline import inline_query_handler
 
         class InlineQueryStub:
             query = "sh|tabc|tdef"
@@ -1618,7 +1632,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(inline_query.answer_kwargs[0]["is_personal"])
 
     async def test_partial_inline_collection_is_never_cached(self) -> None:
-        from music_links_bot.bot import inline_query_handler
+        from music_links_bot.bot_inline import inline_query_handler
 
         class InlineQueryStub:
             query = "sh|tabc|tdef"
@@ -1644,7 +1658,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(inline_query.answer_kwargs[0]["is_personal"])
 
     async def test_inline_direct_urls_return_one_collection_card(self) -> None:
-        from music_links_bot.bot import inline_query_handler
+        from music_links_bot.bot_inline import inline_query_handler
 
         class InlineQueryStub:
             query = (
@@ -1685,7 +1699,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(keyboard[0][0].text, "📺 Смотреть на YouTube")
 
     async def test_inline_text_search_offers_multiple_results(self) -> None:
-        from music_links_bot.bot import inline_query_handler
+        from music_links_bot.bot_inline import inline_query_handler
 
         class InlineQueryStub:
             query = "youth code"
@@ -2875,7 +2889,7 @@ class PublicationOverrideTests(unittest.TestCase):
         self.assertIsNone(hashtags)
 
     def test_normalize_hashtag_slugs_and_rejects_junk(self) -> None:
-        from music_links_bot.bot import normalize_hashtag
+        from music_links_bot.text_utils import normalize_hashtag
 
         self.assertEqual(normalize_hashtag("#Hip-Hop!"), "#hiphop")
         self.assertEqual(normalize_hashtag("Дум метал"), "#думметал")

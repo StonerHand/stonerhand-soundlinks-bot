@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 1.8.2 — 2026-08-28
+
+- Removed the legacy compatibility surface from the central bot module: command,
+  inline, lookup and UI symbols are now imported directly from their owning
+  modules by the application assembler and tests.
+- Deleted dead empty lookup adapters and a redundant mixed-preview wrapper,
+  and collapsed repeated editor-screen rendering into one declarative mapping.
+- Centralized HTTP request headers and the durable statistics key so provider,
+  privacy and admin paths no longer maintain independent copies.
+- Simplified small return paths and health degradation checks without changing
+  user-visible behavior; focused regression tests cover the resulting module
+  boundaries before the full release gate.
+
 ## 1.8.1 — 2026-08-28
 
 - Removed synthetic Spotify search buttons: a platform now appears only when

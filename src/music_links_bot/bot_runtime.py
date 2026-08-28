@@ -205,9 +205,7 @@ class BotRuntime:
         self.request_tokens: dict[int, str] = {}
         self.active_tasks: dict[int, asyncio.Task[Any]] = {}
         self.diagnostics: dict[str, ProviderDiagnostic] = {}
-        self.request_latency_buckets = {
-            upper_bound: 0 for upper_bound in REQUEST_LATENCY_BUCKETS_MS
-        }
+        self.request_latency_buckets = dict.fromkeys(REQUEST_LATENCY_BUCKETS_MS, 0)
         self.request_latency_overflow = 0
         self.metrics: dict[str, int] = {
             "requests": 0,

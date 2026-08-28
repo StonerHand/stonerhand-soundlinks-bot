@@ -8,6 +8,7 @@ from music_links_bot.bot_history import clear_history
 from music_links_bot.bot_runtime import BotRuntime
 from music_links_bot.bot_storage import delete_draft
 from music_links_bot.channel_templates import clear_channel_template
+from music_links_bot.constants import STATS_KV_KEY
 from music_links_bot.inline_storage import clear_inline_history
 from music_links_bot.publication_presets import clear_presets
 from music_links_bot.publish_queue import (
@@ -16,8 +17,6 @@ from music_links_bot.publish_queue import (
     remove_user_jobs,
 )
 from music_links_bot.stats import remove_identity
-
-STATS_KV_KEY = "stats:v1"
 
 
 @dataclass(slots=True, frozen=True)

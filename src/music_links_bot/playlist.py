@@ -8,7 +8,7 @@ from html.parser import HTMLParser
 import httpx
 
 from music_links_bot.cache import TTLCache
-from music_links_bot.constants import HTTP_USER_AGENT
+from music_links_bot.constants import HTTP_HEADERS
 from music_links_bot.models import PlaylistMatch
 from music_links_bot.url_utils import (
     cache_key_for_url,
@@ -17,7 +17,6 @@ from music_links_bot.url_utils import (
     is_spotify_playlist_url,
 )
 
-HTTP_HEADERS = {"User-Agent": HTTP_USER_AGENT}
 MAX_PLAYLIST_IMPORT_TRACKS = 10
 PLAYLIST_IMPORT_TIMEOUT_SECONDS = 2.0
 _SPOTIFY_TRACK_RE = re.compile(

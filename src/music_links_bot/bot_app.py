@@ -14,8 +14,22 @@ from telegram.ext import (
     filters,
 )
 
+from music_links_bot.bot_admin import id_command, stats_command, status_command
+from music_links_bot.bot_crate_handlers import crate_command
+from music_links_bot.bot_inline import inline_query_handler
+from music_links_bot.bot_menu import (
+    cancel_command,
+    channel_command,
+    guide_command,
+    help_command,
+    legacy_menu_callback,
+    platforms_command,
+    privacy_command,
+    start_command,
+)
 from music_links_bot.bot_runtime import BotRuntime
 from music_links_bot.config import Settings
+from music_links_bot.keyboards import _build_platform_order
 from music_links_bot.kvstore import KVStore
 from music_links_bot.lazy_client import LazyAsyncClient
 from music_links_bot.logging_config import quiet_transport_logs
@@ -115,7 +129,7 @@ def build_application(settings: Settings) -> Application:
             "drafts": {},
             "publish_chat_id": settings.publish_chat_id,
             "admin_chat_id": settings.admin_chat_id,
-            "platform_order": handlers._build_platform_order(settings.primary_platform),
+            "platform_order": _build_platform_order(settings.primary_platform),
             "ui_mode": settings.ui_mode,
             "timezone_name": settings.timezone_name,
             "runtime": BotRuntime(kv_store),
@@ -126,27 +140,27 @@ def build_application(settings: Settings) -> Application:
         }
     )
 
-    application.add_handler(CommandHandler("start", handlers.start_command))
-    application.add_handler(CommandHandler("help", handlers.help_command))
-    application.add_handler(CommandHandler("guide", handlers.guide_command))
-    application.add_handler(CommandHandler("platforms", handlers.platforms_command))
-    application.add_handler(CommandHandler("channel", handlers.channel_command))
-    application.add_handler(CommandHandler("id", handlers.id_command))
-    application.add_handler(CommandHandler("stats", handlers.stats_command))
-    application.add_handler(CommandHandler("crate", handlers.crate_command))
-    application.add_handler(CommandHandler("cancel", handlers.cancel_command))
-    application.add_handler(CommandHandler("privacy", handlers.privacy_command))
-    application.add_handler(CommandHandler("status", handlers.status_command))
+    application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("guide", guide_command))
+    application.add_handler(CommandHandler("platforms", platforms_command))
+    application.add_handler(CommandHandler("channel", channel_command))
+    application.add_handler(CommandHandler("id", id_command))
+    application.add_handler(CommandHandler("stats", stats_command))
+    application.add_handler(CommandHandler("crate", crate_command))
+    application.add_handler(CommandHandler("cancel", cancel_command))
+    application.add_handler(CommandHandler("privacy", privacy_command))
+    application.add_handler(CommandHandler("status", status_command))
     application.add_handler(
         CallbackQueryHandler(handlers.bot_callback, pattern=r"^v2\|")
     )
     application.add_handler(
-        CallbackQueryHandler(handlers.menu_callback, pattern=r"^menu:")
+        CallbackQueryHandler(legacy_menu_callback, pattern=r"^menu:")
     )
     application.add_handler(
         CallbackQueryHandler(handlers.editor_callback, pattern=r"^ed\|")
     )
-    application.add_handler(InlineQueryHandler(handlers.inline_query_handler))
+    application.add_handler(InlineQueryHandler(inline_query_handler))
     application.add_handler(
         MessageHandler(
             (filters.TEXT | filters.CAPTION | filters.PHOTO | filters.AUDIO)

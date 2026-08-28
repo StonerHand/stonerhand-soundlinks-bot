@@ -19,119 +19,13 @@ from telegram import (
 )
 from telegram.constants import ChatAction, ParseMode
 from telegram.error import BadRequest, TelegramError
-from telegram.ext import Application, ContextTypes
+from telegram.ext import ContextTypes
 
 from music_links_bot import bot_lookup as _bot_lookup
-from music_links_bot.bot_admin import (
-    id_command,
-    stats_command,
-    status_command,
-)
-from music_links_bot.bot_app import (
-    BOT_DESCRIPTIONS,
-    BOT_SHORT_DESCRIPTIONS,
-    PUBLIC_BOT_COMMANDS,
-    close_application_resources,
-    sync_application_commands,
-)
+from music_links_bot.bot_actions import action_spec
 from music_links_bot.bot_batch import (
     send_partial_lookup_status as _send_partial_lookup_status_impl,
 )
-from music_links_bot.bot_inline import (
-    _build_inline_collection_result,
-    _build_inline_result,
-    inline_query_handler,
-)
-from music_links_bot.bot_stats import (
-    build_user_prefix as _build_user_prefix,
-    message_entities as _message_entities,
-    message_source_urls as _message_source_urls,
-    message_text as _message_text,
-    record_artist_items as _record_artists_safely,
-    record_mixed_items as _record_mixed_safely,
-    record_playlist_items as _record_playlists_safely,
-    record_radio_items as _record_radios_safely,
-    record_tracks as _record_matches_safely,
-    record_video_items as _record_videos_safely,
-)
-from music_links_bot.branding import (
-    brand_label,
-    brand_logo_url,
-    build_branded_cover,
-    photo_branding_enabled,
-)
-
-_split_source_urls = _bot_lookup._split_source_urls
-_format_not_found_message = _bot_lookup._format_not_found_message
-_strip_bot_mention = _bot_lookup._strip_bot_mention
-_format_no_url_message = _bot_lookup._format_no_url_message
-_format_service_unavailable_message = _bot_lookup._format_service_unavailable_message
-_has_recovery_hint = _bot_lookup._has_recovery_hint
-_lookup_playlists = _bot_lookup._lookup_playlists
-_lookup_artists = _bot_lookup._lookup_artists
-_empty_track_lookup = _bot_lookup._empty_track_lookup
-_empty_video_lookup = _bot_lookup._empty_video_lookup
-_empty_radio_lookup = _bot_lookup._empty_radio_lookup
-_empty_playlist_lookup = _bot_lookup._empty_playlist_lookup
-_empty_artist_lookup = _bot_lookup._empty_artist_lookup
-_lookup_youtube_videos = _bot_lookup._lookup_youtube_videos
-_lookup_nts_radios = _bot_lookup._lookup_nts_radios
-_send_youtube_result = _bot_lookup._send_youtube_result
-_send_nts_result = _bot_lookup._send_nts_result
-_send_playlist_result = _bot_lookup._send_playlist_result
-_send_artist_result = _bot_lookup._send_artist_result
-_send_mixed_result = _bot_lookup._send_mixed_result
-_select_mixed_preview_url = _bot_lookup._select_mixed_preview_url
-_lookup_tracks = _bot_lookup._lookup_tracks
-_fill_genres = _bot_lookup._fill_genres
-_build_lookup_fallback = _bot_lookup._build_lookup_fallback
-_songlink_page_url = _bot_lookup._songlink_page_url
-_build_podcast_fallback = _bot_lookup._build_podcast_fallback
-
-from music_links_bot import keyboards as _keyboards
-from music_links_bot.channel_templates import (
-    apply_channel_template,
-    apply_template,
-    save_channel_template,
-)
-from music_links_bot.chat_access import check_publish_access
-from music_links_bot.collection_collage import collection_collage_preview_url
-from music_links_bot.config import Settings
-from music_links_bot.ephemeral import (
-    ephemeral_group_replies_enabled,
-    send_ephemeral_message,
-)
-from music_links_bot.i18n import get_text, resolve_lang
-
-_select_preview_url = _keyboards._select_preview_url
-_build_link_preview_options = _keyboards._build_link_preview_options
-_build_link_keyboard = _keyboards._build_link_keyboard
-_platform_button_label = _keyboards._platform_button_label
-_build_collection_keyboard = _keyboards._build_collection_keyboard
-_build_youtube_keyboard = _keyboards._build_youtube_keyboard
-_build_nts_keyboard = _keyboards._build_nts_keyboard
-_build_playlist_keyboard = _keyboards._build_playlist_keyboard
-_build_artist_keyboard = _keyboards._build_artist_keyboard
-_build_youtube_collection_keyboard = _keyboards._build_youtube_collection_keyboard
-_build_nts_collection_keyboard = _keyboards._build_nts_collection_keyboard
-_build_playlist_collection_keyboard = _keyboards._build_playlist_collection_keyboard
-_build_artist_collection_keyboard = _keyboards._build_artist_collection_keyboard
-_build_mixed_collection_keyboard = _keyboards._build_mixed_collection_keyboard
-_should_include_channel_button = _keyboards._should_include_channel_button
-_should_include_hashtags = _keyboards._should_include_hashtags
-_build_platform_order = _keyboards._build_platform_order
-_normalize_platform_key = _keyboards._normalize_platform_key
-_shorten_button_text = _keyboards._shorten_button_text
-_track_button_icon = _keyboards._track_button_icon
-_release_hub_button_label = _keyboards._release_hub_button_label
-_get_ui_mode = _keyboards._get_ui_mode
-_button_rows = _keyboards._button_rows
-_keyboard_with_optional_channel = _keyboards._keyboard_with_optional_channel
-_single_url_keyboard = _keyboards._single_url_keyboard
-_channel_button = _keyboards._channel_button
-_get_platform_order = _keyboards._get_platform_order
-
-from music_links_bot.bot_actions import action_spec
 from music_links_bot.bot_builder import (
     PENDING_INPUT_TTL_SECONDS,
     BuilderScreen,
@@ -159,7 +53,6 @@ from music_links_bot.bot_crate import (
     save_crate_title,
 )
 from music_links_bot.bot_crate_handlers import (
-    crate_command,
     dispatch_crate_action as _dispatch_crate_action,
 )
 from music_links_bot.bot_editor_state import (
@@ -170,21 +63,21 @@ from music_links_bot.bot_editor_state import (
     restore_setting_state,
 )
 from music_links_bot.bot_history import record_history as _record_recent_item
+from music_links_bot.bot_lookup import (
+    _format_no_url_message,
+    _send_artist_result,
+    _send_mixed_result,
+    _send_nts_result,
+    _send_playlist_result,
+    _send_youtube_result,
+    _strip_bot_mention,
+)
 from music_links_bot.bot_menu import (
     MENU_HELP,
-    cancel_command,
-    channel_command,
     dispatch_menu_action as _dispatch_menu_action,
     dispatch_privacy_action as _dispatch_privacy_action,
-    guide_command,
-    help_command,
-    legacy_menu_callback as menu_callback,
-    menu_text as _menu_text,
-    platforms_command,
-    privacy_command,
     reply_with_menu as _reply_with_menu,
     runtime_for as _runtime,
-    start_command,
     update_lang as _update_lang,
 )
 from music_links_bot.bot_pipeline import LookupRequest, delivery_kind
@@ -205,9 +98,19 @@ from music_links_bot.bot_runtime import (
     detect_action,
     encode_callback,
 )
+from music_links_bot.bot_stats import (
+    build_user_prefix as _build_user_prefix,
+    message_entities as _message_entities,
+    message_source_urls as _message_source_urls,
+    message_text as _message_text,
+    record_artist_items as _record_artists_safely,
+    record_mixed_items as _record_mixed_safely,
+    record_playlist_items as _record_playlists_safely,
+    record_radio_items as _record_radios_safely,
+    record_tracks as _record_matches_safely,
+    record_video_items as _record_videos_safely,
+)
 from music_links_bot.bot_storage import (
-    DRAFT_TTL_SECONDS as _DRAFT_TTL_SECONDS,
-    MAX_MEMORY_DRAFTS as _MAX_MEMORY_DRAFTS,
     load_draft as _load_draft,
     load_retry_sources as _load_retry_sources,
     load_search_selection as _load_search_selection,
@@ -220,33 +123,57 @@ from music_links_bot.bot_ui import (
     build_deleted_draft_keyboard as _deleted_draft_keyboard,
     build_duplicate_post_keyboard as _duplicate_post_keyboard,
     build_error_keyboard as _build_error_keyboard_view,
-    build_home_text as _build_home_text,
-    build_onboarding_keyboard as _build_onboarding_keyboard,
     build_publish_confirmation as _build_publish_confirmation,
     build_section_keyboard as _build_section_keyboard,
-    build_start_keyboard as _build_start_keyboard,
     editor_delivery_rows as _editor_delivery_rows,
     editor_hashtag_rows as _editor_hashtag_rows,
     editor_intro_rows as _editor_intro_rows,
-    editor_more_rows as _editor_more_rows,
     editor_overflow_rows as _editor_overflow_rows,
     editor_platform_rows as _editor_platform_rows,
     editor_preview_rows as _editor_preview_rows,
-    editor_rows as _editor_rows,
     editor_schedule_rows as _editor_schedule_rows,
     editor_style_rows as _editor_style_rows,
     editor_template_rows as _editor_template_rows,
     render_crate as _render_bot_crate,
 )
+from music_links_bot.branding import (
+    brand_label,
+    brand_logo_url,
+    build_branded_cover,
+    photo_branding_enabled,
+)
+from music_links_bot.channel_templates import (
+    apply_channel_template,
+    apply_template,
+    save_channel_template,
+)
+from music_links_bot.chat_access import check_publish_access
+from music_links_bot.collection_collage import collection_collage_preview_url
 from music_links_bot.constants import MAX_LINKS_PER_MESSAGE
 from music_links_bot.draft_model import new_track_draft
 from music_links_bot.editor_view import (
     draft_intro_limit as _draft_intro_limit,
     render_track_draft as _render_track_draft,
 )
+from music_links_bot.ephemeral import (
+    ephemeral_group_replies_enabled,
+    send_ephemeral_message,
+)
 from music_links_bot.formatter import (
     format_collection_message,
     format_track_message,
+)
+from music_links_bot.i18n import get_text, resolve_lang
+from music_links_bot.keyboards import (
+    CHANNEL_USERNAME,
+    _build_collection_keyboard,
+    _build_link_keyboard,
+    _build_link_preview_options,
+    _channel_button,
+    _get_platform_order,
+    _select_preview_url,
+    _should_include_channel_button,
+    _should_include_hashtags,
 )
 from music_links_bot.mixed_post import send_track_video_album
 from music_links_bot.models import (
@@ -264,7 +191,6 @@ from music_links_bot.publication_service import PublicationService
 from music_links_bot.publication_state import (
     find_posted_record as _find_posted_record,
     mark_posted as _schedule_mark_posted,
-    release_fingerprint as _release_fingerprint,
 )
 from music_links_bot.publication_view import build_publication_view
 from music_links_bot.publish_queue import (
@@ -298,7 +224,6 @@ from music_links_bot.telegram_buttons import (
     current_chat_button,
 )
 from music_links_bot.telegram_text import format_user_note_html, telegram_text_length
-from music_links_bot.text_utils import normalize_hashtag
 from music_links_bot.track_merge import coalesce_equivalent_tracks
 from music_links_bot.url_utils import (
     cache_key_for_url,
@@ -307,46 +232,7 @@ from music_links_bot.url_utils import (
 )
 
 LOGGER = logging.getLogger(__name__)
-__all__ = [
-    "BOT_DESCRIPTIONS",
-    "BOT_SHORT_DESCRIPTIONS",
-    "PUBLIC_BOT_COMMANDS",
-    "_build_home_text",
-    "_build_inline_collection_result",
-    "_build_inline_result",
-    "_build_onboarding_keyboard",
-    "_build_start_keyboard",
-    "_editor_more_rows",
-    "_editor_rows",
-    "_menu_text",
-    "_release_fingerprint",
-    "cancel_command",
-    "channel_command",
-    "close_application_resources",
-    "crate_command",
-    "guide_command",
-    "help_command",
-    "id_command",
-    "inline_query_handler",
-    "menu_callback",
-    "normalize_hashtag",
-    "platforms_command",
-    "privacy_command",
-    "start_command",
-    "stats_command",
-    "status_command",
-    "sync_application_commands",
-]
-CHANNEL_USERNAME = "stonerhand"
-CHANNEL_URL = f"https://t.me/{CHANNEL_USERNAME}"
-CHANNEL_BUTTON_TEXT = "🪨 Открыть канал"
 DRAFT_UNDO_SECONDS = 15
-DEFAULT_UI_MODE = "stonerhand"
-MAX_BUTTON_TEXT_LENGTH = 64
-STATS_KV_KEY = "stats:v1"
-# Public compatibility constants used by tests and queue storage.
-DRAFT_TTL_SECONDS = _DRAFT_TTL_SECONDS
-MAX_MEMORY_DRAFTS = _MAX_MEMORY_DRAFTS
 
 _INPUT_OVERRIDE: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "input_override", default=None
@@ -357,44 +243,13 @@ _SEARCH_QUERY_OVERRIDE: contextvars.ContextVar[str | None] = contextvars.Context
 _BYPASS_INTENT_GUARD: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "bypass_intent_guard", default=False
 )
-DEFAULT_PLATFORM_ORDER = (
-    "spotify",
-    "appleMusic",
-    "applePodcasts",
-    "youtubeMusic",
-    "soundcloud",
-    "deezer",
-    "tidal",
-    "yandexMusic",
-)
-PRIMARY_PLATFORM_ALIASES = {
-    "spotify": "spotify",
-    "apple": "appleMusic",
-    "applemusic": "appleMusic",
-    "itunes": "appleMusic",
-    "applepodcasts": "applePodcasts",
-    "podcasts": "applePodcasts",
-    "youtube": "youtubeMusic",
-    "youtubemusic": "youtubeMusic",
-    "ytmusic": "youtubeMusic",
-    "soundcloud": "soundcloud",
-    "sc": "soundcloud",
-    "deezer": "deezer",
-    "tidal": "tidal",
-    "yandex": "yandexMusic",
-    "yandexmusic": "yandexMusic",
-    "yamusic": "yandexMusic",
+
+_SIMPLE_EDITOR_SCREENS = {
+    BuilderScreen.STYLE: ("ed_style_title", _editor_style_rows),
+    BuilderScreen.INTRO: ("ed_intro_title", _editor_intro_rows),
+    BuilderScreen.HASHTAGS: ("ed_hashtags_title", _editor_hashtag_rows),
+    BuilderScreen.DELIVERY: ("ed_delivery_title", _editor_delivery_rows),
 }
-NOT_FOUND_DETAIL = (
-    "Проверь, что это ссылка на трек, альбом, плейлист, артиста, "
-    "подкаст, YouTube-видео или NTS Radio"
-)
-
-
-def build_application(settings: Settings) -> Application:
-    from music_links_bot.bot_app import build_application as assemble
-
-    return assemble(settings)
 
 
 async def _application_error_handler(
@@ -794,10 +649,11 @@ async def _handle_editor_navigation(
         keyboard = InlineKeyboardMarkup(
             [*base_keyboard.inline_keyboard[:1], *overflow_rows]
         )
-    elif screen == BuilderScreen.STYLE:
+    elif screen in _SIMPLE_EDITOR_SCREENS:
+        title_key, row_builder = _SIMPLE_EDITOR_SCREENS[screen]
         text, _ = _render_track_draft(draft, context, draft_id=None)
-        text = f"{get_text(lang, 'ed_style_title')}\n\n{text}"
-        keyboard = InlineKeyboardMarkup(_editor_style_rows(draft_id, draft))
+        text = f"{get_text(lang, title_key)}\n\n{text}"
+        keyboard = InlineKeyboardMarkup(row_builder(draft_id, draft))
     elif screen == BuilderScreen.PLATFORMS:
         text, _ = _render_track_draft(draft, context, draft_id=None)
         text = f"{get_text(lang, 'ed_platforms_title')}\n\n{text}"
@@ -809,14 +665,6 @@ async def _handle_editor_navigation(
                 list(_get_platform_order(context)),
             )
         )
-    elif screen == BuilderScreen.INTRO:
-        text, _ = _render_track_draft(draft, context, draft_id=None)
-        text = f"{get_text(lang, 'ed_intro_title')}\n\n{text}"
-        keyboard = InlineKeyboardMarkup(_editor_intro_rows(draft_id, draft))
-    elif screen == BuilderScreen.HASHTAGS:
-        text, _ = _render_track_draft(draft, context, draft_id=None)
-        text = f"{get_text(lang, 'ed_hashtags_title')}\n\n{text}"
-        keyboard = InlineKeyboardMarkup(_editor_hashtag_rows(draft_id, draft))
     elif screen == BuilderScreen.PREVIEW:
         view = build_publication_view(
             draft,
@@ -837,10 +685,6 @@ async def _handle_editor_navigation(
             f"<blockquote><b>{escape(track.artist)}</b> — {escape(track.title)}</blockquote>"
         )
         keyboard = InlineKeyboardMarkup(_editor_schedule_rows(draft_id, draft))
-    elif screen == BuilderScreen.DELIVERY:
-        text, _ = _render_track_draft(draft, context, draft_id=None)
-        text = f"{get_text(lang, 'ed_delivery_title')}\n\n{text}"
-        keyboard = InlineKeyboardMarkup(_editor_delivery_rows(draft_id, draft))
     elif screen == BuilderScreen.TEMPLATES:
         presets = await load_presets(
             context, query.from_user.id if query.from_user else 0

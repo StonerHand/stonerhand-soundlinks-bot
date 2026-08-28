@@ -153,9 +153,11 @@ def evaluate_provider_metrics(metrics: object) -> dict[str, object]:
         requests = max(0, _safe_int(raw.get("requests")))
         success_rate = _safe_float(raw.get("success_rate_percent"))
         consecutive_failures = max(0, _safe_int(raw.get("consecutive_failures")))
-        if raw.get("circuit_open") is True or consecutive_failures >= 3:
-            degraded.append(str(name))
-        elif requests >= 3 and success_rate < 50:
+        if (
+            raw.get("circuit_open") is True
+            or consecutive_failures >= 3
+            or (requests >= 3 and success_rate < 50)
+        ):
             degraded.append(str(name))
 
     return {

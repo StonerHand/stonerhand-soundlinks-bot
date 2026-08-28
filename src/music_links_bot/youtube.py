@@ -5,11 +5,9 @@ from collections.abc import Mapping
 import httpx
 
 from music_links_bot.cache import TTLCache
-from music_links_bot.constants import HTTP_USER_AGENT
+from music_links_bot.constants import HTTP_HEADERS
 from music_links_bot.models import VideoMatch
 from music_links_bot.url_utils import cache_key_for_url
-
-HTTP_HEADERS = {"User-Agent": HTTP_USER_AGENT}
 
 
 class YouTubeLookupError(RuntimeError):

@@ -27,6 +27,8 @@ SUPPORTED_INPUT_HOSTS = {
 }
 
 HTTP_USER_AGENT = f"StonerHandBot/{__version__} (+https://t.me/stonerhand)"
+HTTP_HEADERS = {"User-Agent": HTTP_USER_AGENT}
+STATS_KV_KEY = "stats:v1"
 # The native crate and a multi-link input share one explicit product limit.
 MAX_LINKS_PER_MESSAGE = 10
 

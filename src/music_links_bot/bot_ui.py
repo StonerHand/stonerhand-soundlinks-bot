@@ -452,7 +452,7 @@ def editor_more_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButt
             count=platform_count
         )
         platform_action = encode_callback("editor", "ls", draft_id)
-    rows = [
+    return [
         [
             InlineKeyboardButton(
                 get_text(lang, f"ed_preset_{preset}"),
@@ -500,7 +500,6 @@ def editor_more_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButt
             ),
         ],
     ]
-    return rows
 
 
 def editor_delivery_rows(
@@ -735,7 +734,7 @@ def editor_hashtag_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardB
 
 def editor_preview_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
     lang = draft.get("lang") or "ru"
-    rows = [
+    return [
         [
             InlineKeyboardButton(
                 get_text(lang, "ed_more"),
@@ -750,7 +749,6 @@ def editor_preview_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardB
             )
         ],
     ]
-    return rows
 
 
 def editor_schedule_rows(

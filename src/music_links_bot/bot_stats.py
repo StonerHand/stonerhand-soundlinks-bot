@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from telegram import Message, MessageEntity
 from telegram.ext import ContextTypes
 
+from music_links_bot.constants import STATS_KV_KEY
 from music_links_bot.formatter import prepend_user_html
 from music_links_bot.kvstore import KVStore
 from music_links_bot.models import (
@@ -36,7 +37,6 @@ from music_links_bot.url_utils import (
 )
 
 LOGGER = logging.getLogger(__name__)
-STATS_KV_KEY = "stats:v1"
 MAX_USER_NOTE_LENGTH = 3_000
 
 

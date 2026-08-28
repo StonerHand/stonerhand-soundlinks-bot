@@ -9,10 +9,9 @@ from telegram.error import TelegramError
 
 from music_links_bot.bot_runtime import METRICS_KV_KEY
 from music_links_bot.chat_access import check_publish_access
+from music_links_bot.constants import STATS_KV_KEY
 from music_links_bot.publish_queue import QueueStorageError, load_jobs
 from music_links_bot.stats import format_stats_message, load_stats, merge_stats
-
-STATS_KV_KEY = "stats:v1"
 
 
 async def id_command(update, context) -> None:

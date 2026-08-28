@@ -12,7 +12,6 @@ from telegram.ext import ContextTypes
 from music_links_bot.artist import ArtistClient, ArtistLookupError
 from music_links_bot.i18n import get_text
 from music_links_bot.lookup_delivery import (
-    select_mixed_preview_url as _select_mixed_preview_url_impl,
     send_artist_result as _send_artist_result_impl,
     send_mixed_result as _send_mixed_result_impl,
     send_nts_result as _send_nts_result_impl,
@@ -350,10 +349,9 @@ def _strip_bot_mention(text: str, bot_username: str | None) -> str:
         return text
 
     mention = f"@{bot_username}"
-    cleaned = " ".join(
+    return " ".join(
         word for word in text.split() if word.casefold() != mention.casefold()
     )
-    return cleaned
 
 
 def _format_no_url_message(
@@ -454,26 +452,6 @@ async def _lookup_artists(
         )
 
     return artists
-
-
-async def _empty_track_lookup() -> tuple[list[TrackMatch], list[str]]:
-    return [], []
-
-
-async def _empty_video_lookup() -> list[VideoMatch]:
-    return []
-
-
-async def _empty_radio_lookup() -> list[RadioMatch]:
-    return []
-
-
-async def _empty_playlist_lookup() -> list[PlaylistMatch]:
-    return []
-
-
-async def _empty_artist_lookup() -> list[ArtistMatch]:
-    return []
 
 
 async def _lookup_youtube_videos(
@@ -682,24 +660,6 @@ async def _send_mixed_result(
         lang=lang,
         allow_share=allow_share,
         requested_count=requested_count,
-    )
-
-
-def _select_mixed_preview_url(
-    tracks: list[TrackMatch],
-    playlists: list[PlaylistMatch],
-    artists: list[ArtistMatch],
-    radios: list[RadioMatch],
-    videos: list[VideoMatch],
-    context: ContextTypes.DEFAULT_TYPE,
-) -> str | None:
-    return _select_mixed_preview_url_impl(
-        tracks,
-        playlists,
-        artists,
-        radios,
-        videos,
-        context,
     )
 
 
