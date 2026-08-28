@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from telegram import (
     InlineKeyboardMarkup,
     LinkPreviewOptions,
@@ -27,6 +29,8 @@ CHANNEL_URL = f"https://t.me/{CHANNEL_USERNAME}"
 CHANNEL_BUTTON_TEXT = "🪨 Открыть канал"
 DEFAULT_UI_MODE = "stonerhand"
 MAX_BUTTON_TEXT_LENGTH = 64
+MAX_COLLECTION_BUTTON_TEXT_LENGTH = 42
+MAX_TWO_COLUMN_BUTTON_TEXT_LENGTH = 24
 MAX_VISIBLE_PLATFORM_BUTTONS = 1
 SPOTIFY_SEARCH_URL = "https://open.spotify.com/search/"
 DEFAULT_PLATFORM_ORDER = (
@@ -187,22 +191,36 @@ def _build_collection_keyboard(
         "song",
         "video",
     }
-    buttons: list[InlineKeyboardButton] = []
-
+    available: list[tuple[int, TrackMatch, str]] = []
     for index, track in enumerate(tracks, start=1):
         destination = track.page_url or _select_preview_url(track.links)
         if not destination:
             continue
+        available.append((index, track, destination))
 
+    artists = {
+        track.artist.strip().casefold()
+        for _, track, _ in available
+        if track.artist.strip()
+    }
+    omit_artist = len(available) > 1 and len(artists) == 1
+    buttons: list[InlineKeyboardButton] = []
+
+    for index, track, destination in available:
         if is_track_video_pair:
             text = "📺 Смотреть клип" if track.kind == "video" else "🎧 Слушать песню"
         else:
-            text = (
-                f"{_track_button_icon(track)} {index}. {track.artist} - {track.title}"
+            title = _compact_release_title(track.title)
+            text = f"{index} · {title}"
+            if not omit_artist:
+                text = f"{index} · {track.artist} — {title}"
+            text = _shorten_button_text(
+                text,
+                max_length=MAX_COLLECTION_BUTTON_TEXT_LENGTH,
             )
         buttons.append(
             _url_button(
-                text=_shorten_button_text(text),
+                text=text,
                 url=destination,
                 style="primary"
                 if is_track_video_pair and track.kind == "song"
@@ -211,7 +229,7 @@ def _build_collection_keyboard(
         )
 
     return _keyboard_with_optional_channel(
-        _button_rows(buttons), include_channel_button
+        _adaptive_collection_rows(buttons), include_channel_button
     )
 
 
@@ -473,11 +491,54 @@ def _normalize_platform_key(platform: str) -> str | None:
     return PRIMARY_PLATFORM_ALIASES.get(compact_value)
 
 
-def _shorten_button_text(text: str) -> str:
-    if len(text) <= MAX_BUTTON_TEXT_LENGTH:
+def _shorten_button_text(
+    text: str,
+    *,
+    max_length: int = MAX_BUTTON_TEXT_LENGTH,
+) -> str:
+    if len(text) <= max_length:
         return text
 
-    return text[: MAX_BUTTON_TEXT_LENGTH - 1].rstrip() + "…"
+    shortened = text[: max(1, max_length - 1)].rstrip()
+    boundary = shortened.rfind(" ")
+    if boundary >= max(8, max_length // 2):
+        shortened = shortened[:boundary]
+    return shortened.rstrip(" -–—·") + "…"
+
+
+_REMASTER_SUFFIX = re.compile(
+    r"(?:\s*[-–—]\s*|\s*\()"
+    r"(?:(?:19|20)\d{2}\s+)?re-?master(?:ed)?"
+    r"(?:\s+(?:19|20)\d{2})?\)?$",
+    re.IGNORECASE,
+)
+
+
+def _compact_release_title(title: str) -> str:
+    compact = _REMASTER_SUFFIX.sub("", title).strip()
+    return compact or title.strip()
+
+
+def _adaptive_collection_rows(
+    buttons: list[InlineKeyboardButton],
+) -> list[list[InlineKeyboardButton]]:
+    rows: list[list[InlineKeyboardButton]] = []
+    pending: InlineKeyboardButton | None = None
+    for button in buttons:
+        if len(button.text) <= MAX_TWO_COLUMN_BUTTON_TEXT_LENGTH:
+            if pending is None:
+                pending = button
+            else:
+                rows.append([pending, button])
+                pending = None
+            continue
+        if pending is not None:
+            rows.append([pending])
+            pending = None
+        rows.append([button])
+    if pending is not None:
+        rows.append([pending])
+    return rows
 
 
 def _track_button_icon(track: TrackMatch) -> str:

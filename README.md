@@ -78,6 +78,11 @@ The editor is progressive rather than crowded:
 3. run a final preflight check;
 4. send or publish with one explicit action.
 
+Collection keyboards adapt to their content: a shared artist is not repeated,
+technical remaster suffixes do not consume button space, short titles share a
+row and long labels receive the full width. Complete metadata remains visible
+in the card itself.
+
 Semantic button styles, disabled progress states, ephemeral notices and Rich
 content are capability-gated. Older Telegram clients always receive the full
 classic experience.

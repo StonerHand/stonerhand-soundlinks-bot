@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Made collection keyboards content-adaptive: repeated artists and remaster
+  suffixes are omitted from button labels, short actions share a row, and long
+  labels receive the full width with word-boundary shortening.
 - Split provider resolution from Telegram result delivery while preserving the
   existing bot-facing compatibility surface, reducing the largest lookup
   module and making provider changes safer to review.

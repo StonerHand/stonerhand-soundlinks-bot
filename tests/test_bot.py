@@ -715,11 +715,36 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(rows[0][0].text, "🎧 1. Youth Code - Transitions")
+        self.assertEqual(rows[0][0].text, "1 · Youth Code — Transitions")
         self.assertEqual(rows[0][0].url, "https://song.link/track-1")
-        self.assertEqual(rows[0][1].text, "🎧 2. Show Me The Body - Camp Orchestra")
-        self.assertEqual(rows[0][1].url, "https://song.link/track-2")
+        self.assertEqual(rows[1][0].text, "2 · Show Me The Body — Camp Orchestra")
+        self.assertEqual(rows[1][0].url, "https://song.link/track-2")
+        self.assertEqual(len(rows), 2)
+
+    def test_same_artist_collection_uses_compact_adaptive_buttons(self) -> None:
+        keyboard = _build_collection_keyboard(
+            [
+                TrackMatch(
+                    title="There's No Other Way - 2012 Remaster",
+                    artist="Blur",
+                    links={"spotify": "https://open.spotify.com/track/1"},
+                    page_url="https://song.link/track-1",
+                ),
+                TrackMatch(
+                    title="Fool - 2012 Remaster",
+                    artist="Blur",
+                    links={"spotify": "https://open.spotify.com/track/2"},
+                    page_url="https://song.link/track-2",
+                ),
+            ]
+        )
+
+        rows = keyboard.inline_keyboard
         self.assertEqual(len(rows), 1)
+        self.assertEqual(
+            [button.text for button in rows[0]],
+            ["1 · There's No Other Way", "2 · Fool"],
+        )
 
     def test_release_keyboard_can_hide_channel_button(self) -> None:
         keyboard = _build_link_keyboard(
@@ -869,7 +894,7 @@ class BotKeyboardTests(unittest.TestCase):
         button_texts = [
             button.text for row in keyboard.inline_keyboard for button in row
         ]
-        self.assertEqual(button_texts, ["🎧 1. Youth Code - Transitions"])
+        self.assertEqual(button_texts, ["1 · Youth Code — Transitions"])
         self.assertFalse(keyboard.inline_keyboard[0][0].api_kwargs)
 
     def test_youtube_keyboard_can_hide_channel_button(self) -> None:
