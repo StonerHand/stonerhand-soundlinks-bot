@@ -8,8 +8,10 @@ from music_links_bot.url_utils import (
     apple_music_url_type,
     apple_podcasts_url_type,
     cache_key_for_url,
+    direct_platform_links,
     extract_supported_urls,
     is_apple_music_playlist_url,
+    is_direct_platform_url,
     is_nts_url,
     is_playlist_url,
     is_soundcloud_url,
@@ -24,6 +26,24 @@ from music_links_bot.url_utils import (
 
 
 class UrlUtilsTests(unittest.TestCase):
+    def test_direct_platform_urls_reject_provider_search_pages(self) -> None:
+        self.assertTrue(
+            is_direct_platform_url("https://open.spotify.com/track/verified")
+        )
+        self.assertFalse(
+            is_direct_platform_url("https://open.spotify.com/search/Artist%20Title")
+        )
+        self.assertEqual(
+            direct_platform_links(
+                {
+                    "spotify": "https://open.spotify.com/search/Artist%20Title",
+                    "soundcloud": "https://soundcloud.com/artist/title",
+                    "invalid": "javascript:alert(1)",
+                }
+            ),
+            {"soundcloud": "https://soundcloud.com/artist/title"},
+        )
+
     def test_is_supported_music_url_accepts_supported_hosts(self) -> None:
         self.assertTrue(is_supported_music_url("https://open.spotify.com/track/123"))
         self.assertTrue(is_supported_music_url("https://open.spotify.com/playlist/abc"))

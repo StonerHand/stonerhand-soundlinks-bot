@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from music_links_bot.models import TrackMatch
 from music_links_bot.publication_view import draft_platform_selection
+from music_links_bot.url_utils import is_direct_platform_url
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,7 +39,7 @@ def validate_publication(draft: dict, track: TrackMatch) -> PreflightResult:
     if not track.artist.strip() or not track.title.strip():
         issues.append(PreflightIssue("missing_title", blocking=True))
     if not draft.get("source_audio_file_id") and not any(
-        isinstance(url, str) and url for url in track.links.values()
+        is_direct_platform_url(url) for url in track.links.values()
     ):
         issues.append(PreflightIssue("missing_links", blocking=True))
     if draft_platform_selection(draft) == [] and not draft.get("source_audio_file_id"):

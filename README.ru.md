@@ -6,7 +6,7 @@
 
 [Открыть бота](https://t.me/StonerHandBot) · [Посмотреть канал](https://t.me/stonerhand) · [English](README.md)
 
-![Release](https://img.shields.io/badge/release-1.8.0-5b5bd6?style=flat-square)
+![Release](https://img.shields.io/badge/release-1.8.1-5b5bd6?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
@@ -38,6 +38,8 @@ StonerHand — музыкальный редактор, который полн�
   страницы NTS Radio.
 - Собирает карточку с крупной обложкой, исходным сервисом, отдельной кнопкой
   **Все платформы** на Songlink/Odesli и компактными вторичными действиями.
+- Показывает кнопку площадки только для прямой ссылки на релиз, которую вернул
+  resolver: поисковая подсказка больше не выглядит подтверждённым совпадением.
 - Объединяет ссылки разных площадок на один релиз вместо карточек-дубликатов.
 - Импортирует доступные треки из публичных плейлистов Spotify и Apple Music.
 - Сохраняет жирный текст, курсив и ссылки в авторской подводке и точно считает

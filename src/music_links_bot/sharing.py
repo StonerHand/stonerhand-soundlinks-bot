@@ -28,7 +28,11 @@ from music_links_bot.keyboards import (
 )
 from music_links_bot.models import TrackMatch
 from music_links_bot.telegram_buttons import button as InlineKeyboardButton
-from music_links_bot.url_utils import cache_key_for_url, is_supported_music_url
+from music_links_bot.url_utils import (
+    cache_key_for_url,
+    is_direct_platform_url,
+    is_supported_music_url,
+)
 
 SHARE_QUERY_PREFIX = "sh5|"
 LEGACY_SHARE_QUERY_PREFIXES = ("sh4|", "sh3|", "sh2|", "sh|")
@@ -59,11 +63,11 @@ def track_share_url(track: TrackMatch) -> str | None:
     """Choose a stable source URL which the inline lookup can resolve again."""
     for platform in DEFAULT_PLATFORM_ORDER:
         url = track.links.get(platform)
-        if url and is_supported_music_url(url):
+        if is_direct_platform_url(url) and is_supported_music_url(url):
             return cache_key_for_url(url)
 
     for url in track.links.values():
-        if url and is_supported_music_url(url):
+        if is_direct_platform_url(url) and is_supported_music_url(url):
             return cache_key_for_url(url)
 
     return None

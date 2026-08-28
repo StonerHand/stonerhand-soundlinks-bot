@@ -2424,12 +2424,11 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 1)
         self.assertIn("<b>Bondage Fairies</b>\nStar Signs", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
-        self.assertEqual(keyboard[0][0].text, "🟢 Spotify")
+        self.assertEqual(keyboard[0][0].text, "🟠 SoundCloud")
         self.assertEqual(
             keyboard[0][0].url,
-            "https://open.spotify.com/search/Bondage%20Fairies%20Star%20Signs",
+            "https://soundcloud.com/bondage-fairies/star-signs",
         )
-        # The synthetic Spotify search link must not become the preview.
         preview_options = message.reply_kwargs[0]["link_preview_options"]
         self.assertEqual(
             preview_options.url,
@@ -2733,7 +2732,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(unavailable_urls, [])
         self.assertEqual(client.calls, 2)
 
-    async def test_lookup_tracks_guarantees_spotify_button_first(self) -> None:
+    async def test_lookup_tracks_keeps_only_provider_confirmed_platforms(self) -> None:
         class NoSpotifyLookupClient:
             async def lookup_track(self, source_url: str) -> TrackMatch:
                 del source_url
@@ -2750,11 +2749,11 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(
-            tracks[0].links["spotify"],
-            "https://open.spotify.com/search/Black%20Sabbath%20Paranoid",
+            tracks[0].links,
+            {"appleMusic": "https://music.apple.com/album/paranoid"},
         )
         keyboard = _build_link_keyboard(tracks[0].links)
-        self.assertEqual(keyboard.inline_keyboard[0][0].text, "🟢 Spotify")
+        self.assertEqual(keyboard.inline_keyboard[0][0].text, "⚪ Apple")
 
     async def test_lookup_tracks_uses_soundcloud_metadata_fallback(self) -> None:
         tracks, unavailable_urls = await _lookup_tracks(
@@ -2769,10 +2768,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(tracks[0].title, "Star Signs")
         self.assertEqual(
             tracks[0].links,
-            {
-                "soundcloud": "https://soundcloud.com/bondage-fairies/star-signs",
-                "spotify": "https://open.spotify.com/search/Bondage%20Fairies%20Star%20Signs",
-            },
+            {"soundcloud": "https://soundcloud.com/bondage-fairies/star-signs"},
         )
 
     async def test_lookup_tracks_keeps_generic_soundcloud_fallback_when_metadata_fails(
@@ -2790,11 +2786,35 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(tracks[0].title, "SoundCloud")
         self.assertEqual(
             tracks[0].links,
-            {
-                "soundcloud": "https://soundcloud.com/bondage-fairies/star-signs",
-                "spotify": "https://open.spotify.com/search/SoundCloud%20SoundCloud",
-            },
+            {"soundcloud": "https://soundcloud.com/bondage-fairies/star-signs"},
         )
+
+    async def test_soundcloud_dj_set_never_gains_a_spotify_search_link(self) -> None:
+        source_url = (
+            "https://soundcloud.com/stoner-hand/"
+            "ethan-kath-dj-set-park-live-moscow-30062013"
+        )
+
+        tracks, unavailable_urls = await _lookup_tracks(
+            FailingLookupClient(),
+            [source_url],
+            soundcloud_client=FailingSoundCloudClientStub(),
+        )
+
+        self.assertEqual(unavailable_urls, [])
+        self.assertEqual(len(tracks), 1)
+        self.assertEqual(tracks[0].links, {"soundcloud": source_url})
+
+    def test_release_keyboard_hides_legacy_provider_search_links(self) -> None:
+        keyboard = _build_link_keyboard(
+            {
+                "spotify": "https://open.spotify.com/search/Slowdive%20Kisses",
+                "soundcloud": "https://soundcloud.com/slowdive/kisses",
+            }
+        )
+
+        buttons = [button for row in keyboard.inline_keyboard for button in row]
+        self.assertEqual([button.text for button in buttons], ["🟠 SoundCloud"])
 
 
 if __name__ == "__main__":

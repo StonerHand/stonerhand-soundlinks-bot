@@ -11,6 +11,7 @@ from music_links_bot.release_presentation import (
     apply_preset,
     normalize_preset,
 )
+from music_links_bot.url_utils import is_direct_platform_url
 
 UNDO_SETTING_SECONDS = 5 * 60
 MAX_UNDO_STEPS = 5
@@ -110,7 +111,10 @@ def draft_status(draft: dict, track: TrackMatch, *, lang: str) -> str:
         if isinstance(selected, list)
         else min(
             6,
-            sum(bool(track.links.get(platform)) for platform in PLATFORM_LABELS),
+            sum(
+                is_direct_platform_url(track.links.get(platform))
+                for platform in PLATFORM_LABELS
+            ),
         )
     )
     return get_text(lang, "ed_status").format(
@@ -127,7 +131,9 @@ def toggle_platform_selection(
     if draft.get("platforms"):
         draft.pop("platforms", None)
         return
-    draft["platforms"] = [key for key in platform_order if track.links.get(key)][:6]
+    draft["platforms"] = [
+        key for key in platform_order if is_direct_platform_url(track.links.get(key))
+    ][:6]
 
 
 def cycle_preset(draft: dict) -> str:

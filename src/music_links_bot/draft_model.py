@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 from music_links_bot.constants import PLATFORM_LABELS
 from music_links_bot.models import TrackMatch
 from music_links_bot.release_presentation import normalize_preset
+from music_links_bot.url_utils import is_direct_platform_url
 
 CURRENT_DRAFT_VERSION = 5
 MAX_TRACK_FIELD_LENGTH = 512
@@ -40,7 +41,7 @@ def _normalize_track_item(value: dict) -> DraftTrackItem:
         for raw_key, raw_url in raw_links.items():
             key = str(raw_key or "").strip()[:64]
             url = _safe_http_url(raw_url)
-            if not key or url is None:
+            if not key or url is None or not is_direct_platform_url(url):
                 continue
             links[key] = url
             if len(links) >= MAX_TRACK_LINKS:

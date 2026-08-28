@@ -25,6 +25,7 @@ from music_links_bot.telegram_buttons import (
     button as InlineKeyboardButton,
     url_button,
 )
+from music_links_bot.url_utils import is_direct_platform_url
 
 CHANNEL_USERNAME = "stonerhand"
 CHANNEL_URL = f"https://t.me/{CHANNEL_USERNAME}"
@@ -34,7 +35,6 @@ MAX_BUTTON_TEXT_LENGTH = 64
 MAX_COLLECTION_BUTTON_TEXT_LENGTH = 42
 MAX_TWO_COLUMN_BUTTON_TEXT_LENGTH = 24
 MAX_VISIBLE_PLATFORM_BUTTONS = 1
-SPOTIFY_SEARCH_URL = "https://open.spotify.com/search/"
 DEFAULT_PLATFORM_ORDER = (
     "spotify",
     "appleMusic",
@@ -72,7 +72,7 @@ def _select_preview_url(
     platform_order = _get_platform_order(context)
     for platform in platform_order:
         url = links.get(platform)
-        if url and not url.startswith(SPOTIFY_SEARCH_URL):
+        if is_direct_platform_url(url):
             return url
 
     return None
@@ -120,7 +120,8 @@ def _build_link_keyboard(
         selected_platforms = [
             platform_key
             for platform_key in platform_selection
-            if links.get(platform_key) and platform_key in PLATFORM_LABELS
+            if platform_key in PLATFORM_LABELS
+            and is_direct_platform_url(links.get(platform_key))
         ]
     else:
         selected_platforms = []
@@ -133,12 +134,14 @@ def _build_link_keyboard(
         ordered_platforms = [
             platform_key
             for platform_key in platform_order
-            if links.get(platform_key) and platform_key in PLATFORM_LABELS
+            if platform_key in PLATFORM_LABELS
+            and is_direct_platform_url(links.get(platform_key))
         ]
         remaining_platforms = [
             platform_key
             for platform_key in PLATFORM_LABELS
-            if platform_key not in ordered_platforms and links.get(platform_key)
+            if platform_key not in ordered_platforms
+            and is_direct_platform_url(links.get(platform_key))
         ]
         final_platforms = [*ordered_platforms, *remaining_platforms]
 

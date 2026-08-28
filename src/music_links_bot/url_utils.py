@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from urllib.parse import parse_qs, parse_qsl, urlencode, urlparse, urlunparse
 
 from music_links_bot.constants import SUPPORTED_INPUT_HOSTS
@@ -54,6 +55,30 @@ def is_supported_music_url(url: str) -> bool:
         return True
 
     return any(normalized.endswith(f".{host}") for host in SUPPORTED_INPUT_HOSTS)
+
+
+def is_direct_platform_url(value: object) -> bool:
+    """Accept a real provider destination, never a synthetic search page."""
+    if not isinstance(value, str) or not value.strip():
+        return False
+
+    parsed = urlparse(value.strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return False
+
+    path_parts = [part.casefold() for part in parsed.path.split("/") if part]
+    return "search" not in path_parts
+
+
+def direct_platform_links(value: object) -> dict[str, str]:
+    """Return only direct HTTP(S) release links from provider metadata."""
+    if not isinstance(value, Mapping):
+        return {}
+    return {
+        str(key): url.strip()
+        for key, url in value.items()
+        if key and isinstance(url, str) and is_direct_platform_url(url)
+    }
 
 
 def extract_supported_urls(text: str | None) -> list[str]:

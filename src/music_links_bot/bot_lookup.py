@@ -5,7 +5,6 @@ import hashlib
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
-from urllib.parse import quote
 
 from telegram import Bot, Message
 from telegram.ext import ContextTypes
@@ -64,6 +63,7 @@ from music_links_bot.soundcloud import (
 from music_links_bot.url_utils import (
     apple_podcasts_url_type,
     cache_key_for_url,
+    direct_platform_links,
     spotify_url_type,
 )
 from music_links_bot.youtube import YouTubeClient, YouTubeLookupError
@@ -900,7 +900,10 @@ async def _lookup_tracks_detailed(
                 )
             )
 
-    tracks = [_ensure_spotify_link(track) for track in tracks]
+    # Provider search pages are suggestions, not verified release matches.
+    # Strip any legacy synthetic links before the result reaches cache or UI.
+    for track in tracks:
+        track.links = direct_platform_links(track.links)
     if search_client is not None and tracks:
         try:
             # Only enrichment completed before rendering can affect this card.
@@ -948,23 +951,6 @@ async def _fill_genres(search_client: SearchClient, tracks: list[TrackMatch]) ->
     for track, genre in zip(pending, genres, strict=True):
         if isinstance(genre, str):
             track.genre = genre
-
-
-SPOTIFY_SEARCH_URL = "https://open.spotify.com/search/"
-
-
-def _ensure_spotify_link(track: TrackMatch) -> TrackMatch:
-    """Every music card must have a Spotify button. When Song.link has no
-    direct link, fall back to a Spotify search deep link for the release."""
-    if track.links.get("spotify"):
-        return track
-
-    query = " ".join(part for part in (track.artist, track.title) if part).strip()
-    if not query:
-        return track
-
-    track.links["spotify"] = SPOTIFY_SEARCH_URL + quote(query, safe="")
-    return track
 
 
 async def _build_lookup_fallback(

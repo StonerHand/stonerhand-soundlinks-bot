@@ -42,6 +42,21 @@ class PublicationPreflightTests(unittest.TestCase):
 
         self.assertTrue(result.ready)
 
+    def test_provider_search_page_is_not_a_publishable_release_link(self) -> None:
+        result = validate_publication(
+            {},
+            TrackMatch(
+                title="DJ Set",
+                artist="StonerHand",
+                links={
+                    "spotify": "https://open.spotify.com/search/StonerHand%20DJ%20Set"
+                },
+            ),
+        )
+
+        self.assertFalse(result.ready)
+        self.assertEqual(result.blocking_code, "missing_links")
+
     def test_photo_without_cover_is_warning_not_blocker(self) -> None:
         result = validate_publication(
             {"as_photo": True},

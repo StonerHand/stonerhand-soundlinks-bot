@@ -5,7 +5,11 @@ import unicodedata
 from dataclasses import replace
 
 from music_links_bot.models import TrackMatch
-from music_links_bot.url_utils import cache_key_for_url
+from music_links_bot.url_utils import (
+    cache_key_for_url,
+    direct_platform_links,
+    is_direct_platform_url,
+)
 
 _NON_WORD_RE = re.compile(r"[^\w]+", re.UNICODE)
 
@@ -44,18 +48,16 @@ def coalesce_equivalent_tracks(tracks: list[TrackMatch]) -> list[TrackMatch]:
             None,
         )
         if not identity[0] or not identity[1] or position is None:
-            merged.append(replace(track, links=dict(track.links)))
+            merged.append(replace(track, links=direct_platform_links(track.links)))
             continue
 
         current = merged[position]
-        links = dict(current.links)
+        links = direct_platform_links(current.links)
         for key, value in track.links.items():
-            if not value:
+            if not is_direct_platform_url(value):
                 continue
             existing = links.get(key)
-            if not existing or (
-                _is_search_destination(existing) and not _is_search_destination(value)
-            ):
+            if not existing:
                 links[key] = value
         merged[position] = replace(
             current,
@@ -79,12 +81,12 @@ def _same_release_destination(first: TrackMatch, second: TrackMatch) -> bool:
     first_links = {
         key: value
         for key, value in first.links.items()
-        if value and not _is_search_destination(value)
+        if is_direct_platform_url(value)
     }
     second_links = {
         key: value
         for key, value in second.links.items()
-        if value and not _is_search_destination(value)
+        if is_direct_platform_url(value)
     }
     shared_platforms = set(first_links) & set(second_links)
     if any(
@@ -95,8 +97,3 @@ def _same_release_destination(first: TrackMatch, second: TrackMatch) -> bool:
     # A Spotify URL and an Apple Music URL with matching metadata are a safe
     # cross-service match. Two different URLs from the same service are not.
     return bool(first_links and second_links and not shared_platforms)
-
-
-def _is_search_destination(url: str) -> bool:
-    normalized = str(url or "").casefold()
-    return "/search/" in normalized or "/search?" in normalized

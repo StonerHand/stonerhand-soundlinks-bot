@@ -84,7 +84,6 @@ _send_mixed_result = _bot_lookup._send_mixed_result
 _select_mixed_preview_url = _bot_lookup._select_mixed_preview_url
 _lookup_tracks = _bot_lookup._lookup_tracks
 _fill_genres = _bot_lookup._fill_genres
-_ensure_spotify_link = _bot_lookup._ensure_spotify_link
 _build_lookup_fallback = _bot_lookup._build_lookup_fallback
 _songlink_page_url = _bot_lookup._songlink_page_url
 _build_podcast_fallback = _bot_lookup._build_podcast_fallback

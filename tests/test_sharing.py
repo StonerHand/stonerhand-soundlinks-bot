@@ -15,10 +15,26 @@ from music_links_bot.sharing import (
     make_channel_safe_keyboard,
     parse_share_query,
     render_inline_share_card,
+    track_share_url,
 )
 
 
 class SharingTests(unittest.TestCase):
+    def test_share_source_ignores_legacy_spotify_search_page(self) -> None:
+        track = TrackMatch(
+            title="DJ Set",
+            artist="StonerHand",
+            links={
+                "spotify": "https://open.spotify.com/search/StonerHand%20DJ%20Set",
+                "soundcloud": "https://soundcloud.com/stoner-hand/dj-set",
+            },
+        )
+
+        self.assertEqual(
+            track_share_url(track),
+            "https://soundcloud.com/stoner-hand/dj-set",
+        )
+
     def test_collection_titles_are_compact_and_use_correct_plural(self) -> None:
         self.assertEqual(collection_title("ru", 1), "Подборка · 1 релиз")
         self.assertEqual(collection_title("ru", 4), "Подборка · 4 релиза")

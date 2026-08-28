@@ -75,3 +75,20 @@ def test_synthetic_search_link_does_not_block_cross_service_merge() -> None:
     assert len(merged) == 1
     assert set(merged[0].links) == {"spotify", "apple_music"}
     assert "/track/" in merged[0].links["spotify"]
+
+
+def test_synthetic_search_link_is_removed_without_a_direct_match() -> None:
+    merged = coalesce_equivalent_tracks(
+        [
+            TrackMatch(
+                title="DJ Set",
+                artist="Artist",
+                links={
+                    "spotify": "https://open.spotify.com/search/Artist%20DJ%20Set",
+                    "soundcloud": "https://soundcloud.com/artist/dj-set",
+                },
+            )
+        ]
+    )
+
+    assert merged[0].links == {"soundcloud": "https://soundcloud.com/artist/dj-set"}

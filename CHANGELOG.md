@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 1.8.1 — 2026-08-28
+
+- Removed synthetic Spotify search buttons: a platform now appears only when
+  the resolver returned a direct release URL for that exact card.
+- Sanitized legacy search destinations across cached lookups, durable drafts,
+  editor selections, publication preflight, keyboards and inline sharing.
+- Versioned the aggregate lookup cache so previously generated search links
+  disappear immediately after deployment.
+- Added a regression for the SoundCloud-only Ethan Kath Park Live DJ set and
+  release contracts for direct provider links.
+
 ## 1.8.0 — 2026-08-28
 
 - Added signed, cached 2–4-cover collages to classic collection link previews;

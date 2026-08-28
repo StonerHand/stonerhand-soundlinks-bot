@@ -135,6 +135,7 @@ class StateMigrationTests(unittest.IsolatedAsyncioTestCase):
                     "release_year": 1992,
                     "links": {
                         "Spotify": "https://open.spotify.com/track/abc",
+                        "legacy_search": "https://open.spotify.com/search/Sleep%20Dragonaut",
                         "unsafe": "javascript:alert(1)",
                     },
                     "unknown_future_field": "must not break old workers",
