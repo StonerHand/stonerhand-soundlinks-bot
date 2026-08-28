@@ -6,7 +6,7 @@
 
 [Open the bot](https://t.me/StonerHandBot) · [See the channel](https://t.me/stonerhand) · [Русская версия](README.ru.md)
 
-![Release](https://img.shields.io/badge/release-1.7.0-5b5bd6?style=flat-square)
+![Release](https://img.shields.io/badge/release-1.8.0-5b5bd6?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
@@ -84,6 +84,8 @@ row and long labels receive the full width. The preview keeps the exact release
 count without repeating type icons, a shared artist or technical remaster text.
 A classic 2–4-release card uses a collage of distinct available covers and
 falls back to the reliable single-cover preview if collage delivery fails.
+Incomplete collections deliberately keep a single cover so they cannot look
+finished before every source resolves.
 
 Semantic button styles, disabled progress states, ephemeral notices and Rich
 content are capability-gated. Older Telegram clients always receive the full
@@ -135,7 +137,7 @@ The repository is configured for Vercel Functions:
 - `/api/telegram` — authenticated Telegram webhook;
 - `/api/set_webhook` — protected webhook maintenance;
 - `/api/queue_worker` — protected scheduled publishing worker;
-- `/api/collage` — signed and cached classic collection artwork;
+- `/api/collage` — signed, compressed and cached classic collection artwork;
 - `/api/health` — Telegram, webhook, Redis, queue and release canary.
 
 Required production values:
@@ -153,6 +155,10 @@ Required production values:
 `ADMIN_CHAT_ID`, `PUBLISH_CHAT_ID`, `SONGLINK_API_KEY` and presentation flags
 are optional and documented in [.env.example](.env.example).
 
+`COLLECTION_COLLAGE_ENABLED=0` disables only generated collages without a new
+deploy; `BOT_SAFE_MODE=1` disables every capability-gated enhancement and keeps
+the complete Classic fallback available.
+
 </details>
 
 <details>
@@ -168,8 +174,9 @@ python -m pytest -q
 ```
 
 CI also checks dependency pins, secrets, generated files, compilation and the
-Vercel route/build/cron contract. A production canary verifies the exact commit
-serving traffic and guards automatic rollback.
+Vercel route/build/cron contract. A production canary verifies the exact commit,
+the collection-artwork service and the production dependencies before it allows
+the guarded automatic rollback decision.
 
 </details>
 

@@ -103,6 +103,43 @@ class SharingTests(unittest.TestCase):
             )
         )
 
+    def test_partial_inline_collection_never_uses_finished_collage(self) -> None:
+        tracks = [
+            TrackMatch(
+                title=f"Track {index}",
+                artist="Artist",
+                links={"spotify": f"https://open.spotify.com/track/{index}"},
+                thumbnail_url=f"https://images.example/{index}.jpg",
+            )
+            for index in range(2)
+        ]
+        bundle = LookupBundle(
+            tracks=tracks,
+            unavailable_urls=[],
+            videos=[],
+            radios=[],
+            playlists=[],
+            artists=[],
+        )
+
+        with patch.dict(
+            os.environ,
+            {"WEBHOOK_BASE_URL": "https://bot.example", "BOT_TOKEN": "secret"},
+            clear=True,
+        ):
+            card = render_inline_share_card(
+                bundle,
+                context=None,
+                lang="ru",
+                share_query="retry",
+                share_label="Поделиться",
+                requested_count=3,
+            )
+
+        self.assertFalse(
+            str(card.preview_url).startswith("https://bot.example/api/collage?")
+        )
+
     def test_complete_inline_collection_uses_signed_collage_preview(self) -> None:
         tracks = [
             TrackMatch(

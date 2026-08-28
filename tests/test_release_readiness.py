@@ -73,10 +73,13 @@ class ReleaseReadinessTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/production-canary.yml").read_text(
             encoding="utf-8"
         )
+        canary = (ROOT / "tests/e2e/production_canary.py").read_text(encoding="utf-8")
 
         self.assertIn("rollback_guard.py", workflow)
         self.assertIn("vercel@59.5.0 rollback", workflow)
         self.assertIn("VERCEL_TOKEN", workflow)
+        self.assertIn("/api/collage?health=1", canary)
+        self.assertIn('"collection-collage"', canary)
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@
 
 [Открыть бота](https://t.me/StonerHandBot) · [Посмотреть канал](https://t.me/stonerhand) · [English](README.md)
 
-![Release](https://img.shields.io/badge/release-1.7.0-5b5bd6?style=flat-square)
+![Release](https://img.shields.io/badge/release-1.8.0-5b5bd6?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
@@ -83,7 +83,8 @@ StonerHand — музыкальный редактор, который полн�
 попарно, а длинные получают отдельную строку. Превью сохраняет точный счётчик
 релизов, но не повторяет иконки, исполнителя и служебный remaster-хвост. Обычная
 карточка из 2–4 релизов получает коллаж из разных доступных обложек; при любой
-ошибке остаётся надёжное превью с одной обложкой.
+ошибке остаётся надёжное превью с одной обложкой. Неполная подборка намеренно
+сохраняет одну обложку, чтобы не выглядеть законченной до обработки всех ссылок.
 
 Семантические цвета кнопок, заблокированный прогресс, временные уведомления и
 Rich-контент включаются по возможностям клиента. Старые версии Telegram всегда
@@ -135,7 +136,7 @@ python -m music_links_bot
 - `/api/telegram` — защищённый Telegram webhook;
 - `/api/set_webhook` — обслуживание webhook;
 - `/api/queue_worker` — worker отложенных публикаций;
-- `/api/collage` — подписанные и кэшируемые коллажи классических подборок;
+- `/api/collage` — подписанные, сжатые и кэшируемые коллажи классических подборок;
 - `/api/health` — Telegram, webhook, Redis, очередь и версия релиза.
 
 Обязательные production-переменные:
@@ -153,6 +154,10 @@ python -m music_links_bot
 `ADMIN_CHAT_ID`, `PUBLISH_CHAT_ID`, `SONGLINK_API_KEY` и параметры оформления
 необязательны и описаны в [.env.example](.env.example).
 
+`COLLECTION_COLLAGE_ENABLED=0` отключает только коллажи без нового деплоя;
+`BOT_SAFE_MODE=1` отключает все дополнительные capability-gated пути, сохраняя
+полноценный Classic fallback.
+
 </details>
 
 <details>
@@ -169,7 +174,8 @@ python -m pytest -q
 
 CI дополнительно проверяет зависимости, секреты, сгенерированные файлы,
 компиляцию и согласованность Vercel routes/builds/crons. Production canary
-подтверждает точный commit на боевом адресе и защищает автоматический rollback.
+подтверждает точный commit, сервис коллажей и production-зависимости до решения
+о защищённом автоматическом rollback.
 
 </details>
 

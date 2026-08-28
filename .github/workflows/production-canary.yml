@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v7
-      - name: Verify bot, webhook and Redis
+      - name: Verify bot, webhook, Redis and collection artwork
         id: canary
         continue-on-error: true
         env:

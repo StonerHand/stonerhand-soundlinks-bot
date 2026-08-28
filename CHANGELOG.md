@@ -2,9 +2,18 @@
 
 ## Unreleased
 
+## 1.8.0 — 2026-08-28
+
 - Added signed, cached 2–4-cover collages to classic collection link previews;
   duplicate or unavailable artwork falls back to the existing single-cover
   card, while Rich Telegram collections keep their native media layout.
+- Compressed signed collage payloads to stay within Telegram-safe URL limits,
+  added immutable ETags and warm HTTP connection reuse, and kept incomplete
+  collections on a deliberately honest single-cover preview.
+- Added an independent collection-artwork health contract to the production
+  canary, so a release cannot pass while its new preview endpoint is missing.
+- Added `COLLECTION_COLLAGE_ENABLED` as a deploy-free kill switch; global safe
+  mode also disables the enhancement without affecting complete Classic cards.
 - Simplified collection previews while keeping the full localized release
   count: repeated type icons and artists are removed, provider remaster
   suffixes are hidden, and Classic and Rich cards now use the same layout.

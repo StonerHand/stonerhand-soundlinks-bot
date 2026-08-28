@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import io
+import os
 import unittest
+from unittest.mock import patch
 from urllib.parse import parse_qs, urlparse
 
 from PIL import Image
 
 from music_links_bot.collection_collage import (
+    MAX_PREVIEW_URL_LENGTH,
     collection_collage_preview_url,
     compose_collection_collage,
     decode_collage_payload,
@@ -51,6 +54,43 @@ class CollectionCollageTests(unittest.TestCase):
             ),
             [track.thumbnail_url for track in tracks],
         )
+        self.assertLessEqual(len(url), MAX_PREVIEW_URL_LENGTH)
+
+    def test_repeated_provider_prefixes_are_compressed_for_telegram_url_limit(
+        self,
+    ) -> None:
+        tracks = [
+            TrackMatch(
+                title=str(index),
+                artist="Artist",
+                links={},
+                thumbnail_url=(
+                    "https://i.scdn.co/image/"
+                    + f"ab67616d0000b273{'a' * 120}{index}"
+                    + "?width=1200&height=1200"
+                ),
+            )
+            for index in range(4)
+        ]
+
+        url = collection_collage_preview_url(
+            tracks,
+            base_url="https://bot.example",
+            signing_secret="secret",
+        )
+
+        self.assertIsNotNone(url)
+        assert url is not None
+        self.assertLessEqual(len(url), MAX_PREVIEW_URL_LENGTH)
+        query = parse_qs(urlparse(url).query)
+        self.assertEqual(
+            decode_collage_payload(
+                query["p"][0],
+                query["s"][0],
+                signing_secret="secret",
+            ),
+            [track.thumbnail_url for track in tracks],
+        )
 
     def test_preview_falls_back_when_collage_would_repeat_one_cover(self) -> None:
         tracks = [
@@ -70,6 +110,26 @@ class CollectionCollageTests(unittest.TestCase):
                 signing_secret="secret",
             )
         )
+
+    def test_preview_can_be_disabled_without_a_deploy(self) -> None:
+        tracks = [
+            TrackMatch(
+                title=str(index),
+                artist="Artist",
+                links={},
+                thumbnail_url=f"https://images.example/{index}.jpg",
+            )
+            for index in range(2)
+        ]
+
+        with patch.dict(os.environ, {"COLLECTION_COLLAGE_ENABLED": "0"}, clear=True):
+            self.assertIsNone(
+                collection_collage_preview_url(
+                    tracks,
+                    base_url="https://bot.example",
+                    signing_secret="secret",
+                )
+            )
 
     def test_payload_rejects_tampering_and_private_sources(self) -> None:
         tracks = [

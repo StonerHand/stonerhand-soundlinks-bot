@@ -7,15 +7,20 @@ import io
 import ipaddress
 import json
 import os
+import zlib
 from urllib.parse import urlencode, urlparse
 
 from music_links_bot.models import TrackMatch
+from music_links_bot.telegram_gateway import feature_enabled
 
 COLLAGE_VERSION = "v1"
 MIN_COLLAGE_ITEMS = 2
 MAX_COLLAGE_ITEMS = 4
 MAX_SOURCE_URL_LENGTH = 2_048
 MAX_PAYLOAD_LENGTH = 12_000
+MAX_DECODED_PAYLOAD_BYTES = 10_000
+MAX_PREVIEW_URL_LENGTH = 2_048
+_COMPRESSED_PAYLOAD_PREFIX = b"z"
 
 
 def collection_collage_preview_url(
@@ -25,6 +30,8 @@ def collection_collage_preview_url(
     signing_secret: str | None = None,
 ) -> str | None:
     """Build a signed public image URL for a 2–4-cover classic preview."""
+    if not feature_enabled("COLLECTION_COLLAGE_ENABLED", default=True):
+        return None
     if not MIN_COLLAGE_ITEMS <= len(tracks) <= MAX_COLLAGE_ITEMS:
         return None
 
@@ -46,7 +53,8 @@ def collection_collage_preview_url(
     payload = _encode_payload(artwork_urls)
     signature = _signature(payload, secret)
     query = urlencode({"p": payload, "s": signature})
-    return f"{public_origin}/api/collage?{query}"
+    preview_url = f"{public_origin}/api/collage?{query}"
+    return preview_url if len(preview_url) <= MAX_PREVIEW_URL_LENGTH else None
 
 
 def decode_collage_payload(
@@ -64,8 +72,23 @@ def decode_collage_payload(
     try:
         padding = "=" * (-len(payload) % 4)
         decoded = base64.urlsafe_b64decode(payload + padding)
+        if decoded.startswith(_COMPRESSED_PAYLOAD_PREFIX):
+            decompressor = zlib.decompressobj()
+            decoded = decompressor.decompress(
+                decoded[len(_COMPRESSED_PAYLOAD_PREFIX) :],
+                MAX_DECODED_PAYLOAD_BYTES + 1,
+            )
+            if (
+                len(decoded) > MAX_DECODED_PAYLOAD_BYTES
+                or decompressor.unconsumed_tail
+                or decompressor.unused_data
+                or not decompressor.eof
+            ):
+                return None
+        elif len(decoded) > MAX_DECODED_PAYLOAD_BYTES:
+            return None
         value = json.loads(decoded)
-    except (ValueError, TypeError, json.JSONDecodeError):
+    except (ValueError, TypeError, json.JSONDecodeError, zlib.error):
         return None
 
     if not isinstance(value, list):
@@ -145,7 +168,9 @@ def _layout_boxes(count: int, size: int, gap: int) -> list[tuple[int, int, int, 
 
 
 def _encode_payload(urls: list[str]) -> str:
-    encoded = json.dumps(urls, ensure_ascii=True, separators=(",", ":")).encode()
+    raw = json.dumps(urls, ensure_ascii=True, separators=(",", ":")).encode()
+    compressed = _COMPRESSED_PAYLOAD_PREFIX + zlib.compress(raw, level=9)
+    encoded = compressed if len(compressed) < len(raw) else raw
     return base64.urlsafe_b64encode(encoded).decode().rstrip("=")
 
 

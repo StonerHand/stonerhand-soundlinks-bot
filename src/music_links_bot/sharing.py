@@ -185,9 +185,13 @@ def render_inline_share_card(
     share_label: str,
     requested_count: int | None = None,
 ) -> InlineShareCard:
-    preview_url = _bundle_preview_url(bundle, context)
     found_count = bundle.item_count
     total_count = max(found_count, int(requested_count or found_count))
+    preview_url = _bundle_preview_url(
+        bundle,
+        context,
+        allow_collage=found_count == total_count,
+    )
 
     if bundle.content_type_count == 1 and bundle.tracks:
         title = collection_result_title(
@@ -321,9 +325,16 @@ def _add_inline_retry_button(
     )
 
 
-def _bundle_preview_url(bundle: Any, context: Any) -> str | None:
+def _bundle_preview_url(
+    bundle: Any,
+    context: Any,
+    *,
+    allow_collage: bool = True,
+) -> str | None:
     if bundle.tracks:
-        collage_url = collection_collage_preview_url(bundle.tracks)
+        collage_url = (
+            collection_collage_preview_url(bundle.tracks) if allow_collage else None
+        )
         if collage_url:
             return collage_url
         track = bundle.tracks[0]

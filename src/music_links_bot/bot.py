@@ -1991,7 +1991,11 @@ async def _send_track_matches(
             message,
             collection_text,
             preview_url=(
-                collection_collage_preview_url(tracks)
+                (
+                    collection_collage_preview_url(tracks)
+                    if len(tracks) == total
+                    else None
+                )
                 or _select_preview_url(tracks[0].links, context)
                 or tracks[0].thumbnail_url
             ),

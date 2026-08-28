@@ -56,6 +56,20 @@ def main() -> int:
     except Exception as exc:  # noqa: BLE001
         failures.append(f"health request failed: {type(exc).__name__}")
 
+    try:
+        status, raw, content_type = fetch("/api/collage?health=1")
+        payload = json.loads(raw)
+        if status != 200 or not payload.get("ok"):
+            failures.append(f"collage status={status} ok={payload.get('ok')}")
+        if payload.get("service") != "collection-collage":
+            failures.append("collage service identity is invalid")
+        if payload.get("layouts") != [2, 3, 4]:
+            failures.append("collage layouts are incomplete")
+        if "application/json" not in content_type:
+            failures.append("collage content-type is not JSON")
+    except Exception as exc:  # noqa: BLE001
+        failures.append(f"collage request failed: {type(exc).__name__}")
+
     if failures:
         print("\n".join(failures), file=sys.stderr)
         return 1
