@@ -3,7 +3,9 @@ import unittest
 from music_links_bot.models import TrackMatch
 from music_links_bot.release_presentation import (
     apply_preset,
+    compact_release_title,
     normalize_preset,
+    shared_collection_artist,
 )
 
 
@@ -30,3 +32,26 @@ class ReleasePresentationTests(unittest.TestCase):
         self.assertTrue(draft["large_preview"])
         self.assertFalse(draft["as_photo"])
         self.assertEqual(draft["publication_mode"], "longread")
+
+    def test_compact_release_title_hides_only_trailing_remaster_metadata(self) -> None:
+        self.assertEqual(
+            compact_release_title("There's No Other Way - 2012 Remaster"),
+            "There's No Other Way",
+        )
+        self.assertEqual(compact_release_title("Fool (Remastered 2012)"), "Fool")
+        self.assertEqual(
+            compact_release_title("Remastering the Past"), "Remastering the Past"
+        )
+
+    def test_shared_collection_artist_requires_every_item_to_match(self) -> None:
+        matching = [
+            self.track,
+            TrackMatch(title="Holy Mountain", artist="sleep", links={}),
+        ]
+        mixed = [
+            self.track,
+            TrackMatch(title="Funeralopolis", artist="Electric Wizard", links={}),
+        ]
+
+        self.assertEqual(shared_collection_artist(matching), "Sleep")
+        self.assertIsNone(shared_collection_artist(mixed))

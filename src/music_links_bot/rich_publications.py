@@ -12,6 +12,10 @@ from telegram.error import BadRequest, TelegramError
 
 from music_links_bot.models import TrackMatch, VideoMatch
 from music_links_bot.publication_model import MusicPublication
+from music_links_bot.release_presentation import (
+    compact_release_title,
+    shared_collection_artist,
+)
 from music_links_bot.telegram_gateway import (
     TelegramApiGateway,
     capability_available,
@@ -488,10 +492,20 @@ def build_rich_collection_html(
         for track in tracks[:MAX_RICH_MEDIA]
         if track.thumbnail_url
     ]
-    items = "".join(
-        f"<li><b>{html.escape(track.artist)}</b> — {html.escape(track.title)}</li>"
-        for track in tracks
-    )
+    shared_artist = shared_collection_artist(tracks)
+    if shared_artist:
+        items = "".join(
+            f"<li>{html.escape(compact_release_title(track.title))}</li>"
+            for track in tracks
+        )
+    else:
+        items = "".join(
+            "<li>"
+            f"<b>{html.escape(track.artist)}</b> — "
+            f"{html.escape(compact_release_title(track.title))}"
+            "</li>"
+            for track in tracks
+        )
     publication = MusicPublication(
         title=title,
         kind="collection",
@@ -503,6 +517,8 @@ def build_rich_collection_html(
     media_html = _media_block(publication)
     if media_html:
         pieces.append(media_html)
+    if shared_artist:
+        pieces.append(f"<p><b>{html.escape(shared_artist)}</b></p>")
     if items:
         pieces.append(f"<ol>{items}</ol>")
     buttons = rich_button_rows_html(reply_markup)

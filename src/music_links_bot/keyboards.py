@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import re
-
 from telegram import (
     InlineKeyboardMarkup,
     LinkPreviewOptions,
@@ -18,6 +16,10 @@ from music_links_bot.models import (
     VideoMatch,
 )
 from music_links_bot.release_hubs import resolve_release_hub_url
+from music_links_bot.release_presentation import (
+    compact_release_title,
+    shared_collection_artist,
+)
 from music_links_bot.telegram_buttons import (
     ButtonTone,
     button as InlineKeyboardButton,
@@ -198,19 +200,14 @@ def _build_collection_keyboard(
             continue
         available.append((index, track, destination))
 
-    artists = {
-        track.artist.strip().casefold()
-        for _, track, _ in available
-        if track.artist.strip()
-    }
-    omit_artist = len(available) > 1 and len(artists) == 1
+    omit_artist = shared_collection_artist([track for _, track, _ in available])
     buttons: list[InlineKeyboardButton] = []
 
     for index, track, destination in available:
         if is_track_video_pair:
             text = "📺 Смотреть клип" if track.kind == "video" else "🎧 Слушать песню"
         else:
-            title = _compact_release_title(track.title)
+            title = compact_release_title(track.title)
             text = f"{index} · {title}"
             if not omit_artist:
                 text = f"{index} · {track.artist} — {title}"
@@ -504,19 +501,6 @@ def _shorten_button_text(
     if boundary >= max(8, max_length // 2):
         shortened = shortened[:boundary]
     return shortened.rstrip(" -–—·") + "…"
-
-
-_REMASTER_SUFFIX = re.compile(
-    r"(?:\s*[-–—]\s*|\s*\()"
-    r"(?:(?:19|20)\d{2}\s+)?re-?master(?:ed)?"
-    r"(?:\s+(?:19|20)\d{2})?\)?$",
-    re.IGNORECASE,
-)
-
-
-def _compact_release_title(title: str) -> str:
-    compact = _REMASTER_SUFFIX.sub("", title).strip()
-    return compact or title.strip()
 
 
 def _adaptive_collection_rows(

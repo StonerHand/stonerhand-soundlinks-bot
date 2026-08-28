@@ -209,8 +209,8 @@ class FormatterTests(unittest.TestCase):
             format_collection_message(tracks),
             (
                 "<b>Подборка</b>\n\n"
-                f"1. {pick_track_emoji(tracks[0])} · <b>Artist</b> — Song\n"
-                "2. 💿 · <b>Band</b> — Album\n\n"
+                "1. <b>Artist</b> — Song\n"
+                "2. <b>Band</b> — Album\n\n"
                 "#stonerhand #track #album"
             ),
         )
@@ -227,12 +227,27 @@ class FormatterTests(unittest.TestCase):
 
         message = format_collection_message(tracks)
 
-        self.assertIn("1. 🎧 · <b>Kokomo</b> — A Torinói Ló", message)
-        self.assertIn(
-            "2. 🎧 · <b>Kokomo</b> — The Lonesome Foghorn Blows",
-            message,
-        )
-        self.assertNotIn("<b>Kokomo</b>\n", message)
+        self.assertIn("<b>Kokomo</b>\n", message)
+        self.assertIn("1. A Torinói Ló", message)
+        self.assertIn("2. The Lonesome Foghorn Blows", message)
+        self.assertEqual(message.count("<b>Kokomo</b>"), 1)
+
+    def test_collection_keeps_release_count_and_hides_remaster_suffixes(self) -> None:
+        tracks = [
+            TrackMatch(
+                title="There's No Other Way - 2012 Remaster",
+                artist="Blur",
+                links={},
+            ),
+            TrackMatch(title="Fool (Remastered 2012)", artist="Blur", links={}),
+        ]
+
+        message = format_collection_message(tracks, title="Подборка · 2 релиза")
+
+        self.assertIn("<b>Подборка · 2 релиза</b>", message)
+        self.assertIn("<b>Blur</b>\n1. There&#x27;s No Other Way\n2. Fool", message)
+        self.assertNotIn("Remaster", message)
+        self.assertNotIn("🎧", message)
 
     def test_format_collection_message_includes_release_format_tags(self) -> None:
         tracks = [

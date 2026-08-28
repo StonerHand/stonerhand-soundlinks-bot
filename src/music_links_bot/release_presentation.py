@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Final
 
 from music_links_bot.models import TrackMatch
@@ -28,6 +29,13 @@ PRESET_PROFILES: Final = {
     },
 }
 
+_REMASTER_SUFFIX: Final = re.compile(
+    r"(?:\s*[-–—]\s*|\s*\()"
+    r"(?:(?:19|20)\d{2}\s+)?re-?master(?:ed)?"
+    r"(?:\s+(?:19|20)\d{2})?\)?$",
+    re.IGNORECASE,
+)
+
 
 def release_emoji(track: TrackMatch) -> str:
     if track.kind == "video":
@@ -37,6 +45,23 @@ def release_emoji(track: TrackMatch) -> str:
     if track.kind == "album":
         return "💿"
     return "🎧"
+
+
+def compact_release_title(value: str) -> str:
+    """Hide provider remaster suffixes without changing stored metadata."""
+    title = value.strip()
+    compact = _REMASTER_SUFFIX.sub("", title).strip()
+    return compact or title
+
+
+def shared_collection_artist(tracks: list[TrackMatch]) -> str | None:
+    """Return the display artist when every collection item uses the same one."""
+    if len(tracks) < 2:
+        return None
+    artists = [track.artist.strip() for track in tracks]
+    if not all(artists):
+        return None
+    return artists[0] if len({artist.casefold() for artist in artists}) == 1 else None
 
 
 def normalize_preset(value: object, draft: dict | None = None) -> str:

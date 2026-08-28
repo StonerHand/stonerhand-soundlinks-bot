@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Simplified collection previews while keeping the full localized release
+  count: repeated type icons and artists are removed, provider remaster
+  suffixes are hidden, and Classic and Rich cards now use the same layout.
 - Made collection keyboards content-adaptive: repeated artists and remaster
   suffixes are omitted from button labels, short actions share a row, and long
   labels receive the full width with word-boundary shortening.

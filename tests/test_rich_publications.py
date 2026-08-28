@@ -113,6 +113,29 @@ class RichPublicationModelTests(unittest.TestCase):
         self.assertIn("<tg-collage>", collection)
         self.assertIn("<ol>", collection)
 
+    def test_rich_collection_groups_artist_and_hides_remaster_suffixes(self) -> None:
+        first = _track()
+        first.artist = "Blur"
+        first.title = "There's No Other Way - 2012 Remaster"
+        second = _track()
+        second.artist = "blur"
+        second.title = "Fool (Remastered 2012)"
+
+        collection = build_rich_collection_html(
+            [first, second],
+            title="Подборка · 2 релиза",
+            hashtags="#collection",
+            reply_markup=None,
+        )
+
+        self.assertIn("<h1>Подборка · 2 релиза</h1>", collection)
+        self.assertIn("<p><b>Blur</b></p>", collection)
+        self.assertIn(
+            "<ol><li>There&#x27;s No Other Way</li><li>Fool</li></ol>",
+            collection,
+        )
+        self.assertNotIn("Remaster", collection)
+
     def test_rich_fragment_drops_scripts_and_unsafe_links(self) -> None:
         result = sanitize_rich_fragment(
             '<b>ok</b><script>alert(1)</script><a href="javascript:x">bad</a>'

@@ -80,8 +80,8 @@ The editor is progressive rather than crowded:
 
 Collection keyboards adapt to their content: a shared artist is not repeated,
 technical remaster suffixes do not consume button space, short titles share a
-row and long labels receive the full width. Complete metadata remains visible
-in the card itself.
+row and long labels receive the full width. The preview keeps the exact release
+count without repeating type icons, a shared artist or technical remaster text.
 
 Semantic button styles, disabled progress states, ephemeral notices and Rich
 content are capability-gated. Older Telegram clients always receive the full

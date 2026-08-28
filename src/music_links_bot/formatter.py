@@ -10,7 +10,11 @@ from music_links_bot.models import (
     TrackMatch,
     VideoMatch,
 )
-from music_links_bot.release_presentation import release_emoji
+from music_links_bot.release_presentation import (
+    compact_release_title,
+    release_emoji,
+    shared_collection_artist,
+)
 
 MAX_METADATA_TEXT_LENGTH = 180
 MAX_COLLECTION_TEXT_LENGTH = 96
@@ -297,6 +301,13 @@ def format_collection_message(
         lines.extend([escape(intro), ""])
 
     active_section = ""
+    shared_artist = (
+        shared_collection_artist(tracks)
+        if not any(section.strip() for section in (item_sections or []))
+        else None
+    )
+    if shared_artist:
+        lines.append(f"<b>{_display_text(shared_artist)}</b>")
     for index, track in enumerate(tracks, start=1):
         section = (
             item_sections[index - 1].strip()
@@ -308,8 +319,15 @@ def format_collection_message(
                 lines.append("")
             lines.append(f"<b>{escape(section)}</b>")
             active_section = section
-        emoji = pick_track_emoji(track)
-        lines.append(f"{index}. {emoji} · {format_track_heading(track)}")
+        title_text = _display_text(
+            compact_release_title(track.title),
+            MAX_COLLECTION_TEXT_LENGTH,
+        )
+        if shared_artist:
+            lines.append(f"{index}. {title_text}")
+        else:
+            artist = _display_text(track.artist, MAX_COLLECTION_TEXT_LENGTH)
+            lines.append(f"{index}. <b>{artist}</b> — {title_text}")
         note = (
             item_notes[index - 1].strip()
             if item_notes and index <= len(item_notes)
