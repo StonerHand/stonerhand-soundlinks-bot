@@ -82,6 +82,8 @@ Collection keyboards adapt to their content: a shared artist is not repeated,
 technical remaster suffixes do not consume button space, short titles share a
 row and long labels receive the full width. The preview keeps the exact release
 count without repeating type icons, a shared artist or technical remaster text.
+A classic 2–4-release card uses a collage of distinct available covers and
+falls back to the reliable single-cover preview if collage delivery fails.
 
 Semantic button styles, disabled progress states, ephemeral notices and Rich
 content are capability-gated. Older Telegram clients always receive the full
@@ -133,6 +135,7 @@ The repository is configured for Vercel Functions:
 - `/api/telegram` — authenticated Telegram webhook;
 - `/api/set_webhook` — protected webhook maintenance;
 - `/api/queue_worker` — protected scheduled publishing worker;
+- `/api/collage` — signed and cached classic collection artwork;
 - `/api/health` — Telegram, webhook, Redis, queue and release canary.
 
 Required production values:
@@ -173,7 +176,7 @@ serving traffic and guards automatic rollback.
 ## Repository
 
 ```text
-api/                    Vercel webhook, health and queue endpoints
+api/                    Vercel webhook, health, collage and queue endpoints
 src/music_links_bot/    application, providers, editor and publishing pipeline
 tests/                  unit, contract, snapshot and production-canary tests
 .github/                CI, dependency updates and guarded release checks

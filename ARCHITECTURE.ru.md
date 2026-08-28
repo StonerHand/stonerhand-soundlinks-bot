@@ -29,7 +29,8 @@ webhook `/api/telegram`. Polling используется исключитель
 - `/api/telegram` — Telegram webhook;
 - `/api/set_webhook` — защищённая регистрация webhook, команд, описаний и меню;
 - `/api/health` — Telegram, webhook, Redis, очередь и runtime-метрики;
-- `/api/queue_worker` — защищённый cron-tick очереди.
+- `/api/queue_worker` — защищённый cron-tick очереди;
+- `/api/collage` — HMAC-подписанный JPEG-коллаж для классических подборок.
 
 ## Основные модули
 
@@ -56,6 +57,7 @@ webhook `/api/telegram`. Polling используется исключитель
   подкастов независимо от источника метаданных;
 - `telegram_gateway.py` — изолированный контракт новых методов Bot API 10.3;
 - `telegram_media_cache.py` — повторное использование Telegram `file_id` обложек;
+- `collection_collage.py` — безопасный URL, компоновка 2–4 обложек и fallback;
 - `publication_view.py` — неизменяемый план публикации: HTML, клавиатура,
   обложка, preview и режим delivery;
 - `publication_budget.py` — динамический лимит подводки для сообщения и photo caption;

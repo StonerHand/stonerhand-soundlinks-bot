@@ -1,4 +1,6 @@
+import os
 import unittest
+from unittest.mock import patch
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -101,6 +103,42 @@ class SharingTests(unittest.TestCase):
             )
         )
 
+    def test_complete_inline_collection_uses_signed_collage_preview(self) -> None:
+        tracks = [
+            TrackMatch(
+                title=f"Track {index}",
+                artist="Artist",
+                links={"spotify": f"https://open.spotify.com/track/{index}"},
+                thumbnail_url=f"https://images.example/{index}.jpg",
+            )
+            for index in range(2)
+        ]
+        bundle = LookupBundle(
+            tracks=tracks,
+            unavailable_urls=[],
+            videos=[],
+            radios=[],
+            playlists=[],
+            artists=[],
+        )
+
+        with patch.dict(
+            os.environ,
+            {"WEBHOOK_BASE_URL": "https://bot.example", "BOT_TOKEN": "secret"},
+            clear=True,
+        ):
+            card = render_inline_share_card(
+                bundle,
+                context=None,
+                lang="ru",
+                share_query="retry",
+                share_label="Поделиться",
+            )
+
+        self.assertIsNotNone(card.preview_url)
+        assert card.preview_url is not None
+        self.assertTrue(card.preview_url.startswith("https://bot.example/api/collage?"))
+
     def test_spotify_collection_is_compact_and_round_trips(self) -> None:
         urls = [
             f"https://open.spotify.com/track/{item_id}?si=tracking"
@@ -132,7 +170,7 @@ class SharingTests(unittest.TestCase):
             ["https://www.youtube.com/watch?v=abc123&feature=share"]
         )
 
-        self.assertEqual(query, "sh4|yabc123")
+        self.assertEqual(query, "sh5|yabc123")
         self.assertEqual(parse_share_query(query), ["https://youtu.be/abc123"])
 
     def test_legacy_share_query_still_opens_existing_posts(self) -> None:
@@ -169,7 +207,7 @@ class SharingTests(unittest.TestCase):
             ]
         )
 
-        self.assertEqual(query, "sh4|tabc")
+        self.assertEqual(query, "sh5|tabc")
         self.assertEqual(
             parse_share_query(query or ""),
             ["https://open.spotify.com/track/abc"],

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added signed, cached 2–4-cover collages to classic collection link previews;
+  duplicate or unavailable artwork falls back to the existing single-cover
+  card, while Rich Telegram collections keep their native media layout.
 - Simplified collection previews while keeping the full localized release
   count: repeated type icons and artists are removed, provider remaster
   suffixes are hidden, and Classic and Rich cards now use the same layout.

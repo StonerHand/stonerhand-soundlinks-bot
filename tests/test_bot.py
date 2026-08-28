@@ -1,4 +1,5 @@
 import asyncio
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -1392,7 +1393,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(all_platforms_button.url, "https://song.link/transitions")
         self.assertEqual(keyboard[-1][0].text, "↗ Поделиться")
-        self.assertTrue(keyboard[-1][0].switch_inline_query.startswith("sh4|"))
+        self.assertTrue(keyboard[-1][0].switch_inline_query.startswith("sh5|"))
 
     async def test_inline_track_result_can_fall_back_to_classic_post(self) -> None:
         result = await _build_inline_result(
@@ -1406,7 +1407,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         keyboard = result.reply_markup.inline_keyboard
         self.assertEqual(keyboard[0][0].text, "🟢 Spotify")
         self.assertEqual(keyboard[-1][0].text, "↗ Поделиться")
-        self.assertTrue(keyboard[-1][0].switch_inline_query.startswith("sh4|"))
+        self.assertTrue(keyboard[-1][0].switch_inline_query.startswith("sh5|"))
 
     async def test_inline_rich_result_uses_cached_telegram_cover(self) -> None:
         with patch(
@@ -1554,6 +1555,38 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             result.reply_markup.inline_keyboard[-1][0].switch_inline_query, query
         )
+
+    async def test_classic_inline_collection_uses_collage_link_preview(self) -> None:
+        class DistinctArtworkClient:
+            async def lookup_track(self, source_url: str) -> TrackMatch:
+                track_id = source_url.rsplit("/", 1)[-1]
+                return TrackMatch(
+                    title=f"Track {track_id}",
+                    artist="Artist",
+                    links={"spotify": source_url},
+                    page_url=f"https://song.link/{track_id}",
+                    thumbnail_url=f"https://images.example/{track_id}.jpg",
+                )
+
+        with patch.dict(
+            os.environ,
+            {"WEBHOOK_BASE_URL": "https://bot.example", "BOT_TOKEN": "secret"},
+            clear=True,
+        ):
+            result = await _build_inline_collection_result(
+                [
+                    "https://open.spotify.com/track/abc",
+                    "https://open.spotify.com/track/def",
+                ],
+                ContextStub(songlink_client=DistinctArtworkClient()),
+                lang="ru",
+            )
+
+        self.assertIsNotNone(result)
+        assert result is not None
+        preview = result.input_message_content.link_preview_options
+        self.assertTrue(preview.url.startswith("https://bot.example/api/collage?"))
+        self.assertTrue(preview.prefer_large_media)
 
     async def test_inline_share_handler_returns_one_collection_card(self) -> None:
         from music_links_bot.bot import inline_query_handler

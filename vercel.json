@@ -16,6 +16,10 @@
     {
       "src": "api/queue_worker.py",
       "use": "@vercel/python"
+    },
+    {
+      "src": "api/collage.py",
+      "use": "@vercel/python"
     }
   ],
   "routes": [
@@ -34,6 +38,10 @@
     {
       "src": "/api/queue_worker",
       "dest": "api/queue_worker.py"
+    },
+    {
+      "src": "/api/collage",
+      "dest": "api/collage.py"
     }
   ],
   "crons": [

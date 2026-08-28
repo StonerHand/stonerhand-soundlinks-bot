@@ -96,6 +96,7 @@ from music_links_bot.channel_templates import (
     save_channel_template,
 )
 from music_links_bot.chat_access import check_publish_access
+from music_links_bot.collection_collage import collection_collage_preview_url
 from music_links_bot.config import Settings
 from music_links_bot.ephemeral import (
     ephemeral_group_replies_enabled,
@@ -1989,8 +1990,11 @@ async def _send_track_matches(
             context.bot,
             message,
             collection_text,
-            preview_url=_select_preview_url(tracks[0].links, context)
-            or tracks[0].thumbnail_url,
+            preview_url=(
+                collection_collage_preview_url(tracks)
+                or _select_preview_url(tracks[0].links, context)
+                or tracks[0].thumbnail_url
+            ),
             reply_markup=collection_keyboard,
         )
         _record_matches_safely(tracks, message, context=context)

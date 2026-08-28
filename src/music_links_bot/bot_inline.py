@@ -75,7 +75,7 @@ from music_links_bot.url_utils import (
 
 LOGGER = logging.getLogger(__name__)
 INLINE_CACHE_SECONDS = 1800
-INLINE_COLLECTION_RESULT_VERSION = "v2"
+INLINE_COLLECTION_RESULT_VERSION = "v3"
 
 
 async def inline_query_handler(

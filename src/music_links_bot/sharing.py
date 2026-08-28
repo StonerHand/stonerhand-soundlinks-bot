@@ -7,6 +7,7 @@ from urllib.parse import parse_qs, urlparse
 
 from telegram import InlineKeyboardMarkup
 
+from music_links_bot.collection_collage import collection_collage_preview_url
 from music_links_bot.formatter import (
     format_artist_collection_message,
     format_collection_message,
@@ -29,8 +30,8 @@ from music_links_bot.models import TrackMatch
 from music_links_bot.telegram_buttons import button as InlineKeyboardButton
 from music_links_bot.url_utils import cache_key_for_url, is_supported_music_url
 
-SHARE_QUERY_PREFIX = "sh4|"
-LEGACY_SHARE_QUERY_PREFIXES = ("sh3|", "sh2|", "sh|")
+SHARE_QUERY_PREFIX = "sh5|"
+LEGACY_SHARE_QUERY_PREFIXES = ("sh4|", "sh3|", "sh2|", "sh|")
 MAX_SHARE_QUERY_LENGTH = 256
 MAX_SHARE_ITEMS = 12
 _SPOTIFY_KINDS = {
@@ -322,6 +323,9 @@ def _add_inline_retry_button(
 
 def _bundle_preview_url(bundle: Any, context: Any) -> str | None:
     if bundle.tracks:
+        collage_url = collection_collage_preview_url(bundle.tracks)
+        if collage_url:
+            return collage_url
         track = bundle.tracks[0]
         return _select_preview_url(track.links, context) or track.thumbnail_url
     if bundle.playlists:
