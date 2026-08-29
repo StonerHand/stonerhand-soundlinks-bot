@@ -14,6 +14,17 @@ def utf16_offset(text: str, index: int) -> int:
 
 
 class TelegramTextTests(unittest.TestCase):
+    def test_url_before_intro_is_removed_without_truncating_intro(self) -> None:
+        text = (
+            "https://open.spotify.com/album/42dcDuItUH0Ed4QU4umdq6?si=test\n\n"
+            "Если что, Frankie Pulitzer — это Том Хард"
+        )
+
+        self.assertEqual(
+            format_user_note_html(text, (), max_length=700),
+            "Если что, Frankie Pulitzer — это Том Хард",
+        )
+
     def test_preserves_formatting_and_paragraphs_after_source_url_removal(self) -> None:
         text = (
             "🎧 Жирный текст\n\n"

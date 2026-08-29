@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 1.9.1 — 2026-08-29
+
+- Fixed source-URL removal when a Spotify, Apple Music or another supported
+  music link is the first character of a message followed by an editorial intro.
+- Preserved the complete intro and its entity mapping instead of leaking the
+  source URL into the quote and truncating the final character.
+- Added URL utility, Telegram HTML and end-to-end post regressions for the exact
+  album-link-first message shape reported from production.
+
 ## 1.9.0 — 2026-08-29
 
 - Split editor callbacks and native Force Reply handling into focused state and

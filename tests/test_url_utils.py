@@ -135,6 +135,17 @@ class UrlUtilsTests(unittest.TestCase):
             "мой текст и еще",
         )
 
+    def test_strip_supported_url_at_message_start_keeps_only_intro(self) -> None:
+        text = (
+            "https://open.spotify.com/album/42dcDuItUH0Ed4QU4umdq6?si=test\n\n"
+            "Если что, Frankie Pulitzer — это Том Хард"
+        )
+
+        stripped, mapping = strip_supported_urls_with_mapping(text)
+
+        self.assertEqual(stripped, "Если что, Frankie Pulitzer — это Том Хард")
+        self.assertEqual("".join(text[index] for index in mapping), stripped)
+
     def test_strip_supported_urls_preserves_editorial_layout(self) -> None:
         text = (
             "Первый абзац с  двумя пробелами\n\n"

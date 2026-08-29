@@ -142,10 +142,12 @@ def strip_supported_urls_with_mapping(
 
         # Remove one separator together with an inline URL, while preserving
         # every other user-authored space, line break, and empty paragraph.
-        if before in " \t" and after in " \t":
+        if before and before in " \t" and after in " \t":
             end += 1
-        elif before in " \t" and (
-            not after or after in "\r\n" or after in TRAILING_PUNCTUATION
+        elif (
+            before
+            and before in " \t"
+            and (not after or after in "\r\n" or after in TRAILING_PUNCTUATION)
         ):
             start -= 1
         elif (not before or before in "\r\n") and after in " \t":

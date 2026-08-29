@@ -2257,6 +2257,25 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(preview_options.show_above_text)
         record_matches.assert_called_once()
 
+    async def test_source_url_before_intro_is_not_rendered_in_post(self) -> None:
+        source_url = (
+            "https://open.spotify.com/album/"
+            "42dcDuItUH0Ed4QU4umdq6?si=FVx8aQ4DSwyuDJQC-1DrsA"
+        )
+
+        class AlbumWithIntroMessage(PrivateSpotifyTrackMessageStub):
+            text = f"{source_url}\n\nЕсли что, Frankie Pulitzer — это Том Хард"
+
+        message = AlbumWithIntroMessage()
+        context = ContextStub()
+
+        with patch("music_links_bot.bot_stats.record_matches"):
+            await track_lookup_message(UpdateStub(message), context)
+
+        self.assertEqual(len(message.replies), 1)
+        self.assertNotIn(source_url, message.replies[0])
+        self.assertIn("Если что, Frankie Pulitzer — это Том Хард", message.replies[0])
+
     async def test_soundcloud_links_use_soundcloud_fallback_post(self) -> None:
         message = PrivateSoundCloudMessageStub()
         context = ContextStub(songlink_client=FailingLookupClient())
