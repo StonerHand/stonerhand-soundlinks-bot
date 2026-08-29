@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 1.9.2 — 2026-08-29
+
+- Removed clickable Spotify, Apple Music and other supported source links from
+  author intros when Telegram hides them behind linked text; meaningful anchor
+  text and surrounding bold or italic formatting stay intact.
+- Hardened URL-boundary handling so the end of a message is never mistaken for
+  whitespace, and normalized common typographic punctuation around shared URLs.
+- Expanded regression coverage across supported providers, message boundaries,
+  multiple sources, CRLF input, emoji/UTF-16 entities, media captions, external
+  editorial links and the complete bot delivery path.
+
 ## 1.9.1 — 2026-08-29
 
 - Fixed source-URL removal when a Spotify, Apple Music or another supported

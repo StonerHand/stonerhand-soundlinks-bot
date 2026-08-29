@@ -116,6 +116,22 @@ class UrlUtilsTests(unittest.TestCase):
             ["https://open.spotify.com/track/1?si=aaa"],
         )
 
+    def test_extract_supported_urls_trims_typographic_punctuation(self) -> None:
+        cases = (
+            ("https://open.spotify.com/track/1;", ";"),
+            ("https://open.spotify.com/track/1:", ":"),
+            ("https://open.spotify.com/track/1\u00bb", "\u00bb"),
+            ("https://open.spotify.com/track/1\u201d", "\u201d"),
+            ("https://open.spotify.com/track/1\u2026", "\u2026"),
+        )
+
+        for token, punctuation in cases:
+            with self.subTest(punctuation=punctuation):
+                self.assertEqual(
+                    extract_supported_urls(f"Слушать: {token}"),
+                    ["https://open.spotify.com/track/1"],
+                )
+
     def test_cache_key_for_url_strips_tracking_query_values(self) -> None:
         self.assertEqual(
             cache_key_for_url(
@@ -183,6 +199,40 @@ class UrlUtilsTests(unittest.TestCase):
 
         self.assertEqual(stripped, "🎧 текст")
         self.assertEqual("".join(text[index] for index in mapping), stripped)
+
+    def test_strip_supported_urls_handles_all_message_boundaries(self) -> None:
+        spotify = "https://open.spotify.com/track/1"
+        apple = "https://music.apple.com/us/album/test/2"
+        cases = (
+            (spotify, ""),
+            (f"{spotify}\nТекст", "Текст"),
+            (f"Текст\n{spotify}", "Текст"),
+            (f"Текст {spotify}", "Текст"),
+            (f"{spotify} Текст", "Текст"),
+            (f"До {spotify} после", "До после"),
+            (f"{spotify} {apple}", ""),
+            (f"{spotify}\r\n\r\nТекст", "Текст"),
+            (f"🎧 {spotify} текст", "🎧 текст"),
+        )
+
+        for text, expected in cases:
+            with self.subTest(text=text):
+                stripped, mapping = strip_supported_urls_with_mapping(text)
+                self.assertEqual(stripped, expected)
+                self.assertEqual(len(mapping), len(stripped))
+                self.assertEqual(tuple(sorted(mapping)), mapping)
+                self.assertEqual(len(set(mapping)), len(mapping))
+                self.assertTrue(all(0 <= index < len(text) for index in mapping))
+
+    def test_strip_supported_urls_preserves_external_links_in_mixed_input(self) -> None:
+        text = (
+            "Статья https://example.com/read\nhttps://open.spotify.com/track/1\nФинал"
+        )
+
+        self.assertEqual(
+            strip_supported_urls(text),
+            "Статья https://example.com/read\n\nФинал",
+        )
 
     def test_spotify_url_type_detects_episode_and_show(self) -> None:
         self.assertEqual(

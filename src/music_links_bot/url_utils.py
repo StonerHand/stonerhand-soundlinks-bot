@@ -7,7 +7,7 @@ from urllib.parse import parse_qs, parse_qsl, urlencode, urlparse, urlunparse
 from music_links_bot.constants import SUPPORTED_INPUT_HOSTS
 
 URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
-TRAILING_PUNCTUATION = ".,!?)]}>\"'"
+TRAILING_PUNCTUATION = ".,!?;:)]}>\"'\u00bb\u2019\u201d\u2026"
 YOUTUBE_MUSIC_HOST = "music.youtube.com"
 YOUTUBE_VIDEO_HOSTS = {"youtube.com", "m.youtube.com", "youtu.be"}
 SOUNDCLOUD_HOSTS = {"soundcloud.com", "m.soundcloud.com", "on.soundcloud.com"}
@@ -139,18 +139,21 @@ def strip_supported_urls_with_mapping(
     for start, end in spans:
         before = text[start - 1] if start > 0 else ""
         after = text[end] if end < len(text) else ""
+        before_is_inline_space = bool(before) and before in " \t"
+        after_is_inline_space = bool(after) and after in " \t"
+        before_is_line_boundary = not before or before in "\r\n"
+        after_is_line_boundary = not after or after in "\r\n"
+        after_is_punctuation = bool(after) and after in TRAILING_PUNCTUATION
 
         # Remove one separator together with an inline URL, while preserving
         # every other user-authored space, line break, and empty paragraph.
-        if before and before in " \t" and after in " \t":
+        if before_is_inline_space and after_is_inline_space:
             end += 1
-        elif (
-            before
-            and before in " \t"
-            and (not after or after in "\r\n" or after in TRAILING_PUNCTUATION)
+        elif before_is_inline_space and (
+            after_is_line_boundary or after_is_punctuation
         ):
             start -= 1
-        elif (not before or before in "\r\n") and after in " \t":
+        elif before_is_line_boundary and after_is_inline_space:
             end += 1
 
         removal_spans.append((start, end))

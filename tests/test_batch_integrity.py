@@ -15,7 +15,7 @@ from music_links_bot.bot_lookup import (
     _send_youtube_result,
 )
 from music_links_bot.bot_runtime import BotRuntime
-from music_links_bot.bot_stats import message_source_urls
+from music_links_bot.bot_stats import build_user_prefix, message_source_urls
 from music_links_bot.models import TrackMatch
 
 
@@ -426,6 +426,30 @@ class TelegramEntitySourceTests(unittest.TestCase):
         )
 
         self.assertEqual(message_source_urls(message), [visible])
+
+    def test_caption_source_link_is_plain_text_in_user_prefix(self) -> None:
+        caption = "Советую этот релиз"
+        source_url = "https://open.spotify.com/track/caption-source"
+        message = SimpleNamespace(
+            text=None,
+            caption=caption,
+            entities=(),
+            caption_entities=(
+                MessageEntity(
+                    MessageEntity.TEXT_LINK,
+                    offset=len("Советую "),
+                    length=len("этот релиз"),
+                    url=source_url,
+                ),
+            ),
+            from_user=None,
+        )
+
+        self.assertEqual(message_source_urls(message), [source_url])
+        prefix = build_user_prefix(message)
+        self.assertIn("Советую этот релиз", prefix)
+        self.assertNotIn(source_url, prefix)
+        self.assertNotIn("<a href=", prefix)
 
 
 if __name__ == "__main__":

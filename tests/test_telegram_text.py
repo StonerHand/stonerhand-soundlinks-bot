@@ -67,6 +67,60 @@ class TelegramTextTests(unittest.TestCase):
             '<a href="https://example.com/?a=1&amp;b=2">читать статью</a>',
         )
 
+    def test_supported_text_link_is_kept_as_plain_text(self) -> None:
+        text = "слушать здесь"
+        entity = MessageEntity(
+            MessageEntity.TEXT_LINK,
+            offset=utf16_offset(text, text.index("здесь")),
+            length=utf16_offset("здесь", len("здесь")),
+            url="https://open.spotify.com/track/1?si=source",
+        )
+
+        self.assertEqual(
+            format_user_note_html(text, (entity,), max_length=700),
+            "слушать здесь",
+        )
+
+    def test_supported_text_link_does_not_break_surrounding_formatting(self) -> None:
+        text = "важный релиз"
+        entities = (
+            MessageEntity(
+                MessageEntity.BOLD,
+                offset=0,
+                length=utf16_offset(text, len(text)),
+            ),
+            MessageEntity(
+                MessageEntity.TEXT_LINK,
+                offset=utf16_offset(text, text.index("релиз")),
+                length=utf16_offset("релиз", len("релиз")),
+                url="https://music.apple.com/us/album/release/1",
+            ),
+        )
+
+        self.assertEqual(
+            format_user_note_html(text, entities, max_length=700),
+            "<b>важный релиз</b>",
+        )
+
+    def test_multiple_source_urls_keep_unicode_entity_offsets(self) -> None:
+        text = (
+            "🎧 Жирный\r\n"
+            "https://open.spotify.com/track/1\r\n"
+            "https://music.apple.com/us/album/test/2\r\n"
+            "Финал"
+        )
+        bold_start = text.index("Жирный")
+        entity = MessageEntity(
+            MessageEntity.BOLD,
+            offset=utf16_offset(text, bold_start),
+            length=utf16_offset("Жирный", len("Жирный")),
+        )
+
+        self.assertEqual(
+            format_user_note_html(text, (entity,), max_length=700),
+            "🎧 <b>Жирный</b>\n\n\nФинал",
+        )
+
     def test_preserves_nested_bold_and_italic_entities(self) -> None:
         text = "очень важный текст"
         entities = (

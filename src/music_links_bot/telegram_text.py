@@ -5,7 +5,10 @@ from urllib.parse import urlparse
 
 from telegram import MessageEntity
 
-from music_links_bot.url_utils import strip_supported_urls_with_mapping
+from music_links_bot.url_utils import (
+    is_supported_music_url,
+    strip_supported_urls_with_mapping,
+)
 
 FORMATTING_ENTITY_TYPES = {
     MessageEntity.BOLD,
@@ -156,6 +159,11 @@ def _sanitize_entity(entity: MessageEntity) -> MessageEntity | None:
             not entity.url
             or urlparse(entity.url).scheme.lower() not in SAFE_LINK_SCHEMES
         ):
+            return None
+        # A supported music link is already represented by the post buttons.
+        # Keep meaningful anchor text, but never duplicate the source as a
+        # clickable link inside the user's note.
+        if is_supported_music_url(entity.url):
             return None
         safe_url = escape(entity.url, quote=True)
     else:

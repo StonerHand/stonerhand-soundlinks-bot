@@ -6,7 +6,7 @@
 
 [Open the bot](https://t.me/StonerHandBot) · [See the channel](https://t.me/stonerhand) · [Русская версия](README.ru.md)
 
-![Release](https://img.shields.io/badge/release-1.9.1-5b5bd6?style=flat-square)
+![Release](https://img.shields.io/badge/release-1.9.2-5b5bd6?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
@@ -42,8 +42,9 @@ is omitted instead of guessed.
 - Combines matching links from different services into one release rather than
   publishing duplicate cards.
 - Imports public Spotify and Apple Music playlists into editable collections.
-- Preserves bold, italic and linked text in author intros and calculates the
-  exact Telegram UTF-16 budget for each delivery format.
+- Preserves bold, italic and external linked text in author intros, removes
+  duplicate music-source links, and calculates the exact Telegram UTF-16
+  budget for each delivery format.
 - Keeps one clear primary action per editor screen, supports undo, reusable
   templates, custom artwork, history and named collections.
 - Publishes immediately or through a durable scheduled queue with duplicate

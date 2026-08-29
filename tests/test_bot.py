@@ -9,6 +9,7 @@ from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     InputTextMessageContent,
+    MessageEntity,
 )
 from telegram.error import BadRequest, TelegramError
 from telegram.ext import CommandHandler
@@ -2275,6 +2276,31 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 1)
         self.assertNotIn(source_url, message.replies[0])
         self.assertIn("Если что, Frankie Pulitzer — это Том Хард", message.replies[0])
+
+    async def test_hidden_source_link_is_not_rendered_as_post_hyperlink(self) -> None:
+        source_url = "https://open.spotify.com/track/abc?si=hidden"
+
+        class HiddenSourceMessage(PrivateSpotifyTrackMessageStub):
+            text = "Слушать этот важный релиз"
+            entities = (
+                MessageEntity(
+                    MessageEntity.TEXT_LINK,
+                    offset=len("Слушать "),
+                    length=len("этот важный релиз"),
+                    url=source_url,
+                ),
+            )
+
+        message = HiddenSourceMessage()
+        context = ContextStub()
+
+        with patch("music_links_bot.bot_stats.record_matches"):
+            await track_lookup_message(UpdateStub(message), context)
+
+        self.assertEqual(len(message.replies), 1)
+        self.assertIn("Слушать этот важный релиз", message.replies[0])
+        self.assertNotIn(source_url, message.replies[0])
+        self.assertNotIn('<a href="https://open.spotify.com', message.replies[0])
 
     async def test_soundcloud_links_use_soundcloud_fallback_post(self) -> None:
         message = PrivateSoundCloudMessageStub()
