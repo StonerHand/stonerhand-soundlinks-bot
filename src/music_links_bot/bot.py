@@ -7,7 +7,7 @@ import logging
 import secrets
 import time
 from collections.abc import Awaitable, Callable
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from html import escape
 
 from telegram import (
@@ -27,35 +27,23 @@ from music_links_bot.bot_batch import (
     send_partial_lookup_status as _send_partial_lookup_status_impl,
 )
 from music_links_bot.bot_builder import (
-    PENDING_INPUT_TTL_SECONDS,
     BuilderScreen,
-    apply_custom_tags,
-    apply_intro_html,
     builder_screen,
     fit_telegram_html,
-    format_schedule_datetime,
-    normalize_crate_title,
-    parse_schedule_datetime,
-    remove_intro,
-    remove_tags,
     schedule_timestamp,
-    select_all_platforms,
-    select_preset,
-    toggle_platform,
-    use_auto_tags,
 )
 from music_links_bot.bot_crate import (
     add_many_to_crate,
     add_to_crate,
     crate_contains_item,
     load_crate,
-    load_crate_title,
-    save_crate_title,
 )
 from music_links_bot.bot_crate_handlers import (
     dispatch_crate_action as _dispatch_crate_action,
 )
 from music_links_bot.bot_editor_state import (
+    apply_delivery_action,
+    apply_editor_shortcut,
     apply_setting_action as _apply_editor_setting,
     draft_owned_by as _draft_owned_by,
     remember_draft as _remember_session_draft,
@@ -79,6 +67,9 @@ from music_links_bot.bot_menu import (
     reply_with_menu as _reply_with_menu,
     runtime_for as _runtime,
     update_lang as _update_lang,
+)
+from music_links_bot.bot_pending import (
+    consume_pending_input as _consume_pending_input_impl,
 )
 from music_links_bot.bot_pipeline import LookupRequest, delivery_kind
 from music_links_bot.bot_progress import (
@@ -134,7 +125,6 @@ from music_links_bot.bot_ui import (
     editor_schedule_rows as _editor_schedule_rows,
     editor_style_rows as _editor_style_rows,
     editor_template_rows as _editor_template_rows,
-    render_crate as _render_bot_crate,
 )
 from music_links_bot.branding import (
     brand_label,
@@ -185,7 +175,6 @@ from music_links_bot.publication_presets import (
     apply_named_preset,
     delete_named_preset,
     load_presets,
-    save_named_preset,
 )
 from music_links_bot.publication_service import PublicationService
 from music_links_bot.publication_state import (
@@ -223,12 +212,11 @@ from music_links_bot.telegram_buttons import (
     callback_button,
     current_chat_button,
 )
-from music_links_bot.telegram_text import format_user_note_html, telegram_text_length
+from music_links_bot.telegram_text import format_user_note_html
 from music_links_bot.track_merge import coalesce_equivalent_tracks
 from music_links_bot.url_utils import (
     cache_key_for_url,
     extract_supported_urls,
-    strip_supported_urls,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -250,6 +238,34 @@ _SIMPLE_EDITOR_SCREENS = {
     BuilderScreen.HASHTAGS: ("ed_hashtags_title", _editor_hashtag_rows),
     BuilderScreen.DELIVERY: ("ed_delivery_title", _editor_delivery_rows),
 }
+_PREFLIGHT_EDITOR_ACTIONS = frozenset(
+    {"p", "q1", "q3", "qe", "qd", "pc", "r", "x", "s"}
+)
+_SCHEDULE_EDITOR_ACTIONS = frozenset({"q1", "q3", "qe", "qd"})
+_PRIMARY_EDITOR_ACTIONS = frozenset({"pc", "r", "x", "s", "c"})
+_PENDING_EDITOR_INPUTS = {
+    "ti": "intro",
+    "hi": "hashtags",
+    "qi": "schedule",
+    "ci": "cover",
+    "tn": "template_name",
+}
+
+
+@dataclass(slots=True)
+class EditorActionRequest:
+    query: object
+    context: ContextTypes.DEFAULT_TYPE
+    action: str
+    draft_id: str
+    draft: dict
+    lang: str
+    track: TrackMatch
+
+    @property
+    def user_id(self) -> int:
+        user = getattr(self.query, "from_user", None)
+        return int(user.id) if user is not None else 0
 
 
 async def _application_error_handler(
@@ -757,6 +773,275 @@ async def _handle_editor_lifecycle(
     return True
 
 
+async def _save_editor_settings(request: EditorActionRequest) -> None:
+    await _store_draft(request.context, request.draft_id, request.draft)
+    if request.user_id:
+        await save_channel_template(
+            request.context,
+            f"user:{request.user_id}",
+            request.draft,
+        )
+
+
+async def _apply_last_editor_template(request: EditorActionRequest) -> bool:
+    if request.action != "lp":
+        return False
+    template = request.draft.get("last_template")
+    if not isinstance(template, dict) or not apply_template(request.draft, template):
+        await request.query.answer(
+            get_text(request.lang, "ed_expired"),
+            show_alert=True,
+        )
+        return True
+    request.draft["last_template_applied"] = True
+    await _store_draft(request.context, request.draft_id, request.draft)
+    await request.query.answer(get_text(request.lang, "ed_last_template_applied"))
+    text, keyboard = _render_track_draft(
+        request.draft,
+        request.context,
+        draft_id=request.draft_id,
+        settings=True,
+        show_status=True,
+    )
+    await _edit_editor_message(
+        request.query,
+        request.context,
+        request.draft,
+        text,
+        keyboard,
+    )
+    return True
+
+
+async def _reject_failed_editor_preflight(request: EditorActionRequest) -> bool:
+    if request.action not in _PREFLIGHT_EDITOR_ACTIONS:
+        return False
+    preflight = validate_publication(request.draft, request.track)
+    if preflight.ready:
+        return False
+    await request.query.answer(
+        get_text(request.lang, f"ed_preflight_{preflight.blocking_code}"),
+        show_alert=True,
+    )
+    return True
+
+
+async def _handle_editor_shortcut(request: EditorActionRequest) -> bool:
+    if request.action == "u":
+        if not restore_setting_state(request.draft):
+            await request.query.answer(
+                get_text(request.lang, "ed_undo_expired"),
+                show_alert=True,
+            )
+            return True
+        await _save_editor_settings(request)
+        await request.query.answer(get_text(request.lang, "settings_restored"))
+        text, keyboard = _render_track_draft(
+            request.draft,
+            request.context,
+            draft_id=request.draft_id,
+            settings=True,
+            show_status=True,
+        )
+        await _edit_editor_message(
+            request.query,
+            request.context,
+            request.draft,
+            text,
+            keyboard,
+        )
+        return True
+    return_screen = apply_editor_shortcut(
+        request.draft,
+        request.action,
+        track=request.track,
+        platform_order=_get_platform_order(request.context),
+    )
+    if return_screen is None:
+        return False
+    await _save_editor_settings(request)
+    await _handle_editor_navigation(
+        request.query,
+        request.context,
+        action=return_screen,
+        draft_id=request.draft_id,
+        draft=request.draft,
+        lang=request.lang,
+    )
+    return True
+
+
+async def _handle_named_editor_template(request: EditorActionRequest) -> bool:
+    action = request.action
+    if not (action.startswith(("ta", "td")) and action[2:].isdigit()):
+        return False
+    index = int(action[2:])
+    if action.startswith("ta"):
+        remember_setting_state(request.draft)
+        changed = await apply_named_preset(
+            request.context,
+            request.user_id,
+            index,
+            request.draft,
+        )
+        answer_key = "ed_template_applied"
+    else:
+        changed = await delete_named_preset(
+            request.context,
+            request.user_id,
+            index,
+        )
+        answer_key = "ed_template_deleted"
+    if not changed:
+        await request.query.answer(
+            get_text(request.lang, "ed_expired"),
+            show_alert=True,
+        )
+        return True
+    await _store_draft(request.context, request.draft_id, request.draft)
+    await _handle_editor_navigation(
+        request.query,
+        request.context,
+        action="tp",
+        draft_id=request.draft_id,
+        draft=request.draft,
+        lang=request.lang,
+        answer_text=get_text(request.lang, answer_key),
+    )
+    return True
+
+
+async def _handle_pending_editor_action(request: EditorActionRequest) -> bool:
+    kind = _PENDING_EDITOR_INPUTS.get(request.action)
+    if kind is None:
+        return False
+    await _start_pending_editor_input(
+        request.query,
+        request.context,
+        draft_id=request.draft_id,
+        kind=kind,
+        lang=request.lang,
+        draft=request.draft,
+    )
+    return True
+
+
+async def _open_editor_publish_confirmation(request: EditorActionRequest) -> bool:
+    if request.action != "p":
+        return False
+    admin_chat_id = request.context.application.bot_data.get("admin_chat_id")
+    if (
+        not request.draft.get("can_publish")
+        or not request.user_id
+        or admin_chat_id is None
+        or request.user_id != admin_chat_id
+    ):
+        await request.query.answer(
+            get_text(request.lang, "ed_admin_only"),
+            show_alert=True,
+        )
+        return True
+    target = str(
+        request.context.application.bot_data.get("publish_chat_id")
+        or f"@{CHANNEL_USERNAME}"
+    )
+    text, keyboard = _build_publish_confirmation(
+        request.draft_id,
+        request.draft,
+        request.track,
+        target=target,
+        lang=request.lang,
+    )
+    await request.query.answer()
+    await _edit_editor_message(
+        request.query,
+        request.context,
+        request.draft,
+        text,
+        keyboard,
+    )
+    return True
+
+
+async def _run_locked_editor_action(request: EditorActionRequest) -> bool:
+    if request.action in _SCHEDULE_EDITOR_ACTIONS:
+        lock_action = "schedule"
+    elif request.action in _PRIMARY_EDITOR_ACTIONS:
+        lock_action = request.action
+    else:
+        return False
+    runtime = _runtime(request.context)
+    lock_key = f"{request.user_id}:{lock_action}:{request.draft_id}"
+    token = await runtime.acquire_action(lock_key)
+    if token is None:
+        await request.query.answer(
+            get_text(request.lang, "action_busy"),
+            show_alert=True,
+        )
+        return True
+    if request.action in _PRIMARY_EDITOR_ACTIONS:
+        await _show_action_busy(request.query, request.lang)
+    try:
+        if request.action in _SCHEDULE_EDITOR_ACTIONS:
+            await _schedule_editor_draft(
+                request.query,
+                request.context,
+                request.action,
+                request.draft,
+                lang=request.lang,
+            )
+        else:
+            await _run_primary_editor_action(request)
+    finally:
+        await runtime.release_action(lock_key, token)
+    return True
+
+
+async def _handle_editor_delivery_setting(request: EditorActionRequest) -> bool:
+    if not apply_delivery_action(request.draft, request.action):
+        return False
+    await _store_draft(request.context, request.draft_id, request.draft)
+    await _handle_editor_navigation(
+        request.query,
+        request.context,
+        action="rs",
+        draft_id=request.draft_id,
+        draft=request.draft,
+        lang=request.lang,
+        answer_text=get_text(request.lang, "settings_saved"),
+    )
+    return True
+
+
+async def _finish_editor_setting(request: EditorActionRequest) -> None:
+    if request.action != "f" and not _apply_editor_setting(
+        request.draft,
+        request.action,
+        track=request.track,
+        platform_order=_get_platform_order(request.context),
+    ):
+        await request.query.answer()
+        return
+    await request.query.answer(
+        get_text(request.lang, "settings_saved") if request.action != "f" else None
+    )
+    await _save_editor_settings(request)
+    text, keyboard = _render_track_draft(
+        request.draft,
+        request.context,
+        draft_id=request.draft_id,
+        settings=request.action != "f",
+        show_status=request.action != "f",
+    )
+    await _edit_editor_message(
+        request.query,
+        request.context,
+        request.draft,
+        text,
+        keyboard,
+    )
+
+
 async def _handle_editor_action(query, context, action: str, draft_id: str) -> None:
     user_lang = resolve_lang(query.from_user.language_code if query.from_user else None)
     draft = await _load_draft(context, draft_id)
@@ -791,257 +1076,29 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
     ):
         return
 
-    if action == "lp":
-        template = draft.get("last_template")
-        if not isinstance(template, dict) or not apply_template(draft, template):
-            await query.answer(get_text(lang, "ed_expired"), show_alert=True)
-            return
-        draft["last_template_applied"] = True
-        await _store_draft(context, draft_id, draft)
-        await query.answer(get_text(lang, "ed_last_template_applied"))
-        text, keyboard = _render_track_draft(
-            draft,
-            context,
-            draft_id=draft_id,
-            settings=True,
-            show_status=True,
-        )
-        await _edit_editor_message(query, context, draft, text, keyboard)
-        return
-
-    track = TrackMatch(**draft["item"])
-    preflight = validate_publication(draft, track)
-    if (
-        action
-        in {
-            "p",
-            "q1",
-            "q3",
-            "qe",
-            "qd",
-            "pc",
-            "r",
-            "x",
-            "s",
-        }
-        and not preflight.ready
-    ):
-        await query.answer(
-            get_text(lang, f"ed_preflight_{preflight.blocking_code}"),
-            show_alert=True,
-        )
-        return
-    return_screen: str | None = None
-    if action in {"z0", "z1", "z2"}:
-        remember_setting_state(draft)
-        select_preset(draft, int(action[1]))
-        return_screen = "zs"
-    elif len(action) >= 2 and action.startswith("l") and action[1:].isdigit():
-        remember_setting_state(draft)
-        toggle_platform(
-            draft,
-            track,
-            list(_get_platform_order(context)),
-            int(action[1:]),
-        )
-        return_screen = "ls"
-    elif action == "la":
-        remember_setting_state(draft)
-        select_all_platforms(
-            draft,
-            track,
-            list(_get_platform_order(context)),
-        )
-        return_screen = "ls"
-    elif action == "ha":
-        remember_setting_state(draft)
-        use_auto_tags(draft)
-        return_screen = "hs"
-    elif action == "hn":
-        remember_setting_state(draft)
-        remove_tags(draft)
-        return_screen = "hs"
-    elif action == "t0":
-        remember_setting_state(draft)
-        remove_intro(draft)
-        return_screen = "ts"
-    elif action == "u":
-        if not restore_setting_state(draft):
-            await query.answer(get_text(lang, "ed_undo_expired"), show_alert=True)
-            return
-        await _store_draft(context, draft_id, draft)
-        if query.from_user is not None:
-            await save_channel_template(context, f"user:{query.from_user.id}", draft)
-        await query.answer(get_text(lang, "settings_restored"))
-        text, keyboard = _render_track_draft(
-            draft, context, draft_id=draft_id, settings=True, show_status=True
-        )
-        await _edit_editor_message(query, context, draft, text, keyboard)
-        return
-
-    if return_screen is not None:
-        await _store_draft(context, draft_id, draft)
-        if query.from_user is not None:
-            await save_channel_template(context, f"user:{query.from_user.id}", draft)
-        await _handle_editor_navigation(
-            query,
-            context,
-            action=return_screen,
-            draft_id=draft_id,
-            draft=draft,
-            lang=lang,
-        )
-        return
-
-    if action.startswith(("ta", "td")) and action[2:].isdigit():
-        index = int(action[2:])
-        if action.startswith("ta"):
-            remember_setting_state(draft)
-            changed = await apply_named_preset(
-                context,
-                query.from_user.id if query.from_user else 0,
-                index,
-                draft,
-            )
-            answer_key = "ed_template_applied"
-        else:
-            changed = await delete_named_preset(
-                context,
-                query.from_user.id if query.from_user else 0,
-                index,
-            )
-            answer_key = "ed_template_deleted"
-        if not changed:
-            await query.answer(get_text(lang, "ed_expired"), show_alert=True)
-            return
-        await _store_draft(context, draft_id, draft)
-        await _handle_editor_navigation(
-            query,
-            context,
-            action="tp",
-            draft_id=draft_id,
-            draft=draft,
-            lang=lang,
-            answer_text=get_text(lang, answer_key),
-        )
-        return
-
-    if action in {"ti", "hi", "qi", "ci", "tn"}:
-        await _start_pending_editor_input(
-            query,
-            context,
-            draft_id=draft_id,
-            kind={
-                "ti": "intro",
-                "hi": "hashtags",
-                "qi": "schedule",
-                "ci": "cover",
-                "tn": "template_name",
-            }[action],
-            lang=lang,
-            draft=draft,
-        )
-        return
-
-    if action == "p":
-        user_id = query.from_user.id if query.from_user else 0
-        admin_chat_id = context.application.bot_data.get("admin_chat_id")
-        if (
-            not draft.get("can_publish")
-            or not user_id
-            or admin_chat_id is None
-            or user_id != admin_chat_id
-        ):
-            await query.answer(get_text(lang, "ed_admin_only"), show_alert=True)
-            return
-        target = str(
-            context.application.bot_data.get("publish_chat_id")
-            or f"@{CHANNEL_USERNAME}"
-        )
-        text, keyboard = _build_publish_confirmation(
-            draft_id,
-            draft,
-            track,
-            target=target,
-            lang=lang,
-        )
-        await query.answer()
-        await _edit_editor_message(query, context, draft, text, keyboard)
-        return
-
-    if action in {"q1", "q3", "qe", "qd"}:
-        user_id = query.from_user.id if query.from_user else 0
-        runtime = _runtime(context)
-        lock_key = f"{user_id}:schedule:{draft_id}"
-        token = await runtime.acquire_action(lock_key)
-        if token is None:
-            await query.answer(get_text(lang, "action_busy"), show_alert=True)
-            return
-        try:
-            await _schedule_editor_draft(query, context, action, draft, lang=lang)
-        finally:
-            await runtime.release_action(lock_key, token)
-        return
-
-    if action in {"pc", "r", "x", "s", "c"}:
-        user_id = query.from_user.id if query.from_user else 0
-        runtime = _runtime(context)
-        lock_key = f"{user_id}:{action}:{draft_id}"
-        token = await runtime.acquire_action(lock_key)
-        if token is None:
-            await query.answer(get_text(lang, "action_busy"), show_alert=True)
-            return
-        await _show_action_busy(query, lang)
-        try:
-            await _run_primary_editor_action(
-                query, context, action, draft_id, draft, lang
-            )
-        finally:
-            await runtime.release_action(lock_key, token)
-        return
-
-    if action in {"ra", "rc", "cr"}:
-        remember_setting_state(draft)
-        if action == "ra":
-            draft["delivery_mode"] = "auto"
-        elif action == "rc":
-            draft["delivery_mode"] = "classic"
-        else:
-            draft.pop("custom_cover_file_id", None)
-            draft.pop("custom_cover_unique_id", None)
-        await _store_draft(context, draft_id, draft)
-        await _handle_editor_navigation(
-            query,
-            context,
-            action="rs",
-            draft_id=draft_id,
-            draft=draft,
-            lang=lang,
-            answer_text=get_text(lang, "settings_saved"),
-        )
-        return
-
-    if action != "f" and not _apply_editor_setting(
-        draft,
-        action,
-        track=TrackMatch(**draft["item"]),
-        platform_order=_get_platform_order(context),
-    ):
-        await query.answer()
-        return
-
-    await query.answer(get_text(lang, "settings_saved") if action != "f" else None)
-    await _store_draft(context, draft_id, draft)
-    if query.from_user is not None:
-        await save_channel_template(context, f"user:{query.from_user.id}", draft)
-    text, keyboard = _render_track_draft(
-        draft,
-        context,
+    request = EditorActionRequest(
+        query=query,
+        context=context,
+        action=action,
         draft_id=draft_id,
-        settings=action != "f",
-        show_status=action != "f",
+        draft=draft,
+        lang=lang,
+        track=TrackMatch(**draft["item"]),
     )
-    await _edit_editor_message(query, context, draft, text, keyboard)
+    for handler in (
+        _apply_last_editor_template,
+        _reject_failed_editor_preflight,
+        _handle_editor_shortcut,
+        _handle_named_editor_template,
+        _handle_pending_editor_action,
+        _open_editor_publish_confirmation,
+        _run_locked_editor_action,
+        _handle_editor_delivery_setting,
+    ):
+        if await handler(request):
+            return
+    await _finish_editor_setting(request)
+    return
 
 
 async def _start_pending_editor_input(
@@ -1142,158 +1199,236 @@ async def _schedule_editor_draft(
     )
 
 
-async def _run_primary_editor_action(
-    query, context, action: str, draft_id: str, draft: dict, lang: str
-) -> None:
-    user_id = query.from_user.id if query.from_user else 0
-    if action == "c":
-        items, added = await add_to_crate(
-            context.application.bot_data,
-            user_id,
-            draft_id=draft_id,
-            item=draft["item"],
-        )
-        draft["in_crate"] = True
-        draft["crate_count"] = len(items)
-        await _store_draft(context, draft_id, draft)
-        await query.answer(
-            get_text(lang, "ed_crate_added").format(count=len(items))
-            if added
-            else get_text(lang, "ed_crate_exists").format(count=len(items)),
-            show_alert=False,
-        )
-        text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
-        await _edit_editor_message(query, context, draft, text, keyboard)
+async def _run_primary_editor_action(request: EditorActionRequest) -> None:
+    if request.action == "c":
+        await _add_editor_item_to_crate(request)
         return
-
-    if action == "s":
-        sent = await _deliver_draft(context, draft, target=user_id, channel_style=False)
-        await query.answer(
-            get_text(lang, "ed_sent_short" if sent else "ed_publish_failed"),
-            show_alert=not bool(sent),
-        )
-        text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
-        await _edit_editor_message(query, context, draft, text, keyboard)
+    if request.action == "s":
+        await _send_editor_post_to_user(request)
         return
-
-    admin_chat_id = context.application.bot_data.get("admin_chat_id")
-    if not user_id or admin_chat_id is None or user_id != admin_chat_id:
-        await query.answer(get_text(lang, "ed_admin_only"), show_alert=True)
-        text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
-        await _edit_editor_message(query, context, draft, text, keyboard)
-        return
-
-    track = TrackMatch(**draft["item"])
-    record = await _find_posted_record(context, track)
-    if action == "pc" and record:
-        draft["duplicate_record"] = record
-        await _store_draft(context, draft_id, draft)
-        await query.answer(
-            get_text(lang, "ed_duplicate").replace(
-                "{date}", str(record.get("date") or "")
-            ),
+    admin_chat_id = request.context.application.bot_data.get("admin_chat_id")
+    if not request.user_id or admin_chat_id != request.user_id:
+        await request.query.answer(
+            get_text(request.lang, "ed_admin_only"),
             show_alert=True,
         )
-        text, _keyboard = _render_track_draft(draft, context, draft_id=None)
-        await _edit_editor_message(
-            query,
-            context,
-            draft,
-            text,
-            _duplicate_post_keyboard(draft_id, record, lang=lang),
-        )
+        await _restore_editor_card(request)
         return
 
-    if action == "x" and record:
-        message_id = record.get("message_id")
-        target = (
-            context.application.bot_data.get("publish_chat_id")
-            or f"@{CHANNEL_USERNAME}"
+    record = await _find_posted_record(request.context, request.track)
+    if request.action == "pc" and record:
+        await _show_duplicate_editor_post(request, record)
+        return
+    if (
+        request.action == "x"
+        and record
+        and not await _delete_duplicate_editor_post(
+            request,
+            record,
         )
-        if isinstance(message_id, int) and message_id > 0:
-            try:
-                await context.bot.delete_message(
-                    chat_id=target,
-                    message_id=message_id,
-                )
-            except TelegramError:
-                await query.answer(
-                    get_text(lang, "ed_publish_failed"),
-                    show_alert=True,
-                )
-                text, _keyboard = _render_track_draft(draft, context, draft_id=None)
-                await _edit_editor_message(
-                    query,
-                    context,
-                    draft,
-                    text,
-                    _duplicate_post_keyboard(draft_id, record, lang=lang),
-                )
-                return
-        else:
-            await query.answer(
-                get_text(lang, "ed_publish_failed"),
-                show_alert=True,
-            )
-            return
+    ):
+        return
+    published = await _publish_draft(request.context, request.draft)
+    await _finish_editor_publish(request, published)
 
-    published = await _publish_draft(context, draft)
+
+async def _restore_editor_card(request: EditorActionRequest) -> None:
+    text, keyboard = _render_track_draft(
+        request.draft,
+        request.context,
+        draft_id=request.draft_id,
+    )
+    await _edit_editor_message(
+        request.query,
+        request.context,
+        request.draft,
+        text,
+        keyboard,
+    )
+
+
+async def _add_editor_item_to_crate(request: EditorActionRequest) -> None:
+    items, added = await add_to_crate(
+        request.context.application.bot_data,
+        request.user_id,
+        draft_id=request.draft_id,
+        item=request.draft["item"],
+    )
+    request.draft["in_crate"] = True
+    request.draft["crate_count"] = len(items)
+    await _store_draft(request.context, request.draft_id, request.draft)
+    answer_key = "ed_crate_added" if added else "ed_crate_exists"
+    await request.query.answer(
+        get_text(request.lang, answer_key).format(count=len(items)),
+        show_alert=False,
+    )
+    await _restore_editor_card(request)
+
+
+async def _send_editor_post_to_user(request: EditorActionRequest) -> None:
+    sent = await _deliver_draft(
+        request.context,
+        request.draft,
+        target=request.user_id,
+        channel_style=False,
+    )
+    await request.query.answer(
+        get_text(
+            request.lang,
+            "ed_sent_short" if sent else "ed_publish_failed",
+        ),
+        show_alert=not bool(sent),
+    )
+    await _restore_editor_card(request)
+
+
+async def _show_duplicate_editor_post(
+    request: EditorActionRequest,
+    record: dict,
+) -> None:
+    request.draft["duplicate_record"] = record
+    await _store_draft(request.context, request.draft_id, request.draft)
+    await request.query.answer(
+        get_text(request.lang, "ed_duplicate").replace(
+            "{date}", str(record.get("date") or "")
+        ),
+        show_alert=True,
+    )
+    text, _ = _render_track_draft(
+        request.draft,
+        request.context,
+        draft_id=None,
+    )
+    await _edit_editor_message(
+        request.query,
+        request.context,
+        request.draft,
+        text,
+        _duplicate_post_keyboard(
+            request.draft_id,
+            record,
+            lang=request.lang,
+        ),
+    )
+
+
+async def _delete_duplicate_editor_post(
+    request: EditorActionRequest,
+    record: dict,
+) -> bool:
+    message_id = record.get("message_id")
+    if not isinstance(message_id, int) or message_id <= 0:
+        await request.query.answer(
+            get_text(request.lang, "ed_publish_failed"),
+            show_alert=True,
+        )
+        return False
+    target = (
+        request.context.application.bot_data.get("publish_chat_id")
+        or f"@{CHANNEL_USERNAME}"
+    )
+    try:
+        await request.context.bot.delete_message(
+            chat_id=target,
+            message_id=message_id,
+        )
+        return True
+    except TelegramError:
+        await request.query.answer(
+            get_text(request.lang, "ed_publish_failed"),
+            show_alert=True,
+        )
+        text, _ = _render_track_draft(
+            request.draft,
+            request.context,
+            draft_id=None,
+        )
+        await _edit_editor_message(
+            request.query,
+            request.context,
+            request.draft,
+            text,
+            _duplicate_post_keyboard(
+                request.draft_id,
+                record,
+                lang=request.lang,
+            ),
+        )
+        return False
+
+
+async def _finish_editor_publish(request: EditorActionRequest, published) -> None:
     if published:
         target = (
-            context.application.bot_data.get("publish_chat_id")
+            request.context.application.bot_data.get("publish_chat_id")
             or f"@{CHANNEL_USERNAME}"
         )
         await _schedule_mark_posted(
-            context,
-            track,
+            request.context,
+            request.track,
             message=published,
             target=target,
         )
-        published_link = (
-            getattr(published, "link", None)
-            if not isinstance(published, bool)
-            else None
-        )
-        success_rows: list[list[InlineKeyboardButton]] = []
-        if isinstance(published_link, str) and published_link.startswith("http"):
-            success_rows.append(
-                [
-                    InlineKeyboardButton(
-                        get_text(lang, "ed_open_publication"),
-                        url=published_link,
-                    )
-                ]
+        await _show_editor_publish_success(request, published)
+        if request.user_id:
+            session = await _runtime(request.context).get_session(
+                request.user_id,
+                lang=request.lang,
             )
-        else:
-            success_rows.append([_channel_button()])
-        success_rows.append(
-            [
-                InlineKeyboardButton(
-                    get_text(lang, "ed_create_more"),
-                    callback_data=encode_callback("menu", "create"),
-                    style="primary",
-                )
-            ]
-        )
-        success_keyboard = InlineKeyboardMarkup(success_rows)
-        text, _ = _render_track_draft(draft, context, draft_id=None)
-        text = f"<b>{escape(get_text(lang, 'ed_published'))}</b>\n\n{text}"
-        await _edit_editor_message(query, context, draft, text, success_keyboard)
-        if query.from_user is not None:
-            session = await _runtime(context).get_session(
-                query.from_user.id,
-                lang=lang,
-            )
-            if session.active_draft_id == draft_id:
+            if session.active_draft_id == request.draft_id:
                 session.active_draft_id = ""
-                await _runtime(context).save_session(session)
-    await query.answer(
-        get_text(lang, "ed_published" if published else "ed_publish_failed"),
+                await _runtime(request.context).save_session(session)
+    await request.query.answer(
+        get_text(
+            request.lang,
+            "ed_published" if published else "ed_publish_failed",
+        ),
         show_alert=not bool(published),
     )
     if not published:
-        text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
-        await _edit_editor_message(query, context, draft, text, keyboard)
+        await _restore_editor_card(request)
+
+
+async def _show_editor_publish_success(
+    request: EditorActionRequest,
+    published,
+) -> None:
+    published_link = (
+        getattr(published, "link", None) if not isinstance(published, bool) else None
+    )
+    if isinstance(published_link, str) and published_link.startswith("http"):
+        first_row = [
+            InlineKeyboardButton(
+                get_text(request.lang, "ed_open_publication"),
+                url=published_link,
+            )
+        ]
+    else:
+        first_row = [_channel_button()]
+    keyboard = InlineKeyboardMarkup(
+        [
+            first_row,
+            [
+                InlineKeyboardButton(
+                    get_text(request.lang, "ed_create_more"),
+                    callback_data=encode_callback("menu", "create"),
+                    style="primary",
+                )
+            ],
+        ]
+    )
+    text, _ = _render_track_draft(
+        request.draft,
+        request.context,
+        draft_id=None,
+    )
+    await _edit_editor_message(
+        request.query,
+        request.context,
+        request.draft,
+        f"<b>{escape(get_text(request.lang, 'ed_published'))}</b>\n\n{text}",
+        keyboard,
+    )
 
 
 async def _show_action_busy(query, lang: str) -> None:
@@ -1894,279 +2029,30 @@ async def _consume_pending_input(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> bool:
-    message = update.effective_message
-    user = update.effective_user
-    if message is None or user is None or message.chat.type != "private":
-        return False
-    lang = _update_lang(update)
-    runtime = _runtime(context)
-    session = await runtime.get_session(user.id, lang=lang)
-    pending = session.pending_input
-    if not pending:
-        return False
-    created_at = int(pending.get("created_at") or 0)
-    if not created_at or time.time() - created_at > PENDING_INPUT_TTL_SECONDS:
-        session.pending_input = {}
-        await runtime.save_session(session)
-        return False
-    kind = str(pending.get("kind") or "")
-    saved_key = "settings_saved"
-    draft_id = str(pending.get("draft_id") or "")
-    draft = await _load_draft(context, draft_id) if draft_id else None
-    value = (_message_text(message) or "").strip()
-    if not value and kind != "cover":
-        return True
-
-    if kind == "replace_source":
-        replacement_urls = extract_supported_urls(value)
-        retry_id = str(pending.get("retry_id") or "")
-        source_index = int(pending.get("source_index") or 0) - 1
-        payload = await _load_retry_sources(context, retry_id)
-        original_urls = (
-            [str(url) for url in payload.get("urls", []) if isinstance(url, str)]
-            if isinstance(payload, dict) and int(payload.get("user_id") or 0) == user.id
-            else []
-        )
-        if len(replacement_urls) != 1 or not 0 <= source_index < len(original_urls):
-            await message.reply_text(get_text(lang, "replace_source_invalid"))
-            return True
-        original_urls[source_index] = replacement_urls[0]
-        session.pending_input = {}
-        await runtime.save_session(session)
-        prompt_message_id = pending.get("prompt_message_id")
-        if isinstance(prompt_message_id, int) and prompt_message_id > 0:
-            try:
-                await context.bot.delete_message(
-                    chat_id=int(pending.get("editor_chat_id") or message.chat_id),
-                    message_id=prompt_message_id,
-                )
-            except TelegramError:
-                LOGGER.debug("Could not clean up replacement prompt", exc_info=True)
-        token = _INPUT_OVERRIDE.set("\n".join(original_urls))
-        guard_token = _BYPASS_INTENT_GUARD.set(True)
-        try:
-            await track_lookup_message(Update(update_id=0, message=message), context)
-        finally:
-            _BYPASS_INTENT_GUARD.reset(guard_token)
-            _INPUT_OVERRIDE.reset(token)
-        return True
-
-    if (
-        kind in {"intro", "hashtags", "schedule", "cover", "template_name"}
-        and draft is None
-    ):
-        session.pending_input = {}
-        await runtime.save_session(session)
-        await message.reply_text(get_text(lang, "ed_expired"))
-        return True
-    if (
-        kind in {"intro", "hashtags", "schedule", "cover", "template_name"}
-        and draft is not None
-    ):
-        if not _draft_owned_by(draft, user.id):
-            session.pending_input = {}
-            await runtime.save_session(session)
-            await message.reply_text(get_text(lang, "ed_owner_only"))
-            return True
-        if kind == "cover":
-            photos = list(getattr(message, "photo", ()) or ())
-            if not photos:
-                await message.reply_text(get_text(lang, "ed_cover_invalid"))
-                return True
-            remember_setting_state(draft)
-            cover = photos[-1]
-            draft["custom_cover_file_id"] = str(cover.file_id)
-            unique_id = getattr(cover, "file_unique_id", None)
-            if unique_id:
-                draft["custom_cover_unique_id"] = str(unique_id)
-            draft["as_photo"] = True
-            saved_key = "ed_cover_saved"
-        elif kind == "template_name":
-            await save_named_preset(context, user.id, value, draft)
-            saved_key = "ed_template_saved"
-        elif kind == "intro":
-            remember_setting_state(draft)
-            limit = _draft_intro_limit(draft, context)
-            visible_source = strip_supported_urls(value).strip()
-            intro_html = format_user_note_html(
-                value,
-                _message_entities(message),
-                max_length=limit,
-            )
-            apply_intro_html(
-                draft,
-                intro_html,
-                visible_length=min(telegram_text_length(visible_source), limit),
-                max_length=limit,
-                truncated=telegram_text_length(visible_source) > limit,
-            )
-            saved_key = "ed_intro_saved"
-        elif kind == "hashtags":
-            remember_setting_state(draft)
-            apply_custom_tags(draft, value)
-            saved_key = "ed_tags_saved"
-        else:
-            timezone_name = str(
-                context.application.bot_data.get("timezone_name") or "Europe/Moscow"
-            )
-            publish_at = parse_schedule_datetime(
-                value,
-                timezone_name=timezone_name,
-            )
-            if publish_at is None:
-                await message.reply_text(
-                    get_text(lang, "schedule_invalid"),
-                    parse_mode=ParseMode.HTML,
-                )
-                return True
-            admin_chat_id = context.application.bot_data.get("admin_chat_id")
-            if not draft.get("can_publish") or admin_chat_id != user.id:
-                session.pending_input = {}
-                await runtime.save_session(session)
-                await message.reply_text(get_text(lang, "ed_admin_only"))
-                return True
-            try:
-                await add_job(context, dict(draft), publish_at)
-            except QueueFullError:
-                await message.reply_text(get_text(lang, "ed_queue_full"))
-                return True
-            except (QueueBusyError, QueueStorageError):
-                await message.reply_text(get_text(lang, "ed_queue_unavailable"))
-                return True
-            date = format_schedule_datetime(
-                publish_at,
-                timezone_name=timezone_name,
-            )
-            saved_key = "schedule_done"
-        await _store_draft(context, draft_id, draft)
-        if kind not in {"schedule", "cover", "template_name"}:
-            await save_channel_template(context, f"user:{user.id}", draft)
-    elif kind == "crate_title":
-        title = normalize_crate_title(value)
-        await save_crate_title(context.application.bot_data, user.id, title)
-        saved_key = "crate_name_saved"
-    else:
-        session.pending_input = {}
-        await runtime.save_session(session)
-        return False
-
-    session.pending_input = {}
-    await runtime.save_session(session)
-    for key in ("prompt_message_id",):
-        message_id = pending.get(key)
-        if isinstance(message_id, int) and message_id > 0:
-            try:
-                await context.bot.delete_message(
-                    chat_id=int(pending.get("editor_chat_id") or message.chat_id),
-                    message_id=message_id,
-                )
-            except TelegramError:
-                LOGGER.debug("Could not clean up native editor input", exc_info=True)
-
-    editor_message_id = pending.get("editor_message_id")
-    editor_chat_id = int(pending.get("editor_chat_id") or message.chat_id)
-
-    if kind == "crate_title":
-        items = await load_crate(context.application.bot_data, user.id)
-        title = await load_crate_title(context.application.bot_data, user.id)
-        text, keyboard = _render_bot_crate(items, lang=lang, title=title)
-        restored = await _edit_pending_screen(
-            context,
-            chat_id=editor_chat_id,
-            message_id=editor_message_id,
-            text=f"<b>{escape(get_text(lang, saved_key))}</b>\n\n{text}",
-            keyboard=keyboard,
-        )
-        if not restored:
-            await message.reply_text(
-                f"<b>{escape(get_text(lang, saved_key))}</b>\n\n{text}",
-                parse_mode=ParseMode.HTML,
-                reply_markup=keyboard,
-            )
-        return True
-
-    if draft is not None:
-        text, keyboard = _render_track_draft(
-            draft,
-            context,
-            draft_id=draft_id,
-            settings=True,
-            show_status=True,
-        )
-        track = TrackMatch(**draft["item"])
-        saved_label = (
-            get_text(lang, saved_key).format(date=date)
-            if saved_key == "schedule_done"
-            else get_text(lang, saved_key)
-        )
-        restored = await _edit_pending_screen(
-            context,
-            chat_id=editor_chat_id,
-            message_id=editor_message_id,
-            text=f"<b>{escape(saved_label)}</b>\n\n{text}",
-            keyboard=keyboard,
-            preview_url=_select_preview_url(track.links, context)
-            or track.thumbnail_url,
-            prefer_large_preview=bool(draft.get("large_preview")),
-        )
-        if not restored:
-            await message.reply_text(
-                f"<b>{escape(saved_label)}</b>\n\n{text}",
-                parse_mode=ParseMode.HTML,
-                link_preview_options=_build_link_preview_options(
-                    _select_preview_url(track.links, context) or track.thumbnail_url,
-                    prefer_large_media=bool(draft.get("large_preview")),
-                ),
-                reply_markup=keyboard,
-            )
-    return True
+    return await _consume_pending_input_impl(
+        update,
+        context,
+        retry_lookup=_retry_pending_lookup,
+    )
 
 
-async def _edit_pending_screen(
-    context,
-    *,
-    chat_id: int,
-    message_id: object,
-    text: str,
-    keyboard,
-    preview_url: str | None = None,
-    prefer_large_preview: bool = False,
-) -> bool:
-    if not isinstance(message_id, int) or message_id <= 0:
-        return False
-    edit = getattr(context.bot, "edit_message_text", None)
-    if not callable(edit):
-        return False
+async def _retry_pending_lookup(message, context, urls: list[str]) -> None:
+    token = _INPUT_OVERRIDE.set("\n".join(urls))
+    guard_token = _BYPASS_INTENT_GUARD.set(True)
     try:
-        kwargs = {
-            "chat_id": chat_id,
-            "message_id": message_id,
-            "text": text,
-            "parse_mode": ParseMode.HTML,
-            "reply_markup": keyboard,
-        }
-        if preview_url:
-            kwargs["link_preview_options"] = _build_link_preview_options(
-                preview_url,
-                prefer_large_media=prefer_large_preview,
-            )
-        await edit(**kwargs)
-        return True
-    except TelegramError:
-        LOGGER.debug("Could not restore editor in place", exc_info=True)
-        return False
+        await track_lookup_message(Update(update_id=0, message=message), context)
+    finally:
+        _BYPASS_INTENT_GUARD.reset(guard_token)
+        _INPUT_OVERRIDE.reset(token)
 
 
-async def _track_lookup_message_impl(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
-    message = update.effective_message
-    if message is None:
-        return
-
+async def _handle_lookup_input_mode(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    message: Message,
+) -> bool:
     if await _consume_pending_input(update, context):
-        return
-
+        return True
     if message.chat.type == "private" and getattr(message, "audio", None) is not None:
         user_id = update.effective_user.id if update.effective_user else message.chat_id
         await _send_uploaded_audio_draft(
@@ -2175,32 +2061,29 @@ async def _track_lookup_message_impl(
             user_id=user_id,
             lang=_update_lang(update),
         )
-        return
-
-    # PHOTO is registered so the custom-cover Force Reply works. An unrelated
-    # photo without a caption is not a search request and should stay silent.
+        return True
     if (
         message.chat.type == "private"
         and getattr(message, "photo", None)
         and not (_message_text(message) or "").strip()
     ):
-        return
-
-    # Posts inserted through this bot's own inline mode arrive as regular
-    # messages; re-processing them would send their text into search.
+        return True
     via_bot = getattr(message, "via_bot", None)
-    if via_bot is not None and via_bot.id == getattr(context.bot, "id", None):
-        return
+    return via_bot is not None and via_bot.id == getattr(context.bot, "id", None)
 
-    message_text = _INPUT_OVERRIDE.get() or _message_text(message) or ""
+
+def _build_lookup_request(update: Update, context, message: Message) -> LookupRequest:
+    override = _INPUT_OVERRIDE.get()
+    message_text = override or _message_text(message) or ""
     is_private = message.chat.type == "private"
-    request = LookupRequest(
+    source_urls = (
+        extract_supported_urls(message_text)
+        if override is not None
+        else _message_source_urls(message, text=message_text)
+    )[:MAX_LINKS_PER_MESSAGE]
+    return LookupRequest(
         message_text=message_text,
-        source_urls=(
-            extract_supported_urls(message_text)
-            if _INPUT_OVERRIDE.get() is not None
-            else _message_source_urls(message, text=message_text)
-        )[:MAX_LINKS_PER_MESSAGE],
+        source_urls=source_urls,
         is_private=is_private,
         lang=_update_lang(update) if is_private else "ru",
         user_id=(
@@ -2210,143 +2093,191 @@ async def _track_lookup_message_impl(
         include_hashtags=_should_include_hashtags(message),
         search_query=(_SEARCH_QUERY_OVERRIDE.get() or "").strip() or None,
     )
-    source_urls = request.source_urls
-    lang = request.lang
-    user_id = request.user_id
-    runtime = _runtime(context)
-    search_query = request.search_query
-    if is_private:
-        action_kind = detect_action(message_text or "", source_urls, is_private=True)
-        allowed, retry_after = await runtime.allow_user_request(user_id)
-        if not allowed:
-            await _reply_with_flow_error(
-                message,
-                context,
-                BotFlowError(
-                    BotErrorCode.RATE_LIMITED,
-                    detail=str(retry_after),
-                ),
-                lang=lang,
-            )
-            return
-        intent_value = (
-            "\n".join(sorted(cache_key_for_url(url) for url in source_urls))
-            if source_urls
-            else message_text or ""
-        )
-        if not _BYPASS_INTENT_GUARD.get() and not await runtime.claim_intent(
-            user_id,
-            kind=action_kind,
-            value=intent_value,
-        ):
-            return
-        if action_kind == "help":
-            await _reply_with_menu(message, context, MENU_HELP, lang=lang)
-            return
-        request_token = await runtime.begin_request(user_id)
-        runtime.record_funnel("started")
-        remembered_value = search_query or message_text or ""
-        if not search_query and len(source_urls) == 1:
-            remembered_value = source_urls[0]
-        await runtime.remember_action(
-            user_id,
-            kind="search" if search_query or not source_urls else "resolve",
-            value=remembered_value,
-            lang=lang,
-        )
-    found_via_search = search_query is not None
-    if not source_urls:
-        if not is_private:
-            return
 
-        search_result = await _resolve_search_sources(
+
+async def _admit_private_lookup(
+    message: Message,
+    context: ContextTypes.DEFAULT_TYPE,
+    request: LookupRequest,
+):
+    if not request.is_private:
+        return True, None
+    runtime = _runtime(context)
+    action_kind = detect_action(
+        request.message_text,
+        request.source_urls,
+        is_private=True,
+    )
+    allowed, retry_after = await runtime.allow_user_request(request.user_id)
+    if not allowed:
+        await _reply_with_flow_error(
             message,
             context,
-            message_text,
-            user_id=user_id,
-            lang=lang,
+            BotFlowError(BotErrorCode.RATE_LIMITED, detail=str(retry_after)),
+            lang=request.lang,
         )
-        if search_result is None:
-            return
-        source_urls, found_via_search, search_query = search_result
-        request.source_urls = source_urls
-        request.found_via_search = found_via_search
-        request.search_query = search_query
+        return False, None
+    intent_value = (
+        "\n".join(sorted(cache_key_for_url(url) for url in request.source_urls))
+        if request.source_urls
+        else request.message_text
+    )
+    if not _BYPASS_INTENT_GUARD.get() and not await runtime.claim_intent(
+        request.user_id,
+        kind=action_kind,
+        value=intent_value,
+    ):
+        return False, None
+    if action_kind == "help":
+        await _reply_with_menu(message, context, MENU_HELP, lang=request.lang)
+        return False, None
+    request_token = await runtime.begin_request(request.user_id)
+    runtime.record_funnel("started")
+    remembered_value = request.search_query or request.message_text
+    if not request.search_query and len(request.source_urls) == 1:
+        remembered_value = request.source_urls[0]
+    await runtime.remember_action(
+        request.user_id,
+        kind="search" if request.search_query or not request.source_urls else "resolve",
+        value=remembered_value,
+        lang=request.lang,
+    )
+    return True, request_token
 
-    if is_private and not await runtime.request_is_current(user_id, request_token):
+
+async def _resolve_request_sources(
+    message: Message,
+    context: ContextTypes.DEFAULT_TYPE,
+    request: LookupRequest,
+) -> bool:
+    if request.source_urls:
+        request.found_via_search = request.search_query is not None
+        return True
+    if not request.is_private:
+        return False
+    search_result = await _resolve_search_sources(
+        message,
+        context,
+        request.message_text,
+        user_id=request.user_id,
+        lang=request.lang,
+    )
+    if search_result is None:
+        return False
+    source_urls, found_via_search, search_query = search_result
+    request.source_urls = source_urls
+    request.found_via_search = found_via_search
+    request.search_query = search_query
+    return True
+
+
+async def _ensure_current_lookup(context, request: LookupRequest, token) -> None:
+    if request.is_private and not await _runtime(context).request_is_current(
+        request.user_id,
+        token,
+    ):
         raise asyncio.CancelledError
 
-    if message.chat.type == "channel":
-        access = await check_publish_access(context, message.chat_id)
-        if not access.allowed or not access.can_delete:
-            missing = (
-                "публиковать" if not access.allowed else "удалять исходные сообщения"
-            )
-            await _notify_admin(
-                context,
-                f"Автозамена в канале {message.chat_id} остановлена: "
-                f"бот не может {missing}. {access.detail}",
-                only_for_channel_message=message,
-            )
-            return
 
-    # The whole message was the search query, so quoting it back is noise.
+async def _ensure_channel_publish_access(
+    message: Message,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> bool:
+    if message.chat.type != "channel":
+        return True
+    access = await check_publish_access(context, message.chat_id)
+    if access.allowed and access.can_delete:
+        return True
+    missing = "публиковать" if not access.allowed else "удалять исходные сообщения"
+    await _notify_admin(
+        context,
+        f"Автозамена в канале {message.chat_id} остановлена: "
+        f"бот не может {missing}. {access.detail}",
+        only_for_channel_message=message,
+    )
+    return False
+
+
+async def _start_lookup_progress(
+    message: Message,
+    context: ContextTypes.DEFAULT_TYPE,
+    request: LookupRequest,
+) -> None:
+    if not request.is_private:
+        await _send_typing_action(context.bot, message)
+        return
+    await _send_loading_placeholder(
+        message,
+        request.lang,
+        total=max(1, len(request.source_urls)),
+    )
+    if len(request.source_urls) > 1:
+        await _update_progress_text(
+            get_text(request.lang, "progress_batch_links").format(
+                total=len(request.source_urls)
+            ),
+            stage=2,
+            lang=request.lang,
+        )
+    else:
+        await _update_loading_placeholder(request.lang, "progress_links")
+
+
+async def _update_resolved_progress(request: LookupRequest, bundle) -> None:
+    if not request.is_private:
+        return
+    if len(request.source_urls) == 1:
+        await _update_loading_placeholder(request.lang, "progress_card")
+        return
+    await _update_progress_text(
+        get_text(
+            request.lang,
+            "progress_batch"
+            if bundle.is_complete_for(request.source_urls)
+            else "progress_batch_partial",
+        ).format(done=bundle.item_count, total=len(request.source_urls)),
+        lang=request.lang,
+    )
+
+
+async def _track_lookup_message_impl(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    message = update.effective_message
+    if message is None:
+        return
+
+    if await _handle_lookup_input_mode(update, context, message):
+        return
+    request = _build_lookup_request(update, context, message)
+    accepted, request_token = await _admit_private_lookup(message, context, request)
+    if not accepted or not await _resolve_request_sources(message, context, request):
+        return
+    await _ensure_current_lookup(context, request, request_token)
+    if not await _ensure_channel_publish_access(message, context):
+        return
     user_prefix = (
         ""
-        if found_via_search
+        if request.prefix_is_noise
         else _build_user_prefix(message, bot_username=context.bot.username)
     )
-    if is_private:
-        await _send_loading_placeholder(
-            message,
-            lang,
-            total=max(1, len(source_urls)),
-        )
-        if len(source_urls) > 1:
-            await _update_progress_text(
-                get_text(lang, "progress_batch_links").format(
-                    total=len(source_urls),
-                ),
-                stage=2,
-                lang=lang,
-            )
-        else:
-            await _update_loading_placeholder(lang, "progress_links")
-    else:
-        await _send_typing_action(context.bot, message)
-
+    await _start_lookup_progress(message, context, request)
     bundle = await _bot_lookup.resolve_sources(
-        context.application.bot_data, source_urls
+        context.application.bot_data,
+        request.source_urls,
     )
-    if is_private and not await runtime.request_is_current(user_id, request_token):
-        raise asyncio.CancelledError
-    if is_private and bundle.item_count:
-        runtime.record_funnel("resolved")
-    if is_private:
-        if len(source_urls) > 1:
-            await _update_progress_text(
-                get_text(
-                    lang,
-                    "progress_batch"
-                    if bundle.is_complete_for(source_urls)
-                    else "progress_batch_partial",
-                ).format(
-                    done=bundle.item_count,
-                    total=len(source_urls),
-                ),
-                lang=lang,
-            )
-        else:
-            await _update_loading_placeholder(lang, "progress_card")
+    await _ensure_current_lookup(context, request, request_token)
+    if request.is_private and bundle.item_count:
+        _runtime(context).record_funnel("resolved")
+    await _update_resolved_progress(request, bundle)
     if await _handle_empty_lookup(
         message,
         context,
         bundle,
-        source_urls,
-        lang=lang,
+        request.source_urls,
+        lang=request.lang,
     ):
         return
-
     await _deliver_lookup_bundle(
         message,
         context,

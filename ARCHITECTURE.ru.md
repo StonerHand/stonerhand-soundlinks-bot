@@ -2,7 +2,7 @@
 
 Документ описывает текущую production-архитектуру Telegram-бота.
 
-> Актуальная схема для релиза 1.8.2. Все пользовательские сценарии сходятся в
+> Актуальная схема для релиза 1.9.0. Все пользовательские сценарии сходятся в
 > одном конвейере публикации и остаются внутри Telegram.
 
 ## Контур системы
@@ -35,8 +35,11 @@ webhook `/api/telegram`. Polling используется исключитель
 ## Основные модули
 
 - `bot_app.py` — единственная точка сборки PTB Application и регистрации handlers;
-- `bot.py` — orchestration поиска, карточки и публикации без переэкспорта
-  команд, UI и lookup-реализаций;
+- `bot.py` — линейная orchestration поиска, редактора и публикации без
+  переэкспорта команд, UI и lookup-реализаций;
+- `bot_pending.py` — нативный Force Reply, валидация ожидаемого ввода и
+  восстановление исходного экрана;
+- `bot_editor_state.py` — чистые переходы и мутации состояния конструктора;
 - `bot_menu.py` — команды, стартовый экран, onboarding и навигация;
 - `bot_crate_handlers.py` — действия и undo пользовательской подборки;
 - `bot_actions.py` — единый контракт всех callback-действий;
@@ -55,7 +58,11 @@ webhook `/api/telegram`. Polling используется исключитель
 - `publication_preflight.py` — блокирующая проверка карточки перед delivery;
 - `publication_presets.py` — именованные пользовательские шаблоны оформления;
 - `publication_model.py` — независимая от Telegram модель готовой публикации;
-- `rich_publications.py` — безопасный Rich HTML, карточки, медиагруппы и fallback;
+- `rich_rendering.py` — чистый безопасный Rich HTML, карточки, медиагруппы и
+  Classic fallback;
+- `rich_publications.py` — тонкий транспорт Rich Messages и capability fallback;
+- `i18n.py` и `locales/catalog.json` — загрузка, маршрутизация и контракт RU/EN
+  UI-текстов без исполняемого словаря в коде;
 - `release_hubs.py` — канонические Songlink/Odesli URL для треков, альбомов и
   подкастов независимо от источника метаданных;
 - `telegram_gateway.py` — изолированный контракт новых методов Bot API 10.3;

@@ -6,7 +6,7 @@
 
 [Открыть бота](https://t.me/StonerHandBot) · [Посмотреть канал](https://t.me/stonerhand) · [English](README.md)
 
-![Release](https://img.shields.io/badge/release-1.8.2-5b5bd6?style=flat-square)
+![Release](https://img.shields.io/badge/release-1.9.0-5b5bd6?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
@@ -79,6 +79,10 @@ StonerHand — музыкальный редактор, который полн�
 2. предлагает изменить только нужные параметры;
 3. выполняет финальную проверку;
 4. отправляет или публикует одним явным действием.
+
+Нативные ответы, callback-действия редактора и поиск разделены с отображением.
+UI-тексты хранятся в отдельном RU/EN-каталоге: формулировки меняются без правки
+исполняемого сценария, а полнота переводов и плейсхолдеры проверяются тестами.
 
 В подборках кнопки подстраиваются под содержание: общий исполнитель не
 повторяется, служебный remaster-хвост не занимает место, короткие названия стоят

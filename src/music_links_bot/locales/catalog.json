@@ -1,0 +1,910 @@
+{
+  "action_busy": {
+    "en": "This action is already running. Give it a few seconds.",
+    "ru": "Это действие уже выполняется. Подожди пару секунд."
+  },
+  "action_duplicate": {
+    "en": "Already done — nothing was sent twice.",
+    "ru": "Уже готово — повторно ничего не отправлял."
+  },
+  "back": {
+    "en": "← Back",
+    "ru": "← Назад"
+  },
+  "back_to_editor": {
+    "en": "← Back to settings",
+    "ru": "← К настройкам"
+  },
+  "cancel": {
+    "en": "Cancel",
+    "ru": "Отмена"
+  },
+  "crate_clear": {
+    "en": "Clear",
+    "ru": "Очистить"
+  },
+  "crate_clear_confirm": {
+    "en": "<b>Clear the whole crate?</b>\n\nAll tracks will be removed. You can restore them with Undo.",
+    "ru": "<b>Очистить всю подборку?</b>\n\nВсе треки будут удалены. После очистки их можно вернуть кнопкой «Отменить»."
+  },
+  "crate_clear_confirm_button": {
+    "en": "Clear crate",
+    "ru": "Очистить подборку"
+  },
+  "crate_down": {
+    "en": "↓ Down",
+    "ru": "↓ Ниже"
+  },
+  "crate_empty": {
+    "en": "🧺 <b>Your crate is empty</b>\n<i>Collect up to ten releases into one music set.</i>\n\n<blockquote>Add tracks with the “+ Add to crate” button under a finished card.</blockquote>",
+    "ru": "🧺 <b>Подборка пока пустая</b>\n<i>Собери до десяти релизов в один музыкальный сет.</i>\n\n<blockquote>Добавляй треки кнопкой «+ В подборку» под готовой карточкой.</blockquote>"
+  },
+  "crate_find": {
+    "en": "+ Find the first track",
+    "ru": "+ Найти первый трек"
+  },
+  "crate_hint": {
+    "en": "<blockquote>Select a track number to reorder or remove it.</blockquote>",
+    "ru": "<blockquote>Выбери номер трека, чтобы изменить порядок или удалить его.</blockquote>"
+  },
+  "crate_name_prompt": {
+    "en": "Send the collection name in one message.",
+    "ru": "Напиши название подборки одним сообщением."
+  },
+  "crate_name_saved": {
+    "en": "Name saved",
+    "ru": "Название сохранено"
+  },
+  "crate_preview": {
+    "en": "👁 Preview",
+    "ru": "👁 Превью"
+  },
+  "crate_preview_title": {
+    "en": "Collection",
+    "ru": "Подборка"
+  },
+  "crate_remove": {
+    "en": "✕ Remove",
+    "ru": "✕ Удалить"
+  },
+  "crate_removed": {
+    "en": "Track removed",
+    "ru": "Трек удалён"
+  },
+  "crate_rename": {
+    "en": "✏️ Name",
+    "ru": "✏️ Название"
+  },
+  "crate_reorder": {
+    "en": "Reorder",
+    "ru": "Порядок"
+  },
+  "crate_restored": {
+    "en": "Track restored",
+    "ru": "Трек возвращён"
+  },
+  "crate_title": {
+    "en": "🧺 <b>My crate · {count}/10</b>",
+    "ru": "🧺 <b>Моя подборка · {count}/10</b>"
+  },
+  "crate_undo": {
+    "en": "Undo removal",
+    "ru": "Вернуть удалённый"
+  },
+  "crate_up": {
+    "en": "↑ Up",
+    "ru": "↑ Выше"
+  },
+  "crate_view": {
+    "en": "Open crate",
+    "ru": "Открыть подборку"
+  },
+  "create_prompt": {
+    "en": "🔎 <b>New card</b>\n\nSend your next message with:\n• a track, album, playlist or artist link\n• a title as <code>artist — track</code>\n• several links, one per line, for a collection\n\n<blockquote><code>Deftones — Rickets</code></blockquote>\nText above a link becomes the post intro.",
+    "ru": "🔎 <b>Новая карточка</b>\n\nОтправь следующим сообщением:\n• ссылку на трек, альбом, плейлист или артиста\n• название в формате <code>артист — трек</code>\n• несколько ссылок, каждую с новой строки — для подборки\n\n<blockquote><code>Deftones — Rickets</code></blockquote>\nСвой текст над ссылкой станет подводкой к посту."
+  },
+  "duplicate_open": {
+    "en": "Open old post",
+    "ru": "Открыть старый пост"
+  },
+  "duplicate_repeat": {
+    "en": "Publish again",
+    "ru": "Опубликовать снова"
+  },
+  "duplicate_replace": {
+    "en": "Replace old post",
+    "ru": "Заменить старый пост"
+  },
+  "ed_actions_title": {
+    "en": "🚀 <b>Delivery</b>\n<i>Choose where to send the finished post.</i>",
+    "ru": "🚀 <b>Отправка</b>\n<i>Выбери, куда отправить готовый пост.</i>"
+  },
+  "ed_add_crate": {
+    "en": "+ Add to crate",
+    "ru": "+ В подборку"
+  },
+  "ed_admin_only": {
+    "en": "Only the bot owner can publish to the channel",
+    "ru": "Публиковать в канал может только владелец бота"
+  },
+  "ed_clean_preview": {
+    "en": "👁 Preview",
+    "ru": "👁 Превью"
+  },
+  "ed_constructor_hint": {
+    "en": "Tap a setting to update the preview instantly",
+    "ru": "Нажимай параметры — превью обновится сразу"
+  },
+  "ed_constructor_title": {
+    "en": "Card builder",
+    "ru": "Конструктор карточки"
+  },
+  "ed_cover_auto": {
+    "en": "Artwork · auto",
+    "ru": "Обложка · авто"
+  },
+  "ed_cover_custom": {
+    "en": "Artwork · custom",
+    "ru": "Обложка · своя"
+  },
+  "ed_cover_invalid": {
+    "en": "Send a photo, not a document.",
+    "ru": "Нужна фотография. Отправь изображение без файла-документа."
+  },
+  "ed_cover_prompt": {
+    "en": "<b>Send new artwork</b>\nReply with one photo. It will be used only for this card.\n<code>/cancel</code> — cancel",
+    "ru": "<b>Пришли новую обложку</b>\nОтветь одной фотографией. Бот сохранит её только для этой карточки.\n<code>/cancel</code> — отменить"
+  },
+  "ed_cover_reset": {
+    "en": "Restore release artwork",
+    "ru": "Вернуть обложку релиза"
+  },
+  "ed_cover_saved": {
+    "en": "Artwork saved",
+    "ru": "Обложка сохранена"
+  },
+  "ed_crate_added": {
+    "en": "Added · {count}/10",
+    "ru": "Добавлено · {count}/10"
+  },
+  "ed_crate_count": {
+    "en": "In crate · {count}/10",
+    "ru": "В подборке · {count}/10"
+  },
+  "ed_crate_exists": {
+    "en": "Already in crate · {count}/10",
+    "ru": "Уже в подборке · {count}/10"
+  },
+  "ed_create_more": {
+    "en": "+ Create another",
+    "ru": "+ Создать ещё"
+  },
+  "ed_delete": {
+    "en": "🗑 Delete",
+    "ru": "🗑 Удалить"
+  },
+  "ed_delete_confirm": {
+    "en": "<b>Delete this card?</b>\n\nYou will have 15 seconds to undo it.",
+    "ru": "<b>Удалить эту карточку?</b>\n\nПосле удаления будет 15 секунд на отмену."
+  },
+  "ed_delete_confirm_button": {
+    "en": "Delete card",
+    "ru": "Удалить карточку"
+  },
+  "ed_deleted": {
+    "en": "<b>Card deleted</b>\n\nYou can undo this for 15 seconds.",
+    "ru": "<b>Карточка удалена</b>\n\nОтменить можно в течение 15 секунд."
+  },
+  "ed_delivery_auto": {
+    "en": "Telegram · auto",
+    "ru": "Telegram · авто"
+  },
+  "ed_delivery_auto_name": {
+    "en": "Auto — modern card",
+    "ru": "Авто — современная карточка"
+  },
+  "ed_delivery_classic": {
+    "en": "Telegram · classic",
+    "ru": "Telegram · классика"
+  },
+  "ed_delivery_classic_name": {
+    "en": "Classic — regular message",
+    "ru": "Классика — обычное сообщение"
+  },
+  "ed_delivery_title": {
+    "en": "📨 <b>Telegram format</b>\n<i>Auto uses the new format and safely falls back to a classic message.</i>",
+    "ru": "📨 <b>Формат Telegram</b>\n<i>Авто использует новый формат и безопасно откатывается к обычному сообщению.</i>"
+  },
+  "ed_done": {
+    "en": "✓ Done",
+    "ru": "✓ Готово"
+  },
+  "ed_duplicate": {
+    "en": "⚠️ Already published on {date}. Tap 📤 again to publish anyway",
+    "ru": "⚠️ Уже публиковалось {date}. Нажми 📤 ещё раз, чтобы опубликовать снова"
+  },
+  "ed_edit": {
+    "en": "Edit",
+    "ru": "Изменить"
+  },
+  "ed_expired": {
+    "en": "This card has expired — send the link again",
+    "ru": "Карточка устарела — пришли ссылку заново"
+  },
+  "ed_hashtags_auto": {
+    "en": "# Hashtags · auto",
+    "ru": "# Хэштеги · авто"
+  },
+  "ed_hashtags_custom": {
+    "en": "# Custom · {count}",
+    "ru": "# Свои · {count}"
+  },
+  "ed_hashtags_none": {
+    "en": "# No hashtags",
+    "ru": "# Без хэштегов"
+  },
+  "ed_hashtags_title": {
+    "en": "#️⃣ <b>Hashtags</b>\n<i>Auto adds the release type and only a verified genre. Uncertain genres are omitted.</i>",
+    "ru": "#️⃣ <b>Хэштеги</b>\n<i>Авто добавляет тип релиза и только подтверждённый жанр. Сомнительный жанр будет пропущен.</i>"
+  },
+  "ed_intro_add": {
+    "en": "+ Add intro",
+    "ru": "+ Добавить подводку"
+  },
+  "ed_intro_change": {
+    "en": "Edit intro",
+    "ru": "Изменить подводку"
+  },
+  "ed_intro_counter": {
+    "en": "Intro: {used}/{limit}",
+    "ru": "Подводка: {used}/{limit}"
+  },
+  "ed_intro_prompt": {
+    "en": "<b>Waiting for an intro</b>\nReply with one message — up to {limit} characters are available. Telegram formatting is preserved.\n<code>/cancel</code> — cancel",
+    "ru": "<b>Жду подводку</b>\nОтветь одним сообщением — доступно до {limit} символов. Форматирование Telegram сохранится.\n<code>/cancel</code> — отменить"
+  },
+  "ed_intro_remove": {
+    "en": "Remove intro",
+    "ru": "Убрать подводку"
+  },
+  "ed_intro_saved": {
+    "en": "Intro saved",
+    "ru": "Подводка сохранена"
+  },
+  "ed_intro_title": {
+    "en": "✍️ <b>Intro</b>\n<i>A short personal note before the release.</i>",
+    "ru": "✍️ <b>Подводка</b>\n<i>Короткий авторский текст перед релизом.</i>"
+  },
+  "ed_intro_will_trim": {
+    "en": "⚠️ The intro is longer than the available space and will be shortened",
+    "ru": "⚠️ Подводка длиннее доступного места и будет сокращена"
+  },
+  "ed_last_template": {
+    "en": "↻ Same as last time",
+    "ru": "↻ Как в прошлый раз"
+  },
+  "ed_last_template_applied": {
+    "en": "Previous format restored",
+    "ru": "Прошлый формат восстановлен"
+  },
+  "ed_more": {
+    "en": "Send",
+    "ru": "Отправить"
+  },
+  "ed_open_publication": {
+    "en": "Open publication",
+    "ru": "Открыть публикацию"
+  },
+  "ed_owner_only": {
+    "en": "This card belongs to another user",
+    "ru": "Эта карточка принадлежит другому пользователю"
+  },
+  "ed_platforms_all_short": {
+    "en": "all",
+    "ru": "все"
+  },
+  "ed_platforms_audio": {
+    "en": "Platforms · not needed",
+    "ru": "Площадки · не нужны"
+  },
+  "ed_platforms_select_all": {
+    "en": "Select all",
+    "ru": "Выбрать все"
+  },
+  "ed_platforms_selected": {
+    "en": "Platforms · {count}",
+    "ru": "Площадки · {count}"
+  },
+  "ed_platforms_title": {
+    "en": "🎛 <b>Platforms</b>\n<i>Select the buttons to keep in the post.</i>",
+    "ru": "🎛 <b>Площадки</b>\n<i>Отметь кнопки, которые нужны в посте.</i>"
+  },
+  "ed_preflight_missing_links": {
+    "en": "⛔ This release has no working delivery link",
+    "ru": "⛔ У релиза нет рабочей ссылки для отправки"
+  },
+  "ed_preflight_missing_title": {
+    "en": "⛔ Artist or title is missing",
+    "ru": "⛔ Не удалось определить исполнителя или название"
+  },
+  "ed_preflight_no_platforms": {
+    "en": "⛔ Select at least one platform",
+    "ru": "⛔ Выбери хотя бы одну площадку"
+  },
+  "ed_preflight_warnings": {
+    "en": "⚠️ Check: {count} warning(s)",
+    "ru": "⚠️ Проверка: замечаний — {count}"
+  },
+  "ed_preset_cover": {
+    "en": "Style · Cover",
+    "ru": "Стиль · Обложка"
+  },
+  "ed_preset_longread": {
+    "en": "Style · Longread",
+    "ru": "Стиль · Лонгрид"
+  },
+  "ed_preset_minimal": {
+    "en": "Style · Minimal",
+    "ru": "Стиль · Минимал"
+  },
+  "ed_preset_name_cover": {
+    "en": "Cover — large preview",
+    "ru": "Обложка — крупное превью"
+  },
+  "ed_preset_name_longread": {
+    "en": "Longread — editorial post",
+    "ru": "Лонгрид — текстовая публикация"
+  },
+  "ed_preset_name_minimal": {
+    "en": "Minimal — compact preview",
+    "ru": "Минимал — компактное превью"
+  },
+  "ed_publish": {
+    "en": "📤 To channel",
+    "ru": "📤 В канал"
+  },
+  "ed_publish_failed": {
+    "en": "Could not publish — check the bot's rights in the channel",
+    "ru": "Не получилось опубликовать — проверь права бота в канале"
+  },
+  "ed_published": {
+    "en": "Published to the channel 🎉",
+    "ru": "Опубликовано в канал 🎉"
+  },
+  "ed_queue_full": {
+    "en": "The queue is full — publish or remove one of the 50 posts first",
+    "ru": "Очередь заполнена — сначала опубликуй или удали один из 50 постов"
+  },
+  "ed_queue_unavailable": {
+    "en": "The queue is temporarily unavailable — try again in a few seconds",
+    "ru": "Очередь временно недоступна — попробуй ещё раз через несколько секунд"
+  },
+  "ed_schedule": {
+    "en": "🕒 Schedule",
+    "ru": "🕒 Запланировать"
+  },
+  "ed_send_self": {
+    "en": "Send to me",
+    "ru": "Отправить себе"
+  },
+  "ed_sent": {
+    "en": "Done — the post is below",
+    "ru": "Готово — пост отправлен ниже"
+  },
+  "ed_sent_short": {
+    "en": "Done · post sent",
+    "ru": "Готово · пост отправлен"
+  },
+  "ed_status": {
+    "en": "{preset} · platforms: {services} · saved",
+    "ru": "{preset} · площадок: {services} · сохранено"
+  },
+  "ed_status_audio": {
+    "en": "{preset} · Telegram audio · saved",
+    "ru": "{preset} · аудио Telegram · сохранено"
+  },
+  "ed_style_title": {
+    "en": "🎨 <b>Card style</b>\n<i>Choose one clear format.</i>",
+    "ru": "🎨 <b>Стиль карточки</b>\n<i>Выбери один понятный формат.</i>"
+  },
+  "ed_tags_auto": {
+    "en": "Automatic",
+    "ru": "Автоматические"
+  },
+  "ed_tags_custom": {
+    "en": "Custom hashtags",
+    "ru": "Свои хэштеги"
+  },
+  "ed_tags_none": {
+    "en": "No hashtags",
+    "ru": "Без хэштегов"
+  },
+  "ed_tags_prompt": {
+    "en": "<b>Waiting for hashtags</b>\nSend up to five separated by spaces: <code>#stonerrock #newmusic</code>\n<code>/cancel</code> — cancel",
+    "ru": "<b>Жду хэштеги</b>\nПришли до пяти через пробел: <code>#stonerrock #newmusic</code>\n<code>/cancel</code> — отменить"
+  },
+  "ed_tags_saved": {
+    "en": "Hashtags saved",
+    "ru": "Хэштеги сохранены"
+  },
+  "ed_template_applied": {
+    "en": "Template applied",
+    "ru": "Шаблон применён"
+  },
+  "ed_template_deleted": {
+    "en": "Template deleted",
+    "ru": "Шаблон удалён"
+  },
+  "ed_template_prompt": {
+    "en": "<b>Template name</b>\nFor example: <code>Album of the week</code> or <code>Minimal</code>.\n<code>/cancel</code> — cancel",
+    "ru": "<b>Название шаблона</b>\nНапример: <code>Альбом недели</code> или <code>Минимал</code>.\n<code>/cancel</code> — отменить"
+  },
+  "ed_template_save": {
+    "en": "+ Save current",
+    "ru": "+ Сохранить текущий"
+  },
+  "ed_template_saved": {
+    "en": "Template saved",
+    "ru": "Шаблон сохранён"
+  },
+  "ed_template_unnamed": {
+    "en": "Untitled",
+    "ru": "Без названия"
+  },
+  "ed_templates": {
+    "en": "Templates",
+    "ru": "Шаблоны"
+  },
+  "ed_templates_title": {
+    "en": "🗂 <b>Design templates</b>\n<i>Save a set of options and apply it with one tap.</i>",
+    "ru": "🗂 <b>Шаблоны оформления</b>\n<i>Сохрани набор настроек и применяй его одним нажатием.</i>"
+  },
+  "ed_text_off": {
+    "en": "Intro · none",
+    "ru": "Подводка · нет"
+  },
+  "ed_text_on": {
+    "en": "Intro · on",
+    "ru": "Подводка · есть"
+  },
+  "ed_undo_delete": {
+    "en": "Restore card",
+    "ru": "Вернуть карточку"
+  },
+  "ed_undo_expired": {
+    "en": "Undo time has expired",
+    "ru": "Время для отмены истекло"
+  },
+  "error_open_source": {
+    "en": "Open source",
+    "ru": "Открыть исходник"
+  },
+  "error_platforms_button": {
+    "en": "What is supported",
+    "ru": "Что поддерживается"
+  },
+  "error_provider": {
+    "en": "The music provider is temporarily unavailable. Your link is saved — tap Retry.",
+    "ru": "Музыкальный сервис временно не отвечает. Ссылка сохранена — нажми «Повторить»."
+  },
+  "error_provider_named": {
+    "en": "<b>{provider}</b> is temporarily unavailable. Your link is saved — tap Retry.",
+    "ru": "Сервис <b>{provider}</b> временно не отвечает. Ссылка сохранена — нажми «Повторить»."
+  },
+  "error_rate_limit": {
+    "en": "Too many requests in a short time. Wait about <b>{seconds} sec.</b> — completed cards will stay in place.",
+    "ru": "Слишком много запросов подряд. Подожди примерно <b>{seconds} сек.</b> — уже собранные карточки останутся на месте."
+  },
+  "error_search": {
+    "en": "Release not found. Refine <code>artist — title</code> or send a direct link.",
+    "ru": "Релиз не найден. Уточни <code>артист — название</code> или пришли прямую ссылку."
+  },
+  "error_title": {
+    "en": "Could not build the post",
+    "ru": "Не получилось собрать пост"
+  },
+  "home_back": {
+    "en": "← Main menu",
+    "ru": "← Главное меню"
+  },
+  "home_body": {
+    "en": "{greeting}\n\n<b>Just send a message with:</b>\n• a track, album, playlist or artist link\n• <code>artist — title</code>\n• several links for a collection\n• your own text above a link for the intro\n\n<i>I will add artwork, platform buttons and verified hashtags automatically.</i>",
+    "ru": "{greeting}\n\n<b>Просто отправь сообщением:</b>\n• ссылку на трек, альбом, плейлист или артиста\n• <code>артист — название</code>\n• несколько ссылок — для подборки\n• свой текст над ссылкой — для подводки\n\n<i>Обложку, кнопки и точные хэштеги соберу автоматически.</i>"
+  },
+  "home_body_new": {
+    "en": "{greeting}\n\nI will find the release and prepare a finished Telegram post with <b>artwork, title, verified hashtags and platform buttons.</b>\n\n<b>What you can send</b>\n• a track, album, playlist or artist link\n• <code>Deftones — Rickets</code>\n• several links in one message for a collection\n\n<blockquote>Write your own text above a link to use it as the post intro.</blockquote>\n<i>{mode}</i>",
+    "ru": "{greeting}\n\nЯ найду релиз и подготовлю готовый Telegram-пост: <b>обложку, название, точные хэштеги и кнопки площадок.</b>\n\n<b>Что можно прислать</b>\n• ссылку на трек, альбом, плейлист или артиста\n• <code>Deftones — Rickets</code>\n• несколько ссылок одним сообщением — получится подборка\n\n<blockquote>Свой текст можно написать над ссылкой — он станет подводкой к посту.</blockquote>\n<i>{mode}</i>"
+  },
+  "home_continue": {
+    "en": "↩ Return to card",
+    "ru": "↩ Вернуться к карточке"
+  },
+  "home_continue_named": {
+    "en": "↩ {release}",
+    "ru": "↩ {release}"
+  },
+  "home_crate": {
+    "en": "🧺 Crate · {count}",
+    "ru": "🧺 Подборка · {count}"
+  },
+  "home_create": {
+    "en": "＋ Create post",
+    "ru": "＋ Создать пост"
+  },
+  "home_mode_admin": {
+    "en": "Editing, queueing and publishing are available right in the bot",
+    "ru": "Редактор, очередь и публикация доступны прямо в боте"
+  },
+  "home_mode_user": {
+    "en": "Edit and send the card directly in this chat",
+    "ru": "Карточку можно изменить и отправить прямо в этом чате"
+  },
+  "home_more": {
+    "en": "••• More",
+    "ru": "••• Ещё"
+  },
+  "home_queue": {
+    "en": "🕒 Publication queue",
+    "ru": "🕒 Очередь публикаций"
+  },
+  "home_recent": {
+    "en": "History",
+    "ru": "История"
+  },
+  "home_title": {
+    "en": "🎧 <b>Music post editor{name}</b>",
+    "ru": "🎧 <b>Музыкальный редактор{name}</b>"
+  },
+  "home_title_new": {
+    "en": "🎧 <b>StonerHandBot</b>\n<i>Music post builder</i>",
+    "ru": "🎧 <b>StonerHandBot</b>\n<i>Музыкальный конструктор постов</i>"
+  },
+  "inline_hint_empty": {
+    "en": "🎧 Type an artist and track or paste a link",
+    "ru": "🎧 Введи артиста и трек или вставь ссылку"
+  },
+  "inline_hint_not_found": {
+    "en": "Nothing found — refine your query",
+    "ru": "Ничего не найдено — измени запрос"
+  },
+  "input_cancelled": {
+    "en": "Input cancelled",
+    "ru": "Ввод отменён"
+  },
+  "input_nothing": {
+    "en": "Nothing is waiting for input",
+    "ru": "Сейчас бот ничего не ожидает"
+  },
+  "menu_demo": {
+    "en": "✨ <b>This is a finished post</b>\n<i>You send a link — the bot builds the rest.</i>\n\n<blockquote>📻 · <b>The Soft Moon</b>\n<i>Criminal</i>\n\n<code>#stonerhand #track</code>\n\n[🟢 Spotify] [⚪ Apple]\n[🪩 All platforms]</blockquote>\n\n<b>Inside the card:</b> artwork, a tappable title, hashtags and compact buttons.\n\nTry it now: send a link or a <code>track title</code>.",
+    "ru": "✨ <b>Так выглядит готовый пост</b>\n<i>Ты присылаешь ссылку — бот собирает остальное.</i>\n\n<blockquote>📻 · <b>The Soft Moon</b>\n<i>Criminal</i>\n\n<code>#stonerhand #track</code>\n\n[🟢 Spotify] [⚪ Apple]\n[🪩 Все платформы]</blockquote>\n\n<b>Внутри карточки:</b> обложка, чистый заголовок, хэштеги и компактные кнопки.\n\nПопробуй прямо сейчас: пришли ссылку или <code>название трека</code>."
+  },
+  "menu_guide": {
+    "en": "📣 <b>The bot for groups and channels</b>\n<i>Set it up once, then just send music.</i>\n\n<blockquote><b>1 · Add the bot</b>\nTo a group or channel as an administrator.\n\n<b>2 · Grant permissions</b>\nTo publish; in groups, also to delete messages.\n\n<b>3 · Send a link</b>\nThe bot replaces it with a finished music post.</blockquote>\n\n<b>Automatic touches</b>\n• intro text becomes a quote with attribution;\n• hashtags and platforms are added;\n• several links become a collection.\n\n<blockquote>🛡 The finished post is published before the original message is removed.</blockquote>",
+    "ru": "📣 <b>Бот для групп и каналов</b>\n<i>Настрой один раз — дальше просто присылай музыку.</i>\n\n<blockquote><b>1 · Добавь бота</b>\nВ группу или канал как администратора.\n\n<b>2 · Выдай права</b>\nНа публикацию; в группе — ещё и на удаление сообщений.\n\n<b>3 · Пришли ссылку</b>\nБот заменит её готовым музыкальным постом.</blockquote>\n\n<b>Автоматически</b>\n• подводка становится цитатой с автором;\n• добавляются хэштеги и площадки;\n• несколько ссылок собираются в подборку.\n\n<blockquote>🛡 Сначала публикуется готовый пост — и только потом удаляется исходное сообщение.</blockquote>"
+  },
+  "menu_help": {
+    "en": "❓ <b>How to build a post</b>\n<i>Three steps and the card is ready.</i>\n\n<blockquote><b>1 · Find a release</b>\nSend a link or type <code>artist — track</code>.\n\n<b>2 · Check the card</b>\nThe bot adds artwork, hashtags and platform buttons.\n\n<b>3 · Send it</b>\nTo yourself, a crate, the queue or your channel.</blockquote>\n\n<b>Useful shortcuts</b>\n• Text above a link becomes a <i>quote</i>.\n• Several links become a numbered collection.\n• Intro formatting is preserved.\n\n<blockquote>⚡ Inline in any chat:\n<code>@StonerHandBot Black Sabbath — Paranoid</code></blockquote>",
+    "ru": "❓ <b>Как собрать пост</b>\n<i>Три шага — и карточка готова.</i>\n\n<blockquote><b>1 · Найди релиз</b>\nПришли ссылку или напиши <code>артист — трек</code>.\n\n<b>2 · Проверь карточку</b>\nБот добавит обложку, хэштеги и кнопки площадок.\n\n<b>3 · Отправь</b>\nСебе, в подборку, очередь или канал.</blockquote>\n\n<b>Полезные приёмы</b>\n• Текст над ссылкой станет <i>цитатой</i>.\n• Несколько ссылок превратятся в нумерованную подборку.\n• Форматирование подводки сохранится.\n\n<blockquote>⚡ Inline в любом чате:\n<code>@StonerHandBot Black Sabbath — Paranoid</code></blockquote>"
+  },
+  "menu_more": {
+    "en": "••• <b>More tools</b>\n<i>Useful extras without crowding the home screen.</i>\n\n<blockquote><b>Help</b> — a short guide\n<b>Services</b> — supported platforms\n<b>For channels</b> — automatic link replacement\n<b>Example</b> — a finished post preview\n<b>Privacy</b> — stored data and deletion controls</blockquote>",
+    "ru": "••• <b>Ещё возможности</b>\n<i>Всё полезное — без перегруженного главного экрана.</i>\n\n<blockquote><b>Помощь</b> — короткая инструкция\n<b>Сервисы</b> — поддерживаемые площадки\n<b>Для каналов</b> — автозамена ссылок\n<b>Пример</b> — как выглядит готовый пост\n<b>Приватность</b> — данные и их удаление</blockquote>"
+  },
+  "menu_platforms": {
+    "en": "🎛 <b>Supported sources</b>\n<i>Send one link — the bot finds the other platforms.</i>\n\n<b>Music and podcasts</b>\n🟢 Spotify · ⚪ Apple Music / Podcasts\n🟠 SoundCloud · 🟦 Deezer\n⚫ Tidal · 🟡 Yandex Music\n\n<b>Video and radio</b>\n🔴 YouTube / YouTube Music · 📡 NTS Radio\n\n<b>Content types</b>\nTracks, albums, playlists, artists, podcasts, videos and radio shows.\n\n<blockquote>✨ The result: artwork, title, smart hashtags and buttons for every matched platform.</blockquote>\n\nNo link? Type <code>artist — track</code>.",
+    "ru": "🎛 <b>Поддерживаемые источники</b>\n<i>Пришли ссылку — бот сам найдёт остальные площадки.</i>\n\n<b>Музыка и подкасты</b>\n🟢 Spotify · ⚪ Apple Music / Podcasts\n🟠 SoundCloud · 🟦 Deezer\n⚫ Tidal · 🟡 Yandex Music\n\n<b>Видео и эфиры</b>\n🔴 YouTube / YouTube Music · 📡 NTS Radio\n\n<b>Типы материалов</b>\nТреки, альбомы, плейлисты, артисты, подкасты, видео и радио-шоу.\n\n<blockquote>✨ На выходе: обложка, название, автохэштеги и кнопки всех найденных площадок.</blockquote>\n\nНет ссылки? Напиши <code>артист — трек</code>."
+  },
+  "menu_start": {
+    "en": "🎧 <b>StonerHand Soundlinks</b>\n\nI turn music links into clean posts: cover art, title, smart hashtags and buttons for every platform\n\n<b>What I can do</b>\n• Track, album, playlist, artist, podcast\n• YouTube videos and NTS Radio shows\n• Search by name: just type <i>artist - track</i>\n• Several links at once → a numbered collection\n• Text above a link → a quote in the post\n• Built-in card editor and channel publishing\n• Inline: type @StonerHandBot + a link in any chat\n\nSend a link or a name 👇",
+    "ru": "🎧 <b>StonerHand Soundlinks</b>\n\nПревращаю музыкальные ссылки в аккуратные посты: обложка, название, автохэштеги и кнопки всех площадок\n\n<b>Что умею</b>\n• Трек, альбом, плейлист, артист, подкаст\n• YouTube-видео и эфиры NTS Radio\n• Поиск по названию: просто напиши <i>artist - track</i>\n• Несколько ссылок разом → нумерованная подборка\n• Подводка над ссылкой → цитата в посте\n• Встроенный редактор карточки и публикация в канал\n• Inline: набери @StonerHandBot + ссылку в любом чате\n\nПришли ссылку или название 👇"
+  },
+  "next": {
+    "en": "Next →",
+    "ru": "Дальше →"
+  },
+  "no_url_hint": {
+    "en": "Send a link to a track, album, playlist, artist, podcast, YouTube video or NTS Radio — or just type a track name",
+    "ru": "Пришли ссылку на трек, альбом, плейлист, артиста, подкаст, YouTube-видео или NTS Radio — или просто название трека"
+  },
+  "onboarding_1": {
+    "en": "🔎 <b>Step 1 of 3 · Find the release</b>\n\n<blockquote>Send a music-platform link or type\n<code>artist — track title</code></blockquote>\nIf several releases match, the bot will show options for you to choose from.",
+    "ru": "🔎 <b>Шаг 1 из 3 · Найди релиз</b>\n\n<blockquote>Пришли ссылку с музыкальной площадки или напиши\n<code>артист — название трека</code></blockquote>\nЕсли совпадений несколько, бот покажет варианты — останется выбрать точный."
+  },
+  "onboarding_2": {
+    "en": "🎛 <b>Step 2 of 3 · Choose the format</b>\n\n<blockquote>The bot finds artwork, platforms and prepares hashtags.</blockquote>\nTap <b>Edit</b> to tune the style, text, hashtags and platforms.",
+    "ru": "🎛 <b>Шаг 2 из 3 · Выбери формат</b>\n\n<blockquote>Бот найдёт обложку, площадки и подготовит хэштеги.</blockquote>\nНажми <b>Изменить</b>, чтобы настроить стиль, текст, хэштеги и площадки."
+  },
+  "onboarding_3": {
+    "en": "📡 <b>Step 3 of 3 · Send the post</b>\n\n<blockquote>Send it to yourself, add the track to a crate or publish to the channel.</blockquote>\nIn any other chat, use inline mode:\n<code>@StonerHandBot artist — track</code>",
+    "ru": "📡 <b>Шаг 3 из 3 · Отправь пост</b>\n\n<blockquote>Отправь пост себе, добавь трек в подборку или опубликуй в канал.</blockquote>\nА в любом другом чате используй inline:\n<code>@StonerHandBot артист — трек</code>"
+  },
+  "partial_not_found": {
+    "en": "release could not be recognized — the link is private, removed, or unavailable",
+    "ru": "не удалось распознать релиз — ссылка удалена, закрыта или недоступна"
+  },
+  "partial_rate_limited": {
+    "en": "platform temporarily rate-limited requests",
+    "ru": "площадка временно ограничила запросы"
+  },
+  "partial_result": {
+    "en": "<b>Some links need another try</b>\n{ok} of {total} links were processed. Check the complete collection again.",
+    "ru": "<b>Готово не всё</b>\n{ok} из {total} ссылок обработано. Проверь всю подборку ещё раз."
+  },
+  "partial_timeout": {
+    "en": "service response timed out",
+    "ru": "истекло время ожидания сервиса"
+  },
+  "partial_unavailable": {
+    "en": "service did not respond in time",
+    "ru": "сервис временно не ответил"
+  },
+  "playlist_import": {
+    "en": "＋ Import tracks",
+    "ru": "＋ Собрать треки"
+  },
+  "playlist_import_started": {
+    "en": "Importing tracks into a crate",
+    "ru": "Собираю треки в подборку"
+  },
+  "privacy_confirm": {
+    "en": "⚠️ <b>Delete data permanently?</b>\n\nDrafts, history, crate, templates, settings and your scheduled posts will be removed. Messages already published to Telegram will remain.",
+    "ru": "⚠️ <b>Удалить данные без возможности восстановления?</b>\n\nБудут удалены черновики, история, подборка, шаблоны, настройки и запланированные тобой публикации. Уже опубликованные сообщения в Telegram останутся на месте."
+  },
+  "privacy_delete": {
+    "en": "Delete my data",
+    "ru": "Удалить мои данные"
+  },
+  "privacy_delete_confirm": {
+    "en": "Delete permanently",
+    "ru": "Удалить безвозвратно"
+  },
+  "privacy_deleted": {
+    "en": "✅ <b>Data deleted</b>\n\nDrafts removed: <b>{drafts}</b>\nScheduled posts removed: <b>{scheduled}</b>\n\nYou can start over by sending a music link.",
+    "ru": "✅ <b>Данные удалены</b>\n\nУдалено черновиков: <b>{drafts}</b>\nСнято с очереди: <b>{scheduled}</b>\n\nМожешь начать заново — просто пришли музыкальную ссылку."
+  },
+  "privacy_deleted_queue_warning": {
+    "en": "\n\n⚠️ The publishing queue is temporarily unavailable. Other data was deleted; ask the bot owner to check the queue later.",
+    "ru": "\n\n⚠️ Очередь публикаций временно недоступна. Остальные данные удалены; проверь очередь позже через владельца бота."
+  },
+  "privacy_title": {
+    "en": "🔐 <b>Data and privacy</b>\n\nThe bot stores only working state: drafts, your crate, history, design settings and scheduled publications. Retention is limited, while product metrics contain no post text or music links.\n\n<blockquote>After deletion, temporary search tokens may remain for up to 30 minutes and then expire automatically.</blockquote>",
+    "ru": "🔐 <b>Данные и приватность</b>\n\nБот хранит только состояние, нужное для работы: черновики, подборку, историю, настройки оформления и запланированные публикации. Срок хранения ограничен, а статистика продукта считается без текста постов и музыкальных ссылок.\n\n<blockquote>После удаления временные токены поиска могут существовать не более 30 минут, затем исчезают автоматически.</blockquote>"
+  },
+  "progress_batch": {
+    "en": "3/3 · Building collection · {done}/{total}",
+    "ru": "3/3 · Собираю подборку · {done}/{total}"
+  },
+  "progress_batch_links": {
+    "en": "0/{total} · Fetching platform data…",
+    "ru": "0/{total} · Получаю данные площадок…"
+  },
+  "progress_batch_partial": {
+    "en": "{done}/{total} · Building the result and marking failed links…",
+    "ru": "{done}/{total} · Оформляю результат и отмечаю проблемные ссылки…"
+  },
+  "progress_batch_start": {
+    "en": "0/{total} · Checking links…",
+    "ru": "0/{total} · Проверяю ссылки…"
+  },
+  "progress_cancelled": {
+    "en": "Search cancelled.",
+    "ru": "Поиск отменён."
+  },
+  "progress_card": {
+    "en": "3/3 · Building the card…",
+    "ru": "3/3 · Собираю карточку…"
+  },
+  "progress_links": {
+    "en": "2/3 · Collecting platforms…",
+    "ru": "2/3 · Собираю площадки…"
+  },
+  "progress_search": {
+    "en": "1/3 · Finding the release…",
+    "ru": "1/3 · Ищу релиз…"
+  },
+  "publish_confirm": {
+    "en": "<b>Ready to publish</b>\n\n<blockquote><b>{artist}</b> — {title}\nTarget: {target} · now</blockquote>\nCheck the card and confirm delivery.",
+    "ru": "<b>Готово к публикации</b>\n\n<blockquote><b>{artist}</b> — {title}\nКуда: {target} · сейчас</blockquote>\nПроверь карточку и подтверди отправку."
+  },
+  "publish_confirm_button": {
+    "en": "Publish",
+    "ru": "Опубликовать"
+  },
+  "queue_cancel_item": {
+    "en": "Remove #{index}",
+    "ru": "Убрать №{index}"
+  },
+  "queue_cancelled": {
+    "en": "Removed from queue",
+    "ru": "Убрано из очереди"
+  },
+  "queue_empty": {
+    "en": "Nothing scheduled. Schedule a card from the Send menu.",
+    "ru": "Пока пусто. Запланируй карточку через меню «Отправить»."
+  },
+  "queue_missing": {
+    "en": "This item is already gone",
+    "ru": "Этой записи уже нет"
+  },
+  "queue_page": {
+    "en": "Page {page} of {pages}",
+    "ru": "Страница {page} из {pages}"
+  },
+  "queue_refresh": {
+    "en": "Refresh",
+    "ru": "Обновить"
+  },
+  "queue_title": {
+    "en": "🕒 <b>Queue · {count}</b>",
+    "ru": "🕒 <b>Очередь · {count}</b>"
+  },
+  "queue_unavailable": {
+    "en": "The queue is temporarily unavailable. Try again.",
+    "ru": "Очередь временно недоступна. Попробуй ещё раз."
+  },
+  "queue_unknown": {
+    "en": "Untitled card",
+    "ru": "Карточка без названия"
+  },
+  "quick_search": {
+    "en": "🔎 Find",
+    "ru": "🔎 Найти"
+  },
+  "quick_tour": {
+    "en": "How does it work?",
+    "ru": "Как это работает?"
+  },
+  "recent_add": {
+    "en": "+ To crate",
+    "ru": "+ В подборку"
+  },
+  "recent_empty": {
+    "en": "<b>No recent posts yet</b>\n\nCreate your first card and it will appear here.",
+    "ru": "<b>Недавних постов пока нет</b>\n\nСоздай первую карточку — она появится здесь."
+  },
+  "recent_repeat": {
+    "en": "Repeat",
+    "ru": "Повторить"
+  },
+  "recent_title": {
+    "en": "<b>Recent posts</b>",
+    "ru": "<b>Недавние посты</b>"
+  },
+  "replace_source": {
+    "en": "Replace #{index}",
+    "ru": "Заменить №{index}"
+  },
+  "replace_source_invalid": {
+    "en": "Send exactly one supported music link.",
+    "ru": "Нужна ровно одна поддерживаемая музыкальная ссылка."
+  },
+  "replace_source_prompt": {
+    "en": "<b>Replace link #{index}</b>\nSend one new music link.\n<code>/cancel</code> — cancel",
+    "ru": "<b>Замена ссылки №{index}</b>\nПришли одну новую музыкальную ссылку.\n<code>/cancel</code> — отменить"
+  },
+  "request_cancel": {
+    "en": "Cancel search",
+    "ru": "Отменить поиск"
+  },
+  "request_cancelled": {
+    "en": "Search cancelled",
+    "ru": "Поиск отменён"
+  },
+  "request_not_running": {
+    "en": "This search has already finished",
+    "ru": "Этот поиск уже завершён"
+  },
+  "retry": {
+    "en": "Retry",
+    "ru": "Повторить"
+  },
+  "retry_failed": {
+    "en": "Check all links again",
+    "ru": "Проверить все ссылки"
+  },
+  "schedule_1d": {
+    "en": "Tomorrow at 12:00",
+    "ru": "Завтра в 12:00"
+  },
+  "schedule_1h": {
+    "en": "In 1 hour",
+    "ru": "Через 1 час"
+  },
+  "schedule_3h": {
+    "en": "In 3 hours",
+    "ru": "Через 3 часа"
+  },
+  "schedule_custom": {
+    "en": "Choose date and time",
+    "ru": "Выбрать дату и время"
+  },
+  "schedule_done": {
+    "en": "Scheduled: {date}",
+    "ru": "Запланировано: {date}"
+  },
+  "schedule_evening": {
+    "en": "Today at 20:00",
+    "ru": "Сегодня в 20:00"
+  },
+  "schedule_invalid": {
+    "en": "I could not read that time. Use <code>15.08 19:30</code> or <code>21:00</code>.",
+    "ru": "Не понял время. Используй <code>15.08 19:30</code> или <code>21:00</code>."
+  },
+  "schedule_prompt": {
+    "en": "<b>Waiting for date and time</b>\nFor example: <code>15.08 19:30</code> or <code>21:00</code>\n<code>/cancel</code> — cancel",
+    "ru": "<b>Жду дату и время</b>\nНапример: <code>15.08 19:30</code> или <code>21:00</code>\n<code>/cancel</code> — отменить"
+  },
+  "schedule_title": {
+    "en": "🕒 <b>When to publish?</b>\n<i>Fixed times use the bot timezone.</i>",
+    "ru": "🕒 <b>Когда опубликовать?</b>\n<i>Фиксированное время — по часовому поясу бота.</i>"
+  },
+  "search_change": {
+    "en": "Change query",
+    "ru": "Изменить запрос"
+  },
+  "search_choose": {
+    "en": "<b>Choose a release</b>\n\nI found several matches for “{query}”:",
+    "ru": "<b>Выбери релиз</b>\n\nНашёл несколько вариантов по запросу «{query}»:"
+  },
+  "search_not_found": {
+    "en": "Found nothing for that query. Try refining it: artist + title",
+    "ru": "Ничего не нашел по этому запросу. Попробуй уточнить: артист + название"
+  },
+  "search_other": {
+    "en": "Another release",
+    "ru": "Другой релиз"
+  },
+  "settings_restored": {
+    "en": "Change undone",
+    "ru": "Изменение отменено"
+  },
+  "settings_saved": {
+    "en": "Settings saved",
+    "ru": "Настройки сохранены"
+  },
+  "settings_undo": {
+    "en": "Undo change",
+    "ru": "Отменить изменение"
+  },
+  "share_post": {
+    "en": "↗ Share",
+    "ru": "↗ Поделиться"
+  },
+  "start_using": {
+    "en": "Done ✓",
+    "ru": "Готово ✓"
+  },
+  "tab_demo": {
+    "en": "🧪 Example post",
+    "ru": "🧪 Пример поста"
+  },
+  "tab_guide": {
+    "en": "📣 For channels",
+    "ru": "📣 Для каналов"
+  },
+  "tab_help": {
+    "en": "❓ Help",
+    "ru": "❓ Помощь"
+  },
+  "tab_platforms": {
+    "en": "🎛 Services",
+    "ru": "🎛 Сервисы"
+  },
+  "tab_privacy": {
+    "en": "🔐 Data and privacy",
+    "ru": "🔐 Данные и приватность"
+  },
+  "tab_start": {
+    "en": "🚀 Quick start",
+    "ru": "🚀 Быстрый старт"
+  },
+  "uploaded_audio_artist": {
+    "en": "Unknown artist",
+    "ru": "Исполнитель не указан"
+  },
+  "uploaded_audio_title": {
+    "en": "Audio file",
+    "ru": "Аудиофайл"
+  }
+}

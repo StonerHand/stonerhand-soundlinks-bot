@@ -6,7 +6,7 @@
       ["🪩 Все платформы", null, "https://song.link/sleep", null]
     ],
     [
-      ["Получить готовый пост", "v2|editor|s|draft123", null, "primary"]
+      ["Отправить себе", "v2|editor|s|draft123", null, "primary"]
     ],
     [
       ["Изменить", "v2|editor|m|draft123", null, null],

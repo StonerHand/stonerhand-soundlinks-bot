@@ -6,7 +6,7 @@
 
 [Open the bot](https://t.me/StonerHandBot) · [See the channel](https://t.me/stonerhand) · [Русская версия](README.ru.md)
 
-![Release](https://img.shields.io/badge/release-1.8.2-5b5bd6?style=flat-square)
+![Release](https://img.shields.io/badge/release-1.9.0-5b5bd6?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
@@ -79,6 +79,10 @@ The editor is progressive rather than crowded:
 2. change only what matters;
 3. run a final preflight check;
 4. send or publish with one explicit action.
+
+Native replies, editor callbacks and lookup orchestration are isolated from
+presentation. UI copy lives in a packaged RU/EN catalog, so wording can change
+without touching the execution path and every placeholder is contract-tested.
 
 Collection keyboards adapt to their content: a shared artist is not repeated,
 technical remaster suffixes do not consume button space, short titles share a

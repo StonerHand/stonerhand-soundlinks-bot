@@ -3,6 +3,14 @@ from __future__ import annotations
 import time
 from copy import deepcopy
 
+from music_links_bot.bot_builder import (
+    remove_intro,
+    remove_tags,
+    select_all_platforms,
+    select_preset,
+    toggle_platform,
+    use_auto_tags,
+)
 from music_links_bot.constants import PLATFORM_LABELS
 from music_links_bot.i18n import get_text
 from music_links_bot.models import TrackMatch
@@ -163,4 +171,53 @@ def apply_setting_action(
         cycle_preset(draft)
     else:
         return False
+    return True
+
+
+def apply_editor_shortcut(
+    draft: dict,
+    action: str,
+    *,
+    track: TrackMatch,
+    platform_order: tuple[str, ...],
+) -> str | None:
+    """Apply a setting-screen action and return the screen to render next."""
+    if action in {"z0", "z1", "z2"}:
+        remember_setting_state(draft)
+        select_preset(draft, int(action[1]))
+        return "zs"
+    if len(action) >= 2 and action.startswith("l") and action[1:].isdigit():
+        remember_setting_state(draft)
+        toggle_platform(draft, track, list(platform_order), int(action[1:]))
+        return "ls"
+    if action == "la":
+        remember_setting_state(draft)
+        select_all_platforms(draft, track, list(platform_order))
+        return "ls"
+    mutations = {
+        "ha": (use_auto_tags, "hs"),
+        "hn": (remove_tags, "hs"),
+        "t0": (remove_intro, "ts"),
+    }
+    mutation = mutations.get(action)
+    if mutation is None:
+        return None
+    remember_setting_state(draft)
+    apply, screen = mutation
+    apply(draft)
+    return screen
+
+
+def apply_delivery_action(draft: dict, action: str) -> bool:
+    """Apply delivery-only settings without Telegram side effects."""
+    if action not in {"ra", "rc", "cr"}:
+        return False
+    remember_setting_state(draft)
+    if action == "ra":
+        draft["delivery_mode"] = "auto"
+    elif action == "rc":
+        draft["delivery_mode"] = "classic"
+    else:
+        draft.pop("custom_cover_file_id", None)
+        draft.pop("custom_cover_unique_id", None)
     return True

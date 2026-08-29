@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## 1.9.0 — 2026-08-29
+
+- Split editor callbacks and native Force Reply handling into focused state and
+  input modules while preserving the existing Telegram interaction contract.
+- Replaced the monolithic lookup controller with a linear request pipeline for
+  admission, source resolution, access checks, progress and delivery.
+- Separated pure Rich HTML rendering from Telegram transport, keeping the
+  public compatibility surface and complete Classic fallback unchanged.
+- Moved every RU/EN interface string into a packaged JSON catalog with
+  placeholder and completeness contracts; shortened the main delivery action
+  to **Send to me** / **Отправить себе**.
+- Split editor UI tests from the large bot integration suite and refreshed the
+  golden keyboard snapshot for the compact action label.
+- Removed duplicated orchestration code, reducing the executable Python
+  surface without removing product features.
+
 ## 1.8.2 — 2026-08-28
 
 - Removed the legacy compatibility surface from the central bot module: command,

@@ -38,15 +38,19 @@ class ReleaseReadinessTests(unittest.TestCase):
         self.assertIn("data/*.json", (ROOT / ".gitignore").read_text(encoding="utf-8"))
 
     def test_package_metadata_is_release_ready(self) -> None:
-        project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))[
-            "project"
-        ]
+        metadata = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+        project = metadata["project"]
 
         self.assertEqual(project["license"], "MIT")
         self.assertEqual(
             project["urls"]["Repository"],
             "https://github.com/StonerHand/stonerhand-soundlinks-bot",
         )
+        self.assertEqual(
+            metadata["tool"]["setuptools"]["package-data"]["music_links_bot"],
+            ["locales/*.json"],
+        )
+        self.assertTrue((ROOT / "src/music_links_bot/locales/catalog.json").is_file())
 
     def test_vercel_routes_builds_and_crons_stay_aligned(self) -> None:
         config = json.loads((ROOT / "vercel.json").read_text(encoding="utf-8"))
