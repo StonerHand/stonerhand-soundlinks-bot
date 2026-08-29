@@ -27,6 +27,10 @@ from music_links_bot.keyboards import (
     _select_preview_url,
 )
 from music_links_bot.models import TrackMatch
+from music_links_bot.publication_contract import (
+    RenderedPublication,
+    require_valid_publication,
+)
 from music_links_bot.telegram_buttons import button as InlineKeyboardButton
 from music_links_bot.url_utils import (
     cache_key_for_url,
@@ -57,6 +61,7 @@ class InlineShareCard:
     text: str
     keyboard: InlineKeyboardMarkup
     preview_url: str | None
+    publication: RenderedPublication
 
 
 def track_share_url(track: TrackMatch) -> str | None:
@@ -285,6 +290,28 @@ def render_inline_share_card(
             bundle.radios,
         )
 
+    final_keyboard = (
+        _add_inline_retry_button(keyboard, share_query=share_query, lang=lang)
+        if found_count < total_count
+        else add_share_button(
+            keyboard,
+            share_query=share_query,
+            label=share_label,
+        )
+    )
+    publication = require_valid_publication(
+        RenderedPublication(
+            text=text,
+            keyboard=final_keyboard,
+            preview_url=preview_url,
+            source_urls=tuple(_bundle_source_urls(bundle)),
+            found_count=found_count,
+            requested_count=total_count,
+            mode="inline",
+            content_kind="collection",
+            cover_expected=any(bool(track.thumbnail_url) for track in bundle.tracks),
+        )
+    )
     return InlineShareCard(
         title=title,
         description=(
@@ -293,17 +320,24 @@ def render_inline_share_card(
             else "Готовый пост со всеми кнопками"
         ),
         text=text,
-        keyboard=(
-            _add_inline_retry_button(keyboard, share_query=share_query, lang=lang)
-            if found_count < total_count
-            else add_share_button(
-                keyboard,
-                share_query=share_query,
-                label=share_label,
-            )
-        ),
+        keyboard=final_keyboard,
         preview_url=preview_url,
+        publication=publication,
     )
+
+
+def _bundle_source_urls(bundle: Any) -> list[str]:
+    return [
+        *[
+            url
+            for track in bundle.tracks
+            if (url := track_share_url(track)) is not None
+        ],
+        *[item.url for item in bundle.videos],
+        *[item.url for item in bundle.radios],
+        *[item.url for item in bundle.playlists],
+        *[item.url for item in bundle.artists],
+    ]
 
 
 def _add_inline_retry_button(

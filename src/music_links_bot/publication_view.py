@@ -9,6 +9,7 @@ from music_links_bot.formatter import build_auto_hashtags, format_track_message
 from music_links_bot.keyboards import _build_link_keyboard, _select_preview_url
 from music_links_bot.models import TrackMatch
 from music_links_bot.publication_budget import IntroBudget, compose_with_intro
+from music_links_bot.publication_contract import RenderedPublication
 from music_links_bot.text_utils import normalize_hashtag
 
 
@@ -30,6 +31,27 @@ class PublicationPlan:
 
 # Compatibility name for callers that only consume the rendered text/keyboard.
 PublicationView = PublicationPlan
+
+
+def publication_contract_from_view(
+    view: PublicationPlan,
+    track: TrackMatch,
+) -> RenderedPublication:
+    mode = "classic"
+    if view.as_photo:
+        mode = "photo"
+    if view.source_audio_file_id:
+        mode = "audio"
+    return RenderedPublication(
+        text=view.text,
+        keyboard=view.keyboard,
+        preview_url=view.preview_url,
+        cover_url=view.cover,
+        source_urls=tuple(track.links.values()),
+        mode=mode,
+        content_kind=track.kind,
+        cover_expected=view.as_photo,
+    )
 
 
 def resolve_draft_hashtags(draft: dict, track: TrackMatch) -> str | None:

@@ -7,6 +7,7 @@
 
 - [ ] CI зелёный, preview-деплой отвечает, `/api/health` возвращает `ok: true`.
 - [ ] `/api/collage?health=1` возвращает JSON с layout `2`, `3` и `4`.
+- [ ] `/api/smoke` возвращает `ok: true`, все семь сценариев имеют `ok: true`.
 - [ ] Версия в `pyproject.toml`, пакете и `CHANGELOG.md` совпадает.
 - [ ] В репозитории нет `.env`, токенов, временных файлов и удалённых компонентов.
 - [ ] В GitHub Actions настроены `VERCEL_TOKEN`, `VERCEL_ORG_ID` и

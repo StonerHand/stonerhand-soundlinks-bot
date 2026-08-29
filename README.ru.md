@@ -6,7 +6,7 @@
 
 [Открыть бота](https://t.me/StonerHandBot) · [Посмотреть канал](https://t.me/stonerhand) · [English](README.md)
 
-![Release](https://img.shields.io/badge/release-1.9.2-5b5bd6?style=flat-square)
+![Release](https://img.shields.io/badge/release-1.10.0-5b5bd6?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
@@ -52,6 +52,8 @@ StonerHand — музыкальный редактор, который полн�
 - Работает inline: `@StonerHandBot артист — трек` в любой переписке.
 - Использует Rich Messages из Bot API 10.3 там, где они доступны, и без потери
   обложки, текста или ссылок возвращается к полной классической карточке.
+- Проверяет каждый готовый Classic, Rich, inline, channel, photo и audio пост
+  единым релизным контрактом до обращения к Telegram.
 - Даёт посмотреть и удалить личные данные через `/privacy` с подтверждением.
 
 ## Поддерживаемые источники
@@ -106,16 +108,18 @@ flowchart LR
     P --> S[Музыкальные площадки]
     P --> D[Единая карточка]
     D --> V[Представление публикации]
-    V --> R[Rich delivery]
-    V --> C[Classic fallback]
+    V --> G[Финальный контракт публикации]
+    G --> R[Rich delivery]
+    G --> C[Classic fallback]
     D <--> K[(Upstash Redis)]
     K --> Q[Worker очереди]
     Q --> V
 ```
 
 Предпросмотр, отправка себе, публикация в канал и очередь используют один
-неизменяемый план публикации. До вызова Telegram он фиксирует текст, хэштеги,
-клавиатуру, обложку, link preview и режим доставки. Durable-черновики проходят
+неизменяемый план публикации. Затем независимый от транспорта финальный
+контракт проверяет текст, счётчики, адреса кнопок, обложку и Telegram-лимиты до
+любого Classic, Rich или inline вызова. Durable-черновики проходят
 нормализацию перед записью в очередь и отправкой. Redis хранит сессии, историю,
 шаблоны, антидубли и очередь; ограниченная память остаётся локальным и аварийным
 fallback.
@@ -144,7 +148,8 @@ python -m music_links_bot
 - `/api/set_webhook` — обслуживание webhook;
 - `/api/queue_worker` — worker отложенных публикаций;
 - `/api/collage` — подписанные, сжатые и кэшируемые коллажи классических подборок;
-- `/api/health` — Telegram, webhook, Redis, очередь и версия релиза.
+- `/api/health` — Telegram, webhook, Redis, очередь и версия релиза;
+- `/api/smoke` — детерминированная матрица Classic/Rich/inline/channel.
 
 Обязательные production-переменные:
 
@@ -181,15 +186,15 @@ python -m pytest -q
 
 CI дополнительно проверяет зависимости, секреты, сгенерированные файлы,
 компиляцию и согласованность Vercel routes/builds/crons. Production canary
-подтверждает точный commit, сервис коллажей и production-зависимости до решения
-о защищённом автоматическом rollback.
+подтверждает точный commit, сервис коллажей и полную матрицу публикации до
+решения о защищённом автоматическом rollback.
 
 </details>
 
 ## Структура репозитория
 
 ```text
-api/                    Vercel webhook, health, collage и queue endpoints
+api/                    Vercel webhook, health, smoke, collage и queue endpoints
 src/music_links_bot/    приложение, площадки, редактор и публикация
 tests/                  unit, contract, snapshot и production-canary тесты
 .github/                CI, обновление зависимостей и релизные проверки

@@ -84,6 +84,8 @@ class ReleaseReadinessTests(unittest.TestCase):
         self.assertIn("VERCEL_TOKEN", workflow)
         self.assertIn("/api/collage?health=1", canary)
         self.assertIn('"collection-collage"', canary)
+        self.assertIn('fetch("/api/smoke")', canary)
+        self.assertIn('"publication-release-smoke"', canary)
 
 
 if __name__ == "__main__":

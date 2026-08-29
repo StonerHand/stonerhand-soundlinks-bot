@@ -145,10 +145,6 @@ from music_links_bot.editor_view import (
     draft_intro_limit as _draft_intro_limit,
     render_track_draft as _render_track_draft,
 )
-from music_links_bot.ephemeral import (
-    ephemeral_group_replies_enabled,
-    send_ephemeral_message,
-)
 from music_links_bot.formatter import (
     format_collection_message,
     format_track_message,
@@ -165,10 +161,17 @@ from music_links_bot.keyboards import (
     _should_include_channel_button,
     _should_include_hashtags,
 )
-from music_links_bot.mixed_post import send_track_video_album
+from music_links_bot.lookup_transport import (
+    reply_with_track as _reply_with_track,
+    send_track_result as _send_track_result,
+    send_track_video_pair_result as _send_track_video_pair_result,
+)
 from music_links_bot.models import (
     TrackMatch,
-    VideoMatch,
+)
+from music_links_bot.publication_contract import (
+    RenderedPublication,
+    require_valid_publication,
 )
 from music_links_bot.publication_preflight import validate_publication
 from music_links_bot.publication_presets import (
@@ -211,6 +214,9 @@ from music_links_bot.telegram_buttons import (
     button as InlineKeyboardButton,
     callback_button,
     current_chat_button,
+)
+from music_links_bot.telegram_messages import (
+    delete_message_safely as _try_delete_message,
 )
 from music_links_bot.telegram_text import format_user_note_html
 from music_links_bot.track_merge import coalesce_equivalent_tracks
@@ -388,6 +394,8 @@ async def _send_track_draft(
         preview_url=_select_preview_url(track.links, context) or track.thumbnail_url,
         reply_markup=keyboard,
         prefer_large_preview=bool(draft.get("large_preview")),
+        source_urls=tuple(track.links.values()),
+        content_kind=track.kind,
     )
     await _store_draft(context, draft_id, draft)
     session = await _runtime(context).get_session(user_id, lang=lang)
@@ -1924,12 +1932,35 @@ async def _send_track_matches(
                     ),
                     label=get_text(lang, "share_post"),
                 )
+            if message.chat.type == "channel":
+                collection_keyboard = make_channel_safe_keyboard(collection_keyboard)
         collection_text = user_prefix + format_collection_message(
             tracks,
             include_hashtags=include_hashtags,
             title=title,
         )
+        collection_preview = (
+            (collection_collage_preview_url(tracks) if len(tracks) == total else None)
+            or _select_preview_url(tracks[0].links, context)
+            or tracks[0].thumbnail_url
+        )
+        collection_sources = tuple(
+            url for track in tracks for url in track.links.values()
+        )
         if not is_private and rich_messages_enabled():
+            require_valid_publication(
+                RenderedPublication(
+                    text=collection_text,
+                    keyboard=collection_keyboard,
+                    preview_url=collection_preview,
+                    source_urls=collection_sources,
+                    found_count=len(tracks),
+                    requested_count=total,
+                    mode="rich",
+                    content_kind="collection",
+                    cover_expected=any(track.thumbnail_url for track in tracks),
+                )
+            )
             rich_html = build_rich_collection_html(
                 tracks,
                 title=title,
@@ -1968,16 +1999,12 @@ async def _send_track_matches(
             context.bot,
             message,
             collection_text,
-            preview_url=(
-                (
-                    collection_collage_preview_url(tracks)
-                    if len(tracks) == total
-                    else None
-                )
-                or _select_preview_url(tracks[0].links, context)
-                or tracks[0].thumbnail_url
-            ),
+            preview_url=collection_preview,
             reply_markup=collection_keyboard,
+            found_count=len(tracks),
+            requested_count=total,
+            source_urls=collection_sources,
+            content_kind="collection",
         )
         _record_matches_safely(tracks, message, context=context)
         return
@@ -2021,6 +2048,8 @@ async def _send_track_matches(
             preview_url=_select_preview_url(track.links, context)
             or track.thumbnail_url,
             reply_markup=keyboard,
+            source_urls=tuple(track.links.values()),
+            content_kind=track.kind,
         )
     _record_matches_safely([track], message, context=context)
 
@@ -2412,157 +2441,6 @@ async def _deliver_lookup_bundle(
     )
 
 
-async def _send_track_result(
-    bot: Bot,
-    message: Message,
-    text: str,
-    *,
-    preview_url: str | None,
-    reply_markup: InlineKeyboardMarkup | None,
-    prefer_large_preview: bool = True,
-) -> None:
-    text = fit_telegram_html(text)
-    if message.chat.type in {"group", "supergroup", "channel"}:
-        if message.chat.type == "channel":
-            reply_markup = make_channel_safe_keyboard(reply_markup)
-        preview_options = _build_link_preview_options(
-            preview_url,
-            prefer_large_media=prefer_large_preview,
-        )
-        # Invisible reply: in a group the card can be shown only to the person
-        # who dropped the link, leaving the chat clean and their message intact.
-        # Opt-in and best-effort — falls through to the public post if Telegram
-        # does not deliver it.
-        if (
-            message.chat.type in {"group", "supergroup"}
-            and ephemeral_group_replies_enabled()
-            and getattr(message, "from_user", None) is not None
-        ):
-            delivered = await send_ephemeral_message(
-                getattr(bot, "token", None),
-                message.chat_id,
-                message.from_user.id,
-                text,
-                parse_mode=ParseMode.HTML,
-                reply_markup=reply_markup,
-                link_preview_options=preview_options,
-                reply_to_message_id=getattr(message, "message_id", None),
-            )
-            if delivered:
-                return
-
-        await bot.send_message(
-            chat_id=message.chat_id,
-            text=text,
-            parse_mode=ParseMode.HTML,
-            link_preview_options=preview_options,
-            reply_markup=reply_markup,
-        )
-        await _try_delete_message(message)
-        return
-
-    await _reply_with_track(
-        message,
-        text,
-        preview_url=preview_url,
-        reply_markup=reply_markup,
-        prefer_large_preview=prefer_large_preview,
-    )
-
-
-async def _send_track_video_pair_result(
-    bot: Bot,
-    message: Message,
-    text: str,
-    *,
-    track: TrackMatch,
-    video: VideoMatch,
-    reply_markup: InlineKeyboardMarkup | None,
-) -> bool:
-    if (
-        message.chat.type in {"group", "supergroup"}
-        and ephemeral_group_replies_enabled()
-        and getattr(message, "from_user", None) is not None
-    ):
-        await _send_track_result(
-            bot,
-            message,
-            text,
-            preview_url=_select_preview_url(track.links) or track.thumbnail_url,
-            reply_markup=reply_markup,
-        )
-        return True
-
-    placeholder = _take_placeholder(message.chat_id)
-    if placeholder is not None:
-        try:
-            await placeholder.delete()
-        except TelegramError:
-            LOGGER.debug("Could not remove mixed-post placeholder", exc_info=True)
-
-    sent = await send_track_video_album(
-        bot,
-        chat_id=message.chat_id,
-        track=track,
-        video_title=video.title,
-        video_url=video.url,
-        video_thumbnail_url=video.thumbnail_url,
-        caption=text,
-        reply_markup=(
-            make_channel_safe_keyboard(reply_markup)
-            if message.chat.type == "channel"
-            else reply_markup
-        ),
-    )
-    if sent is None:
-        await _send_track_result(
-            bot,
-            message,
-            text,
-            preview_url=_select_preview_url(track.links) or track.thumbnail_url,
-            reply_markup=reply_markup,
-        )
-        return True
-
-    if message.chat.type in {"group", "supergroup", "channel"}:
-        await _try_delete_message(message)
-    return True
-
-
-async def _reply_with_track(
-    message: Message,
-    text: str,
-    *,
-    preview_url: str | None,
-    reply_markup: InlineKeyboardMarkup | None,
-    prefer_large_preview: bool = True,
-) -> Message:
-    text = fit_telegram_html(text)
-    link_preview_options = _build_link_preview_options(
-        preview_url,
-        prefer_large_media=prefer_large_preview,
-    )
-    placeholder = _take_placeholder(message.chat_id)
-    if placeholder is not None:
-        try:
-            return await placeholder.edit_text(
-                text=text,
-                parse_mode=ParseMode.HTML,
-                link_preview_options=link_preview_options,
-                reply_markup=reply_markup,
-            )
-        except TelegramError:
-            LOGGER.debug("Could not edit loading placeholder", exc_info=True)
-            await _try_delete_message(placeholder)
-
-    return await message.reply_text(
-        text=text,
-        parse_mode=ParseMode.HTML,
-        link_preview_options=link_preview_options,
-        reply_markup=reply_markup,
-    )
-
-
 _bot_lookup.configure_track_result_sender(_send_track_result)
 _bot_lookup.configure_track_video_pair_sender(_send_track_video_pair_result)
 
@@ -2611,12 +2489,3 @@ async def _notify_admin(
         await context.bot.send_message(chat_id=admin_chat_id, text=text)
     except TelegramError:
         LOGGER.info("Could not notify admin chat %s", admin_chat_id)
-
-
-async def _try_delete_message(message: Message) -> bool:
-    try:
-        await message.delete()
-    except TelegramError:
-        return False
-
-    return True

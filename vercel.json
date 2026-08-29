@@ -20,6 +20,10 @@
     {
       "src": "api/collage.py",
       "use": "@vercel/python"
+    },
+    {
+      "src": "api/smoke.py",
+      "use": "@vercel/python"
     }
   ],
   "routes": [
@@ -42,6 +46,10 @@
     {
       "src": "/api/collage",
       "dest": "api/collage.py"
+    },
+    {
+      "src": "/api/smoke",
+      "dest": "api/smoke.py"
     }
   ],
   "crons": [

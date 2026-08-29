@@ -1814,8 +1814,6 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         import os
         from unittest.mock import patch as env_patch
 
-        import music_links_bot.bot as bot_module
-
         message = ReplaceableMessageStub()
         message.message_id = 99
         message.from_user = type("U", (), {"id": 777})()
@@ -1832,7 +1830,10 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
                 {"EPHEMERAL_GROUP_REPLIES": "1"},
                 clear=False,
             ),
-            env_patch.object(bot_module, "send_ephemeral_message", fake_send),
+            env_patch(
+                "music_links_bot.lookup_transport.send_ephemeral_message",
+                fake_send,
+            ),
         ):
             await _send_track_result(
                 bot, message, "готовый пост", preview_url=None, reply_markup=None
@@ -1845,8 +1846,6 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
     async def test_group_ephemeral_falls_back_to_public_when_undelivered(self) -> None:
         import os
         from unittest.mock import patch as env_patch
-
-        import music_links_bot.bot as bot_module
 
         message = ReplaceableMessageStub()
         message.from_user = type("U", (), {"id": 777})()
@@ -1862,7 +1861,10 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
                 {"EPHEMERAL_GROUP_REPLIES": "1"},
                 clear=False,
             ),
-            env_patch.object(bot_module, "send_ephemeral_message", fake_send),
+            env_patch(
+                "music_links_bot.lookup_transport.send_ephemeral_message",
+                fake_send,
+            ),
         ):
             await _send_track_result(
                 bot, message, "готовый пост", preview_url=None, reply_markup=None

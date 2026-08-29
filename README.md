@@ -6,7 +6,7 @@
 
 [Open the bot](https://t.me/StonerHandBot) · [See the channel](https://t.me/stonerhand) · [Русская версия](README.ru.md)
 
-![Release](https://img.shields.io/badge/release-1.9.2-5b5bd6?style=flat-square)
+![Release](https://img.shields.io/badge/release-1.10.0-5b5bd6?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
@@ -52,6 +52,8 @@ is omitted instead of guessed.
 - Works inline with `@StonerHandBot artist — track` in any conversation.
 - Uses Bot API 10.3 Rich Messages when supported and falls back to a complete
   classic card without losing artwork, text or platform links.
+- Validates every finished Classic, Rich, inline, channel, photo and audio post
+  through one release contract before Telegram receives it.
 - Exposes `/privacy` for transparent data controls and confirmed user-data
   deletion.
 
@@ -107,16 +109,18 @@ flowchart LR
     P --> S[Music providers]
     P --> D[Canonical draft]
     D --> V[Publication view]
-    V --> R[Rich delivery]
-    V --> C[Classic fallback]
+    V --> G[Final publication contract]
+    G --> R[Rich delivery]
+    G --> C[Classic fallback]
     D <--> K[(Upstash Redis)]
     K --> Q[Scheduled worker]
     Q --> V
 ```
 
 One immutable publication plan is shared by preview, direct send, channel
-publishing and the queue. It freezes text, hashtags, keyboard, artwork, link
-preview and delivery mode before Telegram is called. Durable drafts are
+publishing and the queue. A second, transport-neutral final contract verifies
+its text, counts, keyboard destinations, artwork and Telegram limits before any
+Classic, Rich or inline call. Durable drafts are
 normalized before queue storage and delivery. Redis stores sessions, history,
 templates, deduplication claims and queue state; bounded memory remains a
 development and degraded-mode fallback.
@@ -145,7 +149,8 @@ The repository is configured for Vercel Functions:
 - `/api/set_webhook` — protected webhook maintenance;
 - `/api/queue_worker` — protected scheduled publishing worker;
 - `/api/collage` — signed, compressed and cached classic collection artwork;
-- `/api/health` — Telegram, webhook, Redis, queue and release canary.
+- `/api/health` — Telegram, webhook, Redis, queue and release canary;
+- `/api/smoke` — deterministic Classic/Rich/inline/channel publication matrix.
 
 Required production values:
 
@@ -182,15 +187,15 @@ python -m pytest -q
 
 CI also checks dependency pins, secrets, generated files, compilation and the
 Vercel route/build/cron contract. A production canary verifies the exact commit,
-the collection-artwork service and the production dependencies before it allows
-the guarded automatic rollback decision.
+the collection-artwork service and the complete publication smoke matrix before
+it allows the guarded automatic rollback decision.
 
 </details>
 
 ## Repository
 
 ```text
-api/                    Vercel webhook, health, collage and queue endpoints
+api/                    Vercel webhook, health, smoke, collage and queue endpoints
 src/music_links_bot/    application, providers, editor and publishing pipeline
 tests/                  unit, contract, snapshot and production-canary tests
 .github/                CI, dependency updates and guarded release checks

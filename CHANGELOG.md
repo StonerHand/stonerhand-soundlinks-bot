@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+## 1.10.0 — 2026-08-29
+
+- Added one final publication contract shared by Classic, Rich, inline,
+  channel, photo/audio and editor delivery. It blocks visible music-source
+  URLs, invalid partial counts, unsafe or search destinations, broken
+  universal buttons, missing required artwork and Telegram limit violations
+  before a post can leave the bot.
+- Added a deterministic seven-case release matrix for a universal track,
+  SoundCloud-only source, complete and partial collections, channel-safe
+  keyboard, inline share and Rich artwork/buttons, with a reviewed golden snapshot.
+- Added the read-only `/api/smoke` production endpoint and made the guarded
+  production canary verify the complete publication matrix after every deploy.
+- Added 500 deterministic fuzz cases for provider URLs, punctuation, CRLF,
+  emoji/UTF-16 entities and safe external editorial links.
+- Extracted lookup delivery and safe Telegram message deletion from the central
+  bot controller, reducing its size while preserving existing interaction
+  points and fallbacks.
+- Updated architecture, release operations and product documentation for the
+  new pre-delivery contract and production smoke gate.
+
 ## 1.9.2 — 2026-08-29
 
 - Removed clickable Spotify, Apple Music and other supported source links from

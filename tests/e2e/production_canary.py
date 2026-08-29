@@ -70,6 +70,35 @@ def main() -> int:
     except Exception as exc:  # noqa: BLE001
         failures.append(f"collage request failed: {type(exc).__name__}")
 
+    try:
+        status, raw, content_type = fetch("/api/smoke")
+        payload = json.loads(raw)
+        if status != 200 or not payload.get("ok"):
+            failures.append(f"publication smoke status={status} ok={payload.get('ok')}")
+        if payload.get("service") != "publication-release-smoke":
+            failures.append("publication smoke service identity is invalid")
+        cases = payload.get("cases") or {}
+        expected_cases = {
+            "classic_track",
+            "soundcloud_source_only",
+            "collection_complete",
+            "collection_partial",
+            "inline_share",
+            "channel_keyboard",
+            "rich_card",
+        }
+        if set(cases) != expected_cases:
+            failures.append("publication smoke matrix is incomplete")
+        failures.extend(
+            f"publication smoke case {name} failed"
+            for name, case in cases.items()
+            if not (case or {}).get("ok")
+        )
+        if "application/json" not in content_type:
+            failures.append("publication smoke content-type is not JSON")
+    except Exception as exc:  # noqa: BLE001
+        failures.append(f"publication smoke request failed: {type(exc).__name__}")
+
     if failures:
         print("\n".join(failures), file=sys.stderr)
         return 1

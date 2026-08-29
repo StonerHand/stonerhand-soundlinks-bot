@@ -41,6 +41,10 @@ from music_links_bot.keyboards import (
     _build_youtube_keyboard,
     _select_preview_url,
 )
+from music_links_bot.publication_contract import (
+    RenderedPublication,
+    require_valid_publication,
+)
 from music_links_bot.rich_publications import (
     RICH_MESSAGE_CAPABILITY,
     build_rich_inline_card_html,
@@ -67,6 +71,7 @@ from music_links_bot.telegram_gateway import (
 from music_links_bot.telegram_media_cache import get_cached_file_id
 from music_links_bot.url_utils import (
     extract_supported_urls,
+    is_direct_platform_url,
     is_nts_url,
     is_playlist_url,
     is_spotify_artist_url,
@@ -603,6 +608,9 @@ async def _build_inline_collection_result(
         keyboard=card.keyboard,
         preview_url=card.preview_url,
         channel_safe=channel_safe,
+        found_count=card.publication.found_count,
+        requested_count=card.publication.requested_count,
+        source_urls=card.publication.source_urls,
     )
 
 
@@ -619,9 +627,29 @@ def _inline_article(
     rich_html: str | None = None,
     rich_media: list[dict[str, object]] | None = None,
     force_classic: bool = False,
+    found_count: int = 1,
+    requested_count: int = 1,
+    source_urls: tuple[str, ...] = (),
 ) -> InlineQueryResultArticle:
     if channel_safe:
         keyboard = make_channel_safe_keyboard(keyboard)
+    effective_source_urls = source_urls
+    if not effective_source_urls and is_direct_platform_url(source_url):
+        effective_source_urls = (source_url,)
+    require_valid_publication(
+        RenderedPublication(
+            text=text,
+            keyboard=keyboard,
+            preview_url=preview_url,
+            cover_url=thumbnail_url,
+            source_urls=effective_source_urls,
+            found_count=found_count,
+            requested_count=requested_count,
+            mode="inline",
+            content_kind="collection" if requested_count > 1 else "track",
+            cover_expected=bool(thumbnail_url),
+        )
+    )
     use_rich = (
         bool(rich_html)
         and bool(rich_media)

@@ -1,0 +1,114 @@
+{
+  "cases": {
+    "channel_keyboard": {
+      "buttons": ["🟢 Spotify", "🪩 Все платформы"],
+      "checks": {"channel_safe": true},
+      "count": [1, 1],
+      "destinations": ["open.spotify.com", "song.link"],
+      "issues": [],
+      "lines": ["🎧 · Lime Garden", "Love Song", "#stonerhand #track"],
+      "mode": "channel",
+      "ok": true,
+      "preview_host": "images.example"
+    },
+    "classic_track": {
+      "buttons": ["🟢 Spotify", "🪩 Все платформы"],
+      "checks": {},
+      "count": [1, 1],
+      "destinations": ["open.spotify.com", "song.link"],
+      "issues": [],
+      "lines": ["🎧 · Lime Garden", "Love Song", "#stonerhand #track"],
+      "mode": "classic",
+      "ok": true,
+      "preview_host": "images.example"
+    },
+    "collection_complete": {
+      "buttons": [
+        "1 · A Torinói Ló",
+        "2 · The Lonesome Foghorn Blows",
+        "3 · 1758 Times of Weird Sadness"
+      ],
+      "checks": {},
+      "count": [3, 3],
+      "destinations": ["song.link", "song.link", "song.link"],
+      "issues": [],
+      "lines": [
+        "Подборка · 3 релиза",
+        "Kokomo",
+        "1. A Torinói Ló",
+        "2. The Lonesome Foghorn Blows",
+        "3. 1758 Times of Weird Sadness",
+        "#stonerhand #track #collection"
+      ],
+      "mode": "classic",
+      "ok": true,
+      "preview_host": "tg-bot-sh.vercel.app"
+    },
+    "collection_partial": {
+      "buttons": [
+        "1 · A Torinói Ló",
+        "2 · The Lonesome Foghorn Blows",
+        "3 · 1758 Times of Weird Sadness"
+      ],
+      "checks": {},
+      "count": [3, 4],
+      "destinations": ["song.link", "song.link", "song.link"],
+      "issues": [],
+      "lines": [
+        "⚠️ Подборка · 3 из 4",
+        "Kokomo",
+        "1. A Torinói Ló",
+        "2. The Lonesome Foghorn Blows",
+        "3. 1758 Times of Weird Sadness",
+        "#stonerhand #track #collection"
+      ],
+      "mode": "classic",
+      "ok": true,
+      "preview_host": "images.example"
+    },
+    "inline_share": {
+      "buttons": ["🟢 Spotify", "🪩 Все платформы", "↗ Поделиться"],
+      "checks": {},
+      "count": [1, 1],
+      "destinations": ["open.spotify.com", "song.link", "inline"],
+      "issues": [],
+      "lines": ["🎧 · Lime Garden", "Love Song", "#stonerhand #track"],
+      "mode": "inline",
+      "ok": true,
+      "preview_host": "images.example"
+    },
+    "rich_card": {
+      "buttons": ["🟢 Spotify", "🪩 Все платформы"],
+      "checks": {
+        "has_buttons": true,
+        "has_media": true,
+        "within_html_limit": true
+      },
+      "count": [1, 1],
+      "destinations": ["open.spotify.com", "song.link"],
+      "issues": [],
+      "lines": ["🎧 · Lime Garden", "Love Song", "#stonerhand #track"],
+      "mode": "rich",
+      "ok": true,
+      "preview_host": "images.example"
+    },
+    "soundcloud_source_only": {
+      "buttons": ["🟠 SoundCloud"],
+      "checks": {"forbidden_buttons_absent": true},
+      "count": [1, 1],
+      "destinations": ["soundcloud.com"],
+      "issues": [],
+      "lines": [
+        "🎧 · StonerHand",
+        "Ethan Kath DJ Set — Park Live 2013",
+        "#stonerhand #track"
+      ],
+      "mode": "classic",
+      "ok": true,
+      "preview_host": "images.example"
+    }
+  },
+  "contract": 1,
+  "ok": true,
+  "service": "publication-release-smoke"
+}

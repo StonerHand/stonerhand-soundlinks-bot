@@ -16,8 +16,12 @@ from music_links_bot.channel_templates import save_channel_template
 from music_links_bot.chat_access import PublishAccess, check_publish_access
 from music_links_bot.draft_model import prepare_publication_draft
 from music_links_bot.models import TrackMatch
+from music_links_bot.publication_contract import require_valid_publication
 from music_links_bot.publication_preflight import validate_publication
-from music_links_bot.publication_view import build_publication_view
+from music_links_bot.publication_view import (
+    build_publication_view,
+    publication_contract_from_view,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -135,6 +139,7 @@ class PublicationService:
             context=self.context,
             include_channel_button=include_channel_button,
         )
+        require_valid_publication(publication_contract_from_view(view, track))
         text = view.text
         keyboard = view.keyboard
 

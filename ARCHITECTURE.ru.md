@@ -2,7 +2,7 @@
 
 Документ описывает текущую production-архитектуру Telegram-бота.
 
-> Актуальная схема для релиза 1.9.2. Все пользовательские сценарии сходятся в
+> Актуальная схема для релиза 1.10.0. Все пользовательские сценарии сходятся в
 > одном конвейере публикации и остаются внутри Telegram.
 
 ## Контур системы
@@ -14,7 +14,8 @@ flowchart LR
     BOT --> RESOLVE["Resolver и провайдеры"]
     BOT --> EDIT["Черновики и редактор"]
     BOT --> PUB["PublicationService"]
-    PUB --> GW["Telegram API Gateway"]
+    PUB --> CONTRACT["Final publication contract"]
+    CONTRACT --> GW["Telegram API Gateway"]
     GW --> TG
     CRON["Vercel Cron"] --> WORKER["api/queue_worker.py"]
     WORKER --> PUB
@@ -30,13 +31,16 @@ webhook `/api/telegram`. Polling используется исключитель
 - `/api/set_webhook` — защищённая регистрация webhook, команд, описаний и меню;
 - `/api/health` — Telegram, webhook, Redis, очередь и runtime-метрики;
 - `/api/queue_worker` — защищённый cron-tick очереди;
-- `/api/collage` — HMAC-подписанный JPEG-коллаж и независимый health-контракт.
+- `/api/collage` — HMAC-подписанный JPEG-коллаж и независимый health-контракт;
+- `/api/smoke` — read-only матрица готовых публикаций без внешних запросов.
 
 ## Основные модули
 
 - `bot_app.py` — единственная точка сборки PTB Application и регистрации handlers;
 - `bot.py` — линейная orchestration поиска, редактора и публикации без
   переэкспорта команд, UI и lookup-реализаций;
+- `lookup_transport.py` — доставка результатов в private/group/channel,
+  ephemeral fallback и song+video media group;
 - `bot_pending.py` — нативный Force Reply, валидация ожидаемого ввода и
   восстановление исходного экрана;
 - `bot_editor_state.py` — чистые переходы и мутации состояния конструктора;
@@ -56,6 +60,8 @@ webhook `/api/telegram`. Polling используется исключитель
 - `url_utils.py` — канонизация URL и единый фильтр прямых площадочных ссылок;
 - `publication_service.py` — отправка себе и публикация в канал;
 - `publication_preflight.py` — блокирующая проверка карточки перед delivery;
+- `publication_contract.py` — единый финальный контракт Classic, Rich, inline,
+  channel, photo и audio публикаций;
 - `publication_presets.py` — именованные пользовательские шаблоны оформления;
 - `publication_model.py` — независимая от Telegram модель готовой публикации;
 - `rich_rendering.py` — чистый безопасный Rich HTML, карточки, медиагруппы и
@@ -70,6 +76,7 @@ webhook `/api/telegram`. Polling используется исключитель
 - `collection_collage.py` — безопасный URL, компоновка 2–4 обложек и fallback;
 - `publication_view.py` — неизменяемый план публикации: HTML, клавиатура,
   обложка, preview и режим delivery;
+- `release_smoke.py` — детерминированная релизная матрица без сети и секретов;
 - `publication_budget.py` — динамический лимит подводки для сообщения и photo caption;
 - `draft_model.py` — типизированный черновик, очистка внешних данных и миграция схемы;
 - `telegram_buttons.py` — семантический реестр кнопок и цветов;
@@ -182,8 +189,11 @@ redirect и ограничивает размер каждого изображ�
 очереди, поэтому preview не расходится с итоговым постом. Выключенные в
 конструкторе хэштеги не могут быть
 неявно включены режимом канала; custom и automatic варианты также разрешаются
-ровно один раз в этом слое. Сервис
-сначала выполняет локальную preflight-проверку. Загруженное аудио уходит через
+ровно один раз в этом слое. Сервис сначала выполняет локальную
+preflight-проверку, а готовый результат — общий финальный контракт. Он не
+позволяет отправить музыкальную ссылку в тексте, неправильный счётчик partial,
+кнопку «Все платформы» не на Songlink/Odesli, search URL, переполненную
+клавиатуру или публикацию без обязательной обложки. Загруженное аудио уходит через
 `sendAudio`, пользовательская обложка — напрямую по Telegram `file_id` без
 повторной загрузки и брендирования. Для обычной карточки пользователь выбирает
 Auto с Rich fallback или принудительный Classic. Затем сервис собирает Rich
@@ -255,8 +265,8 @@ Webhook worker не запускает: пользовательский update 
   очередь/метрики и возвращает version/commit;
 - внутренний health-to-worker вызов использует отдельный производный ключ,
   если `CRON_SECRET` сохранён пустым; явный секрет всегда имеет приоритет;
-- production canary проверяет реальные API, commit deploy, просроченную очередь
-  и отдельный health-контракт сервиса коллажей;
+- production canary проверяет реальные API, commit deploy, просроченную очередь,
+  сервис коллажей и детерминированную матрицу всех финальных форматов;
 - ручной checklist закрывает iOS, Android, Desktop/Web, темы и реальные переходы;
 - CI выполняет полный настроенный lint, проверку единого формата, compile,
   security-аудит зависимостей, контракт `vercel.json` и полный набор тестов.

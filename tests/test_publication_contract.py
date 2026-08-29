@@ -1,0 +1,96 @@
+import unittest
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+from music_links_bot.publication_contract import (
+    RenderedPublication,
+    validate_rendered_publication,
+)
+
+
+class PublicationContractTests(unittest.TestCase):
+    def test_accepts_a_complete_classic_card(self) -> None:
+        result = validate_rendered_publication(
+            RenderedPublication(
+                text="🎧 · <b>Artist</b>\nSong\n\n#stonerhand #track",
+                keyboard=InlineKeyboardMarkup(
+                    [
+                        [
+                            InlineKeyboardButton(
+                                "🟢 Spotify",
+                                url="https://open.spotify.com/track/abc",
+                            )
+                        ],
+                        [
+                            InlineKeyboardButton(
+                                "🪩 Все платформы",
+                                url="https://song.link/s/abc",
+                            )
+                        ],
+                    ]
+                ),
+                preview_url="https://images.example/cover.jpg",
+                cover_url="https://images.example/cover.jpg",
+                source_urls=("https://open.spotify.com/track/abc",),
+                cover_expected=True,
+            )
+        )
+
+        self.assertTrue(result.ready)
+        self.assertEqual(result.issues, ())
+
+    def test_blocks_a_visible_music_source_url(self) -> None:
+        result = validate_rendered_publication(
+            RenderedPublication(
+                text="Текст https://open.spotify.com/track/abc",
+            )
+        )
+
+        self.assertIn("visible_source_url", result.blocking_codes)
+
+    def test_partial_collection_requires_an_exact_count(self) -> None:
+        result = validate_rendered_publication(
+            RenderedPublication(
+                text="<b>Подборка</b>\n1. Artist — Song",
+                found_count=1,
+                requested_count=4,
+                content_kind="collection",
+            )
+        )
+
+        self.assertIn("missing_partial_count", result.blocking_codes)
+
+    def test_universal_button_must_not_fall_back_to_provider(self) -> None:
+        result = validate_rendered_publication(
+            RenderedPublication(
+                text="Artist — Song",
+                keyboard=InlineKeyboardMarkup(
+                    [
+                        [
+                            InlineKeyboardButton(
+                                "🪩 Все платформы",
+                                url="https://open.spotify.com/track/abc",
+                            )
+                        ]
+                    ]
+                ),
+            )
+        )
+
+        self.assertIn("universal_button_mismatch", result.blocking_codes)
+
+    def test_rejects_oversized_callback_data(self) -> None:
+        result = validate_rendered_publication(
+            RenderedPublication(
+                text="Artist — Song",
+                keyboard=InlineKeyboardMarkup(
+                    [[InlineKeyboardButton("Изменить", callback_data="я" * 33)]]
+                ),
+            )
+        )
+
+        self.assertIn("invalid_callback_data", result.blocking_codes)
+
+
+if __name__ == "__main__":
+    unittest.main()

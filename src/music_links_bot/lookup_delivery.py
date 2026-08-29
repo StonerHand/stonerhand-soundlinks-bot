@@ -86,6 +86,8 @@ async def send_youtube_result(
             + format_video_message(video, include_hashtags=include_hashtags),
             preview_url=video.url,
             reply_markup=keyboard,
+            source_urls=(video.url,),
+            content_kind="video",
         )
         return
 
@@ -112,6 +114,10 @@ async def send_youtube_result(
         ),
         preview_url=videos[0].url,
         reply_markup=collection_keyboard,
+        found_count=len(videos),
+        requested_count=total,
+        source_urls=tuple(video.url for video in videos),
+        content_kind="collection",
     )
 
 
@@ -151,6 +157,8 @@ async def send_nts_result(
             + format_radio_message(radio, include_hashtags=include_hashtags),
             preview_url=radio.url,
             reply_markup=keyboard,
+            source_urls=(radio.url,),
+            content_kind="radio",
         )
         return
 
@@ -177,6 +185,10 @@ async def send_nts_result(
         ),
         preview_url=radios[0].url,
         reply_markup=collection_keyboard,
+        found_count=len(radios),
+        requested_count=total,
+        source_urls=tuple(radio.url for radio in radios),
+        content_kind="collection",
     )
 
 
@@ -232,6 +244,8 @@ async def send_playlist_result(
             + format_playlist_message(playlist, include_hashtags=include_hashtags),
             preview_url=playlist.url,
             reply_markup=keyboard,
+            source_urls=(playlist.url,),
+            content_kind="playlist",
         )
         return
 
@@ -258,6 +272,10 @@ async def send_playlist_result(
         ),
         preview_url=playlists[0].url,
         reply_markup=collection_keyboard,
+        found_count=len(playlists),
+        requested_count=total,
+        source_urls=tuple(playlist.url for playlist in playlists),
+        content_kind="collection",
     )
 
 
@@ -297,6 +315,8 @@ async def send_artist_result(
             + format_artist_message(artist, include_hashtags=include_hashtags),
             preview_url=artist.url,
             reply_markup=keyboard,
+            source_urls=(artist.url,),
+            content_kind="artist",
         )
         return
 
@@ -323,6 +343,10 @@ async def send_artist_result(
         ),
         preview_url=artists[0].url,
         reply_markup=collection_keyboard,
+        found_count=len(artists),
+        requested_count=total,
+        source_urls=tuple(artist.url for artist in artists),
+        content_kind="collection",
     )
 
 
@@ -420,6 +444,18 @@ async def send_mixed_result(
         text,
         preview_url=preview_url,
         reply_markup=keyboard,
+        found_count=found_count,
+        requested_count=total,
+        source_urls=tuple(
+            [
+                *[url for track in tracks for url in track.links.values()],
+                *[playlist.url for playlist in playlists],
+                *[artist.url for artist in artists],
+                *[radio.url for radio in radios],
+                *[video.url for video in videos],
+            ]
+        ),
+        content_kind="collection",
     )
 
 
