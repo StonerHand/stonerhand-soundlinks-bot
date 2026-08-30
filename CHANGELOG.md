@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 1.13.1 — 2026-08-30
+
+- Fixed the first-run `Deftones — Rickets` example and every equivalent text
+  search disappearing when Songlink rejects its public lookup request.
+- Added a verified Apple Music fallback backed by cached iTunes search metadata
+  and a keyless ID lookup across serverless invocations, preserving artwork,
+  artist, title and the direct provider action without inventing availability.
+- Added exact-query, cold-cache and complete resolver-path regressions.
+
 ## 1.13.0 — 2026-08-30
 
 - Turned empty inline mode into a personal discovery surface with up to three

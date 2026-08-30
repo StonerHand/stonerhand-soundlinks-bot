@@ -6,7 +6,7 @@
 
 [Open the bot](https://t.me/StonerHandBot) · [See the channel](https://t.me/stonerhand) · [Русская версия](README.ru.md)
 
-![Release](https://img.shields.io/badge/release-1.13.0-5b5bd6?style=flat-square)
+![Release](https://img.shields.io/badge/release-1.13.1-5b5bd6?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
@@ -39,6 +39,8 @@ is omitted instead of guessed.
   **All platforms** Songlink/Odesli action and compact secondary controls.
 - Shows a provider button only for a direct release URL returned by the
   resolver; search suggestions never masquerade as confirmed availability.
+- Keeps exact text-search and direct Apple Music results publishable with
+  verified iTunes metadata and artwork when Songlink is temporarily unavailable.
 - Combines matching links from different services into one release rather than
   publishing duplicate cards.
 - Removes Spotify page branding and SEO copy from release, artist and playlist

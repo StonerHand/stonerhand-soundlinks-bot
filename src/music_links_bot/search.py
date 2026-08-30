@@ -4,11 +4,15 @@ import asyncio
 import logging
 import unicodedata
 from dataclasses import dataclass
+from urllib.parse import parse_qs, urlparse
 
 import httpx
 
 from music_links_bot.cache import TTLCache
 from music_links_bot.constants import HTTP_USER_AGENT
+from music_links_bot.models import TrackMatch
+from music_links_bot.release_hubs import canonical_release_hub_url
+from music_links_bot.url_utils import cache_key_for_url, normalize_host
 
 LOGGER = logging.getLogger(__name__)
 MIN_QUERY_LENGTH = 2
@@ -36,9 +40,9 @@ class SearchCandidate:
 class SearchClient:
     """Resolves free-text queries to streaming URLs via the iTunes Search API.
 
-    The API is public and keyless; the returned Apple Music URLs are then fed
-    through the regular Song.link pipeline, so search results get the same
-    cross-platform treatment as pasted links.
+    The API is public and keyless. Returned Apple Music URLs normally continue
+    through Song.link; verified iTunes metadata remains a single-platform
+    fallback when the universal resolver is unavailable.
     """
 
     def __init__(self, *, timeout: float = 6.0, country: str = "US") -> None:
@@ -53,6 +57,9 @@ class SearchClient:
         self._miss_cache: TTLCache[bool] = TTLCache(ttl_seconds=10 * 60)
         self._genre_cache: TTLCache[str] = TTLCache(ttl_seconds=24 * 3600)
         self._preview_cache: TTLCache[str] = TTLCache(ttl_seconds=24 * 3600)
+        self._candidate_cache: TTLCache[SearchCandidate] = TTLCache(
+            ttl_seconds=6 * 3600
+        )
         self._inflight: dict[str, asyncio.Task[list[SearchCandidate]]] = {}
 
     async def aclose(self) -> None:
@@ -67,6 +74,33 @@ class SearchClient:
     async def search_release_url(self, query: str) -> str:
         candidates = await self.search_release_candidates(query)
         return candidates[0].url
+
+    async def lookup_release_fallback(self, source_url: str) -> TrackMatch | None:
+        """Build a verified Apple Music card when Song.link cannot resolve it.
+
+        Search results already carry enough provider metadata for a complete
+        single-platform post.  A direct Apple URL may arrive in a later
+        serverless invocation, so a cache miss is repaired through the keyless
+        iTunes lookup endpoint instead of depending on process memory.
+        """
+        cache_key = cache_key_for_url(source_url)
+        candidate = self._candidate_cache.get(cache_key)
+        if candidate is None:
+            candidate = await self._lookup_apple_candidate(source_url)
+        if candidate is None:
+            return None
+
+        kind = "album" if candidate.kind == "album" else "song"
+        return TrackMatch(
+            title=candidate.title,
+            artist=candidate.artist,
+            links={"appleMusic": candidate.url},
+            page_url=canonical_release_hub_url(candidate.url, release_kind=kind),
+            release_year=candidate.year,
+            kind=kind,
+            release_format=candidate.album if kind == "song" else None,
+            thumbnail_url=_large_artwork_url(candidate.artwork_url),
+        )
 
     async def lookup_genre(self, artist: str, title: str) -> str | None:
         """Return a genre only for an exact artist/release match.
@@ -205,7 +239,29 @@ class SearchClient:
             raise SearchLookupError("No release matched the query.")
 
         self._cache.set(cache_key, candidates)
+        self._remember_candidates(candidates)
         return candidates
+
+    def _remember_candidates(self, candidates: list[SearchCandidate]) -> None:
+        for candidate in candidates:
+            self._candidate_cache.set(cache_key_for_url(candidate.url), candidate)
+
+    async def _lookup_apple_candidate(self, source_url: str) -> SearchCandidate | None:
+        item_id = _apple_item_id(source_url)
+        if item_id is None:
+            return None
+        try:
+            response = await self._client.get(
+                "/lookup",
+                params={"id": item_id, "country": self._country},
+            )
+            response.raise_for_status()
+            candidates = _extract_release_candidates(response.json())
+        except (httpx.HTTPError, ValueError):
+            LOGGER.debug("Apple Music metadata fallback failed", exc_info=True)
+            return None
+        self._remember_candidates(candidates)
+        return candidates[0] if candidates else None
 
 
 def normalize_search_query(query: str) -> str | None:
@@ -214,6 +270,25 @@ def normalize_search_query(query: str) -> str | None:
         return None
 
     return normalized[:MAX_QUERY_LENGTH]
+
+
+def _apple_item_id(source_url: str) -> str | None:
+    parsed = urlparse(source_url)
+    if normalize_host(parsed.hostname) != "music.apple.com":
+        return None
+    query_id = (parse_qs(parsed.query).get("i") or [""])[0]
+    path_id = next(
+        (part for part in reversed(parsed.path.split("/")) if part.isdigit()),
+        "",
+    )
+    item_id = query_id or path_id
+    return item_id if item_id.isdigit() else None
+
+
+def _large_artwork_url(value: str | None) -> str | None:
+    if not value:
+        return None
+    return value.replace("100x100bb", "1200x1200bb").replace("60x60bb", "1200x1200bb")
 
 
 def _extract_preview_url(payload: object) -> str | None:

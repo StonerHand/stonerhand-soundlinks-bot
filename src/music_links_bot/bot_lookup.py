@@ -789,6 +789,7 @@ async def _lookup_tracks_detailed(
             fallback_track = await _build_lookup_fallback(
                 source_url,
                 soundcloud_client=soundcloud_client,
+                search_client=search_client,
             )
             if fallback_track:
                 tracks.append(fallback_track)
@@ -917,10 +918,23 @@ async def _build_lookup_fallback(
     source_url: str,
     *,
     soundcloud_client: SoundCloudClient | None,
+    search_client: SearchClient | None = None,
 ) -> TrackMatch | None:
     podcast_fallback = _build_podcast_fallback(source_url)
     if podcast_fallback:
         return podcast_fallback
+
+    if search_client is not None and hasattr(search_client, "lookup_release_fallback"):
+        try:
+            search_fallback = await search_client.lookup_release_fallback(source_url)
+        except Exception:
+            LOGGER.exception(
+                "Unexpected Apple Music fallback error source=%s",
+                _source_log_id(source_url),
+            )
+        else:
+            if search_fallback is not None:
+                return search_fallback
 
     generic_soundcloud_fallback = build_soundcloud_fallback(source_url)
     if generic_soundcloud_fallback is None:

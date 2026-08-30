@@ -2625,6 +2625,48 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(tracks[0].genre, "Industrial")
 
+    async def test_lookup_tracks_uses_verified_apple_search_fallback(self) -> None:
+        source_url = "https://music.apple.com/us/album/rickets/1099843198?i=1099843246"
+
+        class SearchFallbackStub:
+            fallback_calls = 0
+
+            async def lookup_release_fallback(
+                self, requested_url: str
+            ) -> TrackMatch | None:
+                self.fallback_calls += 1
+                self.assert_source = requested_url
+                return TrackMatch(
+                    title="Rickets",
+                    artist="Deftones",
+                    links={"appleMusic": requested_url},
+                    page_url="https://song.link/i/1099843246",
+                    thumbnail_url="https://images.example/rickets.jpg",
+                )
+
+            async def lookup_genre(self, artist: str, title: str) -> str | None:
+                del artist, title
+                return None
+
+        search = SearchFallbackStub()
+        tracks, unavailable_urls = await _lookup_tracks(
+            FailingLookupClient(),
+            [source_url],
+            search_client=search,
+        )
+
+        self.assertEqual(unavailable_urls, [])
+        self.assertEqual(search.fallback_calls, 1)
+        self.assertEqual(search.assert_source, source_url)
+        self.assertEqual(
+            [(track.artist, track.title) for track in tracks], [("Deftones", "Rickets")]
+        )
+        self.assertEqual(tracks[0].links, {"appleMusic": source_url})
+        self.assertEqual(
+            tracks[0].thumbnail_url,
+            "https://images.example/rickets.jpg",
+        )
+
     async def test_lookup_tracks_cancels_slow_genre_enrichment(self) -> None:
         class SlowGenreSearchStub:
             def __init__(self) -> None:

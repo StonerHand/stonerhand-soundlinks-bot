@@ -159,6 +159,112 @@ class SearchQueryTests(unittest.TestCase):
 
 
 class SearchCacheTests(unittest.IsolatedAsyncioTestCase):
+    async def test_text_search_candidate_survives_songlink_outage(self) -> None:
+        apple_url = (
+            "https://music.apple.com/us/album/rickets/1099843198?i=1099843246&uo=4"
+        )
+
+        class ResponseStub:
+            def raise_for_status(self) -> None:
+                return None
+
+            def json(self) -> dict:
+                return {
+                    "results": [
+                        {
+                            "trackViewUrl": apple_url,
+                            "trackName": "Rickets",
+                            "artistName": "Deftones",
+                            "collectionName": "Around the Fur",
+                            "artworkUrl100": (
+                                "https://is1-ssl.mzstatic.com/image/"
+                                "thumb/Music/100x100bb.jpg"
+                            ),
+                            "releaseDate": "1997-10-28T08:00:00Z",
+                            "kind": "song",
+                        }
+                    ]
+                }
+
+        class ClientStub:
+            calls = 0
+
+            async def get(self, path: str, **kwargs):
+                del path, kwargs
+                self.calls += 1
+                return ResponseStub()
+
+            async def aclose(self) -> None:
+                return None
+
+        search = SearchClient()
+        await search._client.aclose()
+        fake = ClientStub()
+        search._client = fake
+        try:
+            candidates = await search.search_release_candidates("Deftones — Rickets")
+            track = await search.lookup_release_fallback(candidates[0].url)
+        finally:
+            await search.aclose()
+
+        self.assertEqual(fake.calls, 1)
+        self.assertIsNotNone(track)
+        assert track is not None
+        self.assertEqual(track.artist, "Deftones")
+        self.assertEqual(track.title, "Rickets")
+        self.assertEqual(track.release_format, "Around the Fur")
+        self.assertEqual(track.release_year, "1997")
+        self.assertEqual(track.links, {"appleMusic": apple_url})
+        self.assertEqual(track.page_url, "https://song.link/i/1099843246")
+        self.assertIn("1200x1200bb", track.thumbnail_url or "")
+
+    async def test_direct_apple_url_repairs_empty_process_cache(self) -> None:
+        apple_url = "https://music.apple.com/us/album/rickets/1099843198?i=1099843246"
+
+        class ResponseStub:
+            def raise_for_status(self) -> None:
+                return None
+
+            def json(self) -> dict:
+                return {
+                    "results": [
+                        {
+                            "trackViewUrl": apple_url,
+                            "trackName": "Rickets",
+                            "artistName": "Deftones",
+                            "collectionName": "Around the Fur",
+                            "kind": "song",
+                        }
+                    ]
+                }
+
+        class ClientStub:
+            def __init__(self) -> None:
+                self.path = ""
+                self.params: dict[str, str] = {}
+
+            async def get(self, path: str, **kwargs):
+                self.path = path
+                self.params = kwargs["params"]
+                return ResponseStub()
+
+            async def aclose(self) -> None:
+                return None
+
+        search = SearchClient()
+        await search._client.aclose()
+        fake = ClientStub()
+        search._client = fake
+        try:
+            track = await search.lookup_release_fallback(apple_url)
+        finally:
+            await search.aclose()
+
+        self.assertIsNotNone(track)
+        self.assertEqual(fake.path, "/lookup")
+        self.assertEqual(fake.params["id"], "1099843246")
+        self.assertEqual(track.title if track else None, "Rickets")
+
     async def test_parallel_equal_searches_share_one_request(self) -> None:
         class ResponseStub:
             def raise_for_status(self) -> None:
