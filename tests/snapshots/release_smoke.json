@@ -2,7 +2,11 @@
   "cases": {
     "channel_keyboard": {
       "buttons": ["🟢 Spotify", "🪩 Все платформы"],
-      "checks": {"channel_safe": true},
+      "checks": {
+        "channel_safe": true,
+        "hub_is_primary": true,
+        "provider_shortcuts_are_neutral": true
+      },
       "count": [1, 1],
       "destinations": ["open.spotify.com", "song.link"],
       "issues": [],
@@ -13,7 +17,11 @@
     },
     "classic_track": {
       "buttons": ["🟢 Spotify", "🪩 Все платформы"],
-      "checks": {"provider_copy_absent": true},
+      "checks": {
+        "hub_is_primary": true,
+        "provider_copy_absent": true,
+        "provider_shortcuts_are_neutral": true
+      },
       "count": [1, 1],
       "destinations": ["open.spotify.com", "song.link"],
       "issues": [],
@@ -68,7 +76,10 @@
     },
     "inline_share": {
       "buttons": ["🟢 Spotify", "🪩 Все платформы", "↗ Поделиться"],
-      "checks": {},
+      "checks": {
+        "hub_is_primary": true,
+        "provider_shortcuts_are_neutral": true
+      },
       "count": [1, 1],
       "destinations": ["open.spotify.com", "song.link", "inline"],
       "issues": [],
@@ -82,7 +93,9 @@
       "checks": {
         "has_buttons": true,
         "has_media": true,
+        "hub_is_primary": true,
         "provider_copy_absent": true,
+        "provider_shortcuts_are_neutral": true,
         "within_html_limit": true
       },
       "count": [1, 1],
@@ -124,7 +137,7 @@
     "ok": true,
     "screens": {
       "editor_actions": {
-        "buttons": ["Отправить себе", "Изменить", "+ В подборку"],
+        "buttons": ["Отправить себе", "Изменить", "＋ В подборку"],
         "checks": {
           "callbacks_bounded": true,
           "labels_compact": true,

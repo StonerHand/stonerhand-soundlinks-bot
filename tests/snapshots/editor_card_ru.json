@@ -10,7 +10,7 @@
     ],
     [
       ["Изменить", "v2|editor|m|draft123", null, null],
-      ["+ В подборку", "v2|editor|c|draft123", null, null]
+      ["＋ В подборку", "v2|editor|c|draft123", null, null]
     ]
   ]
 }

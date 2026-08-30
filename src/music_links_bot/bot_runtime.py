@@ -27,7 +27,7 @@ RATE_LIMIT_WINDOW_SECONDS = 60
 RATE_LIMIT_MAX_REQUESTS = 12
 ACTIVE_REQUEST_TTL_SECONDS = 5 * 60
 SESSION_TTL_SECONDS = 30 * 24 * 3600
-SESSION_SCHEMA_VERSION = 4
+SESSION_SCHEMA_VERSION = 5
 MAX_MEMORY_SESSIONS = 500
 MAX_MEMORY_KEYS = 2_000
 CIRCUIT_FAILURE_THRESHOLD = 3
@@ -90,6 +90,7 @@ class UserSession:
     user_id: int
     lang: str = "ru"
     onboarding_seen: bool = False
+    welcome_seen: bool = False
     last_query: str = ""
     last_action: dict[str, Any] = field(default_factory=dict)
     pending_input: dict[str, Any] = field(default_factory=dict)
@@ -106,6 +107,7 @@ class UserSession:
                 user_id=int(payload["user_id"]),
                 lang=str(payload.get("lang") or "ru"),
                 onboarding_seen=bool(payload.get("onboarding_seen")),
+                welcome_seen=bool(payload.get("welcome_seen")),
                 last_query=str(payload.get("last_query") or "")[:500],
                 last_action=(
                     dict(payload["last_action"])

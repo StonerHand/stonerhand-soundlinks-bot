@@ -10,14 +10,12 @@ LOGGER = logging.getLogger(__name__)
 
 
 def ephemeral_group_replies_enabled() -> bool:
-    """Opt-in flag for invisible (ephemeral) replies in groups.
+    """Use invisible (ephemeral) replies in groups when Telegram supports it.
 
-    Off by default: the feature rides very new Bot API surface, so it only
-    activates when the operator sets EPHEMERAL_GROUP_REPLIES and Telegram
-    actually supports it for the bot. When it can't deliver, the caller falls
-    back to the normal public reply.
+    Bot API 10.3 makes this a stable native path. Operators can still disable
+    it instantly, and every caller retains a normal public fallback.
     """
-    return feature_enabled("EPHEMERAL_GROUP_REPLIES", default=False)
+    return feature_enabled("EPHEMERAL_GROUP_REPLIES", default=True)
 
 
 async def send_ephemeral_message(

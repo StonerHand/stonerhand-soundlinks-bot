@@ -158,7 +158,10 @@ def _build_link_keyboard(
             _url_button(
                 text=f"{prefix}{_platform_button_label(platform_key, context)}",
                 url=links[platform_key],
-                style="primary" if index == 0 else None,
+                # The provider is a convenient shortcut; Songlink/Odesli is
+                # the canonical cross-platform destination and owns the only
+                # primary accent whenever it is available.
+                style="primary" if index == 0 and not release_hub_url else None,
             )
         )
     rows = _button_rows(buttons)
@@ -168,6 +171,7 @@ def _build_link_keyboard(
                 _url_button(
                     _release_hub_button_label(release_kind, release_format, context),
                     url=release_hub_url,
+                    style="primary",
                 )
             ]
         )
@@ -252,7 +256,7 @@ def _build_nts_keyboard(
     include_channel_button: bool = False,
 ) -> InlineKeyboardMarkup:
     return _single_url_keyboard(
-        "📡 Открыть на NTS",
+        "📻 Открыть на NTS",
         url=url,
         style="primary",
         include_channel_button=include_channel_button,
@@ -314,7 +318,7 @@ def _build_nts_collection_keyboard(
     for index, radio in enumerate(radios, start=1):
         buttons.append(
             _url_button(
-                text=_shorten_button_text(f"📡 {index}. {radio.title}"),
+                text=_shorten_button_text(f"📻 {index}. {radio.title}"),
                 url=radio.url,
                 style=None,
             )
@@ -430,7 +434,7 @@ def _build_mixed_collection_keyboard(
     for radio in radios:
         buttons.append(
             _url_button(
-                text=_shorten_button_text(f"📡 {index}. {radio.title}"),
+                text=_shorten_button_text(f"📻 {index}. {radio.title}"),
                 url=radio.url,
                 style=None,
             )

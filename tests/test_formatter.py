@@ -354,7 +354,7 @@ class FormatterTests(unittest.TestCase):
         )
         self.assertEqual(
             format_radio_message(radio),
-            "📡 · <b>Dark Energy w/ Guest</b>\n"
+            "📻 · <b>Dark Energy w/ Guest</b>\n"
             "станция: NTS Radio\n\n"
             "#stonerhand #radio",
         )
@@ -444,8 +444,8 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_radio_collection_message(radios),
             "<b>Радио</b>\n\n"
-            "1. 📡 · <b>First</b>\n"
-            "2. 📡 · <b>Second</b>\n\n"
+            "1. 📻 · <b>First</b>\n"
+            "2. 📻 · <b>Second</b>\n\n"
             "#stonerhand #collection #radio",
         )
 
@@ -517,7 +517,7 @@ class FormatterTests(unittest.TestCase):
 
         message = format_mixed_collection_message([], videos, radios=radios)
 
-        self.assertIn("📡 · <b>Dark Energy</b>", message)
+        self.assertIn("📻 · <b>Dark Energy</b>", message)
         self.assertIn("📺 · <b>Live</b>", message)
         self.assertNotIn("<a href=", message)
         self.assertIn("#stonerhand #radio #video", message)

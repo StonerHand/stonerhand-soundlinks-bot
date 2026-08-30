@@ -121,7 +121,6 @@ from music_links_bot.bot_ui import (
     editor_intro_rows as _editor_intro_rows,
     editor_overflow_rows as _editor_overflow_rows,
     editor_platform_rows as _editor_platform_rows,
-    editor_preview_rows as _editor_preview_rows,
     editor_schedule_rows as _editor_schedule_rows,
     editor_style_rows as _editor_style_rows,
     editor_template_rows as _editor_template_rows,
@@ -144,6 +143,10 @@ from music_links_bot.draft_model import new_track_draft
 from music_links_bot.editor_view import (
     draft_intro_limit as _draft_intro_limit,
     render_track_draft as _render_track_draft,
+)
+from music_links_bot.ephemeral import (
+    ephemeral_group_replies_enabled,
+    send_ephemeral_message,
 )
 from music_links_bot.formatter import (
     format_collection_message,
@@ -184,7 +187,6 @@ from music_links_bot.publication_state import (
     find_posted_record as _find_posted_record,
     mark_posted as _schedule_mark_posted,
 )
-from music_links_bot.publication_view import build_publication_view
 from music_links_bot.publish_queue import (
     QueueBusyError,
     QueueFullError,
@@ -214,6 +216,7 @@ from music_links_bot.telegram_buttons import (
     button as InlineKeyboardButton,
     callback_button,
     current_chat_button,
+    disabled_button,
 )
 from music_links_bot.telegram_messages import (
     delete_message_safely as _try_delete_message,
@@ -690,19 +693,20 @@ async def _handle_editor_navigation(
             )
         )
     elif screen == BuilderScreen.PREVIEW:
-        view = build_publication_view(
-            draft,
-            track,
-            context=context,
-            include_channel_button=False,
+        sent = (
+            await _deliver_preview_draft(
+                context,
+                draft,
+                target=query.message.chat_id,
+            )
+            if query.message is not None
+            else None
         )
-        text = view.text
-        keyboard = InlineKeyboardMarkup(
-            [
-                *[list(row) for row in view.keyboard.inline_keyboard],
-                *_editor_preview_rows(draft_id, draft),
-            ]
+        await query.answer(
+            get_text(lang, "ed_preview_sent" if sent else "ed_publish_failed"),
+            show_alert=not bool(sent),
         )
+        return True
     elif screen == BuilderScreen.SCHEDULE:
         text = (
             f"{get_text(lang, 'schedule_title')}\n\n"
@@ -1445,16 +1449,31 @@ async def _show_action_busy(query, lang: str) -> None:
             InlineKeyboardMarkup(
                 [
                     [
-                        InlineKeyboardButton(
-                            "⏳ " + get_text(lang, "progress_card"),
-                            callback_data=encode_callback("noop", "busy"),
+                        disabled_button(
+                            get_text(lang, "progress_busy"),
+                            tone=ButtonTone.PRIMARY,
                         )
                     ]
                 ]
             )
         )
-    except (AttributeError, TelegramError):
-        LOGGER.debug("Could not mark editor action busy", exc_info=True)
+    except (AttributeError, TelegramError, TypeError):
+        try:
+            await query.edit_message_reply_markup(
+                InlineKeyboardMarkup(
+                    [
+                        [
+                            callback_button(
+                                get_text(lang, "progress_busy"),
+                                encode_callback("noop", "busy"),
+                                tone=ButtonTone.PRIMARY,
+                            )
+                        ]
+                    ]
+                )
+            )
+        except (AttributeError, TelegramError, TypeError):
+            LOGGER.debug("Could not mark editor action busy", exc_info=True)
 
 
 async def _edit_editor_message(
@@ -1516,6 +1535,24 @@ async def _deliver_draft(
     )
 
 
+async def _deliver_preview_draft(
+    context: ContextTypes.DEFAULT_TYPE,
+    draft: dict,
+    *,
+    target: int | str,
+) -> Message | bool | None:
+    return await PublicationService(
+        context,
+        channel_username=CHANNEL_USERNAME,
+        branding_hooks=(
+            photo_branding_enabled,
+            build_branded_cover,
+            brand_label,
+            brand_logo_url,
+        ),
+    ).preview(draft, target=target)
+
+
 async def _reply_with_error(
     message: Message,
     context: ContextTypes.DEFAULT_TYPE,
@@ -1524,6 +1561,13 @@ async def _reply_with_error(
     lang: str = "ru",
 ) -> None:
     reply_markup = _build_error_keyboard(context.bot.username, lang=lang)
+    if await _try_ephemeral_error(
+        message,
+        context,
+        text,
+        reply_markup,
+    ):
+        return
     placeholder = _take_placeholder(message.chat_id)
     if placeholder is not None:
         try:
@@ -1567,7 +1611,14 @@ async def _reply_with_flow_error(
         detail = get_text(lang, "error_provider_named").format(
             provider=escape(provider)
         )
-    text = f"<b>{get_text(lang, 'error_title')}</b>\n\n{detail}"
+    title_key = {
+        BotErrorCode.INVALID_INPUT: "error_title_invalid_input",
+        BotErrorCode.SEARCH_NOT_FOUND: "error_title_not_found",
+        BotErrorCode.RELEASE_NOT_FOUND: "error_title_not_found",
+        BotErrorCode.PROVIDER_UNAVAILABLE: "error_title_provider",
+        BotErrorCode.RATE_LIMITED: "error_title_rate_limit",
+    }.get(error.code, "error_title")
+    text = f"⚠️ <b>{get_text(lang, title_key)}</b>\n{detail}"
     keyboard = _build_error_keyboard(
         context.bot.username,
         lang=lang,
@@ -1575,6 +1626,14 @@ async def _reply_with_flow_error(
         search_query=search_query,
         source_url=source_url,
     )
+    if await _try_ephemeral_error(
+        message,
+        context,
+        text,
+        keyboard,
+        parse_mode=ParseMode.HTML,
+    ):
+        return
     placeholder = _take_placeholder(message.chat_id)
     if placeholder is not None:
         try:
@@ -1586,6 +1645,39 @@ async def _reply_with_flow_error(
             LOGGER.debug("Could not edit flow-error placeholder", exc_info=True)
             await _try_delete_message(placeholder)
     await message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+
+
+async def _try_ephemeral_error(
+    message: Message,
+    context: ContextTypes.DEFAULT_TYPE,
+    text: str,
+    keyboard: InlineKeyboardMarkup,
+    *,
+    parse_mode: object | None = None,
+) -> bool:
+    """Keep recovery private in groups and preserve the public fallback."""
+    user = getattr(message, "from_user", None)
+    if (
+        getattr(message.chat, "type", None) not in {"group", "supergroup"}
+        or user is None
+        or not ephemeral_group_replies_enabled()
+    ):
+        return False
+    delivered = await send_ephemeral_message(
+        getattr(context.bot, "token", None),
+        message.chat_id,
+        user.id,
+        text,
+        parse_mode=parse_mode,
+        reply_markup=keyboard,
+        reply_to_message_id=getattr(message, "message_id", None),
+    )
+    if not delivered:
+        return False
+    placeholder = _take_placeholder(message.chat_id)
+    if placeholder is not None:
+        await _try_delete_message(placeholder)
+    return True
 
 
 async def _send_typing_action(bot: Bot, message: Message) -> None:

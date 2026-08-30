@@ -44,7 +44,7 @@ class PostEditorTests(unittest.TestCase):
         self.assertEqual(rows[0][0].callback_data, "v2|editor|s|abc123")
         self.assertEqual(rows[1][0].text, "Изменить")
         self.assertEqual(rows[1][0].callback_data, "v2|editor|m|abc123")
-        self.assertEqual(rows[1][1].text, "+ В подборку")
+        self.assertEqual(rows[1][1].text, "＋ В подборку")
         self.assertEqual(rows[1][1].callback_data, "v2|editor|c|abc123")
         more = _editor_more_rows("abc123", self._draft(hashtags=True))
         self.assertEqual(more[1][0].text, "# Хэштеги · авто")
@@ -54,7 +54,7 @@ class PostEditorTests(unittest.TestCase):
         rows = _editor_rows("abc123", self._draft(can_publish=True))
 
         labels = [button.text for row in rows for button in row]
-        self.assertEqual(labels, ["📤 В канал", "Изменить", "+ В подборку"])
+        self.assertEqual(labels, ["📤 В канал", "Изменить", "＋ В подборку"])
         self.assertEqual(rows[0][0].style, "success")
 
     def test_editor_rows_turn_added_item_into_crate_shortcut(self) -> None:
@@ -175,7 +175,7 @@ class PostEditorTests(unittest.TestCase):
         self.assertEqual(buttons[1].text, "🪩 Все платформы")
         self.assertEqual(buttons[2].text, "Отправить себе")
         self.assertEqual(buttons[3].text, "Изменить")
-        self.assertEqual(buttons[4].text, "+ В подборку")
+        self.assertEqual(buttons[4].text, "＋ В подборку")
 
 
 class PublicationOverrideTests(unittest.TestCase):

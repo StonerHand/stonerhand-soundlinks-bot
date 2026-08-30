@@ -245,6 +245,7 @@ def _build_ui_contract() -> dict[str, object]:
         "editor_settings": _summarize_ui_keyboard(
             InlineKeyboardMarkup(editor_more_rows("smoke", draft)),
             expected_primary="✓ Готово",
+            expected_style="success",
         ),
     }
     home_text = build_home_text(
@@ -273,11 +274,16 @@ def _summarize_ui_keyboard(
     keyboard: InlineKeyboardMarkup,
     *,
     expected_primary: str,
+    expected_style: str = "primary",
 ) -> dict[str, object]:
     rows = keyboard.inline_keyboard
     buttons = [button for row in rows for button in row]
     labels = [button.text for button in buttons]
-    primary = [button.text for button in buttons if button.style == "primary"]
+    accented = [
+        (button.text, button.style)
+        for button in buttons
+        if button.style in {"primary", "success", "danger"}
+    ]
     callbacks = [
         button.callback_data for button in buttons if button.callback_data is not None
     ]
@@ -288,7 +294,7 @@ def _summarize_ui_keyboard(
         "callbacks_bounded": all(
             1 <= len(value.encode("utf-8")) <= 64 for value in callbacks
         ),
-        "single_primary_action": primary == [expected_primary],
+        "single_primary_action": accented == [(expected_primary, expected_style)],
         "mini_app_absent": all(button.web_app is None for button in buttons),
     }
     return {
@@ -339,6 +345,27 @@ def _summarize(
     labels = [button.text for button in buttons]
     destinations = [_button_destination(button) for button in buttons]
     checks = dict(extra_checks or {})
+    # A single-release Songlink button is the canonical cross-platform CTA.
+    # Collection rows also use Songlink, but every row represents a different
+    # release and deliberately stays neutral to preserve a calm scan pattern.
+    hub_buttons = (
+        [
+            button
+            for button in buttons
+            if _host(button.url) in {"song.link", "album.link", "odesli.co"}
+        ]
+        if publication.found_count == 1
+        else []
+    )
+    if hub_buttons:
+        checks["hub_is_primary"] = all(
+            button.style == "primary" for button in hub_buttons
+        )
+        checks["provider_shortcuts_are_neutral"] = all(
+            button.style is None
+            for button in buttons
+            if button.url and button not in hub_buttons
+        )
     if forbidden_button_markers:
         checks["forbidden_buttons_absent"] = not any(
             marker in label.casefold()

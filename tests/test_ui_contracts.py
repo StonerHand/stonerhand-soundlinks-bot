@@ -154,7 +154,7 @@ class PublicationGoldenTests(unittest.TestCase):
 
         self.assertIn("Готово к публикации", text)
         self.assertIn("Sleep", text)
-        self.assertEqual(keyboard.inline_keyboard[0][0].text, "Опубликовать")
+        self.assertEqual(keyboard.inline_keyboard[0][0].text, "✓ Опубликовать")
         self.assertEqual(
             keyboard.inline_keyboard[0][0].callback_data,
             "v2|editor|pc|draft123",

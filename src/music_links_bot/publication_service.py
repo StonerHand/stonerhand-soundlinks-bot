@@ -57,6 +57,32 @@ class PublicationService:
             notify_failure=notify_failure,
         )
 
+    async def preview(
+        self,
+        draft: dict,
+        *,
+        target: int | str,
+    ) -> Message | bool | None:
+        """Send the exact publication without editor controls or side effects."""
+        prepared = prepare_publication_draft(draft)
+        if (
+            prepared is None
+            or not validate_publication(prepared.data, prepared.track).ready
+        ):
+            return None
+        try:
+            return await self._send(
+                prepared.data,
+                prepared.track,
+                target=target,
+                channel_style=False,
+                include_channel_button=False,
+                record_metrics=False,
+            )
+        except Exception:
+            LOGGER.info("Could not render clean publication preview", exc_info=True)
+            return None
+
     async def deliver(
         self,
         draft: dict,
@@ -129,10 +155,13 @@ class PublicationService:
         *,
         target: int | str,
         channel_style: bool,
+        include_channel_button: bool | None = None,
+        record_metrics: bool = True,
     ):
-        include_channel_button = (
-            str(target).lstrip("@").casefold() != self.channel_username.casefold()
-        )
+        if include_channel_button is None:
+            include_channel_button = (
+                str(target).lstrip("@").casefold() != self.channel_username.casefold()
+            )
         view = build_publication_view(
             draft,
             track,
@@ -162,6 +191,7 @@ class PublicationService:
             preview_url=view.preview_url,
             delivery_mode=view.delivery_mode,
             as_photo=view.as_photo,
+            record_metrics=record_metrics,
         )
         if handled:
             return sent
@@ -216,6 +246,7 @@ class PublicationService:
         preview_url: str | None,
         delivery_mode: str,
         as_photo: bool,
+        record_metrics: bool,
     ) -> tuple[bool, Any]:
         from music_links_bot.keyboards import (
             _build_link_preview_options,
@@ -257,10 +288,12 @@ class PublicationService:
                 chat_id=target,
                 rich_html=rich_html,
             )
-            self._record_rich(ok=True)
+            if record_metrics:
+                self._record_rich(ok=True)
             return True, sent
         except TelegramError as exc:
-            self._record_rich(ok=False, fallback=True)
+            if record_metrics:
+                self._record_rich(ok=False, fallback=True)
             LOGGER.info(
                 "Rich Messages failed for %s; using HTML fallback",
                 target,

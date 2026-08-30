@@ -29,12 +29,14 @@ from music_links_bot.rich_rendering import (
 )
 from music_links_bot.telegram_gateway import (
     TelegramApiGateway,
+    capability_available,
     feature_enabled,
     record_capability_failure,
     record_capability_success,
 )
 
 LOGGER = logging.getLogger(__name__)
+RICH_DRAFT_CAPABILITY = "rich_drafts"
 
 __all__ = (
     "LONGREAD_MODE",
@@ -128,20 +130,29 @@ async def send_rich_progress_draft(
     text: str,
     can_stop: bool = True,
 ) -> bool:
-    if not feature_enabled("RICH_DRAFTS_ENABLED", default=False):
+    if not feature_enabled(
+        "RICH_DRAFTS_ENABLED", default=True
+    ) or not capability_available(RICH_DRAFT_CAPABILITY):
         return False
     gateway = TelegramApiGateway(bot=bot)
     try:
-        return await gateway.send_rich_draft(
+        sent = await gateway.send_rich_draft(
             chat_id=chat_id,
             draft_id=draft_id,
             rich_message={"html": f"<tg-thinking>{html.escape(text)}</tg-thinking>"},
             can_stop=can_stop,
-            keep_on_stop=True,
+            keep_on_stop=False,
         )
-    except TelegramError:
+    except TelegramError as exc:
+        record_capability_failure(
+            RICH_DRAFT_CAPABILITY,
+            exc,
+            unsupported=rich_api_unavailable(exc),
+        )
         LOGGER.debug("Rich progress draft unavailable", exc_info=True)
         return False
+    record_capability_success(RICH_DRAFT_CAPABILITY)
+    return sent
 
 
 def rich_api_unavailable(error: BaseException) -> bool:

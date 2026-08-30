@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+## 1.12.0 — 2026-08-30
+
+- Rebuilt the visual hierarchy around one primary action: Songlink/Odesli owns
+  the universal release CTA, provider shortcuts and sharing stay neutral, and
+  the home screen no longer adds a second accent for a non-empty collection.
+- Added a shared button-icon vocabulary with optional Bot API 10.3 custom emoji
+  IDs and complete regular-emoji fallbacks, including Rich button conversion.
+- Added a deterministic packaged five-second first-visit animation that shows
+  the link → card → publish flow once without delaying later `/start` screens.
+- Reordered Rich cards into a magazine layout and removed duplicated release
+  titles below artwork while retaining complete Classic fallback behavior.
+- Replaced verbose editor diagnostics with a one-line cover/tags/platform/mode
+  summary and added a clean preview action that sends the exact final post
+  through the production delivery pipeline without publication side effects.
+- Reworked lookup progress into a stable three-stage checklist, enabled safe
+  ephemeral group errors and Rich drafts by default, and kept public/classic
+  fallbacks for clients or chats that do not support the new capabilities.
+- Expanded UI, first-run, custom-icon, preview, publication and release-smoke
+  regressions; updated operations, architecture and RU/EN product documentation.
+
 ## 1.11.0 — 2026-08-30
 
 - Expanded the read-only production smoke contract with RU/EN home screens,

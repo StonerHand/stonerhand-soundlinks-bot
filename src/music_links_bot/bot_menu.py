@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from html import escape
+from importlib.resources import files
 
 from telegram import InlineKeyboardMarkup, Message, Update
 from telegram.constants import ParseMode
@@ -167,6 +168,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     active_draft_id, active_draft_label = await _active_home_card(
         context, runtime, session, lang=lang
     )
+    if message.chat.type == "private" and not session.welcome_seen:
+        session.welcome_seen = await _send_first_visit_demo(message, lang=lang)
     sent = await message.reply_text(
         build_home_text(
             lang=lang,
@@ -192,6 +195,24 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await remember_fresh_home_message(
             context, runtime, session, chat_id=message.chat_id, sent=sent
         )
+
+
+async def _send_first_visit_demo(message: Message, *, lang: str) -> bool:
+    """Show the five-second product tour once; never block the real menu."""
+    reply_animation = getattr(message, "reply_animation", None)
+    if not callable(reply_animation):
+        return False
+    try:
+        resource = files("music_links_bot").joinpath("assets/onboarding-demo.gif")
+        with resource.open("rb") as animation:
+            await reply_animation(
+                animation=animation,
+                caption=get_text(lang, "welcome_demo_caption"),
+            )
+        return True
+    except (AttributeError, OSError, TelegramError, TypeError):
+        LOGGER.debug("Could not send first-visit animation", exc_info=True)
+        return False
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

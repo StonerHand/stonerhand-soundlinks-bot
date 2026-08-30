@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from music_links_bot.models import TrackMatch, VideoMatch
+from music_links_bot.release_presentation import compact_release_title
 
 
 @dataclass(slots=True, frozen=True)
@@ -71,5 +72,7 @@ class MusicPublication:
     @staticmethod
     def track_title(track: TrackMatch) -> str:
         return " — ".join(
-            part.strip() for part in (track.artist, track.title) if part.strip()
+            part.strip()
+            for part in (track.artist, compact_release_title(track.title))
+            if part.strip()
         )

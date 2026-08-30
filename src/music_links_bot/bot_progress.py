@@ -41,9 +41,15 @@ _PLACEHOLDER: contextvars.ContextVar[ProgressState | None] = contextvars.Context
 
 
 def _progress_keyboard(text: str, lang: str) -> InlineKeyboardMarkup:
+    del text
     return InlineKeyboardMarkup(
         [
-            [disabled_button(text[:64], tone=ButtonTone.PRIMARY)],
+            [
+                disabled_button(
+                    get_text(lang, "progress_busy"),
+                    tone=ButtonTone.PRIMARY,
+                )
+            ],
             [
                 callback_button(
                     get_text(lang, "request_cancel"),

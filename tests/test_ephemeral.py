@@ -48,7 +48,7 @@ class EphemeralFlagTests(unittest.TestCase):
         with patch.dict(os.environ, {"EPHEMERAL_GROUP_REPLIES": "0"}, clear=True):
             self.assertFalse(ephemeral.ephemeral_group_replies_enabled())
         with patch.dict(os.environ, {}, clear=True):
-            self.assertFalse(ephemeral.ephemeral_group_replies_enabled())
+            self.assertTrue(ephemeral.ephemeral_group_replies_enabled())
 
 
 class SendEphemeralTests(unittest.TestCase):

@@ -6,7 +6,7 @@
 
 [Open the bot](https://t.me/StonerHandBot) · [See the channel](https://t.me/stonerhand) · [Русская версия](README.ru.md)
 
-![Release](https://img.shields.io/badge/release-1.11.0-5b5bd6?style=flat-square)
+![Release](https://img.shields.io/badge/release-1.12.0-5b5bd6?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
@@ -49,6 +49,8 @@ is omitted instead of guessed.
   budget for each delivery format.
 - Keeps one clear primary action per editor screen, supports undo, reusable
   templates, custom artwork, history and named collections.
+- Sends an exact clean preview as a separate publication, while the editor
+  stays in place and never adds controls to the preview itself.
 - Publishes immediately or through a durable scheduled queue with duplicate
   protection, access checks and failure notifications.
 - Works inline with `@StonerHandBot artist — track` in any conversation.
@@ -79,6 +81,9 @@ is omitted instead of guessed.
 The home screen starts with **Create post** and explains every accepted input.
 An active card is recoverable by release name; collections and history stay on
 the second row. Less frequent tools live under one predictable **More** action.
+On the first private `/start`, a packaged five-second animation demonstrates
+the complete link → card → publish flow once; it never replaces or delays the
+normal menu on later visits.
 
 The editor is progressive rather than crowded:
 
@@ -86,6 +91,12 @@ The editor is progressive rather than crowded:
 2. change only what matters;
 3. run a final preflight check;
 4. send or publish with one explicit action.
+
+The editor summary is deliberately compact — cover, tags, platform count and
+delivery mode fit on one scan line. **Preview** sends the exact finished post
+below the editor through the same publication service used by real delivery.
+Lookup progress uses a stable three-step checklist, and short failures in group
+chats use ephemeral replies when Telegram supports them.
 
 Native replies, editor callbacks and lookup orchestration are isolated from
 presentation. UI copy lives in a packaged RU/EN catalog, so wording can change
@@ -101,9 +112,13 @@ falls back to the reliable single-cover preview if collage delivery fails.
 Incomplete collections deliberately keep a single cover so they cannot look
 finished before every source resolves.
 
-Semantic button styles, disabled progress states, ephemeral notices and Rich
-content are capability-gated. Older Telegram clients always receive the full
-classic experience.
+The universal Songlink/Odesli action owns the primary accent; direct providers
+remain calm shortcuts. A shared icon vocabulary is used across native screens,
+with optional Bot API 10.3 custom emoji IDs and a complete regular-emoji
+fallback. Rich cards use a magazine order — title, artwork, lead, body, actions
+and tags — without repeating the title below the cover. Semantic styles,
+disabled progress, ephemeral notices and Rich content remain capability-gated;
+older Telegram clients always receive the full classic experience.
 
 ## Architecture
 

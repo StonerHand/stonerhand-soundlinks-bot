@@ -12,6 +12,7 @@ from music_links_bot.i18n import get_text
 from music_links_bot.models import TrackMatch
 from music_links_bot.release_presentation import PRESET_ORDER, normalize_preset
 from music_links_bot.telegram_buttons import (
+    ButtonIcon,
     ButtonTone,
     button as InlineKeyboardButton,
     callback_button,
@@ -21,11 +22,10 @@ from music_links_bot.telegram_buttons import (
 def _crate_button(lang: str, crate_count: int) -> InlineKeyboardButton:
     """Make a non-empty collection visible without adding another menu row."""
     safe_count = max(0, min(10, crate_count))
-    kwargs = {"style": "success"} if safe_count else {}
     return InlineKeyboardButton(
         get_text(lang, "home_crate").format(count=safe_count),
         callback_data=encode_callback("crate", "open"),
-        **kwargs,
+        icon=ButtonIcon.COLLECTION,
     )
 
 
@@ -67,6 +67,7 @@ def build_start_keyboard(
     create_button = InlineKeyboardButton(
         get_text(lang, "home_create"),
         callback_data=encode_callback("menu", "create"),
+        icon=ButtonIcon.ADD,
         style="primary",
     )
     rows.append([create_button])
@@ -290,6 +291,7 @@ def build_publish_confirmation(
                     get_text(lang, "publish_confirm_button"),
                     encode_callback("editor", "pc", draft_id),
                     tone=ButtonTone.SUCCESS,
+                    icon=ButtonIcon.READY,
                 )
             ],
             [
@@ -378,6 +380,7 @@ def build_onboarding_keyboard(step: int, lang: str) -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     get_text(lang, "start_using"),
                     callback_data=encode_callback("menu", "onboarddone"),
+                    icon=ButtonIcon.READY,
                     style="success",
                 ),
             ]
@@ -400,6 +403,7 @@ def editor_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
         crate_button = InlineKeyboardButton(
             get_text(lang, "ed_add_crate"),
             callback_data=encode_callback("editor", "c", draft_id),
+            icon=ButtonIcon.ADD,
         )
     if draft.get("can_publish"):
         primary = InlineKeyboardButton(
@@ -492,7 +496,8 @@ def editor_more_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButt
             InlineKeyboardButton(
                 get_text(lang, "ed_done"),
                 callback_data=encode_callback("editor", "f", draft_id),
-                style="primary",
+                icon=ButtonIcon.READY,
+                style="success",
             ),
             InlineKeyboardButton(
                 get_text(lang, "ed_more"),
@@ -732,25 +737,6 @@ def editor_hashtag_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardB
     return append_setting_undo(rows, draft_id, draft)
 
 
-def editor_preview_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
-    lang = draft.get("lang") or "ru"
-    return [
-        [
-            InlineKeyboardButton(
-                get_text(lang, "ed_more"),
-                callback_data=encode_callback("editor", "o", draft_id),
-                style="primary",
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                get_text(lang, "back_to_editor"),
-                callback_data=encode_callback("editor", "m", draft_id),
-            )
-        ],
-    ]
-
-
 def editor_schedule_rows(
     draft_id: str, draft: dict
 ) -> list[list[InlineKeyboardButton]]:
@@ -817,11 +803,17 @@ def editor_overflow_rows(
     rows = [
         [
             InlineKeyboardButton(
+                get_text(lang, "ed_clean_preview"),
+                callback_data=encode_callback("editor", "pv", draft_id),
+            )
+        ],
+        [
+            InlineKeyboardButton(
                 get_text(lang, "ed_send_self"),
                 callback_data=encode_callback("editor", "s", draft_id),
                 **({} if draft.get("can_publish") else {"style": "primary"}),
             )
-        ]
+        ],
     ]
     if draft.get("can_publish"):
         rows.append(

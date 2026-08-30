@@ -11,10 +11,6 @@
     "en": "← Back",
     "ru": "← Назад"
   },
-  "back_to_editor": {
-    "en": "← Back to settings",
-    "ru": "← К настройкам"
-  },
   "cancel": {
     "en": "Cancel",
     "ru": "Отмена"
@@ -37,7 +33,7 @@
   },
   "crate_empty": {
     "en": "🧺 <b>Your crate is empty</b>\n<i>Collect up to ten releases into one music set.</i>\n\n<blockquote>Add tracks with the “+ Add to crate” button under a finished card.</blockquote>",
-    "ru": "🧺 <b>Подборка пока пустая</b>\n<i>Собери до десяти релизов в один музыкальный сет.</i>\n\n<blockquote>Добавляй треки кнопкой «+ В подборку» под готовой карточкой.</blockquote>"
+    "ru": "🧺 <b>Подборка пока пустая</b>\n<i>Собери до десяти релизов в один музыкальный сет.</i>\n\n<blockquote>Добавляй треки кнопкой «＋ В подборку» под готовой карточкой.</blockquote>"
   },
   "crate_find": {
     "en": "+ Find the first track",
@@ -128,8 +124,8 @@
     "ru": "Публиковать в канал может только владелец бота"
   },
   "ed_clean_preview": {
-    "en": "👁 Preview",
-    "ru": "👁 Превью"
+    "en": "Preview",
+    "ru": "Превью"
   },
   "ed_constructor_hint": {
     "en": "Tap a setting to update the preview instantly",
@@ -335,6 +331,10 @@
     "en": "⚠️ Check: {count} warning(s)",
     "ru": "⚠️ Проверка: замечаний — {count}"
   },
+  "ed_preview_sent": {
+    "en": "Clean preview sent below",
+    "ru": "Чистое превью отправлено ниже"
+  },
   "ed_preset_cover": {
     "en": "Style · Cover",
     "ru": "Стиль · Обложка"
@@ -396,12 +396,36 @@
     "ru": "Готово · пост отправлен"
   },
   "ed_status": {
-    "en": "{preset} · platforms: {services} · saved",
-    "ru": "{preset} · площадок: {services} · сохранено"
+    "en": "{preset} ✓ · {tags} · {services} · {delivery}",
+    "ru": "{preset} ✓ · {tags} · {services} · {delivery}"
   },
   "ed_status_audio": {
-    "en": "{preset} · Telegram audio · saved",
-    "ru": "{preset} · аудио Telegram · сохранено"
+    "en": "Audio ✓ · {tags} · Telegram",
+    "ru": "Аудио ✓ · {tags} · Telegram"
+  },
+  "ed_status_custom_cover": {
+    "en": "Custom artwork",
+    "ru": "Своя обложка"
+  },
+  "ed_status_delivery_auto": {
+    "en": "Auto",
+    "ru": "Авто"
+  },
+  "ed_status_delivery_classic": {
+    "en": "Classic",
+    "ru": "Classic"
+  },
+  "ed_status_tags_auto": {
+    "en": "Auto tags",
+    "ru": "Теги авто"
+  },
+  "ed_status_tags_custom": {
+    "en": "Tags {count}",
+    "ru": "Теги {count}"
+  },
+  "ed_status_tags_none": {
+    "en": "No tags",
+    "ru": "Без тегов"
   },
   "ed_style_title": {
     "en": "🎨 <b>Card style</b>\n<i>Choose one clear format.</i>",
@@ -503,6 +527,22 @@
     "en": "Could not build the post",
     "ru": "Не получилось собрать пост"
   },
+  "error_title_invalid_input": {
+    "en": "Send a music link or title",
+    "ru": "Пришли музыкальную ссылку или название"
+  },
+  "error_title_not_found": {
+    "en": "Release not found",
+    "ru": "Релиз не найден"
+  },
+  "error_title_provider": {
+    "en": "Service is temporarily unavailable",
+    "ru": "Сервис временно недоступен"
+  },
+  "error_title_rate_limit": {
+    "en": "A short pause is needed",
+    "ru": "Нужна короткая пауза"
+  },
   "home_back": {
     "en": "← Main menu",
     "ru": "← Главное меню"
@@ -592,8 +632,8 @@
     "ru": "••• <b>Ещё возможности</b>\n<i>Всё полезное — без перегруженного главного экрана.</i>\n\n<blockquote><b>Помощь</b> — короткая инструкция\n<b>Сервисы</b> — поддерживаемые площадки\n<b>Для каналов</b> — автозамена ссылок\n<b>Пример</b> — как выглядит готовый пост\n<b>Приватность</b> — данные и их удаление</blockquote>"
   },
   "menu_platforms": {
-    "en": "🎛 <b>Supported sources</b>\n<i>Send one link — the bot finds the other platforms.</i>\n\n<b>Music and podcasts</b>\n🟢 Spotify · ⚪ Apple Music / Podcasts\n🟠 SoundCloud · 🟦 Deezer\n⚫ Tidal · 🟡 Yandex Music\n\n<b>Video and radio</b>\n🔴 YouTube / YouTube Music · 📡 NTS Radio\n\n<b>Content types</b>\nTracks, albums, playlists, artists, podcasts, videos and radio shows.\n\n<blockquote>✨ The result: artwork, title, smart hashtags and buttons for every matched platform.</blockquote>\n\nNo link? Type <code>artist — track</code>.",
-    "ru": "🎛 <b>Поддерживаемые источники</b>\n<i>Пришли ссылку — бот сам найдёт остальные площадки.</i>\n\n<b>Музыка и подкасты</b>\n🟢 Spotify · ⚪ Apple Music / Podcasts\n🟠 SoundCloud · 🟦 Deezer\n⚫ Tidal · 🟡 Yandex Music\n\n<b>Видео и эфиры</b>\n🔴 YouTube / YouTube Music · 📡 NTS Radio\n\n<b>Типы материалов</b>\nТреки, альбомы, плейлисты, артисты, подкасты, видео и радио-шоу.\n\n<blockquote>✨ На выходе: обложка, название, автохэштеги и кнопки всех найденных площадок.</blockquote>\n\nНет ссылки? Напиши <code>артист — трек</code>."
+    "en": "🎛 <b>Supported sources</b>\n<i>Send one link — the bot finds the other platforms.</i>\n\n<b>Music and podcasts</b>\n🟢 Spotify · ⚪ Apple Music / Podcasts\n🟠 SoundCloud · 🟦 Deezer\n⚫ Tidal · 🟡 Yandex Music\n\n<b>Video and radio</b>\n🔴 YouTube / YouTube Music · 📻 NTS Radio\n\n<b>Content types</b>\nTracks, albums, playlists, artists, podcasts, videos and radio shows.\n\n<blockquote>✨ The result: artwork, title, smart hashtags and buttons for every matched platform.</blockquote>\n\nNo link? Type <code>artist — track</code>.",
+    "ru": "🎛 <b>Поддерживаемые источники</b>\n<i>Пришли ссылку — бот сам найдёт остальные площадки.</i>\n\n<b>Музыка и подкасты</b>\n🟢 Spotify · ⚪ Apple Music / Podcasts\n🟠 SoundCloud · 🟦 Deezer\n⚫ Tidal · 🟡 Yandex Music\n\n<b>Видео и эфиры</b>\n🔴 YouTube / YouTube Music · 📻 NTS Radio\n\n<b>Типы материалов</b>\nТреки, альбомы, плейлисты, артисты, подкасты, видео и радио-шоу.\n\n<blockquote>✨ На выходе: обложка, название, автохэштеги и кнопки всех найденных площадок.</blockquote>\n\nНет ссылки? Напиши <code>артист — трек</code>."
   },
   "menu_start": {
     "en": "🎧 <b>StonerHand Soundlinks</b>\n\nI turn music links into clean posts: cover art, title, smart hashtags and buttons for every platform\n\n<b>What I can do</b>\n• Track, album, playlist, artist, podcast\n• YouTube videos and NTS Radio shows\n• Search by name: just type <i>artist - track</i>\n• Several links at once → a numbered collection\n• Text above a link → a quote in the post\n• Built-in card editor and channel publishing\n• Inline: type @StonerHandBot + a link in any chat\n\nSend a link or a name 👇",
@@ -616,8 +656,8 @@
     "ru": "🎛 <b>Шаг 2 из 3 · Выбери формат</b>\n\n<blockquote>Бот найдёт обложку, площадки и подготовит хэштеги.</blockquote>\nНажми <b>Изменить</b>, чтобы настроить стиль, текст, хэштеги и площадки."
   },
   "onboarding_3": {
-    "en": "📡 <b>Step 3 of 3 · Send the post</b>\n\n<blockquote>Send it to yourself, add the track to a crate or publish to the channel.</blockquote>\nIn any other chat, use inline mode:\n<code>@StonerHandBot artist — track</code>",
-    "ru": "📡 <b>Шаг 3 из 3 · Отправь пост</b>\n\n<blockquote>Отправь пост себе, добавь трек в подборку или опубликуй в канал.</blockquote>\nА в любом другом чате используй inline:\n<code>@StonerHandBot артист — трек</code>"
+    "en": "✓ <b>Step 3 of 3 · Send the post</b>\n\n<blockquote>Send it to yourself, add the track to a crate or publish to the channel.</blockquote>\nIn any other chat, use inline mode:\n<code>@StonerHandBot artist — track</code>",
+    "ru": "✓ <b>Шаг 3 из 3 · Отправь пост</b>\n\n<blockquote>Отправь пост себе, добавь трек в подборку или опубликуй в канал.</blockquote>\nА в любом другом чате используй inline:\n<code>@StonerHandBot артист — трек</code>"
   },
   "partial_not_found": {
     "en": "release could not be recognized — the link is private, removed, or unavailable",
@@ -672,36 +712,40 @@
     "ru": "🔐 <b>Данные и приватность</b>\n\nБот хранит только состояние, нужное для работы: черновики, подборку, историю, настройки оформления и запланированные публикации. Срок хранения ограничен, а статистика продукта считается без текста постов и музыкальных ссылок.\n\n<blockquote>После удаления временные токены поиска могут существовать не более 30 минут, затем исчезают автоматически.</blockquote>"
   },
   "progress_batch": {
-    "en": "3/3 · Building collection · {done}/{total}",
-    "ru": "3/3 · Собираю подборку · {done}/{total}"
+    "en": "✓ Links · {done}/{total}\n✓ Platforms\n🎨 Building the collection",
+    "ru": "✓ Ссылки · {done}/{total}\n✓ Площадки\n🎨 Собираю подборку"
   },
   "progress_batch_links": {
-    "en": "0/{total} · Fetching platform data…",
-    "ru": "0/{total} · Получаю данные площадок…"
+    "en": "✓ Links checked\n🔎 Fetching platforms · 0/{total}\n○ Collection",
+    "ru": "✓ Ссылки проверены\n🔎 Получаю площадки · 0/{total}\n○ Подборка"
   },
   "progress_batch_partial": {
-    "en": "{done}/{total} · Building the result and marking failed links…",
-    "ru": "{done}/{total} · Оформляю результат и отмечаю проблемные ссылки…"
+    "en": "✓ Links · {done}/{total}\n⚠️ Some links need attention\n🎨 Building the collection",
+    "ru": "✓ Ссылки · {done}/{total}\n⚠️ Есть проблемные ссылки\n🎨 Собираю подборку"
   },
   "progress_batch_start": {
-    "en": "0/{total} · Checking links…",
-    "ru": "0/{total} · Проверяю ссылки…"
+    "en": "🔎 Checking links · 0/{total}\n○ Platforms\n○ Collection",
+    "ru": "🔎 Проверяю ссылки · 0/{total}\n○ Площадки\n○ Подборка"
+  },
+  "progress_busy": {
+    "en": "Working",
+    "ru": "В работе"
   },
   "progress_cancelled": {
     "en": "Search cancelled.",
     "ru": "Поиск отменён."
   },
   "progress_card": {
-    "en": "3/3 · Building the card…",
-    "ru": "3/3 · Собираю карточку…"
+    "en": "✓ Release\n✓ Platforms\n🎨 Building the card",
+    "ru": "✓ Релиз\n✓ Площадки\n🎨 Собираю карточку"
   },
   "progress_links": {
-    "en": "2/3 · Collecting platforms…",
-    "ru": "2/3 · Собираю площадки…"
+    "en": "✓ Release\n🔎 Collecting platforms\n○ Card",
+    "ru": "✓ Релиз\n🔎 Собираю площадки\n○ Карточка"
   },
   "progress_search": {
-    "en": "1/3 · Finding the release…",
-    "ru": "1/3 · Ищу релиз…"
+    "en": "🔎 Finding the release\n○ Platforms\n○ Card",
+    "ru": "🔎 Ищу релиз\n○ Площадки\n○ Карточка"
   },
   "publish_confirm": {
     "en": "<b>Ready to publish</b>\n\n<blockquote><b>{artist}</b> — {title}\nTarget: {target} · now</blockquote>\nCheck the card and confirm delivery.",
@@ -872,8 +916,8 @@
     "ru": "↗ Поделиться"
   },
   "start_using": {
-    "en": "Done ✓",
-    "ru": "Готово ✓"
+    "en": "Done",
+    "ru": "Готово"
   },
   "tab_demo": {
     "en": "🧪 Example post",
@@ -906,5 +950,9 @@
   "uploaded_audio_title": {
     "en": "Audio file",
     "ru": "Аудиофайл"
+  },
+  "welcome_demo_caption": {
+    "en": "Link → exact release → finished post",
+    "ru": "Ссылка → точный релиз → готовый пост"
   }
 }

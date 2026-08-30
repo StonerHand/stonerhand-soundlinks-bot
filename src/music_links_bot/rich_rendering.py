@@ -302,6 +302,11 @@ def rich_button_rows_html(
             text = html.escape(str(raw_button.get("text") or "")[:64])
             if not text:
                 continue
+            icon_custom_emoji_id = str(raw_button.get("icon_custom_emoji_id") or "")
+            if icon_custom_emoji_id.isdigit():
+                text = (
+                    f'<tg-emoji emoji-id="{icon_custom_emoji_id}">◆</tg-emoji> {text}'
+                )
             style = str(raw_button.get("style") or "")
             style_attr = (
                 f' style="{style}"' if style in {"primary", "success", "danger"} else ""
@@ -378,6 +383,7 @@ def _media_block(publication: MusicPublication) -> str:
         caption = (
             f"<figcaption>{html.escape(item.caption)}</figcaption>"
             if item.caption
+            and item.caption.strip().casefold() != publication.title.strip().casefold()
             else ""
         )
         return f"<figure>{elements}{caption}</figure>"
@@ -390,20 +396,22 @@ def build_music_publication_html(
     *,
     reply_markup: InlineKeyboardMarkup | object | None = None,
 ) -> str:
+    """Render a calm magazine-style card with one clear action area."""
     pieces = [f"<h1>{html.escape(publication.title)}</h1>"]
+    media = _media_block(publication)
+    if media:
+        pieces.append(media)
     if publication.lead_html:
         lead = sanitize_rich_fragment(publication.lead_html)
         if lead:
             pieces.append(lead if lead.startswith("<blockquote") else f"<p>{lead}</p>")
-    media = _media_block(publication)
-    if media:
-        pieces.append(media)
     if publication.body_html:
         body = sanitize_rich_fragment(publication.body_html)
         if body:
             pieces.append(f"<p>{body}</p>")
     buttons = rich_button_rows_html(reply_markup)
     if buttons:
+        pieces.append("<hr/>")
         pieces.append(buttons)
     if publication.hashtags:
         pieces.append(f"<footer>{html.escape(publication.hashtags)}</footer>")

@@ -1,5 +1,5 @@
 {
-  "text": "🎛 <b>Конструктор карточки</b>\n<i>Нажимай параметры — превью обновится сразу</i>\n<i>Обложка · площадок: 2 · сохранено</i>\n\n🎧 · <b>Sleep</b>\nDopesmoker\n\n#stonerhand #track",
+  "text": "🎛 <b>Конструктор карточки</b>\n<i>Нажимай параметры — превью обновится сразу</i>\n<i>Обложка ✓ · Теги авто · 2 площадки · Авто</i>\n\n🎧 · <b>Sleep</b>\nDopesmoker\n\n#stonerhand #track",
   "rows": [
     [
       ["🟢 Spotify", null, "https://open.spotify.com/track/1", null],
@@ -18,7 +18,7 @@
       ["Шаблоны", "v2|editor|tp|draft123", null, null]
     ],
     [
-      ["✓ Готово", "v2|editor|f|draft123", null, "primary"],
+      ["✓ Готово", "v2|editor|f|draft123", null, "success"],
       ["Отправить", "v2|editor|o|draft123", null, null]
     ]
   ]

@@ -111,8 +111,17 @@ def draft_status(draft: dict, track: TrackMatch, *, lang: str) -> str:
         f"ed_preset_{preset}",
     )
     preset_name = preset_label.split("·", 1)[-1].strip()
+    if draft.get("custom_cover_file_id"):
+        preset_name = get_text(lang, "ed_status_custom_cover")
+    custom_tags = draft.get("custom_tags")
+    if not draft.get("hashtags", True):
+        tags = get_text(lang, "ed_status_tags_none")
+    elif isinstance(custom_tags, list) and custom_tags:
+        tags = get_text(lang, "ed_status_tags_custom").format(count=len(custom_tags))
+    else:
+        tags = get_text(lang, "ed_status_tags_auto")
     if draft.get("source_audio_file_id"):
-        return get_text(lang, "ed_status_audio").format(preset=preset_name)
+        return get_text(lang, "ed_status_audio").format(tags=tags)
     selected = draft.get("platforms")
     service_count = (
         len(selected)
@@ -125,10 +134,34 @@ def draft_status(draft: dict, track: TrackMatch, *, lang: str) -> str:
             ),
         )
     )
+    services = _platform_count_label(service_count, lang=lang)
+    delivery = get_text(
+        lang,
+        "ed_status_delivery_classic"
+        if draft.get("delivery_mode") == "classic"
+        else "ed_status_delivery_auto",
+    )
     return get_text(lang, "ed_status").format(
         preset=preset_name,
-        services=service_count,
+        tags=tags,
+        services=services,
+        delivery=delivery,
     )
+
+
+def _platform_count_label(count: int, *, lang: str) -> str:
+    count = max(0, int(count))
+    if lang == "en":
+        return f"{count} platform" + ("" if count == 1 else "s")
+    remainder_100 = count % 100
+    remainder_10 = count % 10
+    if remainder_10 == 1 and remainder_100 != 11:
+        noun = "площадка"
+    elif 2 <= remainder_10 <= 4 and not 12 <= remainder_100 <= 14:
+        noun = "площадки"
+    else:
+        noun = "площадок"
+    return f"{count} {noun}"
 
 
 def toggle_platform_selection(

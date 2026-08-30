@@ -495,6 +495,49 @@ class StartUpdateStub:
 
 
 class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
+    async def test_first_visit_animation_is_sent_once_and_never_replaces_menu(
+        self,
+    ) -> None:
+        class AnimatedPrivateMessage(PrivateMessageStub):
+            def __init__(self) -> None:
+                super().__init__()
+                self.animations: list[tuple[bytes, str]] = []
+
+            async def reply_animation(self, *, animation, caption: str) -> None:
+                self.animations.append((animation.read(), caption))
+
+        message = AnimatedPrivateMessage()
+        update = StartUpdateStub(message)
+        context = ContextStub()
+
+        await start_command(update, context)
+        runtime = context.application.bot_data["runtime"]
+        with patch.object(runtime, "claim_intent", return_value=True):
+            await start_command(update, context)
+
+        session = await runtime.get_session(message.chat_id)
+        self.assertTrue(session.welcome_seen)
+        self.assertEqual(len(message.animations), 1)
+        self.assertTrue(message.animations[0][0].startswith(b"GIF"))
+        self.assertIn("точный релиз", message.animations[0][1])
+        self.assertEqual(len(message.replies), 2)
+
+    async def test_failed_first_visit_animation_can_retry_later(self) -> None:
+        class FailingAnimatedMessage(PrivateMessageStub):
+            async def reply_animation(self, **_kwargs) -> None:
+                raise TelegramError("temporary animation failure")
+
+        message = FailingAnimatedMessage()
+        context = ContextStub()
+
+        await start_command(StartUpdateStub(message), context)
+
+        session = await context.application.bot_data["runtime"].get_session(
+            message.chat_id
+        )
+        self.assertFalse(session.welcome_seen)
+        self.assertEqual(len(message.replies), 1)
+
     async def test_profile_sync_restores_standard_command_menu(self) -> None:
         application = type("ApplicationStub", (), {})()
         application.bot = type("BotStub", (), {})()
@@ -768,7 +811,8 @@ class BotKeyboardTests(unittest.TestCase):
             button.text for row in keyboard.inline_keyboard for button in row
         ]
         self.assertEqual(button_texts, ["🟢 Spotify", "🪩 Все платформы"])
-        self.assertEqual(keyboard.inline_keyboard[0][0].style, "primary")
+        self.assertIsNone(keyboard.inline_keyboard[0][0].style)
+        self.assertEqual(keyboard.inline_keyboard[1][0].style, "primary")
 
     def test_release_keyboard_uses_two_columns(self) -> None:
         keyboard = _build_link_keyboard(
@@ -795,11 +839,12 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[1][0].text, "🟠 SoundCloud")
         self.assertEqual(rows[1][1].text, "🟦 Deezer")
         self.assertEqual(rows[2][0].text, "⚫ Tidal")
-        self.assertEqual(rows[0][0].style, "primary")
+        self.assertIsNone(rows[0][0].style)
         self.assertIsNone(rows[0][1].style)
         self.assertIsNone(rows[1][0].style)
         self.assertIsNone(rows[1][1].style)
         self.assertIsNone(rows[2][0].style)
+        self.assertEqual(rows[-1][0].style, "primary")
 
     def test_release_keyboard_adds_songlink_hub_button(self) -> None:
         keyboard = _build_link_keyboard(
@@ -815,6 +860,7 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[0][0].text, "🟢 Spotify")
         self.assertEqual(rows[1][0].text, "🪩 Все платформы")
         self.assertEqual(rows[1][0].url, "https://song.link/transitions")
+        self.assertEqual(rows[1][0].style, "primary")
         self.assertFalse(rows[1][0].api_kwargs)
 
     def test_release_keyboard_repairs_spotify_fallback_to_songlink(self) -> None:
@@ -930,7 +976,7 @@ class BotKeyboardTests(unittest.TestCase):
         button_texts = [
             button.text for row in keyboard.inline_keyboard for button in row
         ]
-        self.assertEqual(button_texts, ["📡 Открыть на NTS"])
+        self.assertEqual(button_texts, ["📻 Открыть на NTS"])
         self.assertEqual(keyboard.inline_keyboard[0][0].style, "primary")
 
     def test_playlist_keyboard_can_hide_channel_button(self) -> None:
@@ -1001,7 +1047,7 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(rows[0][0].text, "📡 1. Dark Energy")
+        self.assertEqual(rows[0][0].text, "📻 1. Dark Energy")
         self.assertEqual(rows[0][0].url, "https://www.nts.live/shows/example")
         self.assertIsNone(rows[0][0].style)
         self.assertEqual(rows[0][1].text, "📺 2. Live Session")
@@ -1117,7 +1163,7 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[0][0].text, "＋ Создать пост")
         self.assertEqual(rows[0][0].style, "primary")
         self.assertEqual(rows[1][0].text, "🧺 Подборка · 3")
-        self.assertEqual(rows[1][0].style, "success")
+        self.assertIsNone(rows[1][0].style)
         self.assertEqual(rows[1][1].text, "История")
         self.assertEqual(rows[2][0].text, "Как это работает?")
         self.assertIsNone(rows[2][0].style)
@@ -1900,7 +1946,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertIn("Не получилось собрать пост", message.replies[0])
+        self.assertIn("Релиз не найден", message.replies[0])
         self.assertIn("<code>артист — название</code>", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "Повторить")
@@ -2230,7 +2276,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("#stonerhand #radio", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         preview_options = message.reply_kwargs[0]["link_preview_options"]
-        self.assertEqual(keyboard[0][0].text, "📡 Открыть на NTS")
+        self.assertEqual(keyboard[0][0].text, "📻 Открыть на NTS")
         self.assertEqual(keyboard[0][0].url, "https://www.nts.live/shows/example")
         self.assertTrue(preview_options.prefer_large_media)
         self.assertFalse(bool(preview_options.prefer_small_media))
@@ -2253,7 +2299,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(keyboard[0][1].url, "https://song.link/transitions")
         self.assertEqual(keyboard[1][0].text, "Отправить себе")
         self.assertEqual(keyboard[2][0].text, "Изменить")
-        self.assertEqual(keyboard[2][1].text, "+ В подборку")
+        self.assertEqual(keyboard[2][1].text, "＋ В подборку")
         preview_options = message.reply_kwargs[0]["link_preview_options"]
         self.assertTrue(preview_options.prefer_large_media)
         self.assertFalse(bool(preview_options.prefer_small_media))
@@ -2453,7 +2499,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("<a href=", message.replies[0])
         self.assertIn("#stonerhand #radio #video", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
-        self.assertEqual(keyboard[0][0].text, "📡 1. Dark Energy w/ Guest")
+        self.assertEqual(keyboard[0][0].text, "📻 1. Dark Energy w/ Guest")
         self.assertEqual(keyboard[0][1].text, "📺 2. SANSAE Live Session Vol.3 - Melon")
         record_mixed.assert_called_once()
 

@@ -147,7 +147,6 @@ def add_share_button(
                 InlineKeyboardButton(
                     label,
                     switch_inline_query=share_query,
-                    style="primary",
                 )
             ],
         ]

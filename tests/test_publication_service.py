@@ -7,6 +7,40 @@ from music_links_bot.publication_service import PublicationService
 
 
 class PublicationServiceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_clean_preview_uses_delivery_pipeline_without_side_effects(
+        self,
+    ) -> None:
+        runtime = SimpleNamespace(
+            record_publication=Mock(),
+            persist_metrics=AsyncMock(),
+        )
+        context = SimpleNamespace(
+            application=SimpleNamespace(bot_data={"runtime": runtime}),
+            bot=SimpleNamespace(),
+        )
+        service = PublicationService(context, channel_username="stonerhand")
+        draft = {
+            "item": {
+                "artist": "Sleep",
+                "title": "Dragonaut",
+                "kind": "song",
+                "links": {"spotify": "https://open.spotify.com/track/abc"},
+            },
+            "delivery_mode": "classic",
+        }
+        sent = SimpleNamespace(message_id=77)
+
+        with patch.object(service, "_send", new=AsyncMock(return_value=sent)) as send:
+            result = await service.preview(draft, target=7)
+
+        self.assertIs(result, sent)
+        self.assertEqual(send.await_args.kwargs["target"], 7)
+        self.assertFalse(send.await_args.kwargs["channel_style"])
+        self.assertFalse(send.await_args.kwargs["include_channel_button"])
+        self.assertFalse(send.await_args.kwargs["record_metrics"])
+        runtime.record_publication.assert_not_called()
+        runtime.persist_metrics.assert_not_awaited()
+
     async def test_uploaded_audio_uses_native_audio_delivery(self) -> None:
         bot = SimpleNamespace(send_audio=AsyncMock(return_value=SimpleNamespace()))
         context = SimpleNamespace(
