@@ -10,6 +10,8 @@
   and previously saved cards cannot reintroduce provider copy.
 - Added regressions for Spotify albums, tracks, playlists, legacy drafts,
   Classic cards and Rich release smoke output.
+- Removed millisecond-level runner jitter from the ten-source batch integrity
+  test while preserving its concurrency and provider-budget contract.
 
 ## 1.10.0 — 2026-08-29
 

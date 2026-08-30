@@ -40,8 +40,10 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
                 )
 
         with (
-            patch.object(bot_lookup, "_BATCH_ITEM_TIMEOUT_SECONDS", 0.03),
-            patch.object(bot_lookup, "_BATCH_PROVIDER_WORK_SECONDS", 0.07),
+            # Keep the same ordering/concurrency contract without coupling the
+            # assertion to millisecond-level GitHub runner scheduling jitter.
+            patch.object(bot_lookup, "_BATCH_ITEM_TIMEOUT_SECONDS", 0.1),
+            patch.object(bot_lookup, "_BATCH_PROVIDER_WORK_SECONDS", 0.25),
             patch.object(bot_lookup, "_BATCH_LOOKUP_START_INTERVAL_SECONDS", 0),
         ):
             bundle = await bot_lookup.resolve_sources(
