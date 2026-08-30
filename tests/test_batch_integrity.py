@@ -17,6 +17,7 @@ from music_links_bot.bot_lookup import (
 from music_links_bot.bot_runtime import BotRuntime
 from music_links_bot.bot_stats import build_user_prefix, message_source_urls
 from music_links_bot.models import TrackMatch
+from music_links_bot.provider_runtime import ProviderOutcome
 
 
 class _UnusedSoundCloud:
@@ -25,6 +26,40 @@ class _UnusedSoundCloud:
 
 
 class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
+    async def test_provider_fallback_allocates_one_status_per_source(self) -> None:
+        urls = [
+            f"https://open.spotify.com/track/fallback-{index}" for index in range(4)
+        ]
+        fallback_status_count = 0
+
+        async def fail_all(_bot_data, tasks, **_kwargs):
+            nonlocal fallback_status_count
+            task = next(item for item in tasks if item.name == "songlink")
+            task.awaitable.close()
+            fallback_status_count = len(task.fallback[2])
+            return {
+                "songlink": ProviderOutcome(
+                    "songlink",
+                    task.fallback,
+                    False,
+                    0,
+                    error="TimeoutError",
+                )
+            }
+
+        with patch.object(bot_lookup, "run_provider_tasks_detailed", new=fail_all):
+            bundle = await bot_lookup.resolve_sources(
+                {
+                    "songlink_client": object(),
+                    "soundcloud_client": _UnusedSoundCloud(),
+                },
+                urls,
+            )
+
+        self.assertEqual(fallback_status_count, len(urls))
+        self.assertEqual(len(bundle.statuses), len(urls))
+        self.assertEqual(bundle.unavailable_urls, urls)
+
     async def test_ten_sources_can_all_start_within_provider_budget(self) -> None:
         urls = [
             f"https://open.spotify.com/track/capacity-{index}" for index in range(10)

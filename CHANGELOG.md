@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## 1.11.0 — 2026-08-30
+
+- Expanded the read-only production smoke contract with RU/EN home screens,
+  editor actions and settings. It now blocks missing primary actions, cramped
+  rows, empty or oversized callbacks, long labels and any reintroduced Mini App.
+- Made the production canary verify smoke contract v2 and the complete UI/UX
+  matrix in addition to the seven publication scenarios.
+- Cancelled and awaited active Songlink single-flight lookups before closing
+  HTTP transports, preventing background tasks from surviving shutdown.
+- Added a batch fallback regression that guarantees one source status per
+  submitted link and protects collection counts during provider failures.
+- Made CI execute the full test suite on every supported Python version
+  (3.10, 3.11 and 3.12) while retaining the complete quality/security gate on 3.12.
+- Updated Ruff to 0.16.5 and completed a clean dependency, vulnerability,
+  dead-code, secret, repository and Graphify architecture audit.
+
 ## 1.10.1 — 2026-08-30
 
 - Removed Spotify branding and SEO phrases such as

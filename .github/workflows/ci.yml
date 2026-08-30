@@ -14,31 +14,39 @@ on:
 
 jobs:
   test:
+    name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
           cache: pip
 
       - name: Install dependencies
         run: pip install -e ".[dev]"
 
       - name: Dependency consistency
+        if: matrix.python-version == '3.12'
         run: |
           python -m pip check
           python tests/check_dependency_pins.py
           python -m pip_audit -r requirements.txt --progress-spinner off
 
       - name: Public repository safety
+        if: matrix.python-version == '3.12'
         run: |
           test -z "$(git ls-files -ci --exclude-standard)"
           ! git grep -I -n -E 'ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|[0-9]{6,}:[A-Za-z0-9_-]{30,}' -- ':!tests/**'
 
       - name: Lint
+        if: matrix.python-version == '3.12'
         run: |
           python -m pyflakes src api tests
           python -m ruff check src api tests
@@ -46,6 +54,7 @@ jobs:
           python -m bandit -q -r src api -x tests
 
       - name: Compile and deployment config
+        if: matrix.python-version == '3.12'
         run: |
           python -m compileall -q src api tests
           python -m json.tool vercel.json >/dev/null

@@ -5,8 +5,17 @@ import re
 from html import unescape
 from urllib.parse import urlparse
 
+from telegram import InlineKeyboardMarkup
+
+from music_links_bot.bot_ui import (
+    build_home_text,
+    build_start_keyboard,
+    editor_more_rows,
+    editor_rows,
+)
 from music_links_bot.collection_collage import collection_collage_preview_url
 from music_links_bot.formatter import format_collection_message, format_track_message
+from music_links_bot.i18n import get_text
 from music_links_bot.keyboards import _build_collection_keyboard, _build_link_keyboard
 from music_links_bot.models import TrackMatch
 from music_links_bot.publication_contract import (
@@ -199,11 +208,94 @@ def build_release_smoke_report() -> dict[str, object]:
             },
         ),
     }
+    ux = _build_ui_contract()
     return {
-        "ok": all(bool(case["ok"]) for case in cases.values()),
+        "ok": all(bool(case["ok"]) for case in cases.values()) and bool(ux["ok"]),
         "service": "publication-release-smoke",
-        "contract": 1,
+        "contract": 2,
         "cases": cases,
+        "ux": ux,
+    }
+
+
+def _build_ui_contract() -> dict[str, object]:
+    """Guard the small-screen navigation and editor hierarchy in production."""
+    draft = {
+        "lang": "ru",
+        "hashtags": True,
+        "quote": True,
+        "preset": "clean",
+        "delivery_mode": "auto",
+        "platforms": ["spotify", "appleMusic"],
+        "can_publish": False,
+    }
+    screens = {
+        "home_ru": _summarize_ui_keyboard(
+            build_start_keyboard(None, lang="ru", crate_count=2),
+            expected_primary="＋ Создать пост",
+        ),
+        "home_en": _summarize_ui_keyboard(
+            build_start_keyboard(None, lang="en", crate_count=2),
+            expected_primary="＋ Create post",
+        ),
+        "editor_actions": _summarize_ui_keyboard(
+            InlineKeyboardMarkup(editor_rows("smoke", draft)),
+            expected_primary="Отправить себе",
+        ),
+        "editor_settings": _summarize_ui_keyboard(
+            InlineKeyboardMarkup(editor_more_rows("smoke", draft)),
+            expected_primary="✓ Готово",
+        ),
+    }
+    home_text = build_home_text(
+        lang="ru",
+        first_visit=True,
+        crate_count=2,
+    )
+    create_text = get_text("ru", "create_prompt")
+    copy_checks = {
+        "home_explains_link": "ссылку на трек" in home_text,
+        "home_explains_query": "Deftones — Rickets" in home_text,
+        "home_explains_collection": "несколько ссылок" in home_text,
+        "home_explains_intro": "подводкой" in home_text,
+        "create_explains_one_link_per_line": "каждую с новой строки" in create_text,
+        "create_explains_intro": "подводкой" in create_text,
+    }
+    return {
+        "ok": all(bool(screen["ok"]) for screen in screens.values())
+        and all(copy_checks.values()),
+        "screens": screens,
+        "copy_checks": copy_checks,
+    }
+
+
+def _summarize_ui_keyboard(
+    keyboard: InlineKeyboardMarkup,
+    *,
+    expected_primary: str,
+) -> dict[str, object]:
+    rows = keyboard.inline_keyboard
+    buttons = [button for row in rows for button in row]
+    labels = [button.text for button in buttons]
+    primary = [button.text for button in buttons if button.style == "primary"]
+    callbacks = [
+        button.callback_data for button in buttons if button.callback_data is not None
+    ]
+    checks = {
+        "touch_friendly_rows": all(1 <= len(row) <= 2 for row in rows),
+        "labels_present": all(label.strip() for label in labels),
+        "labels_compact": all(len(label) <= 32 for label in labels),
+        "callbacks_bounded": all(
+            1 <= len(value.encode("utf-8")) <= 64 for value in callbacks
+        ),
+        "single_primary_action": primary == [expected_primary],
+        "mini_app_absent": all(button.web_app is None for button in buttons),
+    }
+    return {
+        "ok": all(checks.values()),
+        "rows": [len(row) for row in rows],
+        "buttons": labels,
+        "checks": checks,
     }
 
 

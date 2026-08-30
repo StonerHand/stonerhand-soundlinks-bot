@@ -6,7 +6,7 @@
 
 [Открыть бота](https://t.me/StonerHandBot) · [Посмотреть канал](https://t.me/stonerhand) · [English](README.md)
 
-![Release](https://img.shields.io/badge/release-1.10.1-5b5bd6?style=flat-square)
+![Release](https://img.shields.io/badge/release-1.11.0-5b5bd6?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
@@ -56,6 +56,8 @@ StonerHand — музыкальный редактор, который полн�
   обложки, текста или ссылок возвращается к полной классической карточке.
 - Проверяет каждый готовый Classic, Rich, inline, channel, photo и audio пост
   единым релизным контрактом до обращения к Telegram.
+- Защищает главный экран и конструктор отдельным production UI/UX-контрактом:
+  одна основная кнопка, компактные ряды, безопасные callback и никаких лишних веб-кнопок.
 - Даёт посмотреть и удалить личные данные через `/privacy` с подтверждением.
 
 ## Поддерживаемые источники
@@ -87,7 +89,8 @@ StonerHand — музыкальный редактор, который полн�
 
 Нативные ответы, callback-действия редактора и поиск разделены с отображением.
 UI-тексты хранятся в отдельном RU/EN-каталоге: формулировки меняются без правки
-исполняемого сценария, а полнота переводов и плейсхолдеры проверяются тестами.
+исполняемого сценария, а полнота переводов, плейсхолдеры и визуальная иерархия
+кнопок проверяются тестами и тем же read-only smoke-контрактом в production.
 
 В подборках кнопки подстраиваются под содержание: общий исполнитель не
 повторяется, служебный remaster-хвост не занимает место, короткие названия стоят
@@ -151,7 +154,7 @@ python -m music_links_bot
 - `/api/queue_worker` — worker отложенных публикаций;
 - `/api/collage` — подписанные, сжатые и кэшируемые коллажи классических подборок;
 - `/api/health` — Telegram, webhook, Redis, очередь и версия релиза;
-- `/api/smoke` — детерминированная матрица Classic/Rich/inline/channel.
+- `/api/smoke` — матрица Classic/Rich/inline/channel и основных экранов UI/UX.
 
 Обязательные production-переменные:
 
@@ -186,8 +189,8 @@ python -m pip_audit -r requirements.txt --progress-spinner off
 python -m pytest -q
 ```
 
-CI дополнительно проверяет зависимости, секреты, сгенерированные файлы,
-компиляцию и согласованность Vercel routes/builds/crons. Production canary
+CI дополнительно проверяет Python 3.10–3.12, зависимости, секреты,
+сгенерированные файлы, компиляцию и согласованность Vercel routes/builds/crons. Production canary
 подтверждает точный commit, сервис коллажей и полную матрицу публикации до
 решения о защищённом автоматическом rollback.
 

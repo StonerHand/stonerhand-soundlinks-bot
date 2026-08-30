@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stonerhand-soundlinks-bot"
-version = "1.10.1"
+version = "1.11.0"
 description = "Telegram-native music publishing bot with universal release cards, collections, scheduling and channel delivery."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -37,7 +37,7 @@ dev = [
   "pip-audit==2.10.1",
   "pytest==9.1.1",
   "pyflakes==3.4.0",
-  "ruff==0.16.4",
+  "ruff==0.16.5",
   "tomli==2.4.1; python_version < '3.11'",
 ]
 

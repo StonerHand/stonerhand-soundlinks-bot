@@ -109,7 +109,81 @@
       "preview_host": "images.example"
     }
   },
-  "contract": 1,
+  "contract": 2,
   "ok": true,
-  "service": "publication-release-smoke"
+  "service": "publication-release-smoke",
+  "ux": {
+    "copy_checks": {
+      "create_explains_intro": true,
+      "create_explains_one_link_per_line": true,
+      "home_explains_collection": true,
+      "home_explains_intro": true,
+      "home_explains_link": true,
+      "home_explains_query": true
+    },
+    "ok": true,
+    "screens": {
+      "editor_actions": {
+        "buttons": ["Отправить себе", "Изменить", "+ В подборку"],
+        "checks": {
+          "callbacks_bounded": true,
+          "labels_compact": true,
+          "labels_present": true,
+          "mini_app_absent": true,
+          "single_primary_action": true,
+          "touch_friendly_rows": true
+        },
+        "ok": true,
+        "rows": [1, 2]
+      },
+      "editor_settings": {
+        "buttons": [
+          "Стиль · Обложка",
+          "Подводка · есть",
+          "# Хэштеги · авто",
+          "Площадки · 2",
+          "Telegram · авто",
+          "Шаблоны",
+          "✓ Готово",
+          "Отправить"
+        ],
+        "checks": {
+          "callbacks_bounded": true,
+          "labels_compact": true,
+          "labels_present": true,
+          "mini_app_absent": true,
+          "single_primary_action": true,
+          "touch_friendly_rows": true
+        },
+        "ok": true,
+        "rows": [2, 2, 2, 2]
+      },
+      "home_en": {
+        "buttons": ["＋ Create post", "🧺 Crate · 2", "History", "••• More"],
+        "checks": {
+          "callbacks_bounded": true,
+          "labels_compact": true,
+          "labels_present": true,
+          "mini_app_absent": true,
+          "single_primary_action": true,
+          "touch_friendly_rows": true
+        },
+        "ok": true,
+        "rows": [1, 2, 1]
+      },
+      "home_ru": {
+        "buttons": ["＋ Создать пост", "🧺 Подборка · 2", "История", "••• Ещё"],
+        "checks": {
+          "callbacks_bounded": true,
+          "labels_compact": true,
+          "labels_present": true,
+          "mini_app_absent": true,
+          "single_primary_action": true,
+          "touch_friendly_rows": true
+        },
+        "ok": true,
+        "rows": [1, 2, 1]
+      }
+    }
+  }
 }

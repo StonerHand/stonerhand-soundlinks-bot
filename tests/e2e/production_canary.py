@@ -77,6 +77,8 @@ def main() -> int:
             failures.append(f"publication smoke status={status} ok={payload.get('ok')}")
         if payload.get("service") != "publication-release-smoke":
             failures.append("publication smoke service identity is invalid")
+        if payload.get("contract") != 2:
+            failures.append("publication smoke contract is outdated")
         cases = payload.get("cases") or {}
         expected_cases = {
             "classic_track",
@@ -94,6 +96,16 @@ def main() -> int:
             for name, case in cases.items()
             if not (case or {}).get("ok")
         )
+        ux = payload.get("ux") or {}
+        if not ux.get("ok"):
+            failures.append("navigation and editor UX smoke failed")
+        if set(ux.get("screens") or {}) != {
+            "home_ru",
+            "home_en",
+            "editor_actions",
+            "editor_settings",
+        }:
+            failures.append("navigation and editor UX matrix is incomplete")
         if "application/json" not in content_type:
             failures.append("publication smoke content-type is not JSON")
     except Exception as exc:  # noqa: BLE001

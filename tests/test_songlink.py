@@ -266,6 +266,27 @@ class SonglinkClientAsyncTests(unittest.IsolatedAsyncioTestCase):
             release.set()
             await client.aclose()
 
+    async def test_close_cancels_and_awaits_inflight_lookup(self) -> None:
+        client = SonglinkClient(user_countries=("US",))
+        started = asyncio.Event()
+
+        async def pending_lookup(_source_url: str, _cache_key: str) -> TrackMatch:
+            started.set()
+            await asyncio.Event().wait()
+            raise AssertionError("cancelled lookup must not resume")
+
+        client._lookup_and_cache = pending_lookup
+        waiter = asyncio.create_task(
+            client.lookup_track("https://open.spotify.com/track/pending")
+        )
+        await started.wait()
+
+        await client.aclose()
+
+        with self.assertRaises(asyncio.CancelledError):
+            await waiter
+        self.assertEqual(client._inflight, {})
+
     async def test_lookup_track_coalesces_concurrent_identical_requests(self) -> None:
         client = FakeSonglinkClient(
             {

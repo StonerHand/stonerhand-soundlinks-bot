@@ -6,7 +6,7 @@
 
 [Open the bot](https://t.me/StonerHandBot) · [See the channel](https://t.me/stonerhand) · [Русская версия](README.ru.md)
 
-![Release](https://img.shields.io/badge/release-1.10.1-5b5bd6?style=flat-square)
+![Release](https://img.shields.io/badge/release-1.11.0-5b5bd6?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
@@ -56,6 +56,8 @@ is omitted instead of guessed.
   classic card without losing artwork, text or platform links.
 - Validates every finished Classic, Rich, inline, channel, photo and audio post
   through one release contract before Telegram receives it.
+- Guards the home screen and editor with a production UI/UX contract: one
+  primary action, compact rows, bounded callbacks and no stray web controls.
 - Exposes `/privacy` for transparent data controls and confirmed user-data
   deletion.
 
@@ -87,7 +89,8 @@ The editor is progressive rather than crowded:
 
 Native replies, editor callbacks and lookup orchestration are isolated from
 presentation. UI copy lives in a packaged RU/EN catalog, so wording can change
-without touching the execution path and every placeholder is contract-tested.
+without touching the execution path; placeholders and button hierarchy are
+verified by tests and the same read-only production smoke contract.
 
 Collection keyboards adapt to their content: a shared artist is not repeated,
 technical remaster suffixes do not consume button space, short titles share a
@@ -152,7 +155,7 @@ The repository is configured for Vercel Functions:
 - `/api/queue_worker` — protected scheduled publishing worker;
 - `/api/collage` — signed, compressed and cached classic collection artwork;
 - `/api/health` — Telegram, webhook, Redis, queue and release canary;
-- `/api/smoke` — deterministic Classic/Rich/inline/channel publication matrix.
+- `/api/smoke` — Classic/Rich/inline/channel plus core UI/UX release matrix.
 
 Required production values:
 
@@ -187,7 +190,7 @@ python -m pip_audit -r requirements.txt --progress-spinner off
 python -m pytest -q
 ```
 
-CI also checks dependency pins, secrets, generated files, compilation and the
+CI also checks Python 3.10–3.12, dependency pins, secrets, generated files, compilation and the
 Vercel route/build/cron contract. A production canary verifies the exact commit,
 the collection-artwork service and the complete publication smoke matrix before
 it allows the guarded automatic rollback decision.

@@ -67,6 +67,7 @@ class ReleaseReadinessTests(unittest.TestCase):
     def test_ci_enforces_complete_release_gate(self) -> None:
         workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
 
+        self.assertIn('python-version: ["3.10", "3.11", "3.12"]', workflow)
         self.assertIn("python -m pytest -q", workflow)
         self.assertIn("python -m ruff check src api tests", workflow)
         self.assertIn("python -m ruff format --check src api tests", workflow)

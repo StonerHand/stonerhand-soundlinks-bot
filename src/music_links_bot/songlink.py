@@ -58,6 +58,12 @@ class SonglinkClient:
         self._inflight: dict[str, asyncio.Task[TrackMatch]] = {}
 
     async def aclose(self) -> None:
+        pending = list(self._inflight.values())
+        for task in pending:
+            task.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+        self._inflight.clear()
         await self._client.aclose()
         if self._owns_spotify_client:
             await self._spotify_client.aclose()
