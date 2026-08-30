@@ -15,6 +15,9 @@
   submitted link and protects collection counts during provider failures.
 - Made CI execute the full test suite on every supported Python version
   (3.10, 3.11 and 3.12) while retaining the complete quality/security gate on 3.12.
+- Normalized `asyncio.wait_for` timeout handling across Python 3.10–3.12 so
+  genre enrichment, playlist import and status diagnostics keep their intended
+  soft fallbacks instead of leaking `asyncio.TimeoutError` on Python 3.10.
 - Updated Ruff to 0.16.5 and completed a clean dependency, vulnerability,
   dead-code, secret, repository and Graphify architecture audit.
 

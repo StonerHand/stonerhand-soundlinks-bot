@@ -730,7 +730,7 @@ async def _lookup_tracks_detailed(
                         client.lookup_track(source_url),
                         timeout=remaining,
                     )
-                except TimeoutError as exc:
+                except asyncio.TimeoutError as exc:
                     return exc
                 except SonglinkLookupError as exc:
                     can_retry = spotify_url_type(source_url) in {"track", "album"}
@@ -873,7 +873,7 @@ async def _lookup_tracks_detailed(
                 _fill_genres(search_client, tracks),
                 timeout=_GENRE_ENRICHMENT_TIMEOUT_SECONDS,
             )
-        except TimeoutError:
+        except asyncio.TimeoutError:
             LOGGER.debug("Genre enrichment timed out and was cancelled")
 
     return tracks, unavailable_urls, statuses
@@ -890,7 +890,7 @@ def _failure_reason(error: BaseException) -> str:
     detail = str(error).casefold()
     if "rate" in name or "429" in detail:
         return "rate_limited"
-    if isinstance(error, TimeoutError) or "timeout" in name:
+    if isinstance(error, (TimeoutError, asyncio.TimeoutError)) or "timeout" in name:
         return "timeout"
     return "provider_unavailable"
 

@@ -104,7 +104,7 @@ async def build_status_text(context) -> str:
         if last_error:
             webhook_detail += f", ошибка: {last_error}"
             webhook_ok = False
-    except (TelegramError, TimeoutError, AttributeError) as exc:
+    except (TelegramError, asyncio.TimeoutError, AttributeError) as exc:
         webhook_detail = type(exc).__name__
 
     redis_ok = kv is not None
@@ -120,7 +120,7 @@ async def build_status_text(context) -> str:
                     timeout=1,
                 )
             )
-        except TimeoutError:
+        except asyncio.TimeoutError:
             redis_ok = False
 
     access = await check_publish_access(context, target)

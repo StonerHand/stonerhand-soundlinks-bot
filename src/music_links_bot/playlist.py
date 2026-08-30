@@ -126,7 +126,7 @@ class PlaylistClient:
             )
             page.raise_for_status()
             track_urls = _extract_spotify_track_urls(page.text)
-        except (httpx.HTTPError, TimeoutError):
+        except (httpx.HTTPError, asyncio.TimeoutError):
             # Metadata still makes a useful playlist card. Track import is a
             # progressive enhancement and must not make the lookup fail.
             track_urls = []
