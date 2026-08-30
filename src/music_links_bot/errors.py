@@ -15,6 +15,7 @@ class BotErrorCode(str, Enum):
     ACTION_DUPLICATE = "action_duplicate"
     PERMISSION_DENIED = "permission_denied"
     DELIVERY_FAILED = "delivery_failed"
+    LIMIT_EXCEEDED = "limit_exceeded"
 
 
 class BotFlowError(RuntimeError):
@@ -58,7 +59,7 @@ _API_ERROR_CODES = {
     "network": "provider_unavailable",
     "internal": "provider_unavailable",
     "rate_limited": "rate_limited",
-    "crate full": "crate_full",
+    "crate full": "limit_exceeded",
     "need more tracks": "need_more_tracks",
 }
 

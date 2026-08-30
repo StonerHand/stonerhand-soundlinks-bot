@@ -8,6 +8,8 @@ from urllib.parse import urlparse
 from telegram import InlineKeyboardMarkup
 
 from music_links_bot.bot_ui import (
+    build_delivery_success_keyboard,
+    build_error_keyboard,
     build_home_text,
     build_start_keyboard,
     editor_more_rows,
@@ -212,7 +214,7 @@ def build_release_smoke_report() -> dict[str, object]:
     return {
         "ok": all(bool(case["ok"]) for case in cases.values()) and bool(ux["ok"]),
         "service": "publication-release-smoke",
-        "contract": 2,
+        "contract": 3,
         "cases": cases,
         "ux": ux,
     }
@@ -238,6 +240,43 @@ def _build_ui_contract() -> dict[str, object]:
             build_start_keyboard(None, lang="en", crate_count=2),
             expected_primary="＋ Create post",
         ),
+        "first_run": _summarize_ui_keyboard(
+            build_start_keyboard(
+                None,
+                lang="ru",
+                show_example=True,
+                show_tour=True,
+            ),
+            expected_primary="＋ Создать пост",
+        ),
+        "error_change_query": _summarize_ui_keyboard(
+            build_error_keyboard(
+                None,
+                lang="ru",
+                recovery="change",
+                search_query="Sleep — Dopesmoker",
+            ),
+            expected_primary="Изменить запрос",
+        ),
+        "error_retry": _summarize_ui_keyboard(
+            build_error_keyboard(None, lang="ru", recovery="retry"),
+            expected_primary="Повторить",
+        ),
+        "error_platforms": _summarize_ui_keyboard(
+            build_error_keyboard(None, lang="ru", recovery="platforms"),
+            expected_primary="Что поддерживается",
+        ),
+        "error_crate": _summarize_ui_keyboard(
+            build_error_keyboard(None, lang="ru", recovery="crate"),
+            expected_primary="Вернуться в подборку",
+        ),
+        "delivery_success": _summarize_ui_keyboard(
+            build_delivery_success_keyboard(
+                lang="ru",
+                share_query="sh5|t3E4MuCjetGIkeu2N8fFHgr",
+            ),
+            expected_primary="+ Создать ещё",
+        ),
         "editor_actions": _summarize_ui_keyboard(
             InlineKeyboardMarkup(editor_rows("smoke", draft)),
             expected_primary="Отправить себе",
@@ -261,6 +300,9 @@ def _build_ui_contract() -> dict[str, object]:
         "home_explains_intro": "подводкой" in home_text,
         "create_explains_one_link_per_line": "каждую с новой строки" in create_text,
         "create_explains_intro": "подводкой" in create_text,
+        "localized_hierarchy_matches": (
+            screens["home_ru"]["rows"] == screens["home_en"]["rows"]
+        ),
     }
     return {
         "ok": all(bool(screen["ok"]) for screen in screens.values())
@@ -290,7 +332,20 @@ def _summarize_ui_keyboard(
     checks = {
         "touch_friendly_rows": all(1 <= len(row) <= 2 for row in rows),
         "labels_present": all(label.strip() for label in labels),
-        "labels_compact": all(len(label) <= 32 for label in labels),
+        "labels_descriptive": all(
+            any(char.isalnum() for char in label) for label in labels
+        ),
+        "styled_actions_have_text": all(
+            any(char.isalnum() for char in label) for label, _style in accented
+        ),
+        "destructive_actions_are_named": all(
+            style != "danger"
+            or any(
+                marker in label.casefold()
+                for marker in ("удал", "очист", "delete", "clear", "replace", "замен")
+            )
+            for label, style in accented
+        ),
         "callbacks_bounded": all(
             1 <= len(value.encode("utf-8")) <= 64 for value in callbacks
         ),

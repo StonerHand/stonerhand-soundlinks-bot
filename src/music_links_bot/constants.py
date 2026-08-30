@@ -31,6 +31,9 @@ HTTP_HEADERS = {"User-Agent": HTTP_USER_AGENT}
 STATS_KV_KEY = "stats:v1"
 # The native crate and a multi-link input share one explicit product limit.
 MAX_LINKS_PER_MESSAGE = 10
+# One stable example powers first-run and empty-inline discovery.  Keeping it
+# here prevents the two entry points from drifting apart.
+INLINE_EXAMPLE_QUERY = "Deftones — Rickets"
 
 PLATFORM_LABELS = {
     "spotify": "🟢 Spotify",

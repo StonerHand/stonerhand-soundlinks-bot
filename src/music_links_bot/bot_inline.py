@@ -16,7 +16,7 @@ from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
 from music_links_bot import bot_lookup
-from music_links_bot.constants import MAX_LINKS_PER_MESSAGE
+from music_links_bot.constants import INLINE_EXAMPLE_QUERY, MAX_LINKS_PER_MESSAGE
 from music_links_bot.formatter import (
     build_auto_hashtags,
     format_artist_message,
@@ -95,6 +95,7 @@ async def inline_query_handler(
         inline_query.from_user.language_code if inline_query.from_user else None
     )
     query_text = inline_query.query or ""
+    empty_query = not query_text.strip()
     user_id = inline_query.from_user.id if inline_query.from_user else 0
     channel_safe = getattr(inline_query, "chat_type", None) == "channel"
     shared_urls = parse_share_query(query_text)
@@ -130,11 +131,15 @@ async def inline_query_handler(
             personal_results = True
             history_mode = True
             if not source_urls:
-                await _answer_inline_hint(
+                source_urls = await _search_source_urls(
+                    context,
                     inline_query,
-                    get_text(lang, "inline_hint_empty"),
+                    INLINE_EXAMPLE_QUERY,
+                    lang=lang,
                 )
-                return
+                source_urls = source_urls[:1]
+            else:
+                source_urls = source_urls[:3]
         else:
             source_urls = await _search_source_urls(
                 context,
@@ -192,11 +197,19 @@ async def inline_query_handler(
         return
 
     try:
+        answer_kwargs = {
+            "cache_time": 0 if (channel_safe or empty_query) else INLINE_CACHE_SECONDS,
+            "is_personal": personal_results or empty_query,
+            "next_offset": next_offset,
+        }
+        if empty_query:
+            answer_kwargs["button"] = InlineQueryResultsButton(
+                text=get_text(lang, "inline_find_music"),
+                start_parameter="inline",
+            )
         await inline_query.answer(
             results,
-            cache_time=0 if channel_safe else INLINE_CACHE_SECONDS,
-            is_personal=personal_results,
-            next_offset=next_offset,
+            **answer_kwargs,
         )
         if any(_result_uses_rich(result) for result in results):
             record_capability_success(RICH_MESSAGE_CAPABILITY)
@@ -230,9 +243,7 @@ async def inline_query_handler(
                 try:
                     await inline_query.answer(
                         classic_results,
-                        cache_time=0 if channel_safe else INLINE_CACHE_SECONDS,
-                        is_personal=personal_results,
-                        next_offset=next_offset,
+                        **answer_kwargs,
                     )
                     return
                 except TelegramError:

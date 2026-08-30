@@ -67,6 +67,14 @@
     "en": "Track removed",
     "ru": "Трек удалён"
   },
+  "crate_order_updated": {
+    "en": "Order updated",
+    "ru": "Порядок обновлён"
+  },
+  "crate_cleared": {
+    "en": "Collection cleared · undo is available",
+    "ru": "Подборка очищена · можно отменить"
+  },
   "crate_rename": {
     "en": "✏️ Name",
     "ru": "✏️ Название"
@@ -371,6 +379,10 @@
     "en": "Published to the channel 🎉",
     "ru": "Опубликовано в канал 🎉"
   },
+  "ed_post_ready": {
+    "en": "✓ <b>Post ready</b>",
+    "ru": "✓ <b>Пост готов</b>"
+  },
   "ed_queue_full": {
     "en": "The queue is full — publish or remove one of the 50 posts first",
     "ru": "Очередь заполнена — сначала опубликуй или удали один из 50 постов"
@@ -459,6 +471,10 @@
     "en": "Template deleted",
     "ru": "Шаблон удалён"
   },
+  "ed_template_delete": {
+    "en": "Delete",
+    "ru": "Удалить"
+  },
   "ed_template_prompt": {
     "en": "<b>Template name</b>\nFor example: <code>Album of the week</code> or <code>Minimal</code>.\n<code>/cancel</code> — cancel",
     "ru": "<b>Название шаблона</b>\nНапример: <code>Альбом недели</code> или <code>Минимал</code>.\n<code>/cancel</code> — отменить"
@@ -506,6 +522,10 @@
   "error_platforms_button": {
     "en": "What is supported",
     "ru": "Что поддерживается"
+  },
+  "error_back_crate": {
+    "en": "Back to collection",
+    "ru": "Вернуться в подборку"
   },
   "error_provider": {
     "en": "The music provider is temporarily unavailable. Your link is saved — tap Retry.",
@@ -598,6 +618,14 @@
   "home_title_new": {
     "en": "🎧 <b>StonerHandBot</b>\n<i>Music post builder</i>",
     "ru": "🎧 <b>StonerHandBot</b>\n<i>Музыкальный конструктор постов</i>"
+  },
+  "home_try_example": {
+    "en": "Try an example",
+    "ru": "Попробовать на примере"
+  },
+  "inline_find_music": {
+    "en": "Find music",
+    "ru": "Найти музыку"
   },
   "inline_hint_empty": {
     "en": "🎧 Type an artist and track or paste a link",
@@ -904,8 +932,8 @@
     "ru": "Изменение отменено"
   },
   "settings_saved": {
-    "en": "Settings saved",
-    "ru": "Настройки сохранены"
+    "en": "Saved · you can undo",
+    "ru": "Сохранено · можно отменить"
   },
   "settings_undo": {
     "en": "Undo change",

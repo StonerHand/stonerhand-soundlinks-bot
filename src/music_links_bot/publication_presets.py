@@ -10,6 +10,9 @@ from music_links_bot.kvstore import KVStore
 PRESET_TTL_SECONDS = 365 * 24 * 3600
 MAX_USER_PRESETS = 8
 MAX_MEMORY_USERS = 100
+# Leave room for the visible selection mark inside Telegram's 64-character
+# button boundary without imposing the former 28/32-character UX rule.
+MAX_PRESET_NAME_LENGTH = 60
 
 
 def _key(user_id: int) -> str:
@@ -18,7 +21,7 @@ def _key(user_id: int) -> str:
 
 
 def normalize_preset_name(value: str) -> str:
-    return " ".join(str(value or "").split())[:32].strip()
+    return " ".join(str(value or "").split())[:MAX_PRESET_NAME_LENGTH].strip()
 
 
 def _sanitize_presets(value: object) -> list[dict]:

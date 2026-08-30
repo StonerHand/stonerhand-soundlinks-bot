@@ -7,7 +7,7 @@ from telegram import InlineKeyboardMarkup
 
 from music_links_bot.bot_builder import available_platforms, selected_platforms
 from music_links_bot.bot_runtime import encode_callback
-from music_links_bot.constants import PLATFORM_LABELS
+from music_links_bot.constants import INLINE_EXAMPLE_QUERY, PLATFORM_LABELS
 from music_links_bot.i18n import get_text
 from music_links_bot.models import TrackMatch
 from music_links_bot.release_presentation import PRESET_ORDER, normalize_preset
@@ -16,6 +16,7 @@ from music_links_bot.telegram_buttons import (
     ButtonTone,
     button as InlineKeyboardButton,
     callback_button,
+    current_chat_button,
 )
 
 
@@ -59,6 +60,7 @@ def build_start_keyboard(
     crate_count: int = 0,
     is_admin: bool = False,
     show_tour: bool = False,
+    show_example: bool = False,
     active_draft_id: str | None = None,
     active_draft_label: str | None = None,
 ) -> InlineKeyboardMarkup:
@@ -71,6 +73,16 @@ def build_start_keyboard(
         style="primary",
     )
     rows.append([create_button])
+    if show_example:
+        rows.append(
+            [
+                current_chat_button(
+                    get_text(lang, "home_try_example"),
+                    INLINE_EXAMPLE_QUERY,
+                    icon=ButtonIcon.TRACK,
+                )
+            ]
+        )
     if active_draft_id:
         continue_text = (
             get_text(lang, "home_continue_named").format(release=active_draft_label)
@@ -219,6 +231,31 @@ def build_privacy_keyboard(*, lang: str, confirm: bool = False) -> InlineKeyboar
     )
 
 
+def build_delivery_success_keyboard(
+    *, lang: str, share_query: str | None = None
+) -> InlineKeyboardMarkup:
+    """Render the terminal delivery state with one clear next action."""
+    rows: list[list[InlineKeyboardButton]] = [
+        [
+            InlineKeyboardButton(
+                get_text(lang, "ed_create_more"),
+                callback_data=encode_callback("menu", "create"),
+                style="primary",
+            )
+        ]
+    ]
+    if share_query:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "share_post"),
+                    switch_inline_query=share_query,
+                )
+            ]
+        )
+    return InlineKeyboardMarkup(rows)
+
+
 def build_error_keyboard(
     bot_username: str | None,
     *,
@@ -226,14 +263,42 @@ def build_error_keyboard(
     retryable: bool = False,
     search_query: str | None = None,
     source_url: str | None = None,
+    recovery: str | None = None,
 ) -> InlineKeyboardMarkup:
-    """Keep recovery contextual: one primary action and one predictable back."""
-    if retryable:
+    """Keep errors calm: one contextual recovery action and one way home."""
+    del bot_username, source_url
+    recovery = recovery or ("retry" if retryable else "search")
+    if recovery == "retry":
         primary = InlineKeyboardButton(
             get_text(lang, "retry"),
             callback_data=encode_callback("retry", "last"),
             style="primary",
         )
+    elif recovery == "platforms":
+        primary = InlineKeyboardButton(
+            get_text(lang, "error_platforms_button"),
+            callback_data=encode_callback("menu", "platforms"),
+            style="primary",
+        )
+    elif recovery == "crate":
+        primary = InlineKeyboardButton(
+            get_text(lang, "error_back_crate"),
+            callback_data=encode_callback("crate", "open"),
+            style="primary",
+        )
+    elif recovery == "change":
+        if search_query:
+            primary = InlineKeyboardButton(
+                get_text(lang, "search_change"),
+                switch_inline_query_current_chat=search_query[:120],
+                style="primary",
+            )
+        else:
+            primary = InlineKeyboardButton(
+                get_text(lang, "search_change"),
+                callback_data=encode_callback("menu", "create"),
+                style="primary",
+            )
     else:
         primary = InlineKeyboardButton(
             get_text(lang, "quick_search"),
@@ -241,24 +306,6 @@ def build_error_keyboard(
             style="primary",
         )
     rows = [[primary]]
-    secondary_row: list[InlineKeyboardButton] = []
-    if search_query:
-        secondary_row.append(
-            InlineKeyboardButton(
-                get_text(lang, "search_change"),
-                switch_inline_query_current_chat=search_query[:120],
-            )
-        )
-    if source_url and source_url.startswith(("http://", "https://")):
-        secondary_row.append(
-            InlineKeyboardButton(
-                get_text(lang, "error_open_source"),
-                url=source_url,
-            )
-        )
-    del bot_username
-    if secondary_row:
-        rows.append(secondary_row)
     rows.append(
         [
             InlineKeyboardButton(
@@ -579,11 +626,11 @@ def editor_template_rows(
         rows.append(
             [
                 InlineKeyboardButton(
-                    f"✓ {name[:28]}",
+                    f"✓ {name}",
                     callback_data=encode_callback("editor", f"ta{index}", draft_id),
                 ),
                 InlineKeyboardButton(
-                    "×",
+                    get_text(lang, "ed_template_delete"),
                     callback_data=encode_callback("editor", f"td{index}", draft_id),
                     style="danger",
                 ),

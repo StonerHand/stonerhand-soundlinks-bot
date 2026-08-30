@@ -6,7 +6,7 @@
 
 [Open the bot](https://t.me/StonerHandBot) · [See the channel](https://t.me/stonerhand) · [Русская версия](README.ru.md)
 
-![Release](https://img.shields.io/badge/release-1.12.0-5b5bd6?style=flat-square)
+![Release](https://img.shields.io/badge/release-1.13.0-5b5bd6?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
@@ -83,7 +83,12 @@ An active card is recoverable by release name; collections and history stay on
 the second row. Less frequent tools live under one predictable **More** action.
 On the first private `/start`, a packaged five-second animation demonstrates
 the complete link → card → publish flow once; it never replaces or delays the
-normal menu on later visits.
+normal menu on later visits. A **Try an example** action starts a working inline
+query immediately.
+
+An empty inline screen shows up to three recent releases; a new user gets one
+live example and a **Find music** action. Configure the input hint once in
+`@BotFather` with `/setinline` and `Artist — Title or link`.
 
 The editor is progressive rather than crowded:
 
@@ -102,6 +107,10 @@ Native replies, editor callbacks and lookup orchestration are isolated from
 presentation. UI copy lives in a packaged RU/EN catalog, so wording can change
 without touching the execution path; placeholders and button hierarchy are
 verified by tests and the same read-only production smoke contract.
+Every error exposes one contextual recovery action. Native callback toasts
+confirm settings, ordering and collection changes; short-lived undo covers
+editor changes and destructive collection actions. Successful delivery closes
+the editor with a compact **Post ready** state and a primary **Create another**.
 
 Collection keyboards adapt to their content: a shared artist is not repeated,
 technical remaster suffixes do not consume button space, short titles share a
@@ -119,6 +128,9 @@ fallback. Rich cards use a magazine order — title, artwork, lead, body, action
 and tags — without repeating the title below the cover. Semantic styles,
 disabled progress, ephemeral notices and Rich content remain capability-gated;
 older Telegram clients always receive the full classic experience.
+Button labels remain descriptive and are not governed by an arbitrary 28–32
+character rule; shortening is reserved for labels that would actually overflow
+Telegram. Color is never the only cue and rows contain at most two actions.
 
 ## Architecture
 

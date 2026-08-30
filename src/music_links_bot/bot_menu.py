@@ -168,7 +168,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     active_draft_id, active_draft_label = await _active_home_card(
         context, runtime, session, lang=lang
     )
-    if message.chat.type == "private" and not session.welcome_seen:
+    first_visit = message.chat.type == "private" and not session.welcome_seen
+    if first_visit:
         session.welcome_seen = await _send_first_visit_demo(message, lang=lang)
     sent = await message.reply_text(
         build_home_text(
@@ -187,6 +188,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             crate_count=crate_count,
             is_admin=is_admin,
             show_tour=not session.onboarding_seen,
+            show_example=first_visit,
             active_draft_id=active_draft_id,
             active_draft_label=active_draft_label,
         ),

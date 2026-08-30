@@ -77,7 +77,7 @@ def main() -> int:
             failures.append(f"publication smoke status={status} ok={payload.get('ok')}")
         if payload.get("service") != "publication-release-smoke":
             failures.append("publication smoke service identity is invalid")
-        if payload.get("contract") != 2:
+        if payload.get("contract") != 3:
             failures.append("publication smoke contract is outdated")
         cases = payload.get("cases") or {}
         expected_cases = {
@@ -102,6 +102,12 @@ def main() -> int:
         if set(ux.get("screens") or {}) != {
             "home_ru",
             "home_en",
+            "first_run",
+            "error_change_query",
+            "error_retry",
+            "error_platforms",
+            "error_crate",
+            "delivery_success",
             "editor_actions",
             "editor_settings",
         }:

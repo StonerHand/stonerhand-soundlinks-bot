@@ -2,6 +2,7 @@ import unittest
 from types import SimpleNamespace
 
 from music_links_bot.publication_presets import (
+    MAX_PRESET_NAME_LENGTH,
     apply_named_preset,
     delete_named_preset,
     load_presets,
@@ -48,7 +49,10 @@ class PublicationPresetTests(unittest.IsolatedAsyncioTestCase):
 
     def test_name_is_compact_and_bounded(self) -> None:
         self.assertEqual(normalize_preset_name(" a   b "), "a b")
-        self.assertLessEqual(len(normalize_preset_name("x" * 100)), 32)
+        self.assertEqual(
+            len(normalize_preset_name("x" * 100)),
+            MAX_PRESET_NAME_LENGTH,
+        )
 
 
 if __name__ == "__main__":

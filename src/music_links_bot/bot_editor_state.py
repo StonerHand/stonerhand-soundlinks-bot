@@ -21,7 +21,7 @@ from music_links_bot.release_presentation import (
 )
 from music_links_bot.url_utils import is_direct_platform_url
 
-UNDO_SETTING_SECONDS = 5 * 60
+UNDO_SETTING_SECONDS = 30
 MAX_UNDO_STEPS = 5
 _EDITABLE_FIELDS = (
     "prefix",

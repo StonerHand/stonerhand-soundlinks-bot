@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 1.13.0 — 2026-08-30
+
+- Turned empty inline mode into a personal discovery surface with up to three
+  recent releases, a live fallback example and a persistent Find music action.
+- Added a first-visit Try an example action beside the packaged onboarding tour.
+- Replaced generic error menus with one contextual recovery action per failure.
+- Added compact native confirmations for editor and collection mutations,
+  reduced editor-setting undo to 30 seconds and retained 15-second destructive undo.
+- Added a terminal Post ready screen with Create another as its primary action.
+- Strengthened the production UI contract around descriptive labels, named
+  destructive actions, two-button rows and matching RU/EN hierarchy while
+  explicitly removing the arbitrary 28–32-character accessibility rule.
+- Documented the required BotFather inline placeholder and expanded release tests.
+
 ## 1.12.0 — 2026-08-30
 
 - Rebuilt the visual hierarchy around one primary action: Songlink/Odesli owns

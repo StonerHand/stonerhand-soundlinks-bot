@@ -1,31 +1,57 @@
 {
   "cases": {
     "channel_keyboard": {
-      "buttons": ["🟢 Spotify", "🪩 Все платформы"],
+      "buttons": [
+        "🟢 Spotify",
+        "🪩 Все платформы"
+      ],
       "checks": {
         "channel_safe": true,
         "hub_is_primary": true,
         "provider_shortcuts_are_neutral": true
       },
-      "count": [1, 1],
-      "destinations": ["open.spotify.com", "song.link"],
+      "count": [
+        1,
+        1
+      ],
+      "destinations": [
+        "open.spotify.com",
+        "song.link"
+      ],
       "issues": [],
-      "lines": ["🎧 · Lime Garden", "Love Song", "#stonerhand #track"],
+      "lines": [
+        "🎧 · Lime Garden",
+        "Love Song",
+        "#stonerhand #track"
+      ],
       "mode": "channel",
       "ok": true,
       "preview_host": "images.example"
     },
     "classic_track": {
-      "buttons": ["🟢 Spotify", "🪩 Все платформы"],
+      "buttons": [
+        "🟢 Spotify",
+        "🪩 Все платформы"
+      ],
       "checks": {
         "hub_is_primary": true,
         "provider_copy_absent": true,
         "provider_shortcuts_are_neutral": true
       },
-      "count": [1, 1],
-      "destinations": ["open.spotify.com", "song.link"],
+      "count": [
+        1,
+        1
+      ],
+      "destinations": [
+        "open.spotify.com",
+        "song.link"
+      ],
       "issues": [],
-      "lines": ["🎧 · Lime Garden", "Love Song", "#stonerhand #track"],
+      "lines": [
+        "🎧 · Lime Garden",
+        "Love Song",
+        "#stonerhand #track"
+      ],
       "mode": "classic",
       "ok": true,
       "preview_host": "images.example"
@@ -37,8 +63,15 @@
         "3 · 1758 Times of Weird Sadness"
       ],
       "checks": {},
-      "count": [3, 3],
-      "destinations": ["song.link", "song.link", "song.link"],
+      "count": [
+        3,
+        3
+      ],
+      "destinations": [
+        "song.link",
+        "song.link",
+        "song.link"
+      ],
       "issues": [],
       "lines": [
         "Подборка · 3 релиза",
@@ -59,8 +92,15 @@
         "3 · 1758 Times of Weird Sadness"
       ],
       "checks": {},
-      "count": [3, 4],
-      "destinations": ["song.link", "song.link", "song.link"],
+      "count": [
+        3,
+        4
+      ],
+      "destinations": [
+        "song.link",
+        "song.link",
+        "song.link"
+      ],
       "issues": [],
       "lines": [
         "⚠️ Подборка · 3 из 4",
@@ -75,21 +115,39 @@
       "preview_host": "images.example"
     },
     "inline_share": {
-      "buttons": ["🟢 Spotify", "🪩 Все платформы", "↗ Поделиться"],
+      "buttons": [
+        "🟢 Spotify",
+        "🪩 Все платформы",
+        "↗ Поделиться"
+      ],
       "checks": {
         "hub_is_primary": true,
         "provider_shortcuts_are_neutral": true
       },
-      "count": [1, 1],
-      "destinations": ["open.spotify.com", "song.link", "inline"],
+      "count": [
+        1,
+        1
+      ],
+      "destinations": [
+        "open.spotify.com",
+        "song.link",
+        "inline"
+      ],
       "issues": [],
-      "lines": ["🎧 · Lime Garden", "Love Song", "#stonerhand #track"],
+      "lines": [
+        "🎧 · Lime Garden",
+        "Love Song",
+        "#stonerhand #track"
+      ],
       "mode": "inline",
       "ok": true,
       "preview_host": "images.example"
     },
     "rich_card": {
-      "buttons": ["🟢 Spotify", "🪩 Все платформы"],
+      "buttons": [
+        "🟢 Spotify",
+        "🪩 Все платформы"
+      ],
       "checks": {
         "has_buttons": true,
         "has_media": true,
@@ -98,19 +156,38 @@
         "provider_shortcuts_are_neutral": true,
         "within_html_limit": true
       },
-      "count": [1, 1],
-      "destinations": ["open.spotify.com", "song.link"],
+      "count": [
+        1,
+        1
+      ],
+      "destinations": [
+        "open.spotify.com",
+        "song.link"
+      ],
       "issues": [],
-      "lines": ["🎧 · Lime Garden", "Love Song", "#stonerhand #track"],
+      "lines": [
+        "🎧 · Lime Garden",
+        "Love Song",
+        "#stonerhand #track"
+      ],
       "mode": "rich",
       "ok": true,
       "preview_host": "images.example"
     },
     "soundcloud_source_only": {
-      "buttons": ["🟠 SoundCloud"],
-      "checks": {"forbidden_buttons_absent": true},
-      "count": [1, 1],
-      "destinations": ["soundcloud.com"],
+      "buttons": [
+        "🟠 SoundCloud"
+      ],
+      "checks": {
+        "forbidden_buttons_absent": true
+      },
+      "count": [
+        1,
+        1
+      ],
+      "destinations": [
+        "soundcloud.com"
+      ],
       "issues": [],
       "lines": [
         "🎧 · StonerHand",
@@ -122,7 +199,7 @@
       "preview_host": "images.example"
     }
   },
-  "contract": 2,
+  "contract": 3,
   "ok": true,
   "service": "publication-release-smoke",
   "ux": {
@@ -132,22 +209,53 @@
       "home_explains_collection": true,
       "home_explains_intro": true,
       "home_explains_link": true,
-      "home_explains_query": true
+      "home_explains_query": true,
+      "localized_hierarchy_matches": true
     },
     "ok": true,
     "screens": {
-      "editor_actions": {
-        "buttons": ["Отправить себе", "Изменить", "＋ В подборку"],
+      "delivery_success": {
+        "buttons": [
+          "+ Создать ещё",
+          "↗ Поделиться"
+        ],
         "checks": {
           "callbacks_bounded": true,
-          "labels_compact": true,
+          "destructive_actions_are_named": true,
+          "labels_descriptive": true,
           "labels_present": true,
           "mini_app_absent": true,
           "single_primary_action": true,
+          "styled_actions_have_text": true,
           "touch_friendly_rows": true
         },
         "ok": true,
-        "rows": [1, 2]
+        "rows": [
+          1,
+          1
+        ]
+      },
+      "editor_actions": {
+        "buttons": [
+          "Отправить себе",
+          "Изменить",
+          "＋ В подборку"
+        ],
+        "checks": {
+          "callbacks_bounded": true,
+          "destructive_actions_are_named": true,
+          "labels_descriptive": true,
+          "labels_present": true,
+          "mini_app_absent": true,
+          "single_primary_action": true,
+          "styled_actions_have_text": true,
+          "touch_friendly_rows": true
+        },
+        "ok": true,
+        "rows": [
+          1,
+          2
+        ]
       },
       "editor_settings": {
         "buttons": [
@@ -162,40 +270,181 @@
         ],
         "checks": {
           "callbacks_bounded": true,
-          "labels_compact": true,
+          "destructive_actions_are_named": true,
+          "labels_descriptive": true,
           "labels_present": true,
           "mini_app_absent": true,
           "single_primary_action": true,
+          "styled_actions_have_text": true,
           "touch_friendly_rows": true
         },
         "ok": true,
-        "rows": [2, 2, 2, 2]
+        "rows": [
+          2,
+          2,
+          2,
+          2
+        ]
+      },
+      "error_change_query": {
+        "buttons": [
+          "Изменить запрос",
+          "← Главное меню"
+        ],
+        "checks": {
+          "callbacks_bounded": true,
+          "destructive_actions_are_named": true,
+          "labels_descriptive": true,
+          "labels_present": true,
+          "mini_app_absent": true,
+          "single_primary_action": true,
+          "styled_actions_have_text": true,
+          "touch_friendly_rows": true
+        },
+        "ok": true,
+        "rows": [
+          1,
+          1
+        ]
+      },
+      "error_crate": {
+        "buttons": [
+          "Вернуться в подборку",
+          "← Главное меню"
+        ],
+        "checks": {
+          "callbacks_bounded": true,
+          "destructive_actions_are_named": true,
+          "labels_descriptive": true,
+          "labels_present": true,
+          "mini_app_absent": true,
+          "single_primary_action": true,
+          "styled_actions_have_text": true,
+          "touch_friendly_rows": true
+        },
+        "ok": true,
+        "rows": [
+          1,
+          1
+        ]
+      },
+      "error_platforms": {
+        "buttons": [
+          "Что поддерживается",
+          "← Главное меню"
+        ],
+        "checks": {
+          "callbacks_bounded": true,
+          "destructive_actions_are_named": true,
+          "labels_descriptive": true,
+          "labels_present": true,
+          "mini_app_absent": true,
+          "single_primary_action": true,
+          "styled_actions_have_text": true,
+          "touch_friendly_rows": true
+        },
+        "ok": true,
+        "rows": [
+          1,
+          1
+        ]
+      },
+      "error_retry": {
+        "buttons": [
+          "Повторить",
+          "← Главное меню"
+        ],
+        "checks": {
+          "callbacks_bounded": true,
+          "destructive_actions_are_named": true,
+          "labels_descriptive": true,
+          "labels_present": true,
+          "mini_app_absent": true,
+          "single_primary_action": true,
+          "styled_actions_have_text": true,
+          "touch_friendly_rows": true
+        },
+        "ok": true,
+        "rows": [
+          1,
+          1
+        ]
+      },
+      "first_run": {
+        "buttons": [
+          "＋ Создать пост",
+          "🎧 Попробовать на примере",
+          "🧺 Подборка · 0",
+          "История",
+          "Как это работает?",
+          "••• Ещё"
+        ],
+        "checks": {
+          "callbacks_bounded": true,
+          "destructive_actions_are_named": true,
+          "labels_descriptive": true,
+          "labels_present": true,
+          "mini_app_absent": true,
+          "single_primary_action": true,
+          "styled_actions_have_text": true,
+          "touch_friendly_rows": true
+        },
+        "ok": true,
+        "rows": [
+          1,
+          1,
+          2,
+          1,
+          1
+        ]
       },
       "home_en": {
-        "buttons": ["＋ Create post", "🧺 Crate · 2", "History", "••• More"],
+        "buttons": [
+          "＋ Create post",
+          "🧺 Crate · 2",
+          "History",
+          "••• More"
+        ],
         "checks": {
           "callbacks_bounded": true,
-          "labels_compact": true,
+          "destructive_actions_are_named": true,
+          "labels_descriptive": true,
           "labels_present": true,
           "mini_app_absent": true,
           "single_primary_action": true,
+          "styled_actions_have_text": true,
           "touch_friendly_rows": true
         },
         "ok": true,
-        "rows": [1, 2, 1]
+        "rows": [
+          1,
+          2,
+          1
+        ]
       },
       "home_ru": {
-        "buttons": ["＋ Создать пост", "🧺 Подборка · 2", "История", "••• Ещё"],
+        "buttons": [
+          "＋ Создать пост",
+          "🧺 Подборка · 2",
+          "История",
+          "••• Ещё"
+        ],
         "checks": {
           "callbacks_bounded": true,
-          "labels_compact": true,
+          "destructive_actions_are_named": true,
+          "labels_descriptive": true,
           "labels_present": true,
           "mini_app_absent": true,
           "single_primary_action": true,
+          "styled_actions_have_text": true,
           "touch_friendly_rows": true
         },
         "ok": true,
-        "rows": [1, 2, 1]
+        "rows": [
+          1,
+          2,
+          1
+        ]
       }
     }
   }

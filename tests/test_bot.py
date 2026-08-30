@@ -521,6 +521,17 @@ class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(message.animations[0][0].startswith(b"GIF"))
         self.assertIn("точный релиз", message.animations[0][1])
         self.assertEqual(len(message.replies), 2)
+        first_keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
+        second_keyboard = message.reply_kwargs[1]["reply_markup"].inline_keyboard
+        self.assertEqual(first_keyboard[1][0].text, "🎧 Попробовать на примере")
+        self.assertEqual(
+            first_keyboard[1][0].switch_inline_query_current_chat,
+            "Deftones — Rickets",
+        )
+        self.assertNotIn(
+            "🎧 Попробовать на примере",
+            [button.text for row in second_keyboard for button in row],
+        )
 
     async def test_failed_first_visit_animation_can_retry_later(self) -> None:
         class FailingAnimatedMessage(PrivateMessageStub):
@@ -1770,6 +1781,38 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         ids = {result.id for result in inline_query.answers[0]}
         self.assertEqual(len(ids), 2)
 
+    async def test_empty_inline_query_shows_one_live_example_and_search_cta(
+        self,
+    ) -> None:
+        from music_links_bot.bot_inline import inline_query_handler
+
+        class InlineQueryStub:
+            query = ""
+            from_user = type("UserStub", (), {"id": 7, "language_code": "ru"})()
+
+            def __init__(self) -> None:
+                self.results: list = []
+                self.kwargs: dict = {}
+
+            async def answer(self, results, **kwargs) -> None:
+                self.results = list(results)
+                self.kwargs = kwargs
+
+        inline_query = InlineQueryStub()
+        update = type("InlineUpdateStub", (), {"inline_query": inline_query})()
+        context = ContextStub(search_client=SuccessfulSearchClientStub())
+
+        with patch(
+            "music_links_bot.bot_inline.load_inline_history",
+            AsyncMock(return_value=[]),
+        ):
+            await inline_query_handler(update, context)
+
+        self.assertEqual(len(inline_query.results), 1)
+        self.assertEqual(inline_query.kwargs["cache_time"], 0)
+        self.assertTrue(inline_query.kwargs["is_personal"])
+        self.assertEqual(inline_query.kwargs["button"].text, "Найти музыку")
+
     async def test_inline_playlist_result_uses_playlist_card(self) -> None:
         result = await _build_inline_result(
             "https://open.spotify.com/playlist/37i9dQZF1DX51TD2wakW3K",
@@ -1949,11 +1992,10 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Релиз не найден", message.replies[0])
         self.assertIn("<code>артист — название</code>", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
-        self.assertEqual(keyboard[0][0].text, "Повторить")
-        self.assertEqual(keyboard[1][0].text, "Изменить запрос")
+        self.assertEqual(keyboard[0][0].text, "Изменить запрос")
         self.assertEqual(keyboard[-1][0].text, "← Главное меню")
-        self.assertEqual(keyboard[1][0].switch_inline_query_current_chat, "привет")
-        self.assertEqual(len(keyboard), 3)
+        self.assertEqual(keyboard[0][0].switch_inline_query_current_chat, "привет")
+        self.assertEqual(len(keyboard), 2)
         self.assertEqual(context.bot.sent_messages, [])
         self.assertEqual(context.bot.chat_actions, [])
         self.assertEqual(context.application.bot_data["runtime"].active_tasks, {})

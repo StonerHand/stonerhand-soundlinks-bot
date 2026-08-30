@@ -401,8 +401,25 @@ class TelegramUiContractTests(unittest.TestCase):
             source_url="https://open.spotify.com/track/1",
         )
 
-        self.assertEqual([len(row) for row in keyboard.inline_keyboard], [1, 2, 1])
+        self.assertEqual([len(row) for row in keyboard.inline_keyboard], [1, 1])
+        self.assertEqual(keyboard.inline_keyboard[0][0].text, "Повторить")
         self.assertEqual(keyboard.inline_keyboard[-1][0].text, "← Главное меню")
+
+    def test_recovery_action_changes_with_error_context(self) -> None:
+        cases = {
+            "change": "Изменить запрос",
+            "platforms": "Что поддерживается",
+            "crate": "Вернуться в подборку",
+        }
+        for recovery, expected in cases.items():
+            keyboard = build_error_keyboard(
+                None,
+                lang="ru",
+                search_query="Sleep — Dopesmoker",
+                recovery=recovery,
+            )
+            self.assertEqual(keyboard.inline_keyboard[0][0].text, expected)
+            self.assertEqual([len(row) for row in keyboard.inline_keyboard], [1, 1])
 
     def test_core_keyboards_have_valid_labels_and_callbacks(self) -> None:
         keyboards = [

@@ -112,6 +112,7 @@ from music_links_bot.bot_storage import (
 from music_links_bot.bot_ui import (
     build_delete_confirmation_keyboard as _delete_confirmation_keyboard,
     build_deleted_draft_keyboard as _deleted_draft_keyboard,
+    build_delivery_success_keyboard as _build_delivery_success_keyboard,
     build_duplicate_post_keyboard as _duplicate_post_keyboard,
     build_error_keyboard as _build_error_keyboard_view,
     build_publish_confirmation as _build_publish_confirmation,
@@ -879,6 +880,7 @@ async def _handle_editor_shortcut(request: EditorActionRequest) -> bool:
         draft_id=request.draft_id,
         draft=request.draft,
         lang=request.lang,
+        answer_text=get_text(request.lang, "settings_saved"),
     )
     return True
 
@@ -1291,7 +1293,18 @@ async def _send_editor_post_to_user(request: EditorActionRequest) -> None:
         ),
         show_alert=not bool(sent),
     )
-    await _restore_editor_card(request)
+    if not sent:
+        await _restore_editor_card(request)
+        return
+    await _show_editor_delivery_success(request)
+    if request.user_id:
+        session = await _runtime(request.context).get_session(
+            request.user_id,
+            lang=request.lang,
+        )
+        if session.active_draft_id == request.draft_id:
+            session.active_draft_id = ""
+            await _runtime(request.context).save_session(session)
 
 
 async def _show_duplicate_editor_post(
@@ -1408,18 +1421,18 @@ async def _show_editor_publish_success(
     published_link = (
         getattr(published, "link", None) if not isinstance(published, bool) else None
     )
+    secondary_row: list[InlineKeyboardButton]
     if isinstance(published_link, str) and published_link.startswith("http"):
-        first_row = [
+        secondary_row = [
             InlineKeyboardButton(
                 get_text(request.lang, "ed_open_publication"),
                 url=published_link,
             )
         ]
     else:
-        first_row = [_channel_button()]
+        secondary_row = [_channel_button()]
     keyboard = InlineKeyboardMarkup(
         [
-            first_row,
             [
                 InlineKeyboardButton(
                     get_text(request.lang, "ed_create_more"),
@@ -1427,19 +1440,39 @@ async def _show_editor_publish_success(
                     style="primary",
                 )
             ],
+            secondary_row,
         ]
-    )
-    text, _ = _render_track_draft(
-        request.draft,
-        request.context,
-        draft_id=None,
     )
     await _edit_editor_message(
         request.query,
         request.context,
         request.draft,
-        f"<b>{escape(get_text(request.lang, 'ed_published'))}</b>\n\n{text}",
+        _editor_success_text(request, "ed_published"),
         keyboard,
+    )
+
+
+async def _show_editor_delivery_success(request: EditorActionRequest) -> None:
+    """Replace the busy editor with a small, terminal success state."""
+    share_url = track_share_url(request.track)
+    share_query = build_share_query([share_url] if share_url else [])
+    await _edit_editor_message(
+        request.query,
+        request.context,
+        request.draft,
+        _editor_success_text(request, "ed_post_ready"),
+        _build_delivery_success_keyboard(
+            lang=request.lang,
+            share_query=share_query,
+        ),
+    )
+
+
+def _editor_success_text(request: EditorActionRequest, title_key: str) -> str:
+    return (
+        f"{get_text(request.lang, title_key)}\n\n"
+        f"<blockquote><b>{escape(request.track.artist)}</b> — "
+        f"{escape(request.track.title)}</blockquote>"
     )
 
 
@@ -1560,7 +1593,11 @@ async def _reply_with_error(
     *,
     lang: str = "ru",
 ) -> None:
-    reply_markup = _build_error_keyboard(context.bot.username, lang=lang)
+    reply_markup = _build_error_keyboard(
+        context.bot.username,
+        lang=lang,
+        recovery="platforms",
+    )
     if await _try_ephemeral_error(
         message,
         context,
@@ -1619,12 +1656,21 @@ async def _reply_with_flow_error(
         BotErrorCode.RATE_LIMITED: "error_title_rate_limit",
     }.get(error.code, "error_title")
     text = f"⚠️ <b>{get_text(lang, title_key)}</b>\n{detail}"
+    recovery = {
+        BotErrorCode.INVALID_INPUT: "platforms",
+        BotErrorCode.SEARCH_NOT_FOUND: "change",
+        BotErrorCode.RELEASE_NOT_FOUND: "change",
+        BotErrorCode.PROVIDER_UNAVAILABLE: "retry",
+        BotErrorCode.RATE_LIMITED: "retry",
+        BotErrorCode.LIMIT_EXCEEDED: "crate",
+    }.get(error.code, "retry" if error.retryable else "search")
     keyboard = _build_error_keyboard(
         context.bot.username,
         lang=lang,
         retryable=error.retryable,
         search_query=search_query,
         source_url=source_url,
+        recovery=recovery,
     )
     if await _try_ephemeral_error(
         message,
@@ -2554,6 +2600,7 @@ def _build_error_keyboard(
     retryable: bool = False,
     search_query: str | None = None,
     source_url: str | None = None,
+    recovery: str | None = None,
 ) -> InlineKeyboardMarkup:
     return _build_error_keyboard_view(
         bot_username,
@@ -2561,6 +2608,7 @@ def _build_error_keyboard(
         retryable=retryable,
         search_query=search_query,
         source_url=source_url,
+        recovery=recovery,
     )
 
 

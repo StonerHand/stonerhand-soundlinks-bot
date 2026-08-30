@@ -63,9 +63,11 @@ async def dispatch_crate_action(query, context, action: CallbackAction) -> None:
     if action.action == "up":
         items = await move_crate_item(bot_data, user_id, index, -1)
         selected_index = max(0, index - 1)
+        notice = get_text(lang, "crate_order_updated")
     elif action.action == "down":
         items = await move_crate_item(bot_data, user_id, index, 1)
         selected_index = min(len(items) - 1, index + 1) if items else None
+        notice = get_text(lang, "crate_order_updated")
     elif action.action == "select":
         items = await load_crate(bot_data, user_id)
         selected_index = index
@@ -107,6 +109,7 @@ async def dispatch_crate_action(query, context, action: CallbackAction) -> None:
             max_size=MAX_CRATE_UNDO_RECORDS,
         )
         items = []
+        notice = get_text(lang, "crate_cleared")
     elif action.action in {"clear_cancel", "open"}:
         items = await load_crate(bot_data, user_id)
     else:
