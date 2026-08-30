@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 1.10.1 — 2026-08-30
+
+- Removed Spotify branding and SEO phrases such as
+  `Album by … | Spotify` from release, artist and playlist names.
+- Normalized titles at the shared model and durable-draft boundaries so cached
+  and previously saved cards cannot reintroduce provider copy.
+- Added regressions for Spotify albums, tracks, playlists, legacy drafts,
+  Classic cards and Rich release smoke output.
+
 ## 1.10.0 — 2026-08-29
 
 - Added one final publication contract shared by Classic, Rich, inline,

@@ -6,6 +6,7 @@ from typing import Any, TypedDict
 from urllib.parse import urlparse
 
 from music_links_bot.constants import PLATFORM_LABELS
+from music_links_bot.metadata_cleaning import clean_spotify_metadata_title
 from music_links_bot.models import TrackMatch
 from music_links_bot.release_presentation import normalize_preset
 from music_links_bot.url_utils import is_direct_platform_url
@@ -48,7 +49,9 @@ def _normalize_track_item(value: dict) -> DraftTrackItem:
                 break
 
     item: DraftTrackItem = {
-        "title": str(value.get("title") or "").strip()[:MAX_TRACK_FIELD_LENGTH],
+        "title": clean_spotify_metadata_title(value.get("title"))[
+            :MAX_TRACK_FIELD_LENGTH
+        ],
         "artist": str(value.get("artist") or "").strip()[:MAX_TRACK_FIELD_LENGTH],
         "links": links,
         "kind": str(value.get("kind") or "song").strip()[:32] or "song",

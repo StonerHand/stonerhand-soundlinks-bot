@@ -9,6 +9,7 @@ import httpx
 
 from music_links_bot.cache import TTLCache
 from music_links_bot.constants import HTTP_HEADERS
+from music_links_bot.metadata_cleaning import clean_spotify_metadata_title
 from music_links_bot.models import PlaylistMatch
 from music_links_bot.url_utils import (
     cache_key_for_url,
@@ -116,7 +117,7 @@ class PlaylistClient:
         if not isinstance(payload, Mapping):
             raise PlaylistLookupError("Unexpected playlist metadata.")
 
-        title = str(payload.get("title") or "").strip()
+        title = clean_spotify_metadata_title(payload.get("title"))
         track_urls: list[str] = []
         try:
             page = await asyncio.wait_for(

@@ -33,7 +33,7 @@ def build_release_smoke_report() -> dict[str, object]:
     leaked source links, partial-count drift, and invalid channel keyboards.
     """
     primary = _track(
-        "Love Song",
+        "Love Song - song and lyrics by Lime Garden | Spotify",
         "Lime Garden",
         spotify_id="3E4MuCjetGIkeu2N8fFHgr",
         apple_id="1780000001",
@@ -172,7 +172,12 @@ def build_release_smoke_report() -> dict[str, object]:
     )
 
     cases = {
-        "classic_track": _summarize(classic),
+        "classic_track": _summarize(
+            classic,
+            extra_checks={
+                "provider_copy_absent": _provider_copy_absent(classic.text),
+            },
+        ),
         "soundcloud_source_only": _summarize(
             soundcloud_card,
             forbidden_button_markers=("spotify",),
@@ -189,6 +194,7 @@ def build_release_smoke_report() -> dict[str, object]:
             extra_checks={
                 "has_media": "<figure><img " in rich_html,
                 "has_buttons": "<tg-button" in rich_html,
+                "provider_copy_absent": _provider_copy_absent(rich_html),
                 "within_html_limit": len(rich_html) <= 30_000,
             },
         ),
@@ -199,6 +205,11 @@ def build_release_smoke_report() -> dict[str, object]:
         "contract": 1,
         "cases": cases,
     }
+
+
+def _provider_copy_absent(value: str) -> bool:
+    lowered = value.casefold()
+    return "| spotify" not in lowered and "song and lyrics by" not in lowered
 
 
 def _track(

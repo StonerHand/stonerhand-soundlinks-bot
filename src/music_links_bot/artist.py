@@ -6,6 +6,7 @@ import httpx
 
 from music_links_bot.cache import TTLCache
 from music_links_bot.constants import HTTP_HEADERS
+from music_links_bot.metadata_cleaning import clean_spotify_metadata_title
 from music_links_bot.models import ArtistMatch
 from music_links_bot.url_utils import cache_key_for_url, is_spotify_artist_url
 
@@ -47,7 +48,7 @@ class ArtistClient:
         if not isinstance(payload, Mapping):
             raise ArtistLookupError("Unexpected artist metadata.")
 
-        title = _clean_spotify_title(str(payload.get("title") or ""))
+        title = clean_spotify_metadata_title(payload.get("title"))
         artist = ArtistMatch(
             title=title or "Spotify artist",
             platform="Spotify",
@@ -55,12 +56,3 @@ class ArtistClient:
         )
         self._cache.set(cache_key, artist)
         return artist
-
-
-def _clean_spotify_title(title: str) -> str:
-    title = title.strip()
-    for suffix in (" | Spotify", " - Spotify"):
-        if title.endswith(suffix):
-            return title[: -len(suffix)].strip()
-
-    return title

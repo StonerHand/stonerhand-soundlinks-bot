@@ -6,7 +6,7 @@
 
 [Открыть бота](https://t.me/StonerHandBot) · [Посмотреть канал](https://t.me/stonerhand) · [English](README.md)
 
-![Release](https://img.shields.io/badge/release-1.10.0-5b5bd6?style=flat-square)
+![Release](https://img.shields.io/badge/release-1.10.1-5b5bd6?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
@@ -41,6 +41,8 @@ StonerHand — музыкальный редактор, который полн�
 - Показывает кнопку площадки только для прямой ссылки на релиз, которую вернул
   resolver: поисковая подсказка больше не выглядит подтверждённым совпадением.
 - Объединяет ссылки разных площадок на один релиз вместо карточек-дубликатов.
+- Убирает брендинг и SEO-приписки Spotify из названий релизов, артистов и
+  плейлистов, в том числе в карточках из старых черновиков.
 - Импортирует доступные треки из публичных плейлистов Spotify и Apple Music.
 - Сохраняет жирный текст, курсив и внешние ссылки в авторской подводке, убирает
   дубли музыкальных источников и точно считает Telegram-лимит UTF-16 для

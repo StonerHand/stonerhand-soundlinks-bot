@@ -8,6 +8,7 @@ import httpx
 
 from music_links_bot.cache import TTLCache
 from music_links_bot.constants import HTTP_USER_AGENT
+from music_links_bot.metadata_cleaning import clean_spotify_metadata_title
 from music_links_bot.models import TrackMatch
 from music_links_bot.release_hubs import canonical_release_hub_url
 from music_links_bot.url_utils import cache_key_for_url, spotify_url_type
@@ -136,7 +137,7 @@ def parse_spotify_page(source_url: str, html: str) -> TrackMatch:
     except (TypeError, ValueError) as exc:
         raise SpotifyLookupError("Spotify returned invalid public metadata.") from exc
 
-    title = parser.first("og:title").strip()
+    title = clean_spotify_metadata_title(parser.first("og:title"))
     artists = [
         value.strip()
         for value in parser.values.get("music:musician_description", ())

@@ -13,7 +13,7 @@
     },
     "classic_track": {
       "buttons": ["🟢 Spotify", "🪩 Все платформы"],
-      "checks": {},
+      "checks": {"provider_copy_absent": true},
       "count": [1, 1],
       "destinations": ["open.spotify.com", "song.link"],
       "issues": [],
@@ -82,6 +82,7 @@
       "checks": {
         "has_buttons": true,
         "has_media": true,
+        "provider_copy_absent": true,
         "within_html_limit": true
       },
       "count": [1, 1],

@@ -92,6 +92,26 @@ class PlaylistClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(playlist.title, "Fast metadata")
         self.assertEqual(playlist.track_urls, [])
 
+    async def test_spotify_playlist_removes_provider_seo_copy(self) -> None:
+        source_url = "https://open.spotify.com/playlist/1234567890"
+        metadata = httpx.Response(
+            200,
+            json={"title": "Heavy Rotation - Playlist by Artem | Spotify"},
+            request=httpx.Request("GET", "https://open.spotify.com/oembed"),
+        )
+        page = httpx.Response(
+            200,
+            text="",
+            request=httpx.Request("GET", source_url),
+        )
+        client = PlaylistClient()
+        client._client.get = AsyncMock(side_effect=[metadata, page])
+        self.addAsyncCleanup(client.aclose)
+
+        playlist = await client.lookup_playlist(source_url)
+
+        self.assertEqual(playlist.title, "Heavy Rotation")
+
     def test_spotify_page_tracks_are_unique_and_bounded(self) -> None:
         ids = [f"trackid{index:04d}" for index in range(MAX_PLAYLIST_IMPORT_TRACKS + 3)]
         page = " ".join(

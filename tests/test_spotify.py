@@ -67,6 +67,19 @@ class SpotifyFallbackTests(unittest.TestCase):
         self.assertEqual(track.kind, "album")
         self.assertEqual(track.release_format, "album")
 
+    def test_public_page_removes_spotify_album_seo_copy(self) -> None:
+        track = parse_spotify_page(
+            "https://open.spotify.com/album/abc",
+            _page_html(
+                title=("Czarface Meets Frankie Pulitzer - Album by CZARFACE | Spotify"),
+                artist="CZARFACE",
+                kind="music.album",
+            ),
+        )
+
+        self.assertEqual(track.title, "Czarface Meets Frankie Pulitzer")
+        self.assertEqual(track.artist, "CZARFACE")
+
     def test_public_page_rejects_missing_artist(self) -> None:
         with self.assertRaises(SpotifyLookupError):
             parse_spotify_page(

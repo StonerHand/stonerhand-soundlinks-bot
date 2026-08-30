@@ -43,6 +43,14 @@ class ReleasePresentationTests(unittest.TestCase):
             compact_release_title("Remastering the Past"), "Remastering the Past"
         )
 
+    def test_compact_release_title_removes_legacy_spotify_seo_copy(self) -> None:
+        self.assertEqual(
+            compact_release_title(
+                "Czarface Meets Frankie Pulitzer - Album by CZARFACE | Spotify"
+            ),
+            "Czarface Meets Frankie Pulitzer",
+        )
+
     def test_shared_collection_artist_requires_every_item_to_match(self) -> None:
         matching = [
             self.track,

@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import Final
 
+from music_links_bot.metadata_cleaning import clean_spotify_metadata_title
 from music_links_bot.models import TrackMatch
 
 PRESET_ORDER: Final = ("minimal", "cover", "longread")
@@ -48,8 +49,8 @@ def release_emoji(track: TrackMatch) -> str:
 
 
 def compact_release_title(value: str) -> str:
-    """Hide provider remaster suffixes without changing stored metadata."""
-    title = value.strip()
+    """Hide provider presentation suffixes without changing stored metadata."""
+    title = clean_spotify_metadata_title(value)
     compact = _REMASTER_SUFFIX.sub("", title).strip()
     return compact or title
 
