@@ -15,7 +15,7 @@ from music_links_bot.telegram_gateway import feature_enabled
 
 COLLAGE_VERSION = "v1"
 MIN_COLLAGE_ITEMS = 2
-MAX_COLLAGE_ITEMS = 4
+MAX_COLLAGE_ITEMS = 6
 MAX_SOURCE_URL_LENGTH = 2_048
 MAX_PAYLOAD_LENGTH = 12_000
 MAX_DECODED_PAYLOAD_BYTES = 10_000
@@ -29,22 +29,21 @@ def collection_collage_preview_url(
     base_url: str | None = None,
     signing_secret: str | None = None,
 ) -> str | None:
-    """Build a signed public image URL for a 2–4-cover classic preview."""
+    """Build a signed public image URL for a 2–6-cover classic preview."""
     if not feature_enabled("COLLECTION_COLLAGE_ENABLED", default=True):
         return None
     if not MIN_COLLAGE_ITEMS <= len(tracks) <= MAX_COLLAGE_ITEMS:
         return None
 
-    artwork_urls = [
-        track.thumbnail_url.strip()
-        for track in tracks
-        if track.thumbnail_url and _safe_source_url(track.thumbnail_url.strip())
-    ]
+    artwork_urls = list(
+        dict.fromkeys(
+            track.thumbnail_url.strip()
+            for track in tracks
+            if track.thumbnail_url and _safe_source_url(track.thumbnail_url.strip())
+        )
+    )
     if len(artwork_urls) < MIN_COLLAGE_ITEMS:
         return None
-    if len(set(artwork_urls)) < MIN_COLLAGE_ITEMS:
-        return None
-
     public_origin = _public_origin(base_url)
     secret = (signing_secret or os.getenv("BOT_TOKEN", "")).strip()
     if not public_origin or not secret:
@@ -159,11 +158,65 @@ def _layout_boxes(count: int, size: int, gap: int) -> list[tuple[int, int, int, 
             (middle + gap // 2, 0, size, middle - gap // 2),
             (middle + gap // 2, middle + gap // 2, size, size),
         ]
+    if count == 5:
+        return [
+            *_grid_row_boxes(
+                columns=3,
+                top=0,
+                bottom=middle - gap // 2,
+                size=size,
+                gap=gap,
+            ),
+            *_grid_row_boxes(
+                columns=2,
+                top=middle + gap // 2,
+                bottom=size,
+                size=size,
+                gap=gap,
+            ),
+        ]
+    if count == 6:
+        return [
+            *_grid_row_boxes(
+                columns=3,
+                top=0,
+                bottom=middle - gap // 2,
+                size=size,
+                gap=gap,
+            ),
+            *_grid_row_boxes(
+                columns=3,
+                top=middle + gap // 2,
+                bottom=size,
+                size=size,
+                gap=gap,
+            ),
+        ]
     return [
         (0, 0, middle - gap // 2, middle - gap // 2),
         (middle + gap // 2, 0, size, middle - gap // 2),
         (0, middle + gap // 2, middle - gap // 2, size),
         (middle + gap // 2, middle + gap // 2, size, size),
+    ]
+
+
+def _grid_row_boxes(
+    *,
+    columns: int,
+    top: int,
+    bottom: int,
+    size: int,
+    gap: int,
+) -> list[tuple[int, int, int, int]]:
+    available = size - gap * (columns - 1)
+    return [
+        (
+            (available * index) // columns + gap * index,
+            top,
+            (available * (index + 1)) // columns + gap * index,
+            bottom,
+        )
+        for index in range(columns)
     ]
 
 

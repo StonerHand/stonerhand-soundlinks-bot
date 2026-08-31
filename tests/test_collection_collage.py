@@ -24,7 +24,7 @@ def _image_bytes(color: tuple[int, int, int]) -> bytes:
 
 
 class CollectionCollageTests(unittest.TestCase):
-    def test_signed_preview_url_round_trips_two_to_four_covers(self) -> None:
+    def test_signed_preview_url_round_trips_two_to_six_covers(self) -> None:
         tracks = [
             TrackMatch(
                 title=str(index),
@@ -32,7 +32,7 @@ class CollectionCollageTests(unittest.TestCase):
                 links={},
                 thumbnail_url=f"https://images.example/{index}.jpg",
             )
-            for index in range(4)
+            for index in range(6)
         ]
 
         url = collection_collage_preview_url(
@@ -70,7 +70,7 @@ class CollectionCollageTests(unittest.TestCase):
                     + "?width=1200&height=1200"
                 ),
             )
-            for index in range(4)
+            for index in range(6)
         ]
 
         url = collection_collage_preview_url(
@@ -197,3 +197,36 @@ class CollectionCollageTests(unittest.TestCase):
         self.assertGreater(image.getpixel((100, 300))[0], 180)
         self.assertGreater(image.getpixel((450, 100))[1], 180)
         self.assertGreater(image.getpixel((450, 500))[2], 180)
+
+    def test_six_cover_layout_uses_every_tile_in_three_by_two_grid(self) -> None:
+        colors = [
+            (240, 20, 20),
+            (20, 240, 20),
+            (20, 20, 240),
+            (240, 240, 20),
+            (240, 20, 240),
+            (20, 240, 240),
+        ]
+
+        collage = compose_collection_collage(
+            [_image_bytes(color) for color in colors],
+            size=600,
+            gap=12,
+        )
+
+        self.assertIsNotNone(collage)
+        assert collage is not None
+        image = Image.open(io.BytesIO(collage))
+        samples = [
+            image.getpixel((100, 140)),
+            image.getpixel((300, 140)),
+            image.getpixel((500, 140)),
+            image.getpixel((100, 460)),
+            image.getpixel((300, 460)),
+            image.getpixel((500, 460)),
+        ]
+        for sample, expected in zip(samples, colors, strict=True):
+            self.assertLess(
+                sum(abs(a - b) for a, b in zip(sample, expected, strict=True)),
+                80,
+            )

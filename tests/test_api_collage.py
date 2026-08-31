@@ -70,4 +70,4 @@ class CollageApiTests(unittest.TestCase):
         payload = json.loads(target.wfile.getvalue())
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["service"], "collection-collage")
-        self.assertEqual(payload["layouts"], [2, 3, 4])
+        self.assertEqual(payload["layouts"], [2, 3, 4, 5, 6])

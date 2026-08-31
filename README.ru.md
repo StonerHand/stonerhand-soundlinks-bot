@@ -6,7 +6,7 @@
 
 [Открыть бота](https://t.me/StonerHandBot) · [Посмотреть канал](https://t.me/stonerhand) · [English](README.md)
 
-![Release](https://img.shields.io/badge/release-1.13.2-5b5bd6?style=flat-square)
+![Release](https://img.shields.io/badge/release-1.13.3-5b5bd6?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
@@ -122,9 +122,11 @@ UI-тексты хранятся в отдельном RU/EN-каталоге: �
 повторяется, служебный remaster-хвост не занимает место, короткие названия стоят
 попарно, а длинные получают отдельную строку. Превью сохраняет точный счётчик
 релизов, но не повторяет иконки, исполнителя и служебный remaster-хвост. Обычная
-карточка из 2–4 релизов получает коллаж из разных доступных обложек; при любой
+карточка из 2–6 релизов получает коллаж из разных доступных обложек; при любой
 ошибке остаётся надёжное превью с одной обложкой. Неполная подборка намеренно
 сохраняет одну обложку, чтобы не выглядеть законченной до обработки всех ссылок.
+Кнопка **Поделиться** передаёт всю подборку одним компактным запросом;
+обрезанный Telegram список сырых URL больше не публикуется как будто полный пост.
 
 Главный цвет получает универсальная кнопка Songlink/Odesli, а прямые площадки
 остаются спокойными быстрыми ссылками. Нативные экраны используют единый словарь

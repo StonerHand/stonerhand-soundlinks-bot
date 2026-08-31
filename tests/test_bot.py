@@ -1741,6 +1741,42 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(inline_query.answer_kwargs[0]["cache_time"], 0)
         self.assertTrue(inline_query.answer_kwargs[0]["is_personal"])
 
+    async def test_inline_truncated_url_list_is_never_published_as_partial(
+        self,
+    ) -> None:
+        from music_links_bot.bot_inline import inline_query_handler
+
+        urls = [
+            f"https://open.spotify.com/track/{index:022d}?si={'x' * 20}"
+            for index in range(6)
+        ]
+
+        class InlineQueryStub:
+            query = " ".join(urls)[:256]
+            from_user = None
+
+            def __init__(self) -> None:
+                self.answers: list[tuple[list, dict]] = []
+
+            async def answer(self, results, **kwargs) -> None:
+                self.answers.append((list(results), dict(kwargs)))
+
+        inline_query = InlineQueryStub()
+        update = type("InlineUpdateStub", (), {"inline_query": inline_query})()
+
+        with patch(
+            "music_links_bot.bot_inline._build_inline_collection_result",
+            AsyncMock(),
+        ) as build_result:
+            await inline_query_handler(update, ContextStub())
+
+        build_result.assert_not_awaited()
+        self.assertEqual(inline_query.answers[0][0], [])
+        self.assertEqual(
+            inline_query.answers[0][1]["button"].text,
+            "Список обрезан — поделись из подборки",
+        )
+
     async def test_inline_youtube_result_uses_video_card(self) -> None:
         result = await _build_inline_result(
             "https://www.youtube.com/watch?v=abc123",
@@ -2199,7 +2235,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("<blockquote>", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         labels = [button.text for row in keyboard for button in row]
-        self.assertEqual(labels, ["Открыть подборку", "Порядок"])
+        self.assertEqual(labels, ["Открыть подборку", "Порядок", "↗ Поделиться"])
+        share_query = keyboard[-1][0].switch_inline_query
+        self.assertEqual(len(parse_share_query(share_query or "") or []), 3)
 
     async def test_same_release_from_two_services_becomes_one_clean_card(self) -> None:
         class CrossServiceLookupClient:

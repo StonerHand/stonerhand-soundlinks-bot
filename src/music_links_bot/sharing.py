@@ -79,7 +79,9 @@ def track_share_url(track: TrackMatch) -> str | None:
 
 
 def build_share_query(urls: list[str]) -> str | None:
-    unique_urls = list(dict.fromkeys(cache_key_for_url(url) for url in urls if url))
+    if not urls or any(not str(url).strip() for url in urls):
+        return None
+    unique_urls = list(dict.fromkeys(cache_key_for_url(url) for url in urls))
     if not unique_urls or len(unique_urls) > MAX_SHARE_ITEMS:
         return None
 
@@ -92,6 +94,22 @@ def build_share_query(urls: list[str]) -> str | None:
 
     query = SHARE_QUERY_PREFIX + "|".join(tokens)
     return query if len(query) <= MAX_SHARE_QUERY_LENGTH else None
+
+
+def build_crate_share_query(items: list[dict[str, Any]]) -> str | None:
+    """Build one complete share query from durable collection entries."""
+    if not items:
+        return None
+    tracks: list[TrackMatch] = []
+    for entry in items:
+        item = entry.get("item") if isinstance(entry, dict) else None
+        if not isinstance(item, dict):
+            return None
+        try:
+            tracks.append(TrackMatch(**item))
+        except (TypeError, ValueError):
+            return None
+    return build_share_query([track_share_url(track) or "" for track in tracks])
 
 
 def parse_share_query(query: str) -> list[str] | None:

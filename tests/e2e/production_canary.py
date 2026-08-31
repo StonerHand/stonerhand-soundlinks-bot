@@ -63,7 +63,7 @@ def main() -> int:
             failures.append(f"collage status={status} ok={payload.get('ok')}")
         if payload.get("service") != "collection-collage":
             failures.append("collage service identity is invalid")
-        if payload.get("layouts") != [2, 3, 4]:
+        if payload.get("layouts") != [2, 3, 4, 5, 6]:
             failures.append("collage layouts are incomplete")
         if "application/json" not in content_type:
             failures.append("collage content-type is not JSON")

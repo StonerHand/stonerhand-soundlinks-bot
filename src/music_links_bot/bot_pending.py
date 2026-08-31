@@ -44,6 +44,7 @@ from music_links_bot.publish_queue import (
     QueueStorageError,
     add_job,
 )
+from music_links_bot.sharing import build_crate_share_query
 from music_links_bot.telegram_text import format_user_note_html, telegram_text_length
 from music_links_bot.url_utils import extract_supported_urls, strip_supported_urls
 
@@ -320,7 +321,12 @@ async def _restore_crate_screen(
 ) -> None:
     items = await load_crate(context.application.bot_data, user_id)
     title = await load_crate_title(context.application.bot_data, user_id)
-    text, keyboard = render_crate(items, lang=lang, title=title)
+    text, keyboard = render_crate(
+        items,
+        lang=lang,
+        title=title,
+        share_query=build_crate_share_query(items),
+    )
     text = f"<b>{escape(get_text(lang, saved_key))}</b>\n\n{text}"
     restored = await edit_pending_screen(
         context,

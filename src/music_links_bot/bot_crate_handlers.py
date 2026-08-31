@@ -22,6 +22,7 @@ from music_links_bot.formatter import format_collection_message
 from music_links_bot.i18n import get_text, resolve_lang
 from music_links_bot.keyboards import _build_collection_keyboard
 from music_links_bot.models import TrackMatch
+from music_links_bot.sharing import add_share_button, build_crate_share_query
 from music_links_bot.telegram_buttons import button as InlineKeyboardButton
 
 CRATE_UNDO_SECONDS = 15
@@ -36,7 +37,12 @@ async def crate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     lang = update_lang(update)
     items = await load_crate(context.application.bot_data, user_id)
     title = await load_crate_title(context.application.bot_data, user_id)
-    text, keyboard = render_crate(items, lang=lang, title=title)
+    text, keyboard = render_crate(
+        items,
+        lang=lang,
+        title=title,
+        share_query=build_crate_share_query(items),
+    )
     await message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
 
@@ -123,6 +129,7 @@ async def dispatch_crate_action(query, context, action: CallbackAction) -> None:
         selected_index=selected_index,
         can_undo=undo_record is not None,
         title=title,
+        share_query=build_crate_share_query(items),
     )
     await safe_edit(query, text, keyboard)
 
@@ -185,6 +192,11 @@ async def _show_preview(query, context, *, user_id: int, lang: str, title: str) 
     preview_keyboard = _build_collection_keyboard(
         tracks,
         include_channel_button=False,
+    )
+    preview_keyboard = add_share_button(
+        preview_keyboard,
+        share_query=build_crate_share_query(items),
+        label=get_text(lang, "share_post"),
     )
     keyboard = InlineKeyboardMarkup(
         [

@@ -57,6 +57,7 @@ from music_links_bot.search import (
     normalize_search_query,
 )
 from music_links_bot.sharing import (
+    MAX_SHARE_QUERY_LENGTH,
     add_share_button,
     build_share_query,
     make_channel_safe_keyboard,
@@ -100,6 +101,16 @@ async def inline_query_handler(
     channel_safe = getattr(inline_query, "chat_type", None) == "channel"
     shared_urls = parse_share_query(query_text)
     source_urls = extract_supported_urls(query_text)[:MAX_LINKS_PER_MESSAGE]
+    if (
+        shared_urls is None
+        and len(query_text) >= MAX_SHARE_QUERY_LENGTH
+        and len(source_urls) > 1
+    ):
+        await _answer_inline_hint(
+            inline_query,
+            get_text(lang, "inline_hint_collection_truncated"),
+        )
+        return
     is_direct_collection = shared_urls is None and len(source_urls) > 1
     collection_urls = (
         shared_urls

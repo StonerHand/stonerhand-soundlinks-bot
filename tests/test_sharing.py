@@ -9,6 +9,7 @@ from music_links_bot.models import TrackMatch
 from music_links_bot.sharing import (
     MAX_SHARE_QUERY_LENGTH,
     add_share_button,
+    build_crate_share_query,
     build_share_query,
     collection_result_title,
     collection_title,
@@ -40,6 +41,25 @@ class SharingTests(unittest.TestCase):
         self.assertEqual(collection_title("ru", 4), "Подборка · 4 релиза")
         self.assertEqual(collection_title("ru", 12), "Подборка · 12 релизов")
         self.assertEqual(collection_title("en", 2), "Collection · 2 releases")
+
+    def test_crate_share_query_keeps_every_release(self) -> None:
+        items = [
+            {
+                "item": {
+                    "title": f"Track {index}",
+                    "artist": "Artist",
+                    "links": {
+                        "spotify": f"https://open.spotify.com/track/{index:022d}"
+                    },
+                }
+            }
+            for index in range(6)
+        ]
+
+        query = build_crate_share_query(items)
+
+        self.assertIsNotNone(query)
+        self.assertEqual(len(parse_share_query(query or "") or []), 6)
 
     def test_partial_collection_title_shows_warning_and_progress(self) -> None:
         self.assertEqual(
@@ -164,7 +184,7 @@ class SharingTests(unittest.TestCase):
                 links={"spotify": f"https://open.spotify.com/track/{index}"},
                 thumbnail_url=f"https://images.example/{index}.jpg",
             )
-            for index in range(2)
+            for index in range(6)
         ]
         bundle = LookupBundle(
             tracks=tracks,
@@ -248,6 +268,14 @@ class SharingTests(unittest.TestCase):
                 [
                     "https://open.spotify.com/track/abc",
                     "https://example.com/not-supported",
+                ]
+            )
+        )
+        self.assertIsNone(
+            build_share_query(
+                [
+                    "https://open.spotify.com/track/abc",
+                    "",
                 ]
             )
         )

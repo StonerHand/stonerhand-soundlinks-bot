@@ -109,7 +109,7 @@ def _collage_health_payload() -> dict[str, object]:
     return {
         "ok": rendered is not None,
         "service": "collection-collage",
-        "layouts": [2, 3, 4],
+        "layouts": [2, 3, 4, 5, 6],
         "renderer": renderer,
         "max_artwork_bytes": MAX_ARTWORK_BYTES,
     }

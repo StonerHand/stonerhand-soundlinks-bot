@@ -2056,6 +2056,19 @@ async def _send_track_matches(
                     )
                 ],
             ]
+            if allow_share:
+                share_query = build_share_query(
+                    [track_share_url(track) or "" for track in tracks]
+                )
+                if share_query:
+                    rows.append(
+                        [
+                            InlineKeyboardButton(
+                                get_text(lang, "share_post"),
+                                switch_inline_query=share_query,
+                            )
+                        ]
+                    )
             collection_keyboard = InlineKeyboardMarkup(rows)
         else:
             collection_keyboard = _build_collection_keyboard(

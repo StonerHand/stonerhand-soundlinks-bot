@@ -976,6 +976,7 @@ def render_crate(
     can_undo: bool = False,
     confirm_clear: bool = False,
     title: str = "",
+    share_query: str | None = None,
 ) -> tuple[str, InlineKeyboardMarkup]:
     if confirm_clear:
         return get_text(lang, "crate_clear_confirm"), InlineKeyboardMarkup(
@@ -1089,6 +1090,15 @@ def render_crate(
                 ),
             ]
         )
+        if share_query:
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        get_text(lang, "share_post"),
+                        switch_inline_query=share_query,
+                    )
+                ]
+            )
     else:
         if can_undo:
             rows.append(

@@ -631,6 +631,10 @@
     "en": "🎧 Type an artist and track or paste a link",
     "ru": "🎧 Введи артиста и трек или вставь ссылку"
   },
+  "inline_hint_collection_truncated": {
+    "en": "The list was cut off — share it from the collection",
+    "ru": "Список обрезан — поделись из подборки"
+  },
   "inline_hint_not_found": {
     "en": "Nothing found — refine your query",
     "ru": "Ничего не найдено — измени запрос"
