@@ -2,6 +2,7 @@ import asyncio
 import os
 import sys
 import unittest
+from dataclasses import asdict
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -84,6 +85,7 @@ from music_links_bot.keyboards import (
     _should_include_channel_button,
     _should_include_hashtags,
 )
+from music_links_bot.lookup_models import LookupBundle, SourceStatus
 from music_links_bot.models import (
     ArtistMatch,
     PlaylistMatch,
@@ -1623,6 +1625,59 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             result.reply_markup.inline_keyboard[-1][0].switch_inline_query, query
         )
+
+    async def test_inline_collection_recovers_provider_failure_from_owner_crate(
+        self,
+    ) -> None:
+        urls = [f"https://open.spotify.com/track/{index:022d}" for index in range(4)]
+        tracks = [
+            TrackMatch(
+                title=f"Track {index}",
+                artist="Artist",
+                links={"spotify": url},
+            )
+            for index, url in enumerate(urls)
+        ]
+        partial = LookupBundle(
+            tracks=tracks[:3],
+            unavailable_urls=[urls[3]],
+            videos=[],
+            radios=[],
+            playlists=[],
+            artists=[],
+            statuses=[
+                SourceStatus(
+                    source_url=url,
+                    provider="songlink",
+                    state="success" if index < 3 else "unavailable",
+                    retryable=index == 3,
+                )
+                for index, url in enumerate(urls)
+            ],
+        )
+        context = ContextStub()
+        context.application.bot_data["bot_crates"] = {
+            77: [
+                {"draft_id": str(index), "item": asdict(track)}
+                for index, track in enumerate(tracks)
+            ]
+        }
+
+        with patch(
+            "music_links_bot.bot_inline.bot_lookup.resolve_sources",
+            AsyncMock(return_value=partial),
+        ):
+            result = await _build_inline_collection_result(
+                urls,
+                context,
+                lang="ru",
+                user_id=77,
+            )
+
+        self.assertIsNotNone(result)
+        assert result is not None
+        self.assertEqual(result.title, "Подборка · 4 релиза")
+        self.assertIn("Track 3", result.input_message_content.message_text)
 
     async def test_classic_inline_collection_uses_collage_link_preview(self) -> None:
         class DistinctArtworkClient:

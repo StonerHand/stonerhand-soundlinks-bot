@@ -16,6 +16,7 @@ from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
 from music_links_bot import bot_lookup
+from music_links_bot.bot_crate import load_crate
 from music_links_bot.constants import INLINE_EXAMPLE_QUERY, MAX_LINKS_PER_MESSAGE
 from music_links_bot.formatter import (
     build_auto_hashtags,
@@ -41,6 +42,8 @@ from music_links_bot.keyboards import (
     _build_youtube_keyboard,
     _select_preview_url,
 )
+from music_links_bot.lookup_models import LookupBundle, SourceStatus
+from music_links_bot.models import TrackMatch
 from music_links_bot.publication_contract import (
     RenderedPublication,
     require_valid_publication,
@@ -63,6 +66,7 @@ from music_links_bot.sharing import (
     make_channel_safe_keyboard,
     parse_share_query,
     render_inline_share_card,
+    track_share_url,
 )
 from music_links_bot.telegram_gateway import (
     feature_enabled,
@@ -71,6 +75,7 @@ from music_links_bot.telegram_gateway import (
 )
 from music_links_bot.telegram_media_cache import get_cached_file_id
 from music_links_bot.url_utils import (
+    cache_key_for_url,
     extract_supported_urls,
     is_direct_platform_url,
     is_nts_url,
@@ -127,6 +132,7 @@ async def inline_query_handler(
             lang=lang,
             is_direct=is_direct_collection,
             channel_safe=channel_safe,
+            user_id=user_id,
         )
         return
 
@@ -270,6 +276,7 @@ async def _answer_inline_collection(
     lang: str,
     is_direct: bool,
     channel_safe: bool,
+    user_id: int,
 ) -> None:
     if not source_urls:
         await _answer_inline_hint(
@@ -284,6 +291,7 @@ async def _answer_inline_collection(
             context,
             lang=lang,
             channel_safe=channel_safe,
+            user_id=user_id,
         )
     except Exception:
         LOGGER.exception("Inline collection lookup failed")
@@ -306,8 +314,12 @@ async def _answer_inline_collection(
     try:
         await inline_query.answer(
             [result],
-            cache_time=0 if (is_direct or channel_safe) else INLINE_CACHE_SECONDS,
-            is_personal=is_direct or channel_safe,
+            cache_time=(
+                0
+                if (is_direct or channel_safe or user_id > 0)
+                else INLINE_CACHE_SECONDS
+            ),
+            is_personal=is_direct or channel_safe or user_id > 0,
         )
         if _result_uses_rich(result):
             record_capability_success(RICH_MESSAGE_CAPABILITY)
@@ -324,15 +336,18 @@ async def _answer_inline_collection(
                 lang=lang,
                 channel_safe=channel_safe,
                 force_classic=True,
+                user_id=user_id,
             )
             if classic_result is not None:
                 try:
                     await inline_query.answer(
                         [classic_result],
                         cache_time=(
-                            0 if (is_direct or channel_safe) else INLINE_CACHE_SECONDS
+                            0
+                            if (is_direct or channel_safe or user_id > 0)
+                            else INLINE_CACHE_SECONDS
                         ),
-                        is_personal=is_direct or channel_safe,
+                        is_personal=is_direct or channel_safe or user_id > 0,
                     )
                     return
                 except TelegramError:
@@ -598,6 +613,7 @@ async def _build_inline_collection_result(
     lang: str,
     channel_safe: bool = False,
     force_classic: bool = False,
+    user_id: int = 0,
 ) -> InlineQueryResultArticle | None:
     if len(source_urls) == 1:
         return await _build_inline_result(
@@ -612,6 +628,13 @@ async def _build_inline_collection_result(
         context.application.bot_data,
         source_urls,
     )
+    if user_id > 0 and not bundle.is_complete_for(source_urls):
+        bundle = await _recover_collection_from_crate(
+            bundle,
+            source_urls,
+            bot_data=context.application.bot_data,
+            user_id=user_id,
+        )
     if bundle.item_count == 0:
         return None
 
@@ -636,6 +659,67 @@ async def _build_inline_collection_result(
         requested_count=card.publication.requested_count,
         source_urls=card.publication.source_urls,
     )
+
+
+async def _recover_collection_from_crate(
+    bundle: LookupBundle,
+    source_urls: list[str],
+    *,
+    bot_data: dict,
+    user_id: int,
+) -> LookupBundle:
+    """Recover transiently missing tracks from the owner's durable collection."""
+    items = await load_crate(bot_data, user_id)
+    crate_tracks: list[TrackMatch] = []
+    for entry in items:
+        item = entry.get("item") if isinstance(entry, dict) else None
+        if not isinstance(item, dict):
+            continue
+        try:
+            crate_tracks.append(TrackMatch(**item))
+        except (TypeError, ValueError):
+            continue
+
+    tracks_by_source: dict[str, TrackMatch] = {}
+    for track in [*bundle.tracks, *crate_tracks]:
+        source_url = track_share_url(track)
+        if source_url:
+            tracks_by_source.setdefault(cache_key_for_url(source_url), track)
+
+    source_keys = [cache_key_for_url(url) for url in source_urls]
+    ordered_tracks = [
+        tracks_by_source[key] for key in source_keys if key in tracks_by_source
+    ]
+    if len(ordered_tracks) <= len(bundle.tracks):
+        return bundle
+
+    statuses_by_source = {
+        cache_key_for_url(status.source_url): status for status in bundle.statuses
+    }
+    bundle.tracks = ordered_tracks
+    bundle.statuses = [
+        SourceStatus(
+            source_url=source_url,
+            provider=(
+                statuses_by_source[key].provider
+                if key in statuses_by_source
+                else "collection"
+            ),
+            state="success",
+            label=(
+                f"{tracks_by_source[key].artist} — {tracks_by_source[key].title}"
+                if key in tracks_by_source
+                else ""
+            ),
+        )
+        if key in tracks_by_source
+        else statuses_by_source[key]
+        for source_url, key in zip(source_urls, source_keys, strict=True)
+    ]
+    bundle.unavailable_urls = [
+        status.source_url for status in bundle.statuses if status.state == "unavailable"
+    ]
+    return bundle
 
 
 def _inline_article(
