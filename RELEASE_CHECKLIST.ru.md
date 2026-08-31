@@ -9,6 +9,8 @@
 - [ ] `/api/collage?health=1` возвращает JSON с layout `2`, `3` и `4`.
 - [ ] `/api/smoke` возвращает contract `3`: семь публикаций и десять UI/UX-экранов
       имеют `ok: true`.
+- [ ] `provider-canary` зелёный: живые Spotify, SoundCloud, YouTube, Apple Music
+      и NTS возвращают полные и не рекламные метаданные.
 - [ ] Версия в `pyproject.toml`, пакете и `CHANGELOG.md` совпадает.
 - [ ] В репозитории нет `.env`, токенов, временных файлов и удалённых компонентов.
 - [ ] В GitHub Actions настроены `VERCEL_TOKEN`, `VERCEL_ORG_ID` и

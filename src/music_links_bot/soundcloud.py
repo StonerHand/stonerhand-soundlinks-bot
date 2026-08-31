@@ -62,6 +62,13 @@ def parse_soundcloud_metadata(
     raw_title = str(payload.get("title") or "").strip()
     raw_author = str(payload.get("author_name") or "").strip()
     title, artist = _split_title_and_artist(raw_title, raw_author)
+    raw_thumbnail = payload.get("thumbnail_url")
+    thumbnail_url = (
+        raw_thumbnail.strip()
+        if isinstance(raw_thumbnail, str)
+        and raw_thumbnail.strip().startswith(("http://", "https://"))
+        else None
+    )
 
     return TrackMatch(
         title=title or "SoundCloud",
@@ -69,6 +76,7 @@ def parse_soundcloud_metadata(
         links={"soundcloud": source_url},
         page_url=None,
         kind=_soundcloud_release_kind(source_url),
+        thumbnail_url=thumbnail_url,
     )
 
 

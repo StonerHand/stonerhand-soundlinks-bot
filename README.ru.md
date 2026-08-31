@@ -6,7 +6,7 @@
 
 [Открыть бота](https://t.me/StonerHandBot) · [Посмотреть канал](https://t.me/stonerhand) · [English](README.md)
 
-![Release](https://img.shields.io/badge/release-1.13.1-5b5bd6?style=flat-square)
+![Release](https://img.shields.io/badge/release-1.13.2-5b5bd6?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
@@ -58,6 +58,8 @@ StonerHand — музыкальный редактор, который полн�
 - Работает inline: `@StonerHandBot артист — трек` в любой переписке.
 - Использует Rich Messages из Bot API 10.3 там, где они доступны, и без потери
   обложки, текста или ссылок возвращается к полной классической карточке.
+- Каждые шесть часов проверяет живые контракты Spotify, SoundCloud, YouTube,
+  Apple Music и NTS, чтобы автоматически замечать изменения внешних API и страниц.
 - Проверяет каждый готовый Classic, Rich, inline, channel, photo и audio пост
   единым релизным контрактом до обращения к Telegram.
 - Защищает главный экран и конструктор отдельным production UI/UX-контрактом:
@@ -225,7 +227,8 @@ python -m pytest -q
 CI дополнительно проверяет Python 3.10–3.12, зависимости, секреты,
 сгенерированные файлы, компиляцию и согласованность Vercel routes/builds/crons. Production canary
 подтверждает точный commit, сервис коллажей и полную матрицу публикации до
-решения о защищённом автоматическом rollback.
+решения о защищённом автоматическом rollback. Отдельный provider canary
+проверяет живые публичные контракты площадок, не связывая их сбои с откатом.
 
 </details>
 
@@ -234,7 +237,7 @@ CI дополнительно проверяет Python 3.10–3.12, завис�
 ```text
 api/                    Vercel webhook, health, smoke, collage и queue endpoints
 src/music_links_bot/    приложение, площадки, редактор и публикация
-tests/                  unit, contract, snapshot и production-canary тесты
+tests/                  unit, contract, snapshot, production и provider canary
 .github/                CI, обновление зависимостей и релизные проверки
 ```
 

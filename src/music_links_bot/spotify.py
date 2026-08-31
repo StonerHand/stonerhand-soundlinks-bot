@@ -14,6 +14,7 @@ from music_links_bot.release_hubs import canonical_release_hub_url
 from music_links_bot.url_utils import cache_key_for_url, spotify_url_type
 
 SPOTIFY_EMBED_BASE_URL = "https://open.spotify.com/embed"
+SPOTIFY_OEMBED_URL = "https://open.spotify.com/oembed"
 
 
 class SpotifyLookupError(RuntimeError):
@@ -118,13 +119,36 @@ class SpotifyClient:
 
         # Keep the legacy embed parser as a second independent source. Spotify
         # changes its rendered pages and embed state on different schedules.
+        embed_error: SpotifyLookupError | None = None
         try:
             response = await self._client.get(_spotify_embed_url(source_url, kind))
             response.raise_for_status()
             match = parse_spotify_embed(source_url, response.text)
         except (httpx.HTTPError, SpotifyLookupError) as exc:
+            embed_error = (
+                exc
+                if isinstance(exc, SpotifyLookupError)
+                else SpotifyLookupError("Spotify embed metadata is unavailable.")
+            )
+        else:
+            self._cache.set(cache_key, match)
+            return match
+
+        # Spotify's documented oEmbed API is the final existence check. It no
+        # longer includes artist names, but it reliably supplies the exact
+        # title and artwork and returns 404 for unavailable entities. Prefer an
+        # honest Spotify-only card over a false card built from the marketing
+        # shell served by open.spotify.com.
+        try:
+            response = await self._client.get(
+                SPOTIFY_OEMBED_URL,
+                params={"url": clean_url},
+            )
+            response.raise_for_status()
+            match = parse_spotify_oembed(source_url, response.json())
+        except (httpx.HTTPError, ValueError, SpotifyLookupError) as exc:
             raise SpotifyLookupError("Spotify metadata is unavailable.") from (
-                page_error or exc
+                page_error or embed_error or exc
             )
         self._cache.set(cache_key, match)
         return match
@@ -138,6 +162,17 @@ def parse_spotify_page(source_url: str, html: str) -> TrackMatch:
         raise SpotifyLookupError("Spotify returned invalid public metadata.") from exc
 
     title = clean_spotify_metadata_title(parser.first("og:title"))
+    kind = spotify_url_type(source_url) or "track"
+    page_type = parser.first("og:type").casefold()
+    expected_type = "music.album" if kind == "album" else "music.song"
+    # Spotify serves a generic marketing shell with HTTP 200 for unavailable
+    # or region-blocked releases. Its og:title/description look complete
+    # enough to become a convincing but entirely false music card. Require
+    # release-specific Open Graph metadata and let the independent embed
+    # parser decide whether the URL can still be recovered.
+    if page_type != expected_type:
+        raise SpotifyLookupError("Spotify returned a generic public page.")
+
     artists = [
         value.strip()
         for value in parser.values.get("music:musician_description", ())
@@ -156,8 +191,6 @@ def parse_spotify_page(source_url: str, html: str) -> TrackMatch:
     if not title or not artist:
         raise SpotifyLookupError("Spotify title or artist is missing.")
 
-    kind = spotify_url_type(source_url) or "track"
-    page_type = parser.first("og:type").casefold()
     normalized_kind = (
         "album" if kind == "album" or page_type == "music.album" else "song"
     )
@@ -219,6 +252,48 @@ def parse_spotify_embed(source_url: str, html: str) -> TrackMatch:
         kind=normalized_kind,
         release_format="album" if normalized_kind == "album" else None,
         thumbnail_url=_spotify_thumbnail(entity),
+    )
+
+
+def parse_spotify_oembed(
+    source_url: str,
+    payload: object,
+) -> TrackMatch:
+    """Build an honest minimal card from Spotify's documented oEmbed API."""
+    if not isinstance(payload, Mapping):
+        raise SpotifyLookupError("Spotify returned invalid oEmbed metadata.")
+    if str(payload.get("provider_name") or "").casefold() != "spotify":
+        raise SpotifyLookupError("Spotify oEmbed provider is invalid.")
+
+    title = clean_spotify_metadata_title(payload.get("title"))
+    if not title or title.casefold() in {"spotify", "listening is everything"}:
+        raise SpotifyLookupError("Spotify oEmbed title is missing.")
+    thumbnail = payload.get("thumbnail_url")
+    thumbnail_url = (
+        thumbnail.strip()
+        if isinstance(thumbnail, str)
+        and thumbnail.strip().startswith(("http://", "https://"))
+        else None
+    )
+    if thumbnail_url is None:
+        raise SpotifyLookupError("Spotify oEmbed artwork is missing.")
+
+    kind = spotify_url_type(source_url) or "track"
+    normalized_kind = "album" if kind == "album" else "song"
+    clean_url = cache_key_for_url(source_url)
+    return TrackMatch(
+        title=title,
+        # The current oEmbed schema deliberately exposes no artist field.
+        # Keep the provider label explicit instead of guessing from search.
+        artist="Spotify",
+        links={"spotify": clean_url},
+        page_url=canonical_release_hub_url(
+            clean_url,
+            release_kind=normalized_kind,
+        ),
+        kind=normalized_kind,
+        release_format="album" if normalized_kind == "album" else None,
+        thumbnail_url=thumbnail_url,
     )
 
 

@@ -88,6 +88,17 @@ class ReleaseReadinessTests(unittest.TestCase):
         self.assertIn('fetch("/api/smoke")', canary)
         self.assertIn('"publication-release-smoke"', canary)
 
+    def test_public_provider_contracts_have_a_scheduled_canary(self) -> None:
+        workflow = (ROOT / ".github/workflows/provider-canary.yml").read_text(
+            encoding="utf-8"
+        )
+        script = (ROOT / "tests/e2e/provider_canary.py").read_text(encoding="utf-8")
+
+        self.assertIn('cron: "17 */6 * * *"', workflow)
+        self.assertIn("python tests/e2e/provider_canary.py", workflow)
+        for provider in ("Spotify", "SoundCloud", "YouTube", "Apple Music", "NTS"):
+            self.assertIn(provider, script)
+
 
 if __name__ == "__main__":
     unittest.main()

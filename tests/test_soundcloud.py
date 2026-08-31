@@ -17,6 +17,7 @@ class SoundCloudTests(unittest.TestCase):
             {
                 "title": "Star Signs by Bondage Fairies",
                 "author_name": "Bondage Fairies",
+                "thumbnail_url": "https://i1.sndcdn.com/artworks/cover.jpg",
             },
         )
 
@@ -26,6 +27,22 @@ class SoundCloudTests(unittest.TestCase):
             track.links,
             {"soundcloud": "https://soundcloud.com/bondage-fairies/star-signs"},
         )
+        self.assertEqual(
+            track.thumbnail_url,
+            "https://i1.sndcdn.com/artworks/cover.jpg",
+        )
+
+    def test_parse_soundcloud_metadata_rejects_non_http_artwork(self) -> None:
+        track = parse_soundcloud_metadata(
+            "https://soundcloud.com/youth-code/transitions",
+            {
+                "title": "Transitions by Youth Code",
+                "author_name": "Youth Code",
+                "thumbnail_url": "javascript:alert(1)",
+            },
+        )
+
+        self.assertIsNone(track.thumbnail_url)
 
     def test_parse_soundcloud_metadata_can_guess_artist_from_title(self) -> None:
         track = parse_soundcloud_metadata(

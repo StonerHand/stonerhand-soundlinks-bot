@@ -6,7 +6,7 @@
 
 [Open the bot](https://t.me/StonerHandBot) · [See the channel](https://t.me/stonerhand) · [Русская версия](README.ru.md)
 
-![Release](https://img.shields.io/badge/release-1.13.1-5b5bd6?style=flat-square)
+![Release](https://img.shields.io/badge/release-1.13.2-5b5bd6?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
@@ -58,6 +58,8 @@ is omitted instead of guessed.
 - Works inline with `@StonerHandBot artist — track` in any conversation.
 - Uses Bot API 10.3 Rich Messages when supported and falls back to a complete
   classic card without losing artwork, text or platform links.
+- Verifies Spotify, SoundCloud, YouTube, Apple Music and NTS public contracts
+  every six hours, so upstream API or page drift is detected automatically.
 - Validates every finished Classic, Rich, inline, channel, photo and audio post
   through one release contract before Telegram receives it.
 - Guards the home screen and editor with a production UI/UX contract: one
@@ -222,7 +224,8 @@ python -m pytest -q
 CI also checks Python 3.10–3.12, dependency pins, secrets, generated files, compilation and the
 Vercel route/build/cron contract. A production canary verifies the exact commit,
 the collection-artwork service and the complete publication smoke matrix before
-it allows the guarded automatic rollback decision.
+it allows the guarded automatic rollback decision. A separate provider canary
+checks live public music-provider contracts without coupling their outages to rollback.
 
 </details>
 
@@ -231,7 +234,7 @@ it allows the guarded automatic rollback decision.
 ```text
 api/                    Vercel webhook, health, smoke, collage and queue endpoints
 src/music_links_bot/    application, providers, editor and publishing pipeline
-tests/                  unit, contract, snapshot and production-canary tests
+tests/                  unit, contract, snapshot, production and provider canaries
 .github/                CI, dependency updates and guarded release checks
 ```
 

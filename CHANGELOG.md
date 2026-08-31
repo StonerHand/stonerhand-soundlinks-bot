@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 1.13.2 — 2026-08-31
+
+- Заблокированы ложные Spotify-карточки из общей маркетинговой страницы
+  `Listening is everything`: публичная страница теперь обязана содержать точный
+  Open Graph-тип релиза, а официальный Spotify oEmbed служит финальной проверкой
+  существования, названия и обложки.
+- SoundCloud oEmbed теперь сохраняет безопасную HTTP(S)-обложку, поэтому прямой
+  SoundCloud-релиз не теряет изображение в Classic и Rich-публикациях.
+- Добавлен независимый scheduled canary живых контрактов Spotify, SoundCloud,
+  YouTube, Apple Music и NTS. Он запускается каждые шесть часов и не инициирует
+  откат production при локальном сбое внешнего провайдера.
+- Добавлены регрессии для удалённого Spotify-альбома, изменившейся HTML-разметки,
+  oEmbed-фолбэка и небезопасного SoundCloud artwork URL.
+
 ## 1.13.1 — 2026-08-30
 
 - Fixed the first-run `Deftones — Rickets` example and every equivalent text
