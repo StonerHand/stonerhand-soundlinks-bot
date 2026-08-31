@@ -1685,7 +1685,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(inline_query.answer_kwargs[0]["cache_time"], 1800)
         self.assertFalse(inline_query.answer_kwargs[0]["is_personal"])
 
-    async def test_partial_inline_collection_is_never_cached(self) -> None:
+    async def test_partial_inline_collection_is_never_selectable(self) -> None:
         from music_links_bot.bot_inline import inline_query_handler
 
         class InlineQueryStub:
@@ -1693,9 +1693,11 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
             from_user = None
 
             def __init__(self) -> None:
+                self.answers: list[list] = []
                 self.answer_kwargs: list[dict] = []
 
-            async def answer(self, _results, **kwargs) -> None:
+            async def answer(self, results, **kwargs) -> None:
+                self.answers.append(list(results))
                 self.answer_kwargs.append(dict(kwargs))
 
         inline_query = InlineQueryStub()
@@ -1708,8 +1710,12 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         ):
             await inline_query_handler(update, ContextStub())
 
-        self.assertEqual(inline_query.answer_kwargs[0]["cache_time"], 0)
-        self.assertTrue(inline_query.answer_kwargs[0]["is_personal"])
+        self.assertEqual(inline_query.answers, [[]])
+        self.assertEqual(inline_query.answer_kwargs[0]["cache_time"], 10)
+        self.assertEqual(
+            inline_query.answer_kwargs[0]["button"].text,
+            "Не все ссылки обработаны — вернись в подборку",
+        )
 
     async def test_inline_direct_urls_return_one_collection_card(self) -> None:
         from music_links_bot.bot_inline import inline_query_handler

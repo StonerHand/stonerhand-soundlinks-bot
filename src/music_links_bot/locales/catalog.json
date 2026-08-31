@@ -635,6 +635,10 @@
     "en": "The list was cut off — share it from the collection",
     "ru": "Список обрезан — поделись из подборки"
   },
+  "inline_hint_collection_incomplete": {
+    "en": "Not every link resolved — return to the collection",
+    "ru": "Не все ссылки обработаны — вернись в подборку"
+  },
   "inline_hint_not_found": {
     "en": "Nothing found — refine your query",
     "ru": "Ничего не найдено — измени запрос"

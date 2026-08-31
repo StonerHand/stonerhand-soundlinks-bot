@@ -297,13 +297,17 @@ async def _answer_inline_collection(
         return
 
     partial = result.title.startswith("⚠️")
+    if partial:
+        await _answer_inline_hint(
+            inline_query,
+            get_text(lang, "inline_hint_collection_incomplete"),
+        )
+        return
     try:
         await inline_query.answer(
             [result],
-            cache_time=(
-                0 if (is_direct or channel_safe or partial) else INLINE_CACHE_SECONDS
-            ),
-            is_personal=is_direct or channel_safe or partial,
+            cache_time=0 if (is_direct or channel_safe) else INLINE_CACHE_SECONDS,
+            is_personal=is_direct or channel_safe,
         )
         if _result_uses_rich(result):
             record_capability_success(RICH_MESSAGE_CAPABILITY)
@@ -326,11 +330,9 @@ async def _answer_inline_collection(
                     await inline_query.answer(
                         [classic_result],
                         cache_time=(
-                            0
-                            if (is_direct or channel_safe or partial)
-                            else INLINE_CACHE_SECONDS
+                            0 if (is_direct or channel_safe) else INLINE_CACHE_SECONDS
                         ),
-                        is_personal=is_direct or channel_safe or partial,
+                        is_personal=is_direct or channel_safe,
                     )
                     return
                 except TelegramError:
