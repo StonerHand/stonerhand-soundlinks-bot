@@ -60,7 +60,6 @@ from music_links_bot.search import (
     normalize_search_query,
 )
 from music_links_bot.sharing import (
-    MAX_SHARE_QUERY_LENGTH,
     add_share_button,
     build_share_query,
     make_channel_safe_keyboard,
@@ -87,6 +86,7 @@ from music_links_bot.url_utils import (
 LOGGER = logging.getLogger(__name__)
 INLINE_CACHE_SECONDS = 1800
 INLINE_COLLECTION_RESULT_VERSION = "v3"
+INLINE_TRUNCATION_GUARD_LENGTH = 240
 
 
 async def inline_query_handler(
@@ -106,9 +106,25 @@ async def inline_query_handler(
     channel_safe = getattr(inline_query, "chat_type", None) == "channel"
     shared_urls = parse_share_query(query_text)
     source_urls = extract_supported_urls(query_text)[:MAX_LINKS_PER_MESSAGE]
+    recovered_collection = False
     if (
         shared_urls is None
-        and len(query_text) >= MAX_SHARE_QUERY_LENGTH
+        and len(query_text) >= INLINE_TRUNCATION_GUARD_LENGTH
+        and len(source_urls) > 1
+    ):
+        recovered_urls = await _recover_recent_collection_urls(
+            context,
+            user_id=user_id,
+            visible_urls=source_urls,
+            lang=lang,
+        )
+        if recovered_urls:
+            source_urls = recovered_urls
+            recovered_collection = True
+    if (
+        shared_urls is None
+        and not recovered_collection
+        and len(query_text) >= INLINE_TRUNCATION_GUARD_LENGTH
         and len(source_urls) > 1
     ):
         await _answer_inline_hint(
@@ -266,6 +282,56 @@ async def inline_query_handler(
                 except TelegramError:
                     pass
         LOGGER.debug("Could not answer inline query", exc_info=True)
+
+
+async def _recover_recent_collection_urls(
+    context: ContextTypes.DEFAULT_TYPE,
+    *,
+    user_id: int,
+    visible_urls: list[str],
+    lang: str,
+) -> list[str]:
+    """Restore a Telegram-truncated inline list from the user's last lookup.
+
+    Official clients can keep more text in the composer than the Bot API's
+    256-character InlineQuery field carries. A private lookup already stores
+    the original input in the owner's durable session, so an exact ordered
+    prefix can be expanded without guessing or mixing in another collection.
+    """
+    if user_id <= 0 or len(visible_urls) < 2:
+        return []
+    runtime = context.application.bot_data.get("runtime")
+    get_session = getattr(runtime, "get_session", None)
+    if not callable(get_session):
+        return []
+    try:
+        session = await get_session(user_id, lang=lang)
+    except Exception:
+        LOGGER.debug("Could not load the inline owner's recent lookup", exc_info=True)
+        return []
+
+    last_action = getattr(session, "last_action", None)
+    if not isinstance(last_action, dict) or last_action.get("kind") != "resolve":
+        return []
+    remembered_urls = extract_supported_urls(str(last_action.get("value") or ""))[
+        :MAX_LINKS_PER_MESSAGE
+    ]
+    if len(remembered_urls) <= len(visible_urls):
+        return []
+
+    for index, visible_url in enumerate(visible_urls):
+        if index >= len(remembered_urls):
+            return []
+        visible_key = cache_key_for_url(visible_url)
+        remembered_key = cache_key_for_url(remembered_urls[index])
+        if visible_key == remembered_key:
+            continue
+        # Telegram commonly cuts the final URL in the middle of its provider
+        # identifier. Only the final visible item may use a strict prefix.
+        if index == len(visible_urls) - 1 and remembered_key.startswith(visible_key):
+            continue
+        return []
+    return remembered_urls
 
 
 async def _answer_inline_collection(

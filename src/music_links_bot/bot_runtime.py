@@ -28,6 +28,7 @@ RATE_LIMIT_MAX_REQUESTS = 12
 ACTIVE_REQUEST_TTL_SECONDS = 5 * 60
 SESSION_TTL_SECONDS = 30 * 24 * 3600
 SESSION_SCHEMA_VERSION = 5
+MAX_SESSION_TEXT_LENGTH = 2_048
 MAX_MEMORY_SESSIONS = 500
 MAX_MEMORY_KEYS = 2_000
 CIRCUIT_FAILURE_THRESHOLD = 3
@@ -108,7 +109,9 @@ class UserSession:
                 lang=str(payload.get("lang") or "ru"),
                 onboarding_seen=bool(payload.get("onboarding_seen")),
                 welcome_seen=bool(payload.get("welcome_seen")),
-                last_query=str(payload.get("last_query") or "")[:500],
+                last_query=str(payload.get("last_query") or "")[
+                    :MAX_SESSION_TEXT_LENGTH
+                ],
                 last_action=(
                     dict(payload["last_action"])
                     if isinstance(payload.get("last_action"), dict)
@@ -286,9 +289,12 @@ class BotRuntime:
         self, user_id: int, *, kind: str, value: str, lang: str = "ru"
     ) -> None:
         session = await self.get_session(user_id, lang=lang)
-        session.last_action = {"kind": kind, "value": value[:500]}
+        session.last_action = {
+            "kind": kind,
+            "value": value[:MAX_SESSION_TEXT_LENGTH],
+        }
         if kind == "search":
-            session.last_query = value[:500]
+            session.last_query = value[:MAX_SESSION_TEXT_LENGTH]
         await self.save_session(session)
 
     async def claim_callback(self, callback_id: str) -> bool:

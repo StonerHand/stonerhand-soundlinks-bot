@@ -632,8 +632,8 @@
     "ru": "🎧 Введи артиста и трек или вставь ссылку"
   },
   "inline_hint_collection_truncated": {
-    "en": "The list was cut off — share it from the collection",
-    "ru": "Список обрезан — поделись из подборки"
+    "en": "Telegram cut the list — open the bot and tap Share",
+    "ru": "Telegram обрезал список — открой бота и нажми «Поделиться»"
   },
   "inline_hint_collection_incomplete": {
     "en": "Not every link resolved — return to the collection",

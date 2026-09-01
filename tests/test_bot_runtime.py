@@ -242,6 +242,21 @@ class RuntimeSafetyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(session.last_query, "Youth Code")
         self.assertEqual(session.last_action["kind"], "search")
 
+    async def test_session_preserves_ten_link_collection_for_inline_recovery(
+        self,
+    ) -> None:
+        runtime = BotRuntime()
+        value = "\n".join(
+            f"https://open.spotify.com/track/{index:022d}?si={'x' * 20}"
+            for index in range(10)
+        )
+
+        await runtime.remember_action(7, kind="resolve", value=value, lang="ru")
+
+        session = await runtime.get_session(7)
+        self.assertGreater(len(value), 500)
+        self.assertEqual(session.last_action["value"], value)
+
     async def test_provider_diagnostics_expose_latest_state(self) -> None:
         runtime = BotRuntime()
         runtime.record_provider(
