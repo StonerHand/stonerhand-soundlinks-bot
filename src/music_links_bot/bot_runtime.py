@@ -9,11 +9,17 @@ from math import ceil
 from time import monotonic, time
 from typing import Any
 
+from music_links_bot.constants import MAX_LINKS_PER_MESSAGE
 from music_links_bot.errors import (
     BotErrorCode as _BotErrorCode,
     BotFlowError as _BotFlowError,
 )
 from music_links_bot.kvstore import KVStore
+from music_links_bot.url_utils import (
+    cache_key_for_url,
+    is_direct_platform_url,
+    is_supported_music_url,
+)
 
 # Backwards-compatible exports for existing imports and callbacks.
 BotErrorCode = _BotErrorCode
@@ -27,7 +33,8 @@ RATE_LIMIT_WINDOW_SECONDS = 60
 RATE_LIMIT_MAX_REQUESTS = 12
 ACTIVE_REQUEST_TTL_SECONDS = 5 * 60
 SESSION_TTL_SECONDS = 30 * 24 * 3600
-SESSION_SCHEMA_VERSION = 5
+SESSION_SCHEMA_VERSION = 6
+COLLECTION_STATE_VERSION = 1
 MAX_SESSION_TEXT_LENGTH = 2_048
 MAX_MEMORY_SESSIONS = 500
 MAX_MEMORY_KEYS = 2_000
@@ -86,6 +93,27 @@ def decode_callback(value: str | None) -> CallbackAction | None:
     return None
 
 
+def _normalize_collection_urls(value: object) -> list[str]:
+    if not isinstance(value, (list, tuple)):
+        return []
+    urls: list[str] = []
+    seen: set[str] = set()
+    for raw_url in value[:MAX_LINKS_PER_MESSAGE]:
+        if not isinstance(raw_url, str):
+            continue
+        url = cache_key_for_url(raw_url.strip())
+        if (
+            not url
+            or url in seen
+            or not is_supported_music_url(url)
+            or not is_direct_platform_url(url)
+        ):
+            continue
+        urls.append(url)
+        seen.add(url)
+    return urls
+
+
 @dataclass(slots=True)
 class UserSession:
     user_id: int
@@ -94,6 +122,7 @@ class UserSession:
     welcome_seen: bool = False
     last_query: str = ""
     last_action: dict[str, Any] = field(default_factory=dict)
+    last_collection_urls: list[str] = field(default_factory=list)
     pending_input: dict[str, Any] = field(default_factory=dict)
     active_draft_id: str = ""
     recent_draft_ids: list[str] = field(default_factory=list)
@@ -116,6 +145,9 @@ class UserSession:
                     dict(payload["last_action"])
                     if isinstance(payload.get("last_action"), dict)
                     else {}
+                ),
+                last_collection_urls=_normalize_collection_urls(
+                    payload.get("last_collection_urls")
                 ),
                 pending_input=_normalize_pending_input(payload.get("pending_input")),
                 active_draft_id=str(payload.get("active_draft_id") or "")[:32],
@@ -296,6 +328,43 @@ class BotRuntime:
         if kind == "search":
             session.last_query = value[:MAX_SESSION_TEXT_LENGTH]
         await self.save_session(session)
+
+    async def remember_collection(
+        self,
+        user_id: int,
+        *,
+        urls: list[str],
+        lang: str = "ru",
+    ) -> None:
+        """Persist the latest complete collection independently of UI actions."""
+        normalized = _normalize_collection_urls(urls)
+        if len(normalized) < 2:
+            return
+        session = await self.get_session(user_id, lang=lang)
+        session.last_collection_urls = normalized
+        await self.save_session(session)
+        if self.kv is not None:
+            await self.kv.set_json(
+                f"collection:v1:{user_id}",
+                {"v": COLLECTION_STATE_VERSION, "urls": normalized},
+                ttl_seconds=SESSION_TTL_SECONDS,
+            )
+
+    async def get_collection(
+        self,
+        user_id: int,
+        *,
+        lang: str = "ru",
+    ) -> list[str]:
+        """Load the latest complete collection without session write races."""
+        if self.kv is not None:
+            payload = await self.kv.get_json(f"collection:v1:{user_id}")
+            if isinstance(payload, dict):
+                urls = _normalize_collection_urls(payload.get("urls"))
+                if len(urls) >= 2:
+                    return urls
+        session = await self.get_session(user_id, lang=lang)
+        return list(session.last_collection_urls)
 
     async def claim_callback(self, callback_id: str) -> bool:
         key = f"callback:v2:{callback_id}"
@@ -489,6 +558,7 @@ class BotRuntime:
             await asyncio.gather(
                 self.kv.delete(f"session:v2:{user_id}"),
                 self.kv.delete(f"session:v1:{user_id}"),
+                self.kv.delete(f"collection:v1:{user_id}"),
                 self.kv.delete(f"rate:v1:{user_id}:{wall_window}"),
                 self.kv.delete(f"rate:v1:{user_id}:{wall_window - 1}"),
                 self.kv.delete(f"active-request:v1:{user_id}"),

@@ -161,6 +161,30 @@ class RichPublicationModelTests(unittest.TestCase):
         self.assertIn('type="callback_data" style="link"', result)
         self.assertIn('data="v2|menu|start"', result)
 
+    def test_rich_keyboard_drops_invalid_actions_instead_of_truncating(self) -> None:
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        "Слишком длинный запрос",
+                        switch_inline_query="x" * 257,
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        "Слишком длинный callback",
+                        callback_data="я" * 33,
+                    )
+                ],
+            ]
+        )
+
+        result = rich_button_rows_html(keyboard)
+
+        self.assertNotIn("Слишком длинный запрос", result)
+        self.assertNotIn("Слишком длинный callback", result)
+        self.assertNotIn("x" * 256, result)
+
     def test_default_longread_does_not_repeat_release_metadata(self) -> None:
         self.assertEqual(
             default_longread(_track()),

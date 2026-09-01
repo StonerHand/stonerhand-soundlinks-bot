@@ -1894,6 +1894,99 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(inline_query.answers[0][0], [complete])
         self.assertTrue(inline_query.answers[0][1]["is_personal"])
 
+    async def test_inline_collection_recovery_survives_a_later_user_action(
+        self,
+    ) -> None:
+        from music_links_bot.bot_inline import inline_query_handler
+        from music_links_bot.bot_runtime import BotRuntime
+
+        urls = [
+            "https://open.spotify.com/track/4x53Xb3mAbSOzAq1h9YbuU?si=first",
+            "https://open.spotify.com/track/0WC0jiILJRkb6P041h4jiU?si=second",
+            "https://open.spotify.com/track/3pCoUI2da3hhMQUqZLYlir?si=third",
+            "https://open.spotify.com/track/5Cj1UNdBWSuDyFjiF19mLa4?si=fourth",
+            "https://open.spotify.com/track/1yLW4FiuCJG69WPNpz4bl9?si=fifth",
+            "https://open.spotify.com/track/7eiC7fCOH73X1lpeFuulef?si=sixth",
+        ]
+        expected = [url.split("?", 1)[0] for url in urls]
+        runtime = BotRuntime()
+        await runtime.remember_collection(77, urls=urls, lang="ru")
+        await runtime.remember_action(
+            77,
+            kind="search",
+            value="unrelated later action",
+            lang="ru",
+        )
+        context = ContextStub()
+        context.application.bot_data["runtime"] = runtime
+
+        class InlineQueryStub:
+            query = " ".join(urls)[:255]
+            from_user = type(
+                "InlineUserStub",
+                (),
+                {"id": 77, "language_code": "ru"},
+            )()
+
+            def __init__(self) -> None:
+                self.answers: list[tuple[list, dict]] = []
+
+            async def answer(self, results, **kwargs) -> None:
+                self.answers.append((list(results), dict(kwargs)))
+
+        complete = type("InlineResult", (), {"title": "Подборка · 6 релизов"})()
+        inline_query = InlineQueryStub()
+        update = type("InlineUpdateStub", (), {"inline_query": inline_query})()
+
+        with patch(
+            "music_links_bot.bot_inline._build_inline_collection_result",
+            AsyncMock(return_value=complete),
+        ) as build_result:
+            await inline_query_handler(update, context)
+
+        self.assertEqual(build_result.await_args.args[0], expected)
+        self.assertEqual(inline_query.answers[0][0], [complete])
+
+    async def test_inline_collection_recovery_never_uses_another_users_state(
+        self,
+    ) -> None:
+        from music_links_bot.bot_inline import inline_query_handler
+        from music_links_bot.bot_runtime import BotRuntime
+
+        urls = [
+            f"https://open.spotify.com/track/{index:022d}?si={'x' * 20}"
+            for index in range(6)
+        ]
+        runtime = BotRuntime()
+        await runtime.remember_collection(77, urls=urls, lang="ru")
+        context = ContextStub()
+        context.application.bot_data["runtime"] = runtime
+
+        class InlineQueryStub:
+            query = " ".join(urls)[:255]
+            from_user = type(
+                "InlineUserStub",
+                (),
+                {"id": 78, "language_code": "ru"},
+            )()
+
+            def __init__(self) -> None:
+                self.answers: list[tuple[list, dict]] = []
+
+            async def answer(self, results, **kwargs) -> None:
+                self.answers.append((list(results), dict(kwargs)))
+
+        inline_query = InlineQueryStub()
+        update = type("InlineUpdateStub", (), {"inline_query": inline_query})()
+        with patch(
+            "music_links_bot.bot_inline._build_inline_collection_result",
+            AsyncMock(),
+        ) as build_result:
+            await inline_query_handler(update, context)
+
+        build_result.assert_not_awaited()
+        self.assertEqual(inline_query.answers[0][0], [])
+
     async def test_inline_youtube_result_uses_video_card(self) -> None:
         result = await _build_inline_result(
             "https://www.youtube.com/watch?v=abc123",

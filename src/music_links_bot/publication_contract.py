@@ -17,6 +17,7 @@ MAX_INLINE_BUTTONS = 100
 MAX_INLINE_BUTTONS_PER_ROW = 8
 MAX_BUTTON_TEXT_LENGTH = 64
 MAX_CALLBACK_DATA_BYTES = 64
+MAX_INLINE_QUERY_LENGTH = 256
 _CAPTION_MODES = frozenset({"audio", "photo"})
 _UNIVERSAL_LABEL_MARKERS = (
     "all platforms",
@@ -184,6 +185,22 @@ def _keyboard_issues(
                 1 <= len(str(callback_data).encode("utf-8")) <= MAX_CALLBACK_DATA_BYTES
             ):
                 issues.append(ContractIssue("invalid_callback_data", location))
+
+            for field in (
+                "switch_inline_query",
+                "switch_inline_query_current_chat",
+                "switch_inline_query_chosen_chat",
+            ):
+                query = getattr(button, field, None)
+                if query is None:
+                    continue
+                query_text = str(query)
+                if len(query_text) > MAX_INLINE_QUERY_LENGTH:
+                    issues.append(ContractIssue("invalid_inline_query", location))
+                if len(extract_supported_urls(query_text)) > 1:
+                    issues.append(
+                        ContractIssue("raw_collection_inline_query", location)
+                    )
 
             url = getattr(button, "url", None)
             if url:

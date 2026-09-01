@@ -27,6 +27,9 @@ class KVStub:
         self.values[key] = value
         return True
 
+    async def delete(self, key: str) -> None:
+        self.values.pop(key, None)
+
 
 class StateMigrationTests(unittest.IsolatedAsyncioTestCase):
     async def test_session_versions_are_loaded_in_one_batch_when_supported(
@@ -60,6 +63,73 @@ class StateMigrationTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(session.last_query, "Sleep")
         self.assertTrue(any(key == "session:v2:7" for key, _ in kv.writes))
+
+    async def test_latest_complete_collection_survives_runtime_restart(self) -> None:
+        kv = KVStub({})
+        urls = [
+            "https://open.spotify.com/track/first?si=tracking",
+            "https://open.spotify.com/track/second?si=tracking",
+        ]
+        first_runtime = BotRuntime(kv)
+        await first_runtime.remember_collection(7, urls=urls, lang="ru")
+
+        second_runtime = BotRuntime(kv)
+        session = await second_runtime.get_session(7)
+
+        self.assertEqual(
+            session.last_collection_urls,
+            [
+                "https://open.spotify.com/track/first",
+                "https://open.spotify.com/track/second",
+            ],
+        )
+
+    async def test_stale_runtime_cannot_erase_durable_collection_state(self) -> None:
+        kv = KVStub({})
+        stale_runtime = BotRuntime(kv)
+        await stale_runtime.get_session(7)
+
+        writer_runtime = BotRuntime(kv)
+        urls = [
+            "https://open.spotify.com/track/first?si=tracking",
+            "https://open.spotify.com/track/second?si=tracking",
+        ]
+        await writer_runtime.remember_collection(7, urls=urls, lang="ru")
+
+        # This instance cached the session before the collection existed. Its
+        # later action must not erase the independent complete snapshot.
+        await stale_runtime.remember_action(
+            7,
+            kind="search",
+            value="later action from a stale worker",
+            lang="ru",
+        )
+
+        reader_runtime = BotRuntime(kv)
+        self.assertEqual(
+            await reader_runtime.get_collection(7, lang="ru"),
+            [
+                "https://open.spotify.com/track/first",
+                "https://open.spotify.com/track/second",
+            ],
+        )
+
+    async def test_forget_session_deletes_durable_collection_state(self) -> None:
+        kv = KVStub({})
+        runtime = BotRuntime(kv)
+        await runtime.remember_collection(
+            7,
+            urls=[
+                "https://open.spotify.com/track/first",
+                "https://open.spotify.com/track/second",
+            ],
+            lang="ru",
+        )
+
+        await runtime.forget_session(7)
+
+        self.assertNotIn("collection:v1:7", kv.values)
+        self.assertEqual(await runtime.get_collection(7, lang="ru"), [])
 
     async def test_crate_v1_is_read_and_written_as_v2(self) -> None:
         item = {"draft_id": "d1", "item": {"artist": "Sleep", "title": "Holy Mountain"}}

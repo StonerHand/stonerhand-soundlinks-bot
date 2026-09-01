@@ -91,6 +91,65 @@ class PublicationContractTests(unittest.TestCase):
 
         self.assertIn("invalid_callback_data", result.blocking_codes)
 
+    def test_rejects_oversized_inline_query(self) -> None:
+        result = validate_rendered_publication(
+            RenderedPublication(
+                text="Artist — Song",
+                keyboard=InlineKeyboardMarkup(
+                    [
+                        [
+                            InlineKeyboardButton(
+                                "Поделиться",
+                                switch_inline_query="x" * 257,
+                            )
+                        ]
+                    ]
+                ),
+            )
+        )
+
+        self.assertIn("invalid_inline_query", result.blocking_codes)
+
+    def test_rejects_raw_multi_url_inline_collection(self) -> None:
+        query = (
+            "https://open.spotify.com/track/first https://open.spotify.com/track/second"
+        )
+        result = validate_rendered_publication(
+            RenderedPublication(
+                text="Подборка · 2 релиза",
+                keyboard=InlineKeyboardMarkup(
+                    [[InlineKeyboardButton("Поделиться", switch_inline_query=query)]]
+                ),
+                found_count=2,
+                requested_count=2,
+                content_kind="collection",
+            )
+        )
+
+        self.assertIn("raw_collection_inline_query", result.blocking_codes)
+
+    def test_accepts_compact_collection_inline_token(self) -> None:
+        result = validate_rendered_publication(
+            RenderedPublication(
+                text="Подборка · 2 релиза",
+                keyboard=InlineKeyboardMarkup(
+                    [
+                        [
+                            InlineKeyboardButton(
+                                "Поделиться",
+                                switch_inline_query="sh5|tabc|tdef",
+                            )
+                        ]
+                    ]
+                ),
+                found_count=2,
+                requested_count=2,
+                content_kind="collection",
+            )
+        )
+
+        self.assertTrue(result.ready)
+
 
 if __name__ == "__main__":
     unittest.main()

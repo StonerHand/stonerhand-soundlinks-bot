@@ -257,6 +257,28 @@ class RuntimeSafetyTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreater(len(value), 500)
         self.assertEqual(session.last_action["value"], value)
 
+    async def test_complete_collection_survives_followup_actions(self) -> None:
+        runtime = BotRuntime()
+        urls = [
+            f"https://open.spotify.com/track/{index:022d}?si={'x' * 20}"
+            for index in range(10)
+        ]
+
+        await runtime.remember_collection(7, urls=urls, lang="ru")
+        await runtime.remember_action(
+            7,
+            kind="search",
+            value="a later search must not replace the collection",
+            lang="ru",
+        )
+
+        session = await runtime.get_session(7)
+        self.assertEqual(
+            session.last_collection_urls,
+            [url.split("?", 1)[0] for url in urls],
+        )
+        self.assertEqual(session.last_action["kind"], "search")
+
     async def test_provider_diagnostics_expose_latest_state(self) -> None:
         runtime = BotRuntime()
         runtime.record_provider(

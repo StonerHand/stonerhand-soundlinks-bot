@@ -305,23 +305,44 @@ async def _recover_recent_collection_urls(
     if not callable(get_session):
         return []
     try:
+        durable_urls: list[str] = []
+        get_collection = getattr(runtime, "get_collection", None)
+        if callable(get_collection):
+            durable_urls = await get_collection(user_id, lang=lang)
         session = await get_session(user_id, lang=lang)
     except Exception:
         LOGGER.debug("Could not load the inline owner's recent lookup", exc_info=True)
         return []
 
+    candidates: list[list[str]] = []
+    if durable_urls:
+        candidates.append(durable_urls[:MAX_LINKS_PER_MESSAGE])
+    session_urls = getattr(session, "last_collection_urls", None)
+    if isinstance(session_urls, list) and session_urls != durable_urls:
+        candidates.append(session_urls[:MAX_LINKS_PER_MESSAGE])
     last_action = getattr(session, "last_action", None)
-    if not isinstance(last_action, dict) or last_action.get("kind") != "resolve":
-        return []
-    remembered_urls = extract_supported_urls(str(last_action.get("value") or ""))[
-        :MAX_LINKS_PER_MESSAGE
-    ]
-    if len(remembered_urls) <= len(visible_urls):
-        return []
+    if isinstance(last_action, dict) and last_action.get("kind") == "resolve":
+        candidates.append(
+            extract_supported_urls(str(last_action.get("value") or ""))[
+                :MAX_LINKS_PER_MESSAGE
+            ]
+        )
 
+    for remembered_urls in candidates:
+        if _is_truncated_collection_prefix(visible_urls, remembered_urls):
+            return remembered_urls
+    return []
+
+
+def _is_truncated_collection_prefix(
+    visible_urls: list[str],
+    remembered_urls: list[str],
+) -> bool:
+    if len(remembered_urls) <= len(visible_urls):
+        return False
     for index, visible_url in enumerate(visible_urls):
         if index >= len(remembered_urls):
-            return []
+            return False
         visible_key = cache_key_for_url(visible_url)
         remembered_key = cache_key_for_url(remembered_urls[index])
         if visible_key == remembered_key:
@@ -330,8 +351,8 @@ async def _recover_recent_collection_urls(
         # identifier. Only the final visible item may use a strict prefix.
         if index == len(visible_urls) - 1 and remembered_key.startswith(visible_key):
             continue
-        return []
-    return remembered_urls
+        return False
+    return True
 
 
 async def _answer_inline_collection(

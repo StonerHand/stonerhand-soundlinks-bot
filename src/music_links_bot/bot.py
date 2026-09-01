@@ -2477,6 +2477,23 @@ async def _deliver_lookup_bundle(
 ) -> None:
     """Render an already resolved bundle; lookup orchestration stays separate."""
     partial = not bundle.is_complete_for(request.source_urls)
+    if partial and not request.is_private:
+        # Public replacement is atomic: never publish a shortened collection
+        # and never delete the original group/channel message.
+        await _send_partial_lookup_status(
+            message,
+            context,
+            bundle,
+            user_id=request.user_id,
+            lang=request.lang,
+        )
+        return
+    if request.is_private and not partial and len(request.source_urls) > 1:
+        await _runtime(context).remember_collection(
+            request.user_id,
+            urls=request.source_urls,
+            lang=request.lang,
+        )
     # Different platform URLs often point to the exact same release. Keep the
     # per-source statuses for retries and diagnostics, but show one merged card
     # with all discovered service buttons instead of duplicate releases.

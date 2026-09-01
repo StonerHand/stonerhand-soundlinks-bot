@@ -5,6 +5,11 @@ from enum import Enum
 
 from telegram import InlineKeyboardButton as TelegramInlineKeyboardButton
 
+from music_links_bot.url_utils import extract_supported_urls
+
+MAX_INLINE_QUERY_LENGTH = 256
+MAX_CALLBACK_DATA_BYTES = 64
+
 
 class ButtonTone(str, Enum):
     PRIMARY = "primary"
@@ -89,7 +94,7 @@ def callback_button(
 ) -> TelegramInlineKeyboardButton:
     return TelegramInlineKeyboardButton(
         text=icon_label(text, icon),
-        callback_data=callback_data,
+        callback_data=_validate_callback_data(callback_data),
         **_style_kwargs(tone),
         **_icon_kwargs(icon),
     )
@@ -119,7 +124,7 @@ def current_chat_button(
 ) -> TelegramInlineKeyboardButton:
     return TelegramInlineKeyboardButton(
         text=icon_label(text, icon),
-        switch_inline_query_current_chat=query,
+        switch_inline_query_current_chat=_validate_inline_query(query),
         **_style_kwargs(tone),
         **_icon_kwargs(icon),
     )
@@ -133,7 +138,7 @@ def share_button(
 ) -> TelegramInlineKeyboardButton:
     return TelegramInlineKeyboardButton(
         text=icon_label(text, icon),
-        switch_inline_query=query,
+        switch_inline_query=_validate_inline_query(query),
         **_icon_kwargs(icon),
     )
 
@@ -169,6 +174,30 @@ def button(
     if tone is not None and native_tone is not None and tone is not native_tone:
         raise ValueError("Conflicting Telegram button styles")
     tone = tone or native_tone
+    for field in (
+        "switch_inline_query",
+        "switch_inline_query_current_chat",
+        "switch_inline_query_chosen_chat",
+    ):
+        if field in kwargs and kwargs[field] is not None:
+            kwargs[field] = _validate_inline_query(str(kwargs[field]))
+    callback_data = kwargs.get("callback_data")
+    if callback_data is not None:
+        kwargs["callback_data"] = _validate_callback_data(str(callback_data))
     kwargs.update(_style_kwargs(tone))
     kwargs.update(_icon_kwargs(icon))
     return TelegramInlineKeyboardButton(text=icon_label(text, icon), **kwargs)
+
+
+def _validate_inline_query(query: str) -> str:
+    if len(query) > MAX_INLINE_QUERY_LENGTH:
+        raise ValueError("Telegram inline query exceeds 256 characters")
+    if len(extract_supported_urls(query)) > 1:
+        raise ValueError("Collection inline query must use a compact share token")
+    return query
+
+
+def _validate_callback_data(callback_data: str) -> str:
+    if not 1 <= len(callback_data.encode("utf-8")) <= MAX_CALLBACK_DATA_BYTES:
+        raise ValueError("Telegram callback_data exceeds 64 bytes")
+    return callback_data

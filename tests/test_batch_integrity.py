@@ -8,12 +8,13 @@ from unittest.mock import AsyncMock, patch
 from telegram import MessageEntity
 
 from music_links_bot import bot_lookup
-from music_links_bot.bot import _send_track_matches
+from music_links_bot.bot import _deliver_lookup_bundle, _send_track_matches
 from music_links_bot.bot_lookup import (
     LookupBundle,
     SourceStatus,
     _send_youtube_result,
 )
+from music_links_bot.bot_pipeline import LookupRequest
 from music_links_bot.bot_runtime import BotRuntime
 from music_links_bot.bot_stats import build_user_prefix, message_source_urls
 from music_links_bot.models import TrackMatch
@@ -422,6 +423,133 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
                 for row in keyboard.inline_keyboard
                 for button in row
             )
+        )
+
+    async def test_partial_public_batch_is_atomic_and_keeps_original(self) -> None:
+        urls = [
+            "https://open.spotify.com/track/public-a",
+            "https://open.spotify.com/track/public-b",
+        ]
+        bundle = LookupBundle(
+            tracks=[
+                TrackMatch(
+                    title="A",
+                    artist="Artist",
+                    links={"spotify": urls[0]},
+                )
+            ],
+            unavailable_urls=[urls[1]],
+            videos=[],
+            radios=[],
+            playlists=[],
+            artists=[],
+            statuses=[
+                SourceStatus(urls[0], "songlink", "success"),
+                SourceStatus(
+                    urls[1],
+                    "songlink",
+                    "unavailable",
+                    retryable=True,
+                ),
+            ],
+        )
+        request = LookupRequest(
+            message_text="\n".join(urls),
+            source_urls=urls,
+            is_private=False,
+            lang="ru",
+            user_id=7,
+            include_channel_button=False,
+            include_hashtags=True,
+        )
+        message = SimpleNamespace(
+            chat=SimpleNamespace(type="group", id=-100),
+            chat_id=-100,
+        )
+        context = SimpleNamespace(
+            bot=object(),
+            application=SimpleNamespace(bot_data={}),
+        )
+
+        with (
+            patch("music_links_bot.bot._send_track_matches", new=AsyncMock()) as send,
+            patch(
+                "music_links_bot.bot._send_partial_lookup_status",
+                new=AsyncMock(),
+            ) as status,
+        ):
+            await _deliver_lookup_bundle(
+                message,
+                context,
+                bundle,
+                request=request,
+                user_prefix="",
+            )
+
+        send.assert_not_awaited()
+        status.assert_awaited_once()
+
+    async def test_complete_private_batch_records_durable_collection(self) -> None:
+        urls = [
+            "https://open.spotify.com/track/private-a?si=tracking",
+            "https://open.spotify.com/track/private-b?si=tracking",
+        ]
+        bundle = LookupBundle(
+            tracks=[
+                TrackMatch(
+                    title=label,
+                    artist="Artist",
+                    links={"spotify": source_url},
+                )
+                for label, source_url in zip(("A", "B"), urls, strict=True)
+            ],
+            unavailable_urls=[],
+            videos=[],
+            radios=[],
+            playlists=[],
+            artists=[],
+            statuses=[
+                SourceStatus(source_url, "songlink", "success") for source_url in urls
+            ],
+        )
+        runtime = BotRuntime()
+        request = LookupRequest(
+            message_text="\n".join(urls),
+            source_urls=urls,
+            is_private=True,
+            lang="ru",
+            user_id=7,
+            include_channel_button=False,
+            include_hashtags=True,
+        )
+        message = SimpleNamespace(
+            chat=SimpleNamespace(type="private", id=7),
+            chat_id=7,
+        )
+        context = SimpleNamespace(
+            bot=object(),
+            application=SimpleNamespace(bot_data={"runtime": runtime}),
+        )
+
+        with (
+            patch("music_links_bot.bot._send_track_matches", new=AsyncMock()),
+            patch(
+                "music_links_bot.bot._send_partial_lookup_status",
+                new=AsyncMock(),
+            ),
+        ):
+            await _deliver_lookup_bundle(
+                message,
+                context,
+                bundle,
+                request=request,
+                user_prefix="",
+            )
+
+        session = await runtime.get_session(7)
+        self.assertEqual(
+            session.last_collection_urls,
+            [url.split("?", 1)[0] for url in urls],
         )
 
 

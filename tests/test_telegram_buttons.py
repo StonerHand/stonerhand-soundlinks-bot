@@ -8,7 +8,10 @@ from music_links_bot.rich_publications import rich_button_rows_html
 from music_links_bot.telegram_buttons import (
     ButtonIcon,
     ButtonTone,
+    button,
     callback_button,
+    current_chat_button,
+    share_button,
 )
 
 
@@ -62,6 +65,29 @@ class TelegramButtonTests(unittest.TestCase):
 
         self.assertEqual(button.text, "✓ Готово")
         self.assertIsNone(button.icon_custom_emoji_id)
+
+    def test_inline_query_limit_is_enforced_at_construction(self) -> None:
+        with self.assertRaises(ValueError):
+            share_button("Поделиться", "x" * 257)
+
+        accepted = current_chat_button("Поиск", "x" * 256)
+        self.assertEqual(len(accepted.switch_inline_query_current_chat), 256)
+
+    def test_raw_collection_urls_require_a_compact_share_token(self) -> None:
+        with self.assertRaises(ValueError):
+            share_button(
+                "Поделиться",
+                "https://open.spotify.com/track/first "
+                "https://open.spotify.com/track/second",
+            )
+
+    def test_callback_limit_is_enforced_at_construction(self) -> None:
+        with self.assertRaises(ValueError):
+            callback_button("Изменить", "я" * 33)
+
+    def test_generic_constructor_applies_the_same_query_contract(self) -> None:
+        with self.assertRaises(ValueError):
+            button("Поделиться", switch_inline_query="x" * 257)
 
 
 if __name__ == "__main__":

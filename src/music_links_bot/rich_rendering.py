@@ -320,10 +320,12 @@ def rich_button_rows_html(
                 continue
             callback_data = raw_button.get("callback_data")
             if isinstance(callback_data, str) and callback_data:
+                if len(callback_data.encode("utf-8")) > 64:
+                    continue
                 callback_style = style or "link"
                 buttons.append(
                     f'<tg-button type="callback_data" style="{callback_style}" '
-                    f'data="{html.escape(callback_data[:64], quote=True)}">'
+                    f'data="{html.escape(callback_data, quote=True)}">'
                     f"{text}</tg-button>"
                 )
                 continue
@@ -350,9 +352,11 @@ def rich_button_rows_html(
             ):
                 query = raw_button.get(field)
                 if isinstance(query, str):
+                    if len(query) > 256:
+                        continue
                     buttons.append(
                         f'<tg-button type="{rich_type}"{style_attr} '
-                        f'{attribute}="{html.escape(query[:256], quote=True)}">'
+                        f'{attribute}="{html.escape(query, quote=True)}">'
                         f"{text}</tg-button>"
                     )
                     break
