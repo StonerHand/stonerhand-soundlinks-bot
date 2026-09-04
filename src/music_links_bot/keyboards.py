@@ -205,7 +205,11 @@ def _build_collection_keyboard(
     }
     available: list[tuple[int, TrackMatch, str]] = []
     for index, track in enumerate(tracks, start=1):
-        destination = track.page_url or _select_preview_url(track.links)
+        destination = resolve_release_hub_url(
+            track.page_url,
+            track.links,
+            release_kind=track.kind,
+        ) or _select_preview_url(track.links)
         if not destination:
             continue
         available.append((index, track, destination))

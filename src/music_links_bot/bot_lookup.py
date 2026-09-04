@@ -768,11 +768,35 @@ async def _lookup_tracks_detailed(
         for task in lookup_tasks
     ]
 
+    # Resolve independent provider fallbacks concurrently. In particular,
+    # exact MusicBrainz enrichment is rate-limited internally; starting all
+    # fallbacks together lets later items hit their own short deadline instead
+    # of making a ten-link collection wait for ten sequential timeouts.
+    fallback_indexes = [
+        index
+        for index, result in enumerate(results)
+        if isinstance(result, SonglinkError)
+    ]
+    fallback_values = await asyncio.gather(
+        *(
+            _build_lookup_fallback(
+                source_urls[index],
+                soundcloud_client=soundcloud_client,
+                search_client=search_client,
+            )
+            for index in fallback_indexes
+        ),
+        return_exceptions=True,
+    )
+    fallback_by_index = dict(zip(fallback_indexes, fallback_values, strict=True))
+
     tracks: list[TrackMatch] = []
     unavailable_urls: list[str] = []
     statuses: list[SourceStatus] = []
 
-    for source_url, result in zip(source_urls, results, strict=True):
+    for index, (source_url, result) in enumerate(
+        zip(source_urls, results, strict=True)
+    ):
         if isinstance(result, TrackMatch):
             tracks.append(result)
             statuses.append(
@@ -786,12 +810,8 @@ async def _lookup_tracks_detailed(
             continue
 
         if isinstance(result, SonglinkError):
-            fallback_track = await _build_lookup_fallback(
-                source_url,
-                soundcloud_client=soundcloud_client,
-                search_client=search_client,
-            )
-            if fallback_track:
+            fallback_track = fallback_by_index.get(index)
+            if isinstance(fallback_track, TrackMatch):
                 tracks.append(fallback_track)
                 statuses.append(
                     SourceStatus(
@@ -802,6 +822,18 @@ async def _lookup_tracks_detailed(
                     )
                 )
                 continue
+
+            if isinstance(fallback_track, BaseException):
+                LOGGER.error(
+                    "Fallback resolver failed source=%s error=%s",
+                    _source_log_id(source_url),
+                    type(fallback_track).__name__,
+                    exc_info=(
+                        type(fallback_track),
+                        fallback_track,
+                        fallback_track.__traceback__,
+                    ),
+                )
 
             if isinstance(result, SonglinkLookupError):
                 retryable = spotify_url_type(source_url) in {"track", "album"}

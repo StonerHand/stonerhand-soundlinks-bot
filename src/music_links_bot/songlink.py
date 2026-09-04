@@ -109,6 +109,20 @@ class SonglinkClient:
             cache.set(cache_key, shared_match)
             return shared_match
 
+        # The anonymous v1-alpha.1 API now rejects requests. Without an
+        # explicitly configured legacy key, avoid four guaranteed 401s and go
+        # directly to the verified Spotify/provider-specific fallback chain.
+        if not self._api_key:
+            try:
+                match = await self._spotify_client.lookup_release(source_url)
+            except SpotifyLookupError as exc:
+                raise SonglinkLookupError(
+                    "Song.link legacy API is not configured for this URL."
+                ) from exc
+            self._fallback_cache.set(cache_key, match)
+            await self._set_shared_cache(cache_key, match, fallback=True)
+            return match
+
         countries = self._user_countries or ("US",)
         primary_result = await asyncio.gather(
             self._lookup_track_for_country(source_url, countries[0]),

@@ -6,7 +6,7 @@
 
 [Open the bot](https://t.me/StonerHandBot) · [See the channel](https://t.me/stonerhand) · [Русская версия](README.ru.md)
 
-![Release](https://img.shields.io/badge/release-1.14.0-5b5bd6?style=flat-square)
+![Release](https://img.shields.io/badge/release-1.14.1-5b5bd6?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
@@ -40,7 +40,8 @@ is omitted instead of guessed.
 - Shows a provider button only for a direct release URL returned by the
   resolver; search suggestions never masquerade as confirmed availability.
 - Keeps exact text-search and direct Apple Music results publishable with
-  verified iTunes metadata and artwork when Songlink is temporarily unavailable.
+  verified iTunes metadata and artwork, and restores a direct Spotify URL only
+  from an exact artist/title relation in MusicBrainz.
 - Combines matching links from different services into one release rather than
   publishing duplicate cards.
 - Removes Spotify page branding and SEO copy from release, artist and playlist
@@ -58,8 +59,8 @@ is omitted instead of guessed.
 - Works inline with `@StonerHandBot artist — track` in any conversation.
 - Uses Bot API 10.3 Rich Messages when supported and falls back to a complete
   classic card without losing artwork, text or platform links.
-- Verifies Spotify, SoundCloud, YouTube, Apple Music and NTS public contracts
-  every six hours, so upstream API or page drift is detected automatically.
+- Verifies Spotify, MusicBrainz, SoundCloud, YouTube, Apple Music and NTS public
+  contracts every six hours, so upstream API or page drift is detected automatically.
 - Validates every finished Classic, Rich, inline, channel, photo and audio post
   through one release contract before Telegram receives it.
 - Guards the home screen and editor with a production UI/UX contract: one
@@ -134,9 +135,11 @@ owner's latest complete collection is also stored independently from later UI
 actions, so a Telegram-truncated raw URL list can be restored after a restart;
 an unverified list is rejected instead of becoming an apparently valid partial post.
 
-The universal Songlink/Odesli action is the first, full-width primary CTA;
-direct providers follow as calm secondary shortcuts. The same hierarchy is
-used by classic cards, previews and editor screens. A shared icon vocabulary is
+When verified, the universal Songlink/Odesli action is the first, full-width
+primary CTA; direct providers follow as calm secondary shortcuts. If only one
+direct provider is confirmed, the bot shows it without promising unavailable
+services. The same hierarchy is used by classic cards, previews and editor
+screens. A shared icon vocabulary is
 used across native screens,
 with optional Bot API 10.3 custom emoji IDs and a complete regular-emoji
 fallback. Rich cards use a magazine order — title, artwork, lead, body, actions
@@ -184,8 +187,8 @@ cp .env.example .env
 python -m music_links_bot
 ```
 
-Only `BOT_TOKEN` is required for local polling. Add Songlink and Redis values to
-exercise universal links and durable state.
+Only `BOT_TOKEN` is required for local polling. MusicBrainz and iTunes are
+keyless; Redis is only required for durable production state.
 
 <details>
 <summary><strong>Production configuration</strong></summary>

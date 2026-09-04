@@ -25,6 +25,7 @@ class FakeSonglinkClient(SonglinkClient):
     ) -> None:
         super().__init__(
             user_countries=tuple(outcomes),
+            api_key="test-key",
             spotify_client=spotify_client,
             kv=kv,
         )
@@ -207,6 +208,47 @@ class SonglinkClientTests(unittest.TestCase):
 
 
 class SonglinkClientAsyncTests(unittest.IsolatedAsyncioTestCase):
+    async def test_missing_legacy_key_skips_dead_songlink_api(self) -> None:
+        class SpotifyFallback:
+            calls = 0
+
+            async def lookup_release(self, source_url: str) -> TrackMatch:
+                self.calls += 1
+                return TrackMatch(
+                    title="Rickets",
+                    artist="Deftones",
+                    links={"spotify": source_url},
+                    page_url="https://song.link/s/spotify-id",
+                )
+
+        spotify = SpotifyFallback()
+        client = SonglinkClient(
+            user_countries=("US", "GB", "DE"),
+            spotify_client=spotify,
+        )
+
+        class DeadHttpClient:
+            async def get(self, *args, **kwargs):
+                del args, kwargs
+                raise AssertionError("anonymous Songlink API must not be called")
+
+            async def aclose(self) -> None:
+                return None
+
+        await client._client.aclose()
+        client._client = DeadHttpClient()
+        try:
+            match = await client.lookup_track(
+                "https://open.spotify.com/track/spotify-id"
+            )
+        finally:
+            await client.aclose()
+
+        self.assertEqual(
+            match.links["spotify"], "https://open.spotify.com/track/spotify-id"
+        )
+        self.assertEqual(spotify.calls, 1)
+
     async def test_default_region_fallback_recovers_release_missing_in_primary_region(
         self,
     ) -> None:

@@ -11,6 +11,7 @@ import httpx
 from music_links_bot.cache import TTLCache
 from music_links_bot.constants import HTTP_USER_AGENT
 from music_links_bot.models import TrackMatch
+from music_links_bot.musicbrainz import MusicBrainzClient, MusicBrainzLookupError
 from music_links_bot.release_hubs import canonical_release_hub_url
 from music_links_bot.url_utils import cache_key_for_url, normalize_host
 
@@ -19,6 +20,7 @@ MIN_QUERY_LENGTH = 2
 MAX_QUERY_LENGTH = 120
 MAX_CANDIDATES = 3
 GENRE_SEARCH_LIMIT = 12
+SPOTIFY_ENRICHMENT_TIMEOUT_SECONDS = 5.0
 
 
 class SearchLookupError(RuntimeError):
@@ -45,7 +47,13 @@ class SearchClient:
     fallback when the universal resolver is unavailable.
     """
 
-    def __init__(self, *, timeout: float = 6.0, country: str = "US") -> None:
+    def __init__(
+        self,
+        *,
+        timeout: float = 6.0,
+        country: str = "US",
+        musicbrainz_client: MusicBrainzClient | None = None,
+    ) -> None:
         self._country = country
         self._client = httpx.AsyncClient(
             base_url="https://itunes.apple.com",
@@ -61,6 +69,10 @@ class SearchClient:
             ttl_seconds=6 * 3600
         )
         self._inflight: dict[str, asyncio.Task[list[SearchCandidate]]] = {}
+        self._musicbrainz_client = musicbrainz_client or MusicBrainzClient(
+            timeout=min(timeout, 4.0)
+        )
+        self._owns_musicbrainz_client = musicbrainz_client is None
 
     async def aclose(self) -> None:
         pending = list(self._inflight.values())
@@ -70,6 +82,8 @@ class SearchClient:
             await asyncio.gather(*pending, return_exceptions=True)
         self._inflight.clear()
         await self._client.aclose()
+        if self._owns_musicbrainz_client:
+            await self._musicbrainz_client.aclose()
 
     async def search_release_url(self, query: str) -> str:
         candidates = await self.search_release_candidates(query)
@@ -91,11 +105,36 @@ class SearchClient:
             return None
 
         kind = "album" if candidate.kind == "album" else "song"
+        links = {"appleMusic": candidate.url}
+        page_url = None
+        try:
+            spotify_url = await asyncio.wait_for(
+                self._musicbrainz_client.lookup_spotify_release(
+                    candidate.artist,
+                    candidate.title,
+                    kind=kind,
+                ),
+                timeout=SPOTIFY_ENRICHMENT_TIMEOUT_SECONDS,
+            )
+        except (MusicBrainzLookupError, asyncio.TimeoutError):
+            LOGGER.debug(
+                "Exact Spotify relation lookup failed for %s — %s",
+                candidate.artist,
+                candidate.title,
+                exc_info=True,
+            )
+        else:
+            if spotify_url:
+                links["spotify"] = spotify_url
+                page_url = canonical_release_hub_url(
+                    spotify_url,
+                    release_kind=kind,
+                )
         return TrackMatch(
             title=candidate.title,
             artist=candidate.artist,
-            links={"appleMusic": candidate.url},
-            page_url=canonical_release_hub_url(candidate.url, release_kind=kind),
+            links=links,
+            page_url=page_url,
             release_year=candidate.year,
             kind=kind,
             release_format=candidate.album if kind == "song" else None,

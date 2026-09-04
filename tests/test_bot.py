@@ -814,6 +814,21 @@ class BotKeyboardTests(unittest.TestCase):
             ["1 · There's No Other Way", "2 · Fool"],
         )
 
+    def test_collection_repairs_stale_apple_hub_to_direct_provider(self) -> None:
+        apple_url = "https://music.apple.com/us/album/example/123?i=456"
+        keyboard = _build_collection_keyboard(
+            [
+                TrackMatch(
+                    title="Track",
+                    artist="Artist",
+                    links={"appleMusic": apple_url},
+                    page_url="https://song.link/i/456",
+                )
+            ]
+        )
+
+        self.assertEqual(keyboard.inline_keyboard[0][0].url, apple_url)
+
     def test_release_keyboard_can_hide_channel_button(self) -> None:
         keyboard = _build_link_keyboard(
             {"spotify": "https://open.spotify.com/track/1"},
@@ -886,6 +901,17 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[0][0].url, "https://song.link/s/1")
         self.assertEqual(rows[1][0].text, "🟢 Spotify")
         self.assertEqual(rows[1][0].url, "https://open.spotify.com/track/1?si=tracking")
+
+    def test_apple_only_fallback_does_not_show_false_universal_action(self) -> None:
+        keyboard = _build_link_keyboard(
+            {"appleMusic": ("https://music.apple.com/us/album/example/123?i=456")},
+            include_channel_button=False,
+        )
+
+        rows = keyboard.inline_keyboard
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0][0].text, "⚪ Apple")
+        self.assertEqual(rows[0][0].style, "primary")
 
     def test_minimal_ui_mode_strips_platform_button_emoji(self) -> None:
         keyboard = _build_link_keyboard(
@@ -2875,7 +2901,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(tracks[0].genre, "Industrial")
 
-    async def test_lookup_tracks_uses_verified_apple_search_fallback(self) -> None:
+    async def test_lookup_tracks_enriches_apple_search_fallback_with_spotify(
+        self,
+    ) -> None:
         source_url = "https://music.apple.com/us/album/rickets/1099843198?i=1099843246"
 
         class SearchFallbackStub:
@@ -2889,8 +2917,11 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
                 return TrackMatch(
                     title="Rickets",
                     artist="Deftones",
-                    links={"appleMusic": requested_url},
-                    page_url="https://song.link/i/1099843246",
+                    links={
+                        "appleMusic": requested_url,
+                        "spotify": "https://open.spotify.com/track/spotify-rickets",
+                    },
+                    page_url="https://song.link/s/spotify-rickets",
                     thumbnail_url="https://images.example/rickets.jpg",
                 )
 
@@ -2911,11 +2942,64 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             [(track.artist, track.title) for track in tracks], [("Deftones", "Rickets")]
         )
-        self.assertEqual(tracks[0].links, {"appleMusic": source_url})
+        self.assertEqual(
+            tracks[0].links,
+            {
+                "appleMusic": source_url,
+                "spotify": "https://open.spotify.com/track/spotify-rickets",
+            },
+        )
+        keyboard = _build_link_keyboard(
+            tracks[0].links,
+            release_page_url=tracks[0].page_url,
+        )
+        self.assertEqual(
+            [button.text for row in keyboard.inline_keyboard for button in row],
+            ["🪩 Все платформы", "🟢 Spotify"],
+        )
         self.assertEqual(
             tracks[0].thumbnail_url,
             "https://images.example/rickets.jpg",
         )
+
+    async def test_provider_fallbacks_run_concurrently(self) -> None:
+        class FailingBatchClient:
+            async def lookup_track(self, source_url: str) -> TrackMatch:
+                raise SonglinkError(source_url)
+
+        class ConcurrentSearchFallback:
+            def __init__(self) -> None:
+                self.active = 0
+                self.max_active = 0
+
+            async def lookup_release_fallback(
+                self, source_url: str
+            ) -> TrackMatch | None:
+                self.active += 1
+                self.max_active = max(self.max_active, self.active)
+                await asyncio.sleep(0)
+                self.active -= 1
+                return TrackMatch(
+                    title=source_url.rsplit("/", 1)[-1],
+                    artist="Artist",
+                    links={"appleMusic": source_url},
+                )
+
+            async def lookup_genre(self, artist: str, title: str) -> None:
+                del artist, title
+                return None
+
+        search = ConcurrentSearchFallback()
+        urls = [f"https://music.apple.com/track/{index}" for index in range(3)]
+        tracks, unavailable_urls = await _lookup_tracks(
+            FailingBatchClient(),
+            urls,
+            search_client=search,
+        )
+
+        self.assertEqual(unavailable_urls, [])
+        self.assertEqual(len(tracks), 3)
+        self.assertEqual(search.max_active, 3)
 
     async def test_lookup_tracks_cancels_slow_genre_enrichment(self) -> None:
         class SlowGenreSearchStub:

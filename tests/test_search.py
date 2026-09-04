@@ -197,7 +197,15 @@ class SearchCacheTests(unittest.IsolatedAsyncioTestCase):
             async def aclose(self) -> None:
                 return None
 
-        search = SearchClient()
+        class MusicBrainzStub:
+            async def lookup_spotify_release(
+                self, artist: str, title: str, *, kind: str = "song"
+            ) -> str:
+                self.request = (artist, title, kind)
+                return "https://open.spotify.com/track/7Ca5yTC81P0AtRnNKHKzwJ"
+
+        musicbrainz = MusicBrainzStub()
+        search = SearchClient(musicbrainz_client=musicbrainz)
         await search._client.aclose()
         fake = ClientStub()
         search._client = fake
@@ -214,8 +222,21 @@ class SearchCacheTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(track.title, "Rickets")
         self.assertEqual(track.release_format, "Around the Fur")
         self.assertEqual(track.release_year, "1997")
-        self.assertEqual(track.links, {"appleMusic": apple_url})
-        self.assertEqual(track.page_url, "https://song.link/i/1099843246")
+        self.assertEqual(
+            track.links,
+            {
+                "appleMusic": apple_url,
+                "spotify": ("https://open.spotify.com/track/7Ca5yTC81P0AtRnNKHKzwJ"),
+            },
+        )
+        self.assertEqual(
+            track.page_url,
+            "https://song.link/s/7Ca5yTC81P0AtRnNKHKzwJ",
+        )
+        self.assertEqual(
+            musicbrainz.request,
+            ("Deftones", "Rickets", "song"),
+        )
         self.assertIn("1200x1200bb", track.thumbnail_url or "")
 
     async def test_direct_apple_url_repairs_empty_process_cache(self) -> None:
@@ -251,7 +272,14 @@ class SearchCacheTests(unittest.IsolatedAsyncioTestCase):
             async def aclose(self) -> None:
                 return None
 
-        search = SearchClient()
+        class MusicBrainzStub:
+            async def lookup_spotify_release(
+                self, artist: str, title: str, *, kind: str = "song"
+            ) -> None:
+                del artist, title, kind
+                return None
+
+        search = SearchClient(musicbrainz_client=MusicBrainzStub())
         await search._client.aclose()
         fake = ClientStub()
         search._client = fake
@@ -264,6 +292,8 @@ class SearchCacheTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(fake.path, "/lookup")
         self.assertEqual(fake.params["id"], "1099843246")
         self.assertEqual(track.title if track else None, "Rickets")
+        self.assertEqual(track.links if track else None, {"appleMusic": apple_url})
+        self.assertIsNone(track.page_url if track else "missing")
 
     async def test_parallel_equal_searches_share_one_request(self) -> None:
         class ResponseStub:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import sys
 
+from music_links_bot.musicbrainz import MusicBrainzClient
 from music_links_bot.nts import NTSClient
 from music_links_bot.playlist import PlaylistClient
 from music_links_bot.soundcloud import SoundCloudClient
@@ -32,6 +33,7 @@ async def verify() -> list[str]:
     youtube = YouTubeClient(timeout=10)
     playlist = PlaylistClient(timeout=10)
     nts = NTSClient(timeout=10)
+    musicbrainz = MusicBrainzClient(timeout=10)
     try:
         try:
             track = await spotify.lookup_release(SPOTIFY_TRACK)
@@ -43,6 +45,18 @@ async def verify() -> list[str]:
                 failures.append("spotify valid-track metadata is generic or incomplete")
         except Exception as exc:  # noqa: BLE001
             failures.append(f"spotify valid-track lookup failed: {type(exc).__name__}")
+
+        try:
+            spotify_url = await musicbrainz.lookup_spotify_release(
+                "Deftones",
+                "Rickets",
+            )
+            if spotify_url != "https://open.spotify.com/track/7Ca5yTC81P0AtRnNKHKzwJ":
+                failures.append("musicbrainz exact Spotify relation is missing")
+        except Exception as exc:  # noqa: BLE001
+            failures.append(
+                f"musicbrainz Spotify relation lookup failed: {type(exc).__name__}"
+            )
 
         try:
             await spotify.lookup_release(SPOTIFY_REMOVED_ALBUM)
@@ -87,6 +101,7 @@ async def verify() -> list[str]:
             youtube.aclose(),
             playlist.aclose(),
             nts.aclose(),
+            musicbrainz.aclose(),
         )
     return failures
 
@@ -96,7 +111,10 @@ def main() -> int:
     if failures:
         print("\n".join(failures), file=sys.stderr)
         return 1
-    print("Provider canary OK: Spotify, SoundCloud, YouTube, Apple Music, NTS")
+    print(
+        "Provider canary OK: Spotify, MusicBrainz, SoundCloud, YouTube, "
+        "Apple Music, NTS"
+    )
     return 0
 
 

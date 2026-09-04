@@ -60,6 +60,56 @@ class ReleaseHubTests(unittest.TestCase):
             "https://song.link/s/track",
         )
 
+    def test_apple_only_fallback_does_not_claim_all_platforms(self) -> None:
+        self.assertIsNone(
+            resolve_release_hub_url(
+                None,
+                {"appleMusic": ("https://music.apple.com/us/album/example/123?i=456")},
+            )
+        )
+
+        self.assertIsNone(
+            resolve_release_hub_url(
+                "https://song.link/i/456",
+                {"appleMusic": ("https://music.apple.com/us/album/example/123?i=456")},
+            )
+        )
+
+    def test_verified_spotify_repairs_apple_fallback_hub(self) -> None:
+        self.assertEqual(
+            resolve_release_hub_url(
+                None,
+                {
+                    "appleMusic": (
+                        "https://music.apple.com/us/album/example/123?i=456"
+                    ),
+                    "spotify": "https://open.spotify.com/track/spotify-id",
+                },
+            ),
+            "https://song.link/s/spotify-id",
+        )
+        self.assertEqual(
+            resolve_release_hub_url(
+                "https://song.link/i/456",
+                {
+                    "appleMusic": (
+                        "https://music.apple.com/us/album/example/123?i=456"
+                    ),
+                    "spotify": "https://open.spotify.com/track/spotify-id",
+                },
+            ),
+            "https://song.link/s/spotify-id",
+        )
+
+    def test_mismatched_spotify_type_cannot_create_release_hub(self) -> None:
+        self.assertIsNone(
+            resolve_release_hub_url(
+                None,
+                {"spotify": "https://open.spotify.com/track/not-an-album"},
+                release_kind="album",
+            )
+        )
+
     def test_unsupported_source_does_not_create_broken_nested_url(self) -> None:
         self.assertIsNone(
             canonical_release_hub_url("https://soundcloud.com/artist/track")

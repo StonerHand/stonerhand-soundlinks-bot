@@ -3,7 +3,11 @@ from __future__ import annotations
 import re
 from urllib.parse import parse_qs, urlparse
 
-from music_links_bot.url_utils import cache_key_for_url, normalize_host
+from music_links_bot.url_utils import (
+    cache_key_for_url,
+    normalize_host,
+    spotify_url_type,
+)
 
 UNIVERSAL_RELEASE_HOSTS = frozenset(
     {
@@ -111,14 +115,44 @@ def resolve_release_hub_url(
     release_kind: str = "song",
 ) -> str | None:
     """Prefer Odesli's pageUrl and repair Spotify metadata fallbacks."""
+    spotify_type = spotify_url_type(links.get("spotify") or "")
+    expected_spotify_types = {
+        "album": {"album"},
+        "podcast": {"episode", "show"},
+        "song": {"track"},
+    }.get(release_kind, {"track"})
+    has_verified_spotify = spotify_type in expected_spotify_types
     if is_universal_release_url(release_page_url):
-        return cache_key_for_url(str(release_page_url))
+        clean_page_url = cache_key_for_url(str(release_page_url))
+        page_parts = [part for part in urlparse(clean_page_url).path.split("/") if part]
+        is_apple_origin_page = len(page_parts) >= 2 and page_parts[-2] == "i"
+        if is_apple_origin_page and has_verified_spotify:
+            return canonical_release_hub_url(
+                links["spotify"],
+                release_kind=release_kind,
+            )
+        if is_apple_origin_page and set(links) <= {"appleMusic"}:
+            return None
+        return clean_page_url
 
     candidates = [release_page_url]
     candidates.extend(links.get(platform) for platform in _PLATFORM_PRIORITY)
     candidates.extend(links.values())
     for candidate in candidates:
         if not isinstance(candidate, str):
+            continue
+        # An Apple-only iTunes fallback proves the Apple destination, not
+        # Spotify or any other provider. Its public song.link page may show a
+        # Spotify tile without a direct URL, so presenting it as an exhaustive
+        # “All platforms” action would be misleading.
+        candidate_host = normalize_host(urlparse(candidate).hostname)
+        if candidate_host in {"open.spotify.com", "spotify.com"} and (
+            spotify_url_type(candidate) not in expected_spotify_types
+        ):
+            continue
+        if candidate_host in {"music.apple.com", "itunes.apple.com"} and not (
+            has_verified_spotify
+        ):
             continue
         hub_url = canonical_release_hub_url(
             candidate,

@@ -96,7 +96,14 @@ class ReleaseReadinessTests(unittest.TestCase):
 
         self.assertIn('cron: "17 */6 * * *"', workflow)
         self.assertIn("python tests/e2e/provider_canary.py", workflow)
-        for provider in ("Spotify", "SoundCloud", "YouTube", "Apple Music", "NTS"):
+        for provider in (
+            "Spotify",
+            "MusicBrainz",
+            "SoundCloud",
+            "YouTube",
+            "Apple Music",
+            "NTS",
+        ):
             self.assertIn(provider, script)
 
 
