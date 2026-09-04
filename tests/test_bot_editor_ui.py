@@ -171,8 +171,8 @@ class PostEditorTests(unittest.TestCase):
         buttons = [button for row in keyboard.inline_keyboard for button in row]
 
         self.assertEqual(len(buttons), 5)
-        self.assertEqual(buttons[0].text, "🟢 Spotify")
-        self.assertEqual(buttons[1].text, "🪩 Все платформы")
+        self.assertEqual(buttons[0].text, "🪩 Все платформы")
+        self.assertEqual(buttons[1].text, "🟢 Spotify")
         self.assertEqual(buttons[2].text, "Отправить себе")
         self.assertEqual(buttons[3].text, "Изменить")
         self.assertEqual(buttons[4].text, "＋ В подборку")

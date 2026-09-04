@@ -12,7 +12,7 @@ from music_links_bot.i18n import get_text
 from music_links_bot.telegram_buttons import button as InlineKeyboardButton
 
 
-async def render_recent_view(
+async def render_drafts_view(
     context,
     *,
     user_id: int,
@@ -20,13 +20,17 @@ async def render_recent_view(
     draft_ids: list[str],
     load_draft: Callable[[object, str], Awaitable[dict | None]],
 ) -> tuple[str, InlineKeyboardMarkup]:
+    """Show editable cards only; published history has its own screen."""
     drafts: list[tuple[str, dict]] = []
     for draft_id in draft_ids[:5]:
         draft = await load_draft(context, draft_id)
         if isinstance(draft, dict) and isinstance(draft.get("item"), dict):
             drafts.append((draft_id, draft))
 
-    lines = [get_text(lang, "recent_title")]
+    if not drafts:
+        return _empty_drafts_view(lang)
+
+    lines = [get_text(lang, "drafts_title")]
     rows: list[list[InlineKeyboardButton]] = []
     for index, (draft_id, draft) in enumerate(drafts, start=1):
         item = dict(draft["item"])
@@ -35,9 +39,8 @@ async def render_recent_view(
         rows.append(
             [
                 InlineKeyboardButton(
-                    f"↻ {index} · {get_text(lang, 'recent_repeat')}",
+                    f"{index} · {get_text(lang, 'drafts_open')}",
                     callback_data=encode_callback("editor", "b", draft_id),
-                    style="primary",
                 ),
                 InlineKeyboardButton(
                     f"{index} · {get_text(lang, 'recent_add')}",
@@ -46,24 +49,35 @@ async def render_recent_view(
             ]
         )
 
-    if not drafts:
-        history = await load_history_items(context, user_id)
-        if not history:
-            return _empty_recent_view(lang)
-        for index, item in enumerate(history[:5], start=1):
-            _append_recent_line(lines, index, item, lang=lang)
-            rows.append(
-                [
-                    InlineKeyboardButton(
-                        f"↻ {index} · {get_text(lang, 'recent_repeat')}",
-                        switch_inline_query_current_chat=str(
-                            item.get("source_url") or ""
-                        )[:256],
-                        style="primary",
-                    )
-                ]
-            )
+    rows.append([_home_button(lang)])
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
 
+
+async def render_recent_view(
+    context,
+    *,
+    user_id: int,
+    lang: str,
+) -> tuple[str, InlineKeyboardMarkup]:
+    """Show delivered releases without mixing them with editable drafts."""
+    history = await load_history_items(context, user_id)
+    if not history:
+        return _empty_recent_view(lang)
+
+    lines = [get_text(lang, "recent_title")]
+    rows: list[list[InlineKeyboardButton]] = []
+    for index, item in enumerate(history[:5], start=1):
+        _append_recent_line(lines, index, item, lang=lang)
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    f"↻ {index} · {get_text(lang, 'recent_repeat')}",
+                    switch_inline_query_current_chat=str(item.get("source_url") or "")[
+                        :256
+                    ],
+                )
+            ]
+        )
     rows.append([_home_button(lang)])
     return "\n".join(lines), InlineKeyboardMarkup(rows)
 
@@ -91,6 +105,21 @@ def _append_recent_line(lines: list[str], index: int, item: dict, *, lang: str) 
 
 def _empty_recent_view(lang: str) -> tuple[str, InlineKeyboardMarkup]:
     return get_text(lang, "recent_empty"), InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "home_create"),
+                    callback_data=encode_callback("menu", "create"),
+                    style="primary",
+                )
+            ],
+            [_home_button(lang)],
+        ]
+    )
+
+
+def _empty_drafts_view(lang: str) -> tuple[str, InlineKeyboardMarkup]:
+    return get_text(lang, "drafts_empty"), InlineKeyboardMarkup(
         [
             [
                 InlineKeyboardButton(

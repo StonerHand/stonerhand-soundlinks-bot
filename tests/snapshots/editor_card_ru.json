@@ -2,8 +2,10 @@
   "text": "🎧 · <b>Sleep</b>\nDopesmoker\n\n#stonerhand #track",
   "rows": [
     [
-      ["🟢 Spotify", null, "https://open.spotify.com/track/1", null],
       ["🪩 Все платформы", null, "https://song.link/sleep", null]
+    ],
+    [
+      ["🟢 Spotify", null, "https://open.spotify.com/track/1", null]
     ],
     [
       ["Отправить себе", "v2|editor|s|draft123", null, "primary"]

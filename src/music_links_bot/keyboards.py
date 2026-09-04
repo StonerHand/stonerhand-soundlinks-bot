@@ -164,7 +164,9 @@ def _build_link_keyboard(
                 style="primary" if index == 0 and not release_hub_url else None,
             )
         )
-    rows = _button_rows(buttons)
+    # The universal release hub is the canonical destination, so it owns the
+    # first full-width row. Provider shortcuts stay secondary underneath it.
+    rows: list[list[InlineKeyboardButton]] = []
     if release_hub_url:
         rows.append(
             [
@@ -175,6 +177,7 @@ def _build_link_keyboard(
                 )
             ]
         )
+    rows.extend(_button_rows(buttons))
 
     return _keyboard_with_optional_channel(rows, include_channel_button)
 
@@ -305,7 +308,7 @@ def _build_youtube_collection_keyboard(
         )
 
     return _keyboard_with_optional_channel(
-        _button_rows(buttons), include_channel_button
+        _adaptive_collection_rows(buttons), include_channel_button
     )
 
 
@@ -325,7 +328,7 @@ def _build_nts_collection_keyboard(
         )
 
     return _keyboard_with_optional_channel(
-        _button_rows(buttons), include_channel_button
+        _adaptive_collection_rows(buttons), include_channel_button
     )
 
 
@@ -345,7 +348,7 @@ def _build_playlist_collection_keyboard(
         )
 
     return _keyboard_with_optional_channel(
-        _button_rows(buttons), include_channel_button
+        _adaptive_collection_rows(buttons), include_channel_button
     )
 
 
@@ -365,7 +368,7 @@ def _build_artist_collection_keyboard(
         )
 
     return _keyboard_with_optional_channel(
-        _button_rows(buttons), include_channel_button
+        _adaptive_collection_rows(buttons), include_channel_button
     )
 
 
@@ -456,7 +459,7 @@ def _build_mixed_collection_keyboard(
         index += 1
 
     return _keyboard_with_optional_channel(
-        _button_rows(buttons), include_channel_button
+        _adaptive_collection_rows(buttons), include_channel_button
     )
 
 

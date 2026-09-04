@@ -2,8 +2,8 @@
   "cases": {
     "channel_keyboard": {
       "buttons": [
-        "🟢 Spotify",
-        "🪩 Все платформы"
+        "🪩 Все платформы",
+        "🟢 Spotify"
       ],
       "checks": {
         "channel_safe": true,
@@ -15,8 +15,8 @@
         1
       ],
       "destinations": [
-        "open.spotify.com",
-        "song.link"
+        "song.link",
+        "open.spotify.com"
       ],
       "issues": [],
       "lines": [
@@ -30,8 +30,8 @@
     },
     "classic_track": {
       "buttons": [
-        "🟢 Spotify",
-        "🪩 Все платформы"
+        "🪩 Все платформы",
+        "🟢 Spotify"
       ],
       "checks": {
         "hub_is_primary": true,
@@ -43,8 +43,8 @@
         1
       ],
       "destinations": [
-        "open.spotify.com",
-        "song.link"
+        "song.link",
+        "open.spotify.com"
       ],
       "issues": [],
       "lines": [
@@ -116,9 +116,9 @@
     },
     "inline_share": {
       "buttons": [
-        "🟢 Spotify",
         "🪩 Все платформы",
-        "↗ Поделиться"
+        "🟢 Spotify",
+        "Поделиться"
       ],
       "checks": {
         "hub_is_primary": true,
@@ -129,8 +129,8 @@
         1
       ],
       "destinations": [
-        "open.spotify.com",
         "song.link",
+        "open.spotify.com",
         "inline"
       ],
       "issues": [],
@@ -145,8 +145,8 @@
     },
     "rich_card": {
       "buttons": [
-        "🟢 Spotify",
-        "🪩 Все платформы"
+        "🪩 Все платформы",
+        "🟢 Spotify"
       ],
       "checks": {
         "has_buttons": true,
@@ -161,8 +161,8 @@
         1
       ],
       "destinations": [
-        "open.spotify.com",
-        "song.link"
+        "song.link",
+        "open.spotify.com"
       ],
       "issues": [],
       "lines": [
@@ -199,7 +199,7 @@
       "preview_host": "images.example"
     }
   },
-  "contract": 3,
+  "contract": 4,
   "ok": true,
   "service": "publication-release-smoke",
   "ux": {
@@ -217,7 +217,7 @@
       "delivery_success": {
         "buttons": [
           "+ Создать ещё",
-          "↗ Поделиться"
+          "Поделиться"
         ],
         "checks": {
           "callbacks_bounded": true,
@@ -289,6 +289,7 @@
       "error_change_query": {
         "buttons": [
           "Изменить запрос",
+          "Отправить прямую ссылку",
           "← Главное меню"
         ],
         "checks": {
@@ -303,6 +304,7 @@
         },
         "ok": true,
         "rows": [
+          1,
           1,
           1
         ]
@@ -375,9 +377,10 @@
           "＋ Создать пост",
           "🎧 Попробовать на примере",
           "🧺 Подборка · 0",
-          "История",
-          "Как это работает?",
-          "••• Ещё"
+          "📝 Черновики",
+          "🕒 Недавние",
+          "⚙️ Настройки",
+          "Как это работает?"
         ],
         "checks": {
           "callbacks_bounded": true,
@@ -394,7 +397,7 @@
           1,
           1,
           2,
-          1,
+          2,
           1
         ]
       },
@@ -402,8 +405,9 @@
         "buttons": [
           "＋ Create post",
           "🧺 Crate · 2",
-          "History",
-          "••• More"
+          "📝 Drafts",
+          "🕒 Recent",
+          "⚙️ Settings"
         ],
         "checks": {
           "callbacks_bounded": true,
@@ -419,15 +423,16 @@
         "rows": [
           1,
           2,
-          1
+          2
         ]
       },
       "home_ru": {
         "buttons": [
           "＋ Создать пост",
           "🧺 Подборка · 2",
-          "История",
-          "••• Ещё"
+          "📝 Черновики",
+          "🕒 Недавние",
+          "⚙️ Настройки"
         ],
         "checks": {
           "callbacks_bounded": true,
@@ -443,7 +448,7 @@
         "rows": [
           1,
           2,
-          1
+          2
         ]
       }
     }

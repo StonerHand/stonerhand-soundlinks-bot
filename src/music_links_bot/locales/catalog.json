@@ -111,6 +111,18 @@
     "en": "Open old post",
     "ru": "Открыть старый пост"
   },
+  "drafts_empty": {
+    "en": "<b>No drafts yet</b>\n\nCreate a card and you can return to it here.",
+    "ru": "<b>Черновиков пока нет</b>\n\nСоздай карточку — к ней можно будет вернуться здесь."
+  },
+  "drafts_open": {
+    "en": "Open",
+    "ru": "Открыть"
+  },
+  "drafts_title": {
+    "en": "<b>Drafts</b>\n<i>Editable cards are kept separately from published history.</i>",
+    "ru": "<b>Черновики</b>\n<i>Карточки для редактирования хранятся отдельно от истории.</i>"
+  },
   "duplicate_repeat": {
     "en": "Publish again",
     "ru": "Опубликовать снова"
@@ -124,8 +136,8 @@
     "ru": "🚀 <b>Отправка</b>\n<i>Выбери, куда отправить готовый пост.</i>"
   },
   "ed_add_crate": {
-    "en": "+ Add to crate",
-    "ru": "+ В подборку"
+    "en": "＋ Add to crate",
+    "ru": "＋ В подборку"
   },
   "ed_admin_only": {
     "en": "Only the bot owner can publish to the channel",
@@ -543,6 +555,10 @@
     "en": "Release not found. Refine <code>artist — title</code> or send a direct link.",
     "ru": "Релиз не найден. Уточни <code>артист — название</code> или пришли прямую ссылку."
   },
+  "error_send_link": {
+    "en": "Send a direct link",
+    "ru": "Отправить прямую ссылку"
+  },
   "error_title": {
     "en": "Could not build the post",
     "ru": "Не получилось собрать пост"
@@ -587,6 +603,10 @@
     "en": "🧺 Crate · {count}",
     "ru": "🧺 Подборка · {count}"
   },
+  "home_drafts": {
+    "en": "📝 Drafts",
+    "ru": "📝 Черновики"
+  },
   "home_create": {
     "en": "＋ Create post",
     "ru": "＋ Создать пост"
@@ -600,16 +620,16 @@
     "ru": "Карточку можно изменить и отправить прямо в этом чате"
   },
   "home_more": {
-    "en": "••• More",
-    "ru": "••• Ещё"
+    "en": "⚙️ Settings",
+    "ru": "⚙️ Настройки"
   },
   "home_queue": {
     "en": "🕒 Publication queue",
     "ru": "🕒 Очередь публикаций"
   },
   "home_recent": {
-    "en": "History",
-    "ru": "История"
+    "en": "🕒 Recent",
+    "ru": "🕒 Недавние"
   },
   "home_title": {
     "en": "🎧 <b>Music post editor{name}</b>",
@@ -664,8 +684,8 @@
     "ru": "❓ <b>Как собрать пост</b>\n<i>Три шага — и карточка готова.</i>\n\n<blockquote><b>1 · Найди релиз</b>\nПришли ссылку или напиши <code>артист — трек</code>.\n\n<b>2 · Проверь карточку</b>\nБот добавит обложку, хэштеги и кнопки площадок.\n\n<b>3 · Отправь</b>\nСебе, в подборку, очередь или канал.</blockquote>\n\n<b>Полезные приёмы</b>\n• Текст над ссылкой станет <i>цитатой</i>.\n• Несколько ссылок превратятся в нумерованную подборку.\n• Форматирование подводки сохранится.\n\n<blockquote>⚡ Inline в любом чате:\n<code>@StonerHandBot Black Sabbath — Paranoid</code></blockquote>"
   },
   "menu_more": {
-    "en": "••• <b>More tools</b>\n<i>Useful extras without crowding the home screen.</i>\n\n<blockquote><b>Help</b> — a short guide\n<b>Services</b> — supported platforms\n<b>For channels</b> — automatic link replacement\n<b>Example</b> — a finished post preview\n<b>Privacy</b> — stored data and deletion controls</blockquote>",
-    "ru": "••• <b>Ещё возможности</b>\n<i>Всё полезное — без перегруженного главного экрана.</i>\n\n<blockquote><b>Помощь</b> — короткая инструкция\n<b>Сервисы</b> — поддерживаемые площадки\n<b>Для каналов</b> — автозамена ссылок\n<b>Пример</b> — как выглядит готовый пост\n<b>Приватность</b> — данные и их удаление</blockquote>"
+    "en": "⚙️ <b>Settings and help</b>\n<i>Reference pages and account controls.</i>\n\n<blockquote><b>Help</b> — a short guide\n<b>Services</b> — supported platforms\n<b>For channels</b> — automatic link replacement\n<b>Example</b> — a finished post preview\n<b>Privacy</b> — stored data and deletion controls</blockquote>",
+    "ru": "⚙️ <b>Настройки и помощь</b>\n<i>Справка и управление данными — в одном месте.</i>\n\n<blockquote><b>Помощь</b> — короткая инструкция\n<b>Сервисы</b> — поддерживаемые площадки\n<b>Для каналов</b> — автозамена ссылок\n<b>Пример</b> — как выглядит готовый пост\n<b>Приватность</b> — данные и их удаление</blockquote>"
   },
   "menu_platforms": {
     "en": "🎛 <b>Supported sources</b>\n<i>Send one link — the bot finds the other platforms.</i>\n\n<b>Music and podcasts</b>\n🟢 Spotify · ⚪ Apple Music / Podcasts\n🟠 SoundCloud · 🟦 Deezer\n⚫ Tidal · 🟡 Yandex Music\n\n<b>Video and radio</b>\n🔴 YouTube / YouTube Music · 📻 NTS Radio\n\n<b>Content types</b>\nTracks, albums, playlists, artists, podcasts, videos and radio shows.\n\n<blockquote>✨ The result: artwork, title, smart hashtags and buttons for every matched platform.</blockquote>\n\nNo link? Type <code>artist — track</code>.",
@@ -948,8 +968,8 @@
     "ru": "Отменить изменение"
   },
   "share_post": {
-    "en": "↗ Share",
-    "ru": "↗ Поделиться"
+    "en": "Share",
+    "ru": "Поделиться"
   },
   "start_using": {
     "en": "Done",

@@ -6,7 +6,7 @@
 
 [Open the bot](https://t.me/StonerHandBot) · [See the channel](https://t.me/stonerhand) · [Русская версия](README.ru.md)
 
-![Release](https://img.shields.io/badge/release-1.13.7-5b5bd6?style=flat-square)
+![Release](https://img.shields.io/badge/release-1.14.0-5b5bd6?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
@@ -82,9 +82,11 @@ is omitted instead of guessed.
 
 ## Telegram UX
 
-The home screen starts with **Create post** and explains every accepted input.
-An active card is recoverable by release name; collections and history stay on
-the second row. Less frequent tools live under one predictable **More** action.
+The home screen starts with the full-width **Create post** action and explains
+every accepted input. An active card is recoverable by release name. Editable
+**Drafts** and already delivered **Recent** posts are separate destinations, so
+unfinished work is never mixed with publishing history. Settings and help live
+under one predictable **Settings** action.
 On the first private `/start`, a packaged five-second animation demonstrates
 the complete link → card → publish flow once; it never replaces or delays the
 normal menu on later visits. A **Try an example** action starts a working inline
@@ -111,7 +113,9 @@ Native replies, editor callbacks and lookup orchestration are isolated from
 presentation. UI copy lives in a packaged RU/EN catalog, so wording can change
 without touching the execution path; placeholders and button hierarchy are
 verified by tests and the same read-only production smoke contract.
-Every error exposes one contextual recovery action. Native callback toasts
+Every error exposes contextual recovery without hiding the failed input. A
+not-found search repeats the exact query and offers both **Change query** and
+**Send direct link** before the route back home. Native callback toasts
 confirm settings, ordering and collection changes; short-lived undo covers
 editor changes and destructive collection actions. Successful delivery closes
 the editor with a compact **Post ready** state and a primary **Create another**.
@@ -130,8 +134,10 @@ owner's latest complete collection is also stored independently from later UI
 actions, so a Telegram-truncated raw URL list can be restored after a restart;
 an unverified list is rejected instead of becoming an apparently valid partial post.
 
-The universal Songlink/Odesli action owns the primary accent; direct providers
-remain calm shortcuts. A shared icon vocabulary is used across native screens,
+The universal Songlink/Odesli action is the first, full-width primary CTA;
+direct providers follow as calm secondary shortcuts. The same hierarchy is
+used by classic cards, previews and editor screens. A shared icon vocabulary is
+used across native screens,
 with optional Bot API 10.3 custom emoji IDs and a complete regular-emoji
 fallback. Rich cards use a magazine order — title, artwork, lead, body, actions
 and tags — without repeating the title below the cover. Semantic styles,

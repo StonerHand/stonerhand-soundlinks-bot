@@ -56,7 +56,7 @@ class PublicationGoldenTests(unittest.TestCase):
         )
         self.assertEqual(draft["v"], CURRENT_DRAFT_VERSION)
         labels = [button.text for row in keyboard.inline_keyboard for button in row]
-        self.assertEqual(labels[:2], ["🟢 Spotify", "🪩 Все платформы"])
+        self.assertEqual(labels[:2], ["🪩 Все платформы", "🟢 Spotify"])
         self.assertIn("Изменить", labels)
 
     def test_editor_card_snapshots_are_stable(self) -> None:
@@ -419,7 +419,10 @@ class TelegramUiContractTests(unittest.TestCase):
                 recovery=recovery,
             )
             self.assertEqual(keyboard.inline_keyboard[0][0].text, expected)
-            self.assertEqual([len(row) for row in keyboard.inline_keyboard], [1, 1])
+            expected_rows = [1, 1, 1] if recovery == "change" else [1, 1]
+            self.assertEqual(
+                [len(row) for row in keyboard.inline_keyboard], expected_rows
+            )
 
     def test_core_keyboards_have_valid_labels_and_callbacks(self) -> None:
         keyboards = [

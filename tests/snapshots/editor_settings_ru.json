@@ -2,8 +2,10 @@
   "text": "🎛 <b>Конструктор карточки</b>\n<i>Нажимай параметры — превью обновится сразу</i>\n<i>Обложка ✓ · Теги авто · 2 площадки · Авто</i>\n\n🎧 · <b>Sleep</b>\nDopesmoker\n\n#stonerhand #track",
   "rows": [
     [
-      ["🟢 Spotify", null, "https://open.spotify.com/track/1", null],
       ["🪩 Все платформы", null, "https://song.link/sleep", null]
+    ],
+    [
+      ["🟢 Spotify", null, "https://open.spotify.com/track/1", null]
     ],
     [
       ["Стиль · Обложка", "v2|editor|zs|draft123", null, null],

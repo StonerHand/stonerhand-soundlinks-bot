@@ -142,7 +142,7 @@ def build_release_smoke_report() -> dict[str, object]:
     channel_keyboard = add_share_button(
         classic_keyboard,
         share_query="sh5|t3E4MuCjetGIkeu2N8fFHgr",
-        label="↗ Поделиться",
+        label="Поделиться",
     )
     channel = RenderedPublication(
         text=classic.text,
@@ -214,7 +214,7 @@ def build_release_smoke_report() -> dict[str, object]:
     return {
         "ok": all(bool(case["ok"]) for case in cases.values()) and bool(ux["ok"]),
         "service": "publication-release-smoke",
-        "contract": 3,
+        "contract": 4,
         "cases": cases,
         "ux": ux,
     }

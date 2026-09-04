@@ -1656,6 +1656,11 @@ async def _reply_with_flow_error(
         BotErrorCode.RATE_LIMITED: "error_title_rate_limit",
     }.get(error.code, "error_title")
     text = f"⚠️ <b>{get_text(lang, title_key)}</b>\n{detail}"
+    if search_query and error.code in {
+        BotErrorCode.SEARCH_NOT_FOUND,
+        BotErrorCode.RELEASE_NOT_FOUND,
+    }:
+        text += f"\n\n<blockquote>{escape(search_query[:120])}</blockquote>"
     recovery = {
         BotErrorCode.INVALID_INPUT: "platforms",
         BotErrorCode.SEARCH_NOT_FOUND: "change",

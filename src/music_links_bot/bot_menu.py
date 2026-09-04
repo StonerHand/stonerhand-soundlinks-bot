@@ -13,7 +13,7 @@ from telegram.ext import ContextTypes
 from music_links_bot.bot_admin import stats_text
 from music_links_bot.bot_builder import active_card_label
 from music_links_bot.bot_crate import load_crate
-from music_links_bot.bot_recent import render_recent_view
+from music_links_bot.bot_recent import render_drafts_view, render_recent_view
 from music_links_bot.bot_runtime import BotRuntime, CallbackAction, UserSession
 from music_links_bot.bot_storage import load_draft
 from music_links_bot.bot_ui import (
@@ -36,6 +36,7 @@ MENU_GUIDE = "menu:guide"
 MENU_PLATFORMS = "menu:platforms"
 MENU_DEMO = "menu:demo"
 MENU_MORE = "menu:more"
+MENU_DRAFTS = "menu:drafts"
 MENU_RECENT = "menu:recent"
 MENU_PRIVACY = "menu:privacy"
 MENU_KEYS = frozenset(
@@ -46,6 +47,7 @@ MENU_KEYS = frozenset(
         MENU_PLATFORMS,
         MENU_DEMO,
         MENU_MORE,
+        MENU_DRAFTS,
         MENU_RECENT,
         MENU_PRIVACY,
     }
@@ -351,8 +353,19 @@ async def recent_view(
     query, context: ContextTypes.DEFAULT_TYPE, *, lang: str
 ) -> tuple[str, InlineKeyboardMarkup]:
     user_id = query.from_user.id if query.from_user else 0
-    session = await runtime_for(context).get_session(user_id, lang=lang)
     return await render_recent_view(
+        context,
+        user_id=user_id,
+        lang=lang,
+    )
+
+
+async def drafts_view(
+    query, context: ContextTypes.DEFAULT_TYPE, *, lang: str
+) -> tuple[str, InlineKeyboardMarkup]:
+    user_id = query.from_user.id if query.from_user else 0
+    session = await runtime_for(context).get_session(user_id, lang=lang)
+    return await render_drafts_view(
         context,
         user_id=user_id,
         lang=lang,
@@ -411,6 +424,8 @@ async def dispatch_menu_action(query, context, action: CallbackAction) -> None:
         return
     if action.action == "start":
         text, keyboard = await home_view(query, context, lang=lang)
+    elif action.action == "drafts":
+        text, keyboard = await drafts_view(query, context, lang=lang)
     elif action.action == "recent":
         text, keyboard = await recent_view(query, context, lang=lang)
     elif action.action == "create":
@@ -456,6 +471,10 @@ async def legacy_menu_callback(
     menu_key = query.data if query.data in MENU_KEYS else MENU_START
     if menu_key == MENU_START:
         text, keyboard = await home_view(query, context, lang=lang)
+    elif menu_key == MENU_DRAFTS:
+        text, keyboard = await drafts_view(query, context, lang=lang)
+    elif menu_key == MENU_RECENT:
+        text, keyboard = await recent_view(query, context, lang=lang)
     else:
         user_id = query.from_user.id if query.from_user else 0
         crate_count, _is_admin = await home_state(context, user_id)

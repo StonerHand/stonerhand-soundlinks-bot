@@ -33,6 +33,7 @@ ACTION_SPECS = tuple(
     for scope, code, name, kind in (
         ("menu", "start", "home", ActionKind.NAVIGATION),
         ("menu", "create", "create", ActionKind.NAVIGATION),
+        ("menu", "drafts", "drafts", ActionKind.NAVIGATION),
         ("menu", "recent", "history", ActionKind.NAVIGATION),
         ("menu", "help", "help", ActionKind.NAVIGATION),
         ("menu", "guide", "guide", ActionKind.NAVIGATION),

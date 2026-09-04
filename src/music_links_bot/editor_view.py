@@ -83,12 +83,16 @@ def render_track_draft(
 
     # The editor uses one accent action per screen. Platform links remain
     # neutral here; their brand styling is kept in the finished publication.
-    url_buttons = [
-        url_button(button.text, button.url) if button.url else button
-        for row in keyboard.inline_keyboard
-        for button in list(row)
+    # Preserve the finished card's row hierarchy: the universal hub stays on
+    # its own line and a provider shortcut never competes for the same tap area.
+    link_rows = [
+        [
+            url_button(button.text, button.url) if button.url else button
+            for button in row
+        ]
+        for row in keyboard.inline_keyboard[:2]
     ]
-    rows = [url_buttons[:2]] if url_buttons else []
+    rows = [row for row in link_rows if row]
     rows.extend(
         editor_more_rows(draft_id, draft) if settings else editor_rows(draft_id, draft)
     )

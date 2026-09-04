@@ -101,8 +101,20 @@ def build_start_keyboard(
         [
             _crate_button(lang, crate_count),
             InlineKeyboardButton(
+                get_text(lang, "home_drafts"),
+                callback_data=encode_callback("menu", "drafts"),
+            ),
+        ]
+    )
+    rows.append(
+        [
+            InlineKeyboardButton(
                 get_text(lang, "home_recent"),
                 callback_data=encode_callback("menu", "recent"),
+            ),
+            InlineKeyboardButton(
+                get_text(lang, "home_more"),
+                callback_data=encode_callback("menu", "more"),
             ),
         ]
     )
@@ -115,14 +127,6 @@ def build_start_keyboard(
                 )
             ]
         )
-    rows.append(
-        [
-            InlineKeyboardButton(
-                get_text(lang, "home_more"),
-                callback_data=encode_callback("menu", "more"),
-            )
-        ]
-    )
     if is_admin:
         rows.append(
             [
@@ -156,6 +160,18 @@ def build_section_keyboard(
     rows.append(
         [
             _crate_button(lang, crate_count),
+            InlineKeyboardButton(
+                get_text(lang, "home_drafts"),
+                callback_data=encode_callback("menu", "drafts"),
+            ),
+        ]
+    )
+    rows.append(
+        [
+            InlineKeyboardButton(
+                get_text(lang, "home_recent"),
+                callback_data=encode_callback("menu", "recent"),
+            ),
             InlineKeyboardButton(
                 get_text(lang, "home_more"),
                 callback_data=encode_callback("menu", "more"),
@@ -306,6 +322,15 @@ def build_error_keyboard(
             style="primary",
         )
     rows = [[primary]]
+    if recovery == "change":
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "error_send_link"),
+                    callback_data=encode_callback("menu", "create"),
+                )
+            ]
+        )
     rows.append(
         [
             InlineKeyboardButton(
