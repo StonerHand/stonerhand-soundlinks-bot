@@ -112,7 +112,7 @@ def main() -> int:
         print("\n".join(failures), file=sys.stderr)
         return 1
     print(
-        "Provider canary OK: Spotify, MusicBrainz, SoundCloud, YouTube, "
+        "Provider canary OK: Spotify, Deezer, MusicBrainz, SoundCloud, YouTube, "
         "Apple Music, NTS"
     )
     return 0

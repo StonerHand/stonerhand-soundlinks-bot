@@ -40,8 +40,8 @@ is omitted instead of guessed.
 - Shows a provider button only for a direct release URL returned by the
   resolver; search suggestions never masquerade as confirmed availability.
 - Keeps exact text-search and direct Apple Music results publishable with
-  verified iTunes metadata and artwork, and restores a direct Spotify URL only
-  from an exact artist/title relation in MusicBrainz.
+  verified iTunes metadata and artwork, and restores a direct Spotify URL from
+  an exact Deezer ISRC plus its confirmed MusicBrainz relation.
 - Combines matching links from different services into one release rather than
   publishing duplicate cards.
 - Removes Spotify page branding and SEO copy from release, artist and playlist
@@ -59,8 +59,8 @@ is omitted instead of guessed.
 - Works inline with `@StonerHandBot artist — track` in any conversation.
 - Uses Bot API 10.3 Rich Messages when supported and falls back to a complete
   classic card without losing artwork, text or platform links.
-- Verifies Spotify, MusicBrainz, SoundCloud, YouTube, Apple Music and NTS public
-  contracts every six hours, so upstream API or page drift is detected automatically.
+- Verifies Spotify, Deezer, MusicBrainz, SoundCloud, YouTube, Apple Music and NTS
+  public contracts every six hours, so upstream drift is detected automatically.
 - Validates every finished Classic, Rich, inline, channel, photo and audio post
   through one release contract before Telegram receives it.
 - Guards the home screen and editor with a production UI/UX contract: one

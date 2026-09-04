@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import unicodedata
 from collections.abc import Mapping
 
@@ -14,6 +15,7 @@ MUSICBRAINZ_CACHE_TTL_SECONDS = 7 * 24 * 3600
 MUSICBRAINZ_MISS_TTL_SECONDS = 6 * 3600
 MUSICBRAINZ_REQUEST_INTERVAL_SECONDS = 1.05
 MUSICBRAINZ_MIN_SCORE = 95
+_ISRC_RE = re.compile(r"^[A-Z]{2}[A-Z0-9]{3}\d{7}$")
 
 
 class MusicBrainzLookupError(RuntimeError):
@@ -35,6 +37,12 @@ class MusicBrainzClient:
             limits=httpx.Limits(max_connections=2, max_keepalive_connections=1),
             timeout=httpx.Timeout(timeout, connect=3.0),
         )
+        self._deezer_client = httpx.AsyncClient(
+            base_url="https://api.deezer.com",
+            headers={"User-Agent": HTTP_USER_AGENT, "Accept": "application/json"},
+            limits=httpx.Limits(max_connections=2, max_keepalive_connections=1),
+            timeout=httpx.Timeout(timeout, connect=3.0),
+        )
         self._cache: TTLCache[str] = TTLCache(ttl_seconds=MUSICBRAINZ_CACHE_TTL_SECONDS)
         self._miss_cache: TTLCache[bool] = TTLCache(
             ttl_seconds=MUSICBRAINZ_MISS_TTL_SECONDS
@@ -50,7 +58,10 @@ class MusicBrainzClient:
         if pending:
             await asyncio.gather(*pending, return_exceptions=True)
         self._inflight.clear()
-        await self._client.aclose()
+        await asyncio.gather(
+            self._client.aclose(),
+            self._deezer_client.aclose(),
+        )
 
     async def lookup_spotify_release(
         self,
@@ -115,6 +126,22 @@ class MusicBrainzClient:
         entity_type: str,
         expected_spotify_type: str,
     ) -> str | None:
+        if entity_type == "recording":
+            isrc = await self._lookup_exact_isrc(artist=artist, title=title)
+            if isrc:
+                payload = await self._get_json(
+                    f"/isrc/{isrc}",
+                    params={"inc": "recording-rels+url-rels", "fmt": "json"},
+                )
+                spotify_url = _extract_exact_isrc_spotify_url(
+                    payload,
+                    artist=artist,
+                    title=title,
+                )
+                if spotify_url:
+                    self._cache.set(cache_key, spotify_url)
+                    return spotify_url
+
         entity_id = await self._find_exact_entity_id(
             artist=artist,
             title=title,
@@ -138,6 +165,23 @@ class MusicBrainzClient:
 
         self._cache.set(cache_key, spotify_url)
         return spotify_url
+
+    async def _lookup_exact_isrc(self, *, artist: str, title: str) -> str | None:
+        query = f'artist:"{artist}" track:"{title}"'
+        try:
+            response = await self._deezer_client.get(
+                "/search",
+                params={"q": query, "limit": 5},
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except (httpx.HTTPError, ValueError):
+            return None
+        return _extract_exact_deezer_isrc(
+            payload,
+            artist=artist,
+            title=title,
+        )
 
     async def _find_exact_entity_id(
         self,
@@ -303,6 +347,62 @@ def _extract_spotify_url(
         clean_url = cache_key_for_url(resource)
         if spotify_url_type(clean_url) == expected_type:
             return clean_url
+    return None
+
+
+def _extract_exact_deezer_isrc(
+    payload: object,
+    *,
+    artist: str,
+    title: str,
+) -> str | None:
+    if not isinstance(payload, Mapping):
+        return None
+    results = payload.get("data")
+    if not isinstance(results, list):
+        return None
+
+    expected_artist = _match_key(artist)
+    expected_title = _match_key(title)
+    for result in results:
+        if not isinstance(result, Mapping):
+            continue
+        result_artist = result.get("artist")
+        artist_name = (
+            result_artist.get("name") if isinstance(result_artist, Mapping) else None
+        )
+        if _match_key(artist_name) != expected_artist:
+            continue
+        result_titles = (result.get("title"), result.get("title_short"))
+        if expected_title not in {_match_key(value) for value in result_titles}:
+            continue
+        isrc = str(result.get("isrc") or "").strip().upper()
+        if _ISRC_RE.fullmatch(isrc):
+            return isrc
+    return None
+
+
+def _extract_exact_isrc_spotify_url(
+    payload: Mapping[str, object],
+    *,
+    artist: str,
+    title: str,
+) -> str | None:
+    recordings = payload.get("recordings")
+    if not isinstance(recordings, list):
+        return None
+
+    expected_artist = _match_key(artist)
+    expected_title = _match_key(title)
+    for recording in recordings:
+        if not isinstance(recording, Mapping):
+            continue
+        if _match_key(recording.get("title")) != expected_title:
+            continue
+        if expected_artist not in _artist_credit_keys(recording.get("artist-credit")):
+            continue
+        if spotify_url := _extract_spotify_url(recording, expected_type="track"):
+            return spotify_url
     return None
 
 

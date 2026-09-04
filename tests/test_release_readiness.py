@@ -98,6 +98,7 @@ class ReleaseReadinessTests(unittest.TestCase):
         self.assertIn("python tests/e2e/provider_canary.py", workflow)
         for provider in (
             "Spotify",
+            "Deezer",
             "MusicBrainz",
             "SoundCloud",
             "YouTube",
