@@ -6,7 +6,7 @@
 
 [Открыть бота](https://t.me/StonerHandBot) · [Посмотреть канал](https://t.me/stonerhand) · [English](README.md)
 
-![Release](https://img.shields.io/badge/release-1.15.1-5b5bd6?style=flat-square)
+![Release](https://img.shields.io/badge/release-1.15.2-5b5bd6?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
@@ -127,8 +127,9 @@ UI-тексты хранятся в отдельном RU/EN-каталоге: �
 повторяется, служебный remaster-хвост не занимает место, короткие названия стоят
 попарно, а длинные получают отдельную строку. Превью сохраняет точный счётчик
 релизов, но не повторяет иконки, исполнителя и служебный remaster-хвост. Подборка
-намеренно сохраняет знакомый Classic-вид и крупное preview первого релиза:
-автоматический Rich-рендер или коллаж больше не меняет оформление готового поста.
+сохраняет знакомый Classic-вид, а полный набор из 2–6 релизов получает единый
+квадратный коллаж из разных обложек. Если безопасных обложек меньше двух,
+остаётся крупное preview первого релиза.
 Публичная замена атомарна: если одна ссылка не обработана, бот сохраняет исходное
 сообщение и не публикует сокращённую подборку. Кнопка **Поделиться** передаёт всю
 подборку одним компактным запросом. Последняя полная подборка и её форматированная
@@ -224,8 +225,8 @@ Cron остаётся резервом. GitHub secret `CRON_SECRET` должен
 `ADMIN_CHAT_ID`, `PUBLISH_CHAT_ID`, `SONGLINK_API_KEY` и параметры оформления
 необязательны и описаны в [.env.example](.env.example).
 
-`COLLECTION_COLLAGE_ENABLED=0` остаётся совместимым переключателем старой
-генерации коллажей; новые подборки всегда используют preview первого релиза.
+`COLLECTION_COLLAGE_ENABLED=0` мгновенно отключает коллажи и возвращает preview
+первого релиза, не меняя остальной Classic-формат.
 `BOT_SAFE_MODE=1` отключает все дополнительные capability-gated пути, сохраняя
 полноценный Classic fallback.
 

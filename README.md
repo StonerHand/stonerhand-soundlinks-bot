@@ -6,7 +6,7 @@
 
 [Open the bot](https://t.me/StonerHandBot) · [See the channel](https://t.me/stonerhand) · [Русская версия](README.ru.md)
 
-![Release](https://img.shields.io/badge/release-1.15.1-5b5bd6?style=flat-square)
+![Release](https://img.shields.io/badge/release-1.15.2-5b5bd6?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
@@ -126,9 +126,10 @@ Collection keyboards adapt to their content: a shared artist is not repeated,
 technical remaster suffixes do not consume button space, short titles share a
 row and long labels receive the full width. The preview keeps the exact release
 count without repeating type icons, a shared artist or technical remaster text.
-A collection deliberately keeps the familiar Classic layout and the large
-preview of its first release; automatic Rich or collage rendering never changes
-the final post. Incomplete collections use the same visual language so status is
+A collection keeps the familiar Classic layout while a complete set of 2–6
+releases receives one square collage made from its distinct covers. If fewer
+than two safe covers are available, the first release remains the fallback.
+Incomplete collections use the same visual language so status is
 communicated by text rather than a second card design. Public replacement is
 atomic: if one source fails, the bot keeps the original message and never
 publishes a shortened collection. Collection sharing uses one compact query
@@ -222,8 +223,8 @@ is strictly read-only and reports the latest worker tick.
 `ADMIN_CHAT_ID`, `PUBLISH_CHAT_ID`, `SONGLINK_API_KEY` and presentation flags
 are optional and documented in [.env.example](.env.example).
 
-`COLLECTION_COLLAGE_ENABLED=0` remains as a compatibility switch for legacy
-collage generation; new collections always use the Classic first-release preview.
+`COLLECTION_COLLAGE_ENABLED=0` disables collection collages immediately and
+falls back to the first-release preview without changing the Classic layout.
 `BOT_SAFE_MODE=1` disables every capability-gated enhancement and keeps the
 complete Classic fallback available.
 

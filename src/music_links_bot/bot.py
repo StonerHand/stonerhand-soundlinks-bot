@@ -138,6 +138,7 @@ from music_links_bot.channel_templates import (
     save_channel_template,
 )
 from music_links_bot.chat_access import check_publish_access
+from music_links_bot.collection_collage import collection_collage_preview_url
 from music_links_bot.constants import MAX_LINKS_PER_MESSAGE
 from music_links_bot.draft_model import new_track_draft
 from music_links_bot.editor_view import (
@@ -2090,10 +2091,10 @@ async def _send_track_matches(
             prefix_html=user_prefix,
             body_html=collection_body,
         )
-        # Preserve the familiar classic preview of the first release. A
-        # generated collage makes the post look like a different Rich card.
         collection_preview = (
-            _select_preview_url(tracks[0].links, context) or tracks[0].thumbnail_url
+            (collection_collage_preview_url(tracks) if len(tracks) == total else None)
+            or _select_preview_url(tracks[0].links, context)
+            or tracks[0].thumbnail_url
         )
         collection_sources = tuple(
             url for track in tracks for url in track.links.values()

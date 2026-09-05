@@ -85,7 +85,7 @@ from music_links_bot.url_utils import (
 
 LOGGER = logging.getLogger(__name__)
 INLINE_CACHE_SECONDS = 1800
-INLINE_COLLECTION_RESULT_VERSION = "v4"
+INLINE_COLLECTION_RESULT_VERSION = "v5"
 INLINE_TRUNCATION_GUARD_LENGTH = 240
 
 

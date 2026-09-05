@@ -83,7 +83,7 @@
       ],
       "mode": "classic",
       "ok": true,
-      "preview_host": "open.spotify.com"
+      "preview_host": "tg-bot-sh.vercel.app"
     },
     "collection_partial": {
       "buttons": [
@@ -199,7 +199,7 @@
       "preview_host": "i1.sndcdn.com"
     }
   },
-  "contract": 4,
+  "contract": 5,
   "ok": true,
   "service": "publication-release-smoke",
   "ux": {

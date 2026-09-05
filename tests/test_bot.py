@@ -1,4 +1,5 @@
 import asyncio
+import os
 import sys
 import unittest
 from dataclasses import asdict
@@ -1726,7 +1727,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.title, "Подборка · 4 релиза")
         self.assertIn("Track 3", result.input_message_content.message_text)
 
-    async def test_classic_inline_collection_uses_first_release_preview(self) -> None:
+    async def test_classic_inline_collection_uses_collage_preview(self) -> None:
         class DistinctArtworkClient:
             async def lookup_track(self, source_url: str) -> TrackMatch:
                 track_id = source_url.rsplit("/", 1)[-1]
@@ -1738,19 +1739,24 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
                     thumbnail_url=f"https://i.scdn.co/{track_id}.jpg",
                 )
 
-        result = await _build_inline_collection_result(
-            [
-                "https://open.spotify.com/track/abc",
-                "https://open.spotify.com/track/def",
-            ],
-            ContextStub(songlink_client=DistinctArtworkClient()),
-            lang="ru",
-        )
+        with patch.dict(
+            os.environ,
+            {"WEBHOOK_BASE_URL": "https://bot.example", "BOT_TOKEN": "secret"},
+            clear=True,
+        ):
+            result = await _build_inline_collection_result(
+                [
+                    "https://open.spotify.com/track/abc",
+                    "https://open.spotify.com/track/def",
+                ],
+                ContextStub(songlink_client=DistinctArtworkClient()),
+                lang="ru",
+            )
 
         self.assertIsNotNone(result)
         assert result is not None
         preview = result.input_message_content.link_preview_options
-        self.assertEqual(preview.url, "https://open.spotify.com/track/abc")
+        self.assertTrue(preview.url.startswith("https://bot.example/api/collage?"))
         self.assertTrue(preview.prefer_large_media)
 
     async def test_inline_collection_restores_matching_editorial_intro(self) -> None:

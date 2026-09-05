@@ -7,6 +7,7 @@ from urllib.parse import parse_qs, urlparse
 
 from telegram import InlineKeyboardMarkup
 
+from music_links_bot.collection_collage import collection_collage_preview_url
 from music_links_bot.formatter import (
     format_artist_collection_message,
     format_collection_message,
@@ -215,7 +216,15 @@ def render_inline_share_card(
 ) -> InlineShareCard:
     found_count = bundle.item_count
     total_count = max(found_count, int(requested_count or found_count))
-    preview_url = _bundle_preview_url(bundle, context)
+    preview_url = _bundle_preview_url(
+        bundle,
+        context,
+        allow_collage=(
+            bundle.content_type_count == 1
+            and bool(bundle.tracks)
+            and found_count == total_count
+        ),
+    )
 
     if bundle.content_type_count == 1 and bundle.tracks:
         title = collection_result_title(
@@ -386,8 +395,15 @@ def _add_inline_retry_button(
 def _bundle_preview_url(
     bundle: Any,
     context: Any,
+    *,
+    allow_collage: bool = True,
 ) -> str | None:
     if bundle.tracks:
+        collage_url = (
+            collection_collage_preview_url(bundle.tracks) if allow_collage else None
+        )
+        if collage_url:
+            return collage_url
         track = bundle.tracks[0]
         return _select_preview_url(track.links, context) or track.thumbnail_url
     if bundle.playlists:

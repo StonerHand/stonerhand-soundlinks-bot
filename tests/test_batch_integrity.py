@@ -632,7 +632,14 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
         )
         prefix = "<blockquote>Авторская подводка</blockquote>\n\n"
 
-        with patch("music_links_bot.bot._send_track_result", new=AsyncMock()) as send:
+        collage_url = "https://bot.example/api/collage?p=fixture&s=signature"
+        with (
+            patch(
+                "music_links_bot.bot.collection_collage_preview_url",
+                return_value=collage_url,
+            ),
+            patch("music_links_bot.bot._send_track_result", new=AsyncMock()) as send,
+        ):
             await _send_track_matches(
                 message,
                 context,
@@ -651,7 +658,7 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Подборка · 2 релиза", rendered)
         self.assertEqual(
             send.await_args.kwargs["preview_url"],
-            "https://open.spotify.com/track/classic-A",
+            collage_url,
         )
 
 

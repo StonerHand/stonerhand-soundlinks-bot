@@ -1,4 +1,6 @@
+import os
 import unittest
+from unittest.mock import patch
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -152,7 +154,7 @@ class SharingTests(unittest.TestCase):
             )
         )
 
-    def test_partial_inline_collection_uses_first_release_preview(self) -> None:
+    def test_partial_inline_collection_does_not_imply_a_complete_collage(self) -> None:
         tracks = [
             TrackMatch(
                 title=f"Track {index}",
@@ -171,17 +173,22 @@ class SharingTests(unittest.TestCase):
             artists=[],
         )
 
-        card = render_inline_share_card(
-            bundle,
-            context=None,
-            lang="ru",
-            share_query="retry",
-            share_label="Поделиться",
-            requested_count=3,
-        )
+        with patch.dict(
+            os.environ,
+            {"WEBHOOK_BASE_URL": "https://bot.example", "BOT_TOKEN": "secret"},
+            clear=True,
+        ):
+            card = render_inline_share_card(
+                bundle,
+                context=None,
+                lang="ru",
+                share_query="retry",
+                share_label="Поделиться",
+                requested_count=3,
+            )
         self.assertEqual(card.preview_url, "https://open.spotify.com/track/0")
 
-    def test_complete_inline_collection_keeps_old_first_release_preview(self) -> None:
+    def test_complete_inline_collection_uses_all_distinct_artworks(self) -> None:
         tracks = [
             TrackMatch(
                 title=f"Track {index}",
@@ -200,15 +207,22 @@ class SharingTests(unittest.TestCase):
             artists=[],
         )
 
-        card = render_inline_share_card(
-            bundle,
-            context=None,
-            lang="ru",
-            share_query="retry",
-            share_label="Поделиться",
-        )
+        with patch.dict(
+            os.environ,
+            {"WEBHOOK_BASE_URL": "https://bot.example", "BOT_TOKEN": "secret"},
+            clear=True,
+        ):
+            card = render_inline_share_card(
+                bundle,
+                context=None,
+                lang="ru",
+                share_query="retry",
+                share_label="Поделиться",
+            )
 
-        self.assertEqual(card.preview_url, "https://open.spotify.com/track/0")
+        self.assertIsNotNone(card.preview_url)
+        assert card.preview_url is not None
+        self.assertTrue(card.preview_url.startswith("https://bot.example/api/collage?"))
 
     def test_inline_collection_preserves_intro_with_body_budget(self) -> None:
         tracks = [
