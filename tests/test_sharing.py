@@ -1,6 +1,4 @@
-import os
 import unittest
-from unittest.mock import patch
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -154,7 +152,7 @@ class SharingTests(unittest.TestCase):
             )
         )
 
-    def test_partial_inline_collection_never_uses_finished_collage(self) -> None:
+    def test_partial_inline_collection_uses_first_release_preview(self) -> None:
         tracks = [
             TrackMatch(
                 title=f"Track {index}",
@@ -173,25 +171,17 @@ class SharingTests(unittest.TestCase):
             artists=[],
         )
 
-        with patch.dict(
-            os.environ,
-            {"WEBHOOK_BASE_URL": "https://bot.example", "BOT_TOKEN": "secret"},
-            clear=True,
-        ):
-            card = render_inline_share_card(
-                bundle,
-                context=None,
-                lang="ru",
-                share_query="retry",
-                share_label="Поделиться",
-                requested_count=3,
-            )
-
-        self.assertFalse(
-            str(card.preview_url).startswith("https://bot.example/api/collage?")
+        card = render_inline_share_card(
+            bundle,
+            context=None,
+            lang="ru",
+            share_query="retry",
+            share_label="Поделиться",
+            requested_count=3,
         )
+        self.assertEqual(card.preview_url, "https://open.spotify.com/track/0")
 
-    def test_complete_inline_collection_uses_signed_collage_preview(self) -> None:
+    def test_complete_inline_collection_keeps_old_first_release_preview(self) -> None:
         tracks = [
             TrackMatch(
                 title=f"Track {index}",
@@ -210,22 +200,45 @@ class SharingTests(unittest.TestCase):
             artists=[],
         )
 
-        with patch.dict(
-            os.environ,
-            {"WEBHOOK_BASE_URL": "https://bot.example", "BOT_TOKEN": "secret"},
-            clear=True,
-        ):
-            card = render_inline_share_card(
-                bundle,
-                context=None,
-                lang="ru",
-                share_query="retry",
-                share_label="Поделиться",
-            )
+        card = render_inline_share_card(
+            bundle,
+            context=None,
+            lang="ru",
+            share_query="retry",
+            share_label="Поделиться",
+        )
 
-        self.assertIsNotNone(card.preview_url)
-        assert card.preview_url is not None
-        self.assertTrue(card.preview_url.startswith("https://bot.example/api/collage?"))
+        self.assertEqual(card.preview_url, "https://open.spotify.com/track/0")
+
+    def test_inline_collection_preserves_intro_with_body_budget(self) -> None:
+        tracks = [
+            TrackMatch(
+                title=f"Track {index}",
+                artist="Artist",
+                links={"spotify": f"https://open.spotify.com/track/{index}"},
+            )
+            for index in range(2)
+        ]
+        bundle = LookupBundle(
+            tracks=tracks,
+            unavailable_urls=[],
+            videos=[],
+            radios=[],
+            playlists=[],
+            artists=[],
+        )
+
+        card = render_inline_share_card(
+            bundle,
+            context=None,
+            lang="ru",
+            share_query="retry",
+            share_label="Поделиться",
+            intro_html="<blockquote>Авторская подводка</blockquote>\n\n",
+        )
+
+        self.assertTrue(card.text.startswith("<blockquote>Авторская подводка"))
+        self.assertIn("Подборка · 2 релиза", card.text)
 
     def test_spotify_collection_is_compact_and_round_trips(self) -> None:
         urls = [

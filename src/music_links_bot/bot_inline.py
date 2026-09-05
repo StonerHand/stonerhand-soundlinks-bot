@@ -85,7 +85,7 @@ from music_links_bot.url_utils import (
 
 LOGGER = logging.getLogger(__name__)
 INLINE_CACHE_SECONDS = 1800
-INLINE_COLLECTION_RESULT_VERSION = "v3"
+INLINE_COLLECTION_RESULT_VERSION = "v4"
 INLINE_TRUNCATION_GUARD_LENGTH = 240
 
 
@@ -726,6 +726,15 @@ async def _build_inline_collection_result(
         return None
 
     share_query = build_share_query(source_urls)
+    intro_html = ""
+    runtime = context.application.bot_data.get("runtime")
+    get_collection_intro = getattr(runtime, "get_collection_intro", None)
+    if user_id > 0 and callable(get_collection_intro):
+        intro_html = await get_collection_intro(
+            user_id,
+            urls=source_urls,
+            lang=lang,
+        )
     card = render_inline_share_card(
         bundle,
         context=context,
@@ -733,6 +742,7 @@ async def _build_inline_collection_result(
         share_query=share_query,
         share_label=get_text(lang, "share_post"),
         requested_count=len(source_urls),
+        intro_html=intro_html,
     )
     return _inline_article(
         INLINE_COLLECTION_RESULT_VERSION + "|" + "|".join(source_urls),

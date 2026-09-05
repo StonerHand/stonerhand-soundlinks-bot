@@ -1,5 +1,4 @@
 import asyncio
-import os
 import sys
 import unittest
 from dataclasses import asdict
@@ -58,6 +57,7 @@ from music_links_bot.bot_menu import (
     platforms_command,
     start_command,
 )
+from music_links_bot.bot_runtime import BotRuntime
 from music_links_bot.bot_stats import message_text as _message_text
 from music_links_bot.bot_storage import (
     MAX_MEMORY_DRAFTS,
@@ -1726,7 +1726,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.title, "Подборка · 4 релиза")
         self.assertIn("Track 3", result.input_message_content.message_text)
 
-    async def test_classic_inline_collection_uses_collage_link_preview(self) -> None:
+    async def test_classic_inline_collection_uses_first_release_preview(self) -> None:
         class DistinctArtworkClient:
             async def lookup_track(self, source_url: str) -> TrackMatch:
                 track_id = source_url.rsplit("/", 1)[-1]
@@ -1738,25 +1738,51 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
                     thumbnail_url=f"https://i.scdn.co/{track_id}.jpg",
                 )
 
-        with patch.dict(
-            os.environ,
-            {"WEBHOOK_BASE_URL": "https://bot.example", "BOT_TOKEN": "secret"},
-            clear=True,
-        ):
-            result = await _build_inline_collection_result(
-                [
-                    "https://open.spotify.com/track/abc",
-                    "https://open.spotify.com/track/def",
-                ],
-                ContextStub(songlink_client=DistinctArtworkClient()),
-                lang="ru",
-            )
+        result = await _build_inline_collection_result(
+            [
+                "https://open.spotify.com/track/abc",
+                "https://open.spotify.com/track/def",
+            ],
+            ContextStub(songlink_client=DistinctArtworkClient()),
+            lang="ru",
+        )
 
         self.assertIsNotNone(result)
         assert result is not None
         preview = result.input_message_content.link_preview_options
-        self.assertTrue(preview.url.startswith("https://bot.example/api/collage?"))
+        self.assertEqual(preview.url, "https://open.spotify.com/track/abc")
         self.assertTrue(preview.prefer_large_media)
+
+    async def test_inline_collection_restores_matching_editorial_intro(self) -> None:
+        urls = [
+            "https://open.spotify.com/track/abc",
+            "https://open.spotify.com/track/def",
+        ]
+        context = ContextStub()
+        runtime = BotRuntime()
+        context.application.bot_data["runtime"] = runtime
+        await runtime.remember_collection(
+            77,
+            urls=urls,
+            intro_html="<blockquote><b>Подводка недели</b></blockquote>\n\n",
+            lang="ru",
+        )
+
+        result = await _build_inline_collection_result(
+            urls,
+            context,
+            lang="ru",
+            user_id=77,
+        )
+
+        self.assertIsNotNone(result)
+        assert result is not None
+        self.assertTrue(
+            result.input_message_content.message_text.startswith(
+                "<blockquote><b>Подводка недели</b>"
+            )
+        )
+        self.assertIn("Подборка · 2 релиза", result.input_message_content.message_text)
 
     async def test_inline_share_handler_returns_one_collection_card(self) -> None:
         from music_links_bot.bot_inline import inline_query_handler
@@ -2529,7 +2555,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("<blockquote>", message.replies[0])
         self.assertEqual(len(context.application.bot_data["drafts"]), 1)
 
-    async def test_collection_omits_note_and_source_links(self) -> None:
+    async def test_collection_keeps_note_and_omits_source_links(self) -> None:
         class DistinctLookupClient:
             async def lookup_track(self, source_url: str) -> TrackMatch:
                 track_id = source_url.split("/track/", 1)[-1].split("?", 1)[0]
@@ -2552,9 +2578,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertNotIn("Три трека для вечерней подборки", message.replies[0])
+        self.assertIn("Три трека для вечерней подборки", message.replies[0])
         self.assertNotIn("open.spotify.com", message.replies[0])
-        self.assertNotIn("<blockquote>", message.replies[0])
+        self.assertIn("<blockquote>", message.replies[0])
 
     async def test_collection_post_hides_internal_duplicate_status(self) -> None:
         class DistinctLookupClient:
@@ -2784,8 +2810,8 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(context.bot.sent_media_groups), 1)
         media = context.bot.sent_media_groups[0]["media"]
         caption = media[0].caption
-        self.assertNotIn("вечерний набор", caption)
-        self.assertNotIn("<blockquote>", caption)
+        self.assertIn("вечерний набор", caption)
+        self.assertIn("<blockquote>", caption)
         self.assertIn("<b>Песня + клип</b>", caption)
         self.assertIn("<b>Youth Code</b> — Transitions", caption)
         self.assertIn("<b>SANSAE Live Session Vol.3 - Melon</b>", caption)
@@ -2806,8 +2832,8 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertNotIn("пачка ссылок", message.replies[0])
-        self.assertNotIn("<blockquote>", message.replies[0])
+        self.assertIn("пачка ссылок", message.replies[0])
+        self.assertIn("<blockquote>", message.replies[0])
         self.assertIn("<b>Women of Punk</b>", message.replies[0])
         self.assertIn(
             "<b>SANSAE Live Session Vol.3 - Melon</b>",
@@ -2828,8 +2854,8 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertNotIn("радио и видео", message.replies[0])
-        self.assertNotIn("<blockquote>", message.replies[0])
+        self.assertIn("радио и видео", message.replies[0])
+        self.assertIn("<blockquote>", message.replies[0])
         self.assertIn("<b>Dark Energy w/ Guest</b>", message.replies[0])
         self.assertIn(
             "<b>SANSAE Live Session Vol.3 - Melon</b>",

@@ -9,6 +9,7 @@ from math import ceil
 from time import monotonic, time
 from typing import Any
 
+from music_links_bot.bot_builder import MAX_INTRO_LENGTH, fit_telegram_html
 from music_links_bot.constants import MAX_LINKS_PER_MESSAGE
 from music_links_bot.errors import (
     BotErrorCode as _BotErrorCode,
@@ -33,9 +34,10 @@ RATE_LIMIT_WINDOW_SECONDS = 60
 RATE_LIMIT_MAX_REQUESTS = 12
 ACTIVE_REQUEST_TTL_SECONDS = 5 * 60
 SESSION_TTL_SECONDS = 30 * 24 * 3600
-SESSION_SCHEMA_VERSION = 6
-COLLECTION_STATE_VERSION = 1
+SESSION_SCHEMA_VERSION = 7
+COLLECTION_STATE_VERSION = 2
 MAX_SESSION_TEXT_LENGTH = 2_048
+MAX_COLLECTION_INTRO_HTML_LENGTH = 20_000
 MAX_MEMORY_SESSIONS = 500
 MAX_MEMORY_KEYS = 2_000
 CIRCUIT_FAILURE_THRESHOLD = 3
@@ -114,6 +116,25 @@ def _normalize_collection_urls(value: object) -> list[str]:
     return urls
 
 
+def _normalize_collection_intro_html(value: object) -> str:
+    """Accept only the bounded blockquote produced by ``build_user_prefix``."""
+    if not isinstance(value, str):
+        return ""
+    clean = value.strip()
+    opening = "<blockquote>"
+    closing = "</blockquote>"
+    if (
+        not clean
+        or len(clean) > MAX_COLLECTION_INTRO_HTML_LENGTH
+        or not clean.startswith(opening)
+        or not clean.endswith(closing)
+    ):
+        return ""
+    inner = clean[len(opening) : -len(closing)]
+    fitted = fit_telegram_html(inner, MAX_INTRO_LENGTH).strip()
+    return f"{opening}{fitted}{closing}\n\n" if fitted else ""
+
+
 @dataclass(slots=True)
 class UserSession:
     user_id: int
@@ -123,6 +144,7 @@ class UserSession:
     last_query: str = ""
     last_action: dict[str, Any] = field(default_factory=dict)
     last_collection_urls: list[str] = field(default_factory=list)
+    last_collection_intro_html: str = ""
     pending_input: dict[str, Any] = field(default_factory=dict)
     active_draft_id: str = ""
     recent_draft_ids: list[str] = field(default_factory=list)
@@ -148,6 +170,9 @@ class UserSession:
                 ),
                 last_collection_urls=_normalize_collection_urls(
                     payload.get("last_collection_urls")
+                ),
+                last_collection_intro_html=_normalize_collection_intro_html(
+                    payload.get("last_collection_intro_html")
                 ),
                 pending_input=_normalize_pending_input(payload.get("pending_input")),
                 active_draft_id=str(payload.get("active_draft_id") or "")[:32],
@@ -334,6 +359,7 @@ class BotRuntime:
         user_id: int,
         *,
         urls: list[str],
+        intro_html: str = "",
         lang: str = "ru",
     ) -> None:
         """Persist the latest complete collection independently of UI actions."""
@@ -342,11 +368,18 @@ class BotRuntime:
             return
         session = await self.get_session(user_id, lang=lang)
         session.last_collection_urls = normalized
+        session.last_collection_intro_html = _normalize_collection_intro_html(
+            intro_html
+        )
         await self.save_session(session)
         if self.kv is not None:
             await self.kv.set_json(
                 f"collection:v1:{user_id}",
-                {"v": COLLECTION_STATE_VERSION, "urls": normalized},
+                {
+                    "v": COLLECTION_STATE_VERSION,
+                    "urls": normalized,
+                    "intro_html": session.last_collection_intro_html,
+                },
                 ttl_seconds=SESSION_TTL_SECONDS,
             )
 
@@ -365,6 +398,31 @@ class BotRuntime:
                     return urls
         session = await self.get_session(user_id, lang=lang)
         return list(session.last_collection_urls)
+
+    async def get_collection_intro(
+        self,
+        user_id: int,
+        *,
+        urls: list[str],
+        lang: str = "ru",
+    ) -> str:
+        """Return an intro only for the exact collection it was written for."""
+        normalized = _normalize_collection_urls(urls)
+        if len(normalized) < 2:
+            return ""
+        if self.kv is not None:
+            payload = await self.kv.get_json(f"collection:v1:{user_id}")
+            if (
+                isinstance(payload, dict)
+                and _normalize_collection_urls(payload.get("urls")) == normalized
+            ):
+                intro = _normalize_collection_intro_html(payload.get("intro_html"))
+                if intro:
+                    return intro
+        session = await self.get_session(user_id, lang=lang)
+        if session.last_collection_urls != normalized:
+            return ""
+        return _normalize_collection_intro_html(session.last_collection_intro_html)
 
     async def claim_callback(self, callback_id: str) -> bool:
         key = f"callback:v2:{callback_id}"

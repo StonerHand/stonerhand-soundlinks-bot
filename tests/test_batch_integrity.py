@@ -552,6 +552,108 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
             [url.split("?", 1)[0] for url in urls],
         )
 
+    async def test_complete_public_batch_preserves_editorial_intro(self) -> None:
+        urls = [
+            "https://open.spotify.com/track/editorial-a",
+            "https://open.spotify.com/track/editorial-b",
+        ]
+        message = SimpleNamespace(
+            text=f"Новая музыка недели\n\n{urls[0]}\n{urls[1]}",
+            caption=None,
+            entities=(),
+            caption_entities=(),
+            from_user=None,
+            chat=SimpleNamespace(type="channel", id=-100),
+            chat_id=-100,
+        )
+        prefix = build_user_prefix(message)
+        bundle = LookupBundle(
+            tracks=[
+                TrackMatch(
+                    title=title,
+                    artist="Artist",
+                    links={"spotify": source_url},
+                )
+                for title, source_url in zip(("A", "B"), urls, strict=True)
+            ],
+            unavailable_urls=[],
+            videos=[],
+            radios=[],
+            playlists=[],
+            artists=[],
+            statuses=[
+                SourceStatus(source_url, "songlink", "success") for source_url in urls
+            ],
+        )
+        request = LookupRequest(
+            message_text=message.text,
+            source_urls=urls,
+            is_private=False,
+            lang="ru",
+            user_id=7,
+            include_channel_button=False,
+            include_hashtags=True,
+        )
+
+        with patch("music_links_bot.bot._send_track_matches", new=AsyncMock()) as send:
+            await _deliver_lookup_bundle(
+                message,
+                SimpleNamespace(
+                    bot=object(),
+                    application=SimpleNamespace(bot_data={}),
+                ),
+                bundle,
+                request=request,
+                user_prefix=prefix,
+            )
+
+        self.assertIn("Новая музыка недели", prefix)
+        self.assertNotIn("open.spotify.com", prefix)
+        self.assertEqual(send.await_args.kwargs["user_prefix"], prefix)
+
+    async def test_public_track_collection_uses_classic_renderer(self) -> None:
+        tracks = [
+            TrackMatch(
+                title=title,
+                artist="Artist",
+                links={"spotify": f"https://open.spotify.com/track/classic-{title}"},
+                thumbnail_url=f"https://i.scdn.co/classic-{title}.jpg",
+            )
+            for title in ("A", "B")
+        ]
+        message = SimpleNamespace(
+            chat=SimpleNamespace(type="channel", id=-100),
+            chat_id=-100,
+            from_user=None,
+        )
+        context = SimpleNamespace(
+            bot=object(),
+            application=SimpleNamespace(bot_data={}),
+        )
+        prefix = "<blockquote>Авторская подводка</blockquote>\n\n"
+
+        with patch("music_links_bot.bot._send_track_result", new=AsyncMock()) as send:
+            await _send_track_matches(
+                message,
+                context,
+                tracks,
+                is_private=False,
+                user_id=7,
+                user_prefix=prefix,
+                lang="ru",
+                include_channel_button=False,
+                include_hashtags=True,
+            )
+
+        send.assert_awaited_once()
+        rendered = send.await_args.args[2]
+        self.assertTrue(rendered.startswith(prefix))
+        self.assertIn("Подборка · 2 релиза", rendered)
+        self.assertEqual(
+            send.await_args.kwargs["preview_url"],
+            "https://open.spotify.com/track/classic-A",
+        )
+
 
 class TelegramEntitySourceTests(unittest.TestCase):
     def test_hidden_text_links_are_processed_in_message_order(self) -> None:

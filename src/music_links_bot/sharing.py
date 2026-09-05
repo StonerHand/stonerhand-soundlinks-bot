@@ -7,7 +7,6 @@ from urllib.parse import parse_qs, urlparse
 
 from telegram import InlineKeyboardMarkup
 
-from music_links_bot.collection_collage import collection_collage_preview_url
 from music_links_bot.formatter import (
     format_artist_collection_message,
     format_collection_message,
@@ -27,6 +26,7 @@ from music_links_bot.keyboards import (
     _select_preview_url,
 )
 from music_links_bot.models import TrackMatch
+from music_links_bot.publication_budget import compose_with_intro
 from music_links_bot.publication_contract import (
     RenderedPublication,
     require_valid_publication,
@@ -211,14 +211,11 @@ def render_inline_share_card(
     share_query: str | None,
     share_label: str,
     requested_count: int | None = None,
+    intro_html: str = "",
 ) -> InlineShareCard:
     found_count = bundle.item_count
     total_count = max(found_count, int(requested_count or found_count))
-    preview_url = _bundle_preview_url(
-        bundle,
-        context,
-        allow_collage=found_count == total_count,
-    )
+    preview_url = _bundle_preview_url(bundle, context)
 
     if bundle.content_type_count == 1 and bundle.tracks:
         title = collection_result_title(
@@ -308,6 +305,11 @@ def render_inline_share_card(
             bundle.radios,
         )
 
+    text, _intro = compose_with_intro(
+        {"quote": bool(intro_html)},
+        prefix_html=intro_html,
+        body_html=text,
+    )
     final_keyboard = (
         _add_inline_retry_button(keyboard, share_query=share_query, lang=lang)
         if found_count < total_count
@@ -384,15 +386,8 @@ def _add_inline_retry_button(
 def _bundle_preview_url(
     bundle: Any,
     context: Any,
-    *,
-    allow_collage: bool = True,
 ) -> str | None:
     if bundle.tracks:
-        collage_url = (
-            collection_collage_preview_url(bundle.tracks) if allow_collage else None
-        )
-        if collage_url:
-            return collage_url
         track = bundle.tracks[0]
         return _select_preview_url(track.links, context) or track.thumbnail_url
     if bundle.playlists:

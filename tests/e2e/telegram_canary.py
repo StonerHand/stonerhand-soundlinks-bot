@@ -12,7 +12,6 @@ import os
 from types import SimpleNamespace
 from urllib.parse import urlparse
 
-import httpx
 from telegram import Bot, Message
 
 from music_links_bot.draft_model import new_track_draft
@@ -179,20 +178,9 @@ async def verify(chat_id: int) -> tuple[list[str], list[str]]:
             )
             try:
                 require(
-                    bool(card.preview_url) and "/api/collage?" in card.preview_url,
-                    "Signed collage preview is missing",
+                    card.preview_url == tracks[0].links.get("spotify"),
+                    "Classic collection did not keep the first-release preview",
                 )
-                async with httpx.AsyncClient(
-                    timeout=20, follow_redirects=False
-                ) as client:
-                    image = await client.get(card.preview_url)
-                    require(
-                        image.status_code == 200
-                        and image.headers.get("content-type", "").startswith(
-                            "image/jpeg"
-                        ),
-                        "Collage renderer failed or fell back to one artwork",
-                    )
                 sent = await recorded.send_message(
                     chat_id=chat_id,
                     text=card.text,
@@ -210,7 +198,7 @@ async def verify(chat_id: int) -> tuple[list[str], list[str]]:
                     sent.reply_markup == card.keyboard,
                     "Telegram changed the collection buttons",
                 )
-                passed.append("classic-collection-collage")
+                passed.append("classic-collection")
             except Exception as exc:  # noqa: BLE001
                 failures.append(
                     f"classic-collection: {type(exc).__name__}: {str(exc)[:140]}"

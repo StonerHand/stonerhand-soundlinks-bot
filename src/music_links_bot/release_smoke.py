@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import re
 from html import unescape
 from urllib.parse import urlparse
@@ -15,7 +14,6 @@ from music_links_bot.bot_ui import (
     editor_more_rows,
     editor_rows,
 )
-from music_links_bot.collection_collage import collection_collage_preview_url
 from music_links_bot.formatter import format_collection_message, format_track_message
 from music_links_bot.i18n import get_text
 from music_links_bot.keyboards import _build_collection_keyboard, _build_link_keyboard
@@ -33,7 +31,6 @@ from music_links_bot.sharing import (
 from music_links_bot.telegram_buttons import button as InlineKeyboardButton
 
 _TAG_RE = re.compile(r"<[^>]*>")
-_DETERMINISTIC_COLLAGE_KEY = hashlib.sha256(b"public-release-smoke-fixture").hexdigest()
 
 
 def build_release_smoke_report() -> dict[str, object]:
@@ -107,11 +104,7 @@ def build_release_smoke_report() -> dict[str, object]:
     )
 
     collection_keyboard = _build_collection_keyboard(collection)
-    collection_preview = collection_collage_preview_url(
-        collection,
-        base_url="https://tg-bot-sh.vercel.app",
-        signing_secret=_DETERMINISTIC_COLLAGE_KEY,
-    )
+    collection_preview = collection[0].links["spotify"]
     complete_collection = RenderedPublication(
         text=format_collection_message(
             collection,

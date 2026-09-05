@@ -38,6 +38,7 @@ from music_links_bot.models import (
     TrackMatch,
     VideoMatch,
 )
+from music_links_bot.publication_budget import compose_with_intro
 from music_links_bot.sharing import (
     add_share_button,
     build_share_query,
@@ -48,6 +49,15 @@ from music_links_bot.telegram_buttons import button as InlineKeyboardButton
 
 SendTrackResult = Callable[..., Awaitable[Any]]
 SendTrackVideoPairResult = Callable[..., Awaitable[bool]]
+
+
+def _with_user_intro(user_prefix: str, body_html: str) -> str:
+    text, _intro = compose_with_intro(
+        {"quote": bool(user_prefix)},
+        prefix_html=user_prefix,
+        body_html=body_html,
+    )
+    return text
 
 
 async def send_youtube_result(
@@ -82,8 +92,10 @@ async def send_youtube_result(
         await send_track_result(
             bot,
             message,
-            user_prefix
-            + format_video_message(video, include_hashtags=include_hashtags),
+            _with_user_intro(
+                user_prefix,
+                format_video_message(video, include_hashtags=include_hashtags),
+            ),
             preview_url=video.url,
             reply_markup=keyboard,
             source_urls=(video.url,),
@@ -104,12 +116,14 @@ async def send_youtube_result(
     await send_track_result(
         bot,
         message,
-        user_prefix
-        + format_video_collection_message(
-            videos,
-            include_hashtags=include_hashtags,
-            title=collection_result_title(
-                lang, found=len(videos), total=total, item_kind="video"
+        _with_user_intro(
+            user_prefix,
+            format_video_collection_message(
+                videos,
+                include_hashtags=include_hashtags,
+                title=collection_result_title(
+                    lang, found=len(videos), total=total, item_kind="video"
+                ),
             ),
         ),
         preview_url=videos[0].url,
@@ -153,8 +167,10 @@ async def send_nts_result(
         await send_track_result(
             bot,
             message,
-            user_prefix
-            + format_radio_message(radio, include_hashtags=include_hashtags),
+            _with_user_intro(
+                user_prefix,
+                format_radio_message(radio, include_hashtags=include_hashtags),
+            ),
             preview_url=radio.url,
             reply_markup=keyboard,
             source_urls=(radio.url,),
@@ -175,12 +191,14 @@ async def send_nts_result(
     await send_track_result(
         bot,
         message,
-        user_prefix
-        + format_radio_collection_message(
-            radios,
-            include_hashtags=include_hashtags,
-            title=collection_result_title(
-                lang, found=len(radios), total=total, item_kind="radio"
+        _with_user_intro(
+            user_prefix,
+            format_radio_collection_message(
+                radios,
+                include_hashtags=include_hashtags,
+                title=collection_result_title(
+                    lang, found=len(radios), total=total, item_kind="radio"
+                ),
             ),
         ),
         preview_url=radios[0].url,
@@ -240,8 +258,13 @@ async def send_playlist_result(
         await send_track_result(
             bot,
             message,
-            user_prefix
-            + format_playlist_message(playlist, include_hashtags=include_hashtags),
+            _with_user_intro(
+                user_prefix,
+                format_playlist_message(
+                    playlist,
+                    include_hashtags=include_hashtags,
+                ),
+            ),
             preview_url=playlist.url,
             reply_markup=keyboard,
             source_urls=(playlist.url,),
@@ -262,12 +285,14 @@ async def send_playlist_result(
     await send_track_result(
         bot,
         message,
-        user_prefix
-        + format_playlist_collection_message(
-            playlists,
-            include_hashtags=include_hashtags,
-            title=collection_result_title(
-                lang, found=len(playlists), total=total, item_kind="playlist"
+        _with_user_intro(
+            user_prefix,
+            format_playlist_collection_message(
+                playlists,
+                include_hashtags=include_hashtags,
+                title=collection_result_title(
+                    lang, found=len(playlists), total=total, item_kind="playlist"
+                ),
             ),
         ),
         preview_url=playlists[0].url,
@@ -311,8 +336,10 @@ async def send_artist_result(
         await send_track_result(
             bot,
             message,
-            user_prefix
-            + format_artist_message(artist, include_hashtags=include_hashtags),
+            _with_user_intro(
+                user_prefix,
+                format_artist_message(artist, include_hashtags=include_hashtags),
+            ),
             preview_url=artist.url,
             reply_markup=keyboard,
             source_urls=(artist.url,),
@@ -333,12 +360,14 @@ async def send_artist_result(
     await send_track_result(
         bot,
         message,
-        user_prefix
-        + format_artist_collection_message(
-            artists,
-            include_hashtags=include_hashtags,
-            title=collection_result_title(
-                lang, found=len(artists), total=total, item_kind="artist"
+        _with_user_intro(
+            user_prefix,
+            format_artist_collection_message(
+                artists,
+                include_hashtags=include_hashtags,
+                title=collection_result_title(
+                    lang, found=len(artists), total=total, item_kind="artist"
+                ),
             ),
         ),
         preview_url=artists[0].url,
@@ -381,22 +410,25 @@ async def send_mixed_result(
         len(tracks) + len(videos) + len(radios) + len(playlists) + len(artists)
     )
     total = max(found_count, int(requested_count or found_count))
-    text = user_prefix + format_mixed_collection_message(
-        tracks,
-        videos,
-        playlists,
-        artists,
-        radios,
-        include_hashtags=include_hashtags,
-        title=(
-            collection_result_title(
-                lang,
-                found=found_count,
-                total=total,
-                item_kind="item",
-            )
-            if found_count < total
-            else None
+    text = _with_user_intro(
+        user_prefix,
+        format_mixed_collection_message(
+            tracks,
+            videos,
+            playlists,
+            artists,
+            radios,
+            include_hashtags=include_hashtags,
+            title=(
+                collection_result_title(
+                    lang,
+                    found=found_count,
+                    total=total,
+                    item_kind="item",
+                )
+                if found_count < total
+                else None
+            ),
         ),
     )
     keyboard = _build_mixed_collection_keyboard(

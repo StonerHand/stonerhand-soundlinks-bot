@@ -138,7 +138,6 @@ from music_links_bot.channel_templates import (
     save_channel_template,
 )
 from music_links_bot.chat_access import check_publish_access
-from music_links_bot.collection_collage import collection_collage_preview_url
 from music_links_bot.constants import MAX_LINKS_PER_MESSAGE
 from music_links_bot.draft_model import new_track_draft
 from music_links_bot.editor_view import (
@@ -173,10 +172,7 @@ from music_links_bot.lookup_transport import (
 from music_links_bot.models import (
     TrackMatch,
 )
-from music_links_bot.publication_contract import (
-    RenderedPublication,
-    require_valid_publication,
-)
+from music_links_bot.publication_budget import compose_with_intro
 from music_links_bot.publication_preflight import validate_publication
 from music_links_bot.publication_presets import (
     apply_named_preset,
@@ -193,12 +189,6 @@ from music_links_bot.publish_queue import (
     QueueFullError,
     QueueStorageError,
     add_job,
-)
-from music_links_bot.rich_publications import (
-    build_rich_collection_html,
-    rich_api_unavailable,
-    rich_messages_enabled,
-    send_rich_publication,
 )
 from music_links_bot.search import (
     SearchClient,
@@ -2090,67 +2080,24 @@ async def _send_track_matches(
                 )
             if message.chat.type == "channel":
                 collection_keyboard = make_channel_safe_keyboard(collection_keyboard)
-        collection_text = user_prefix + format_collection_message(
+        collection_body = format_collection_message(
             tracks,
             include_hashtags=include_hashtags,
             title=title,
         )
+        collection_text, _intro = compose_with_intro(
+            {"quote": bool(user_prefix)},
+            prefix_html=user_prefix,
+            body_html=collection_body,
+        )
+        # Preserve the familiar classic preview of the first release. A
+        # generated collage makes the post look like a different Rich card.
         collection_preview = (
-            (collection_collage_preview_url(tracks) if len(tracks) == total else None)
-            or _select_preview_url(tracks[0].links, context)
-            or tracks[0].thumbnail_url
+            _select_preview_url(tracks[0].links, context) or tracks[0].thumbnail_url
         )
         collection_sources = tuple(
             url for track in tracks for url in track.links.values()
         )
-        if not is_private and rich_messages_enabled():
-            require_valid_publication(
-                RenderedPublication(
-                    text=collection_text,
-                    keyboard=collection_keyboard,
-                    preview_url=collection_preview,
-                    source_urls=collection_sources,
-                    found_count=len(tracks),
-                    requested_count=total,
-                    mode="rich",
-                    content_kind="collection",
-                    cover_expected=any(track.thumbnail_url for track in tracks),
-                )
-            )
-            rich_html = build_rich_collection_html(
-                tracks,
-                title=title,
-                hashtags=(
-                    "#stonerhand #track #collection" if include_hashtags else None
-                ),
-                reply_markup=collection_keyboard,
-            )
-            placeholder = _take_placeholder(message.chat_id)
-            if placeholder is not None:
-                await _try_delete_message(placeholder)
-            try:
-                await send_rich_publication(
-                    context.bot,
-                    chat_id=message.chat_id,
-                    rich_html=rich_html,
-                )
-                await _try_delete_message(message)
-                _record_matches_safely(tracks, message, context=context)
-                runtime = context.application.bot_data.get("runtime")
-                if runtime is not None and hasattr(runtime, "record_rich_message"):
-                    runtime.record_rich_message(ok=True)
-                return
-            except TelegramError as exc:
-                runtime = context.application.bot_data.get("runtime")
-                if runtime is not None and hasattr(runtime, "record_rich_message"):
-                    runtime.record_rich_message(
-                        ok=False,
-                        fallback=rich_api_unavailable(exc),
-                    )
-                LOGGER.info(
-                    "Rich collection unavailable; using classic collection",
-                    exc_info=not rich_api_unavailable(exc),
-                )
         await _send_track_result(
             context.bot,
             message,
@@ -2497,6 +2444,7 @@ async def _deliver_lookup_bundle(
         await _runtime(context).remember_collection(
             request.user_id,
             urls=request.source_urls,
+            intro_html=user_prefix,
             lang=request.lang,
         )
     # Different platform URLs often point to the exact same release. Keep the
@@ -2505,11 +2453,11 @@ async def _deliver_lookup_bundle(
     if bundle.tracks:
         bundle.tracks = coalesce_equivalent_tracks(bundle.tracks)
     kind = delivery_kind(bundle)
-    # Multi-source input is an instruction, not editorial copy. Even when
-    # cross-service merging leaves one card, never quote the submitted URLs.
-    prefix = (
-        "" if len(request.source_urls) > 1 or bundle.item_count > 1 else user_prefix
-    )
+    # ``build_user_prefix`` already removes supported source URLs while
+    # preserving the user's prose and Telegram formatting. Keep that prose
+    # for collections instead of treating the whole multi-link message as an
+    # instruction and silently discarding its editorial introduction.
+    prefix = user_prefix
     common = {
         "user_prefix": prefix,
         "include_channel_button": request.include_channel_button,

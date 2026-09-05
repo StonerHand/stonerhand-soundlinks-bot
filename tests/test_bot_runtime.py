@@ -279,6 +279,64 @@ class RuntimeSafetyTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(session.last_action["kind"], "search")
 
+    async def test_collection_intro_round_trips_only_for_exact_urls(self) -> None:
+        runtime = BotRuntime()
+        urls = [
+            "https://open.spotify.com/track/first?si=tracking",
+            "https://open.spotify.com/track/second?si=tracking",
+        ]
+        intro = "<blockquote><b>Новая музыка</b></blockquote>\n\n"
+
+        await runtime.remember_collection(
+            7,
+            urls=urls,
+            intro_html=intro,
+            lang="ru",
+        )
+
+        self.assertEqual(
+            await runtime.get_collection_intro(7, urls=urls, lang="ru"),
+            intro,
+        )
+        self.assertEqual(
+            await runtime.get_collection_intro(
+                7,
+                urls=list(reversed(urls)),
+                lang="ru",
+            ),
+            "",
+        )
+
+    async def test_collection_intro_survives_a_new_serverless_instance(self) -> None:
+        class JsonKV:
+            def __init__(self) -> None:
+                self.values: dict[str, object] = {}
+
+            async def get_json(self, key: str):
+                return self.values.get(key)
+
+            async def set_json(self, key: str, value: object, **_kwargs) -> None:
+                self.values[key] = value
+
+        kv = JsonKV()
+        urls = [
+            "https://open.spotify.com/track/first",
+            "https://open.spotify.com/track/second",
+        ]
+        intro = "<blockquote>Текст для подборки</blockquote>\n\n"
+
+        await BotRuntime(kv).remember_collection(  # type: ignore[arg-type]
+            7,
+            urls=urls,
+            intro_html=intro,
+        )
+        restored = await BotRuntime(kv).get_collection_intro(  # type: ignore[arg-type]
+            7,
+            urls=urls,
+        )
+
+        self.assertEqual(restored, intro)
+
     async def test_provider_diagnostics_expose_latest_state(self) -> None:
         runtime = BotRuntime()
         runtime.record_provider(
