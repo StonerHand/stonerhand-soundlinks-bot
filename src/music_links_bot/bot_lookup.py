@@ -63,6 +63,7 @@ from music_links_bot.url_utils import (
     apple_podcasts_url_type,
     cache_key_for_url,
     direct_platform_links,
+    is_soundcloud_url,
     spotify_url_type,
 )
 from music_links_bot.youtube import YouTubeClient, YouTubeLookupError
@@ -725,6 +726,21 @@ async def _lookup_tracks_detailed(
                 remaining = item_deadline - loop.time()
                 if remaining <= 0:
                     return TimeoutError("source lookup deadline exhausted")
+                if soundcloud_client is not None and is_soundcloud_url(source_url):
+                    # SoundCloud is authoritative for a direct SoundCloud URL.
+                    # Asking an aggregator to infer another service can attach
+                    # a same-named but unrelated Spotify release.
+                    try:
+                        return await asyncio.wait_for(
+                            soundcloud_client.lookup_track(source_url),
+                            timeout=remaining,
+                        )
+                    except SoundCloudLookupError as exc:
+                        return build_soundcloud_fallback(source_url) or exc
+                    except asyncio.TimeoutError as exc:
+                        return exc
+                    except Exception as exc:  # noqa: BLE001
+                        return exc
                 try:
                     return await asyncio.wait_for(
                         client.lookup_track(source_url),
@@ -802,7 +818,7 @@ async def _lookup_tracks_detailed(
             statuses.append(
                 SourceStatus(
                     source_url=source_url,
-                    provider="songlink",
+                    provider=_track_provider(source_url),
                     state="success",
                     label=_item_label(result),
                 )
@@ -816,7 +832,7 @@ async def _lookup_tracks_detailed(
                 statuses.append(
                     SourceStatus(
                         source_url=source_url,
-                        provider="songlink",
+                        provider=_track_provider(source_url),
                         state="success",
                         label=_item_label(fallback_track),
                     )
@@ -845,7 +861,7 @@ async def _lookup_tracks_detailed(
                 statuses.append(
                     SourceStatus(
                         source_url=source_url,
-                        provider="songlink",
+                        provider=_track_provider(source_url),
                         state="not_found",
                         retryable=retryable,
                         reason="release_not_found",
@@ -862,7 +878,7 @@ async def _lookup_tracks_detailed(
             statuses.append(
                 SourceStatus(
                     source_url=source_url,
-                    provider="songlink",
+                    provider=_track_provider(source_url),
                     state="unavailable",
                     retryable=True,
                     reason=_failure_reason(result),
@@ -886,7 +902,7 @@ async def _lookup_tracks_detailed(
             statuses.append(
                 SourceStatus(
                     source_url=source_url,
-                    provider="songlink",
+                    provider=_track_provider(source_url),
                     state="unavailable",
                     retryable=True,
                     reason=_failure_reason(result),
@@ -910,6 +926,10 @@ async def _lookup_tracks_detailed(
             LOGGER.debug("Genre enrichment timed out and was cancelled")
 
     return tracks, unavailable_urls, statuses
+
+
+def _track_provider(source_url: str) -> str:
+    return "soundcloud" if is_soundcloud_url(source_url) else "songlink"
 
 
 def _source_log_id(source_url: str) -> str:

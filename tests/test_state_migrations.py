@@ -219,7 +219,7 @@ class StateMigrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(draft["item"]["release_year"], "1992")
         self.assertEqual(
             draft["item"]["links"],
-            {"Spotify": "https://open.spotify.com/track/abc"},
+            {"spotify": "https://open.spotify.com/track/abc"},
         )
         self.assertEqual(TrackMatch(**draft["item"]).title, "Dragonaut")
 

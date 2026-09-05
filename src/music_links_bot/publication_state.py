@@ -7,6 +7,7 @@ from typing import Any
 
 from music_links_bot.kvstore import KVStore
 from music_links_bot.models import TrackMatch
+from music_links_bot.url_utils import cache_key_for_url, direct_platform_links
 
 
 def release_fingerprint(artist: str, title: str) -> str:
@@ -15,8 +16,36 @@ def release_fingerprint(artist: str, title: str) -> str:
     return f"posted:{digest}"
 
 
+def publication_key(context, track: TrackMatch, target=None) -> str:
+    destination = (
+        target or context.application.bot_data.get("publish_chat_id") or "stonerhand"
+    )
+    links = direct_platform_links(track.links)
+    source = next(
+        (
+            links[key]
+            for key in ("spotify", "appleMusic", "soundcloud", "youtubeMusic")
+            if key in links
+        ),
+        next(iter(links.values()), ""),
+    )
+    identity = [
+        str(destination).lstrip("@").casefold(),
+        track.kind.casefold(),
+        " ".join(track.artist.casefold().split()),
+        " ".join(track.title.casefold().split()),
+        cache_key_for_url(source),
+    ]
+    digest = hashlib.sha256(
+        json.dumps(identity, ensure_ascii=False).encode()
+    ).hexdigest()[:32]
+    return f"posted:v3:{digest}"
+
+
 async def find_posted_date(context, track: TrackMatch) -> str | None:
     record = await find_posted_record(context, track)
+    if record is None:
+        return None
     return str(record.get("date") or "") or None
 
 
@@ -24,7 +53,11 @@ async def find_posted_record(context, track: TrackMatch) -> dict[str, Any] | Non
     kv: KVStore | None = context.application.bot_data.get("kv_store")
     if kv is None:
         return None
-    raw = await kv.get(release_fingerprint(track.artist, track.title))
+    raw = await kv.get(publication_key(context, track))
+    if not raw:
+        # Read the pre-v3 key during the migration window. New records use the
+        # stronger channel/kind/source identity below.
+        raw = await kv.get(release_fingerprint(track.artist, track.title))
     if not raw:
         return None
     try:
@@ -55,7 +88,7 @@ async def mark_posted(
         target_value = getattr(chat, "username", None) or getattr(chat, "id", None)
     url = _message_url(target_value, message_id)
     await kv.set_json(
-        release_fingerprint(track.artist, track.title),
+        publication_key(context, track, target_value),
         {
             "date": posted_date,
             "chat_id": target_value,

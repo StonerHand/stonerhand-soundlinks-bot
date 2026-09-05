@@ -5,6 +5,7 @@ from urllib.parse import parse_qs, urlparse
 
 from music_links_bot.url_utils import (
     cache_key_for_url,
+    is_direct_platform_url,
     normalize_host,
     spotify_url_type,
 )
@@ -31,9 +32,13 @@ _PLATFORM_PRIORITY = (
 
 
 def is_universal_release_url(url: str | None) -> bool:
-    if not url:
+    if not url or not is_direct_platform_url(url):
         return False
-    return normalize_host(urlparse(url).hostname) in UNIVERSAL_RELEASE_HOSTS
+    parsed = urlparse(url)
+    return (
+        parsed.scheme == "https"
+        and normalize_host(parsed.hostname) in UNIVERSAL_RELEASE_HOSTS
+    )
 
 
 def canonical_release_hub_url(
@@ -49,6 +54,8 @@ def canonical_release_hub_url(
     if is_universal_release_url(clean_url):
         return clean_url
 
+    if not is_direct_platform_url(clean_url):
+        return None
     parsed = urlparse(clean_url)
     host = normalize_host(parsed.hostname)
     parts = [part for part in parsed.path.split("/") if part]
@@ -139,7 +146,7 @@ def resolve_release_hub_url(
     candidates.extend(links.get(platform) for platform in _PLATFORM_PRIORITY)
     candidates.extend(links.values())
     for candidate in candidates:
-        if not isinstance(candidate, str):
+        if not isinstance(candidate, str) or not is_direct_platform_url(candidate):
             continue
         # An Apple-only iTunes fallback proves the Apple destination, not
         # Spotify or any other provider. Its public song.link page may show a

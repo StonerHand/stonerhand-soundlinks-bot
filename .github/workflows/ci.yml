@@ -60,6 +60,16 @@ jobs:
           python -m json.tool vercel.json >/dev/null
 
       - name: Tests
+        if: matrix.python-version != '3.12'
         run: python -m pytest -q
+        env:
+          PYTHONPATH: src
+
+      - name: Tests with branch coverage and gradual typing
+        if: matrix.python-version == '3.12'
+        run: |
+          python -m coverage run -m pytest -q
+          python -m coverage report
+          python -m mypy
         env:
           PYTHONPATH: src

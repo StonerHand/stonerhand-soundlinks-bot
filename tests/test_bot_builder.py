@@ -102,6 +102,14 @@ class BuilderJourneyTests(unittest.TestCase):
         self.assertTrue(self.draft["hashtags"])
         self.assertNotIn("custom_tags", self.draft)
 
+    def test_platform_selector_hides_a_mislabeled_destination(self) -> None:
+        track = TrackMatch(
+            artist="Artist",
+            title="Track",
+            links={"appleMusic": "https://open.spotify.com/track/wrong"},
+        )
+        self.assertEqual(selected_platforms({}, track, ["appleMusic"]), [])
+
     def test_selector_keyboards_are_explicit_and_reversible(self) -> None:
         style_rows = editor_style_rows("abc", self.draft)
         self.assertEqual(style_rows[0][0].callback_data, "v2|editor|z0|abc")

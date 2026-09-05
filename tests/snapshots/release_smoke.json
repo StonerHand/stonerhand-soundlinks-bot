@@ -26,7 +26,7 @@
       ],
       "mode": "channel",
       "ok": true,
-      "preview_host": "images.example"
+      "preview_host": "i.scdn.co"
     },
     "classic_track": {
       "buttons": [
@@ -54,7 +54,7 @@
       ],
       "mode": "classic",
       "ok": true,
-      "preview_host": "images.example"
+      "preview_host": "i.scdn.co"
     },
     "collection_complete": {
       "buttons": [
@@ -112,7 +112,7 @@
       ],
       "mode": "classic",
       "ok": true,
-      "preview_host": "images.example"
+      "preview_host": "i.scdn.co"
     },
     "inline_share": {
       "buttons": [
@@ -141,7 +141,7 @@
       ],
       "mode": "inline",
       "ok": true,
-      "preview_host": "images.example"
+      "preview_host": "i.scdn.co"
     },
     "rich_card": {
       "buttons": [
@@ -172,7 +172,7 @@
       ],
       "mode": "rich",
       "ok": true,
-      "preview_host": "images.example"
+      "preview_host": "i.scdn.co"
     },
     "soundcloud_source_only": {
       "buttons": [
@@ -196,7 +196,7 @@
       ],
       "mode": "classic",
       "ok": true,
-      "preview_host": "images.example"
+      "preview_host": "i1.sndcdn.com"
     }
   },
   "contract": 4,

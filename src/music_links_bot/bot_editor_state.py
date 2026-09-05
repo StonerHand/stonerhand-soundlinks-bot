@@ -19,7 +19,7 @@ from music_links_bot.release_presentation import (
     apply_preset,
     normalize_preset,
 )
-from music_links_bot.url_utils import is_direct_platform_url
+from music_links_bot.url_utils import is_platform_destination_url
 
 UNDO_SETTING_SECONDS = 30
 MAX_UNDO_STEPS = 5
@@ -129,7 +129,7 @@ def draft_status(draft: dict, track: TrackMatch, *, lang: str) -> str:
         else min(
             6,
             sum(
-                is_direct_platform_url(track.links.get(platform))
+                is_platform_destination_url(platform, track.links.get(platform))
                 for platform in PLATFORM_LABELS
             ),
         )
@@ -173,7 +173,9 @@ def toggle_platform_selection(
         draft.pop("platforms", None)
         return
     draft["platforms"] = [
-        key for key in platform_order if is_direct_platform_url(track.links.get(key))
+        key
+        for key in platform_order
+        if is_platform_destination_url(key, track.links.get(key))
     ][:6]
 
 

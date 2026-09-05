@@ -30,7 +30,7 @@ class CollectionCollageTests(unittest.TestCase):
                 title=str(index),
                 artist="Artist",
                 links={},
-                thumbnail_url=f"https://images.example/{index}.jpg",
+                thumbnail_url=f"https://i.scdn.co/{index}.jpg",
             )
             for index in range(6)
         ]
@@ -98,7 +98,7 @@ class CollectionCollageTests(unittest.TestCase):
                 title=str(index),
                 artist="Blur",
                 links={},
-                thumbnail_url="https://images.example/shared.jpg",
+                thumbnail_url="https://i.scdn.co/shared.jpg",
             )
             for index in range(2)
         ]
@@ -117,7 +117,7 @@ class CollectionCollageTests(unittest.TestCase):
                 title=str(index),
                 artist="Artist",
                 links={},
-                thumbnail_url=f"https://images.example/{index}.jpg",
+                thumbnail_url=f"https://i.scdn.co/{index}.jpg",
             )
             for index in range(2)
         ]
@@ -137,13 +137,13 @@ class CollectionCollageTests(unittest.TestCase):
                 title="One",
                 artist="A",
                 links={},
-                thumbnail_url="https://images.example/1.jpg",
+                thumbnail_url="https://i.scdn.co/1.jpg",
             ),
             TrackMatch(
                 title="Two",
                 artist="B",
                 links={},
-                thumbnail_url="https://images.example/2.jpg",
+                thumbnail_url="https://i.scdn.co/2.jpg",
             ),
         ]
         url = collection_collage_preview_url(

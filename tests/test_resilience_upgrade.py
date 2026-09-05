@@ -120,6 +120,60 @@ class _MemoryKV:
 
 
 class PublicationStateTests(unittest.IsolatedAsyncioTestCase):
+    def test_duplicate_identity_separates_kind_source_and_channel(self) -> None:
+        from music_links_bot.publication_state import publication_key
+
+        context = SimpleNamespace(application=SimpleNamespace(bot_data={}))
+        song = TrackMatch(
+            artist="Artist",
+            title="Release",
+            kind="song",
+            links={"spotify": "https://open.spotify.com/track/a?si=tracking"},
+        )
+        album = TrackMatch(
+            artist="Artist",
+            title="Release",
+            kind="album",
+            links={"spotify": "https://open.spotify.com/album/a"},
+        )
+        other_recording = TrackMatch(
+            artist="Artist",
+            title="Release",
+            links={"spotify": "https://open.spotify.com/track/b"},
+        )
+        self.assertNotEqual(
+            publication_key(context, song), publication_key(context, album)
+        )
+        self.assertNotEqual(
+            publication_key(context, song), publication_key(context, other_recording)
+        )
+        self.assertNotEqual(
+            publication_key(context, song, "first"),
+            publication_key(context, song, "second"),
+        )
+        deezer = TrackMatch(
+            artist="Artist",
+            title="Release",
+            links={"deezer": "https://deezer.com/track/a"},
+        )
+        another_deezer_recording = TrackMatch(
+            artist="Artist",
+            title="Release",
+            links={"deezer": "https://deezer.com/track/b"},
+        )
+        self.assertNotEqual(
+            publication_key(context, deezer),
+            publication_key(context, another_deezer_recording),
+        )
+        plain = TrackMatch(
+            artist="artist",
+            title="release",
+            links={"spotify": "https://open.spotify.com/track/a"},
+        )
+        self.assertEqual(
+            publication_key(context, song), publication_key(context, plain)
+        )
+
     async def test_duplicate_record_keeps_old_post_link(self) -> None:
         kv = _MemoryKV()
         context = SimpleNamespace(

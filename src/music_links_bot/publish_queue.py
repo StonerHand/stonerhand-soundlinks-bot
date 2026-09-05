@@ -13,6 +13,7 @@ from music_links_bot.kvstore import KVStore, KVUnavailableError
 LOGGER = logging.getLogger(__name__)
 
 QUEUE_KV_KEY = "queue:v1"
+QUEUE_TICK_KV_KEY = "queue:last-tick:v1"
 QUEUE_LOCK_KEY = "queue:lock"
 QUEUE_LOCK_TTL_SECONDS = 30
 QUEUE_MEMORY_KEY = "publish_queue"
@@ -24,6 +25,8 @@ PROCESSING_LEASE_SECONDS = 90
 MAX_JOBS_PER_TICK = 3
 JOB_PENDING = "pending"
 JOB_PROCESSING = "processing"
+JOB_DELIVERING = "delivering"
+JOB_UNCERTAIN = "uncertain"
 
 
 class QueueBusyError(RuntimeError):
@@ -66,16 +69,33 @@ def _normalize_job(job: dict) -> dict | None:
     if not job.get("id"):
         return None
     normalized = dict(job)
-    if normalized.get("status") not in {JOB_PENDING, JOB_PROCESSING}:
+    if normalized.get("status") not in {
+        JOB_PENDING,
+        JOB_PROCESSING,
+        JOB_DELIVERING,
+        JOB_UNCERTAIN,
+    }:
         normalized["status"] = JOB_PENDING
     if normalized["status"] == JOB_PENDING:
         normalized.pop("lease_owner", None)
         normalized.pop("lease_until", None)
+        normalized.pop("delivery_started_at", None)
+        normalized.pop("uncertain_at", None)
     return normalized
 
 
 def _sort_jobs(jobs: list[dict]) -> list[dict]:
     return sorted(jobs, key=lambda item: int(item.get("publish_at") or 0))
+
+
+def _draft_chat_id(job: dict) -> int | None:
+    draft = job.get("draft")
+    if not isinstance(draft, dict):
+        return None
+    try:
+        return int(draft.get("chat_id"))
+    except (TypeError, ValueError):
+        return None
 
 
 async def _locked_mutate(
@@ -191,6 +211,12 @@ async def add_job(context, draft: dict, publish_at: int) -> dict:
 
 async def remove_job(context, job_id: str) -> bool:
     def mutate(jobs: list[dict]):
+        if any(
+            job.get("id") == job_id
+            and job.get("status") in {JOB_PROCESSING, JOB_DELIVERING}
+            for job in jobs
+        ):
+            raise QueueBusyError("Publication is already being sent")
         remaining = [job for job in jobs if job.get("id") != job_id]
         return len(remaining) != len(jobs), remaining
 
@@ -201,12 +227,18 @@ async def remove_user_jobs(context, user_id: int) -> int:
     """Delete scheduled drafts created in the user's private chat."""
 
     def mutate(jobs: list[dict]):
+        if any(
+            job.get("status") in {JOB_PROCESSING, JOB_DELIVERING}
+            and _draft_chat_id(job) == user_id
+            for job in jobs
+        ):
+            # Never report an already-running publication as deleted. The
+            # privacy flow can retry once delivery reaches a durable state.
+            raise QueueBusyError("A user publication is already being sent")
         remaining: list[dict] = []
         removed = 0
         for job in jobs:
-            draft = job.get("draft")
-            owner_id = int(draft.get("chat_id") or 0) if isinstance(draft, dict) else 0
-            if owner_id == user_id:
+            if _draft_chat_id(job) == user_id:
                 removed += 1
             else:
                 remaining.append(job)
@@ -215,21 +247,83 @@ async def remove_user_jobs(context, user_id: int) -> int:
     return await _locked_mutate(context, mutate)
 
 
-async def reschedule_job(context, job_id: str, publish_at: int) -> bool:
+async def reschedule_job(
+    context, job_id: str, publish_at: int, *, only_uncertain: bool = False
+) -> bool:
     def mutate(jobs: list[dict]):
         found = False
         updated: list[dict] = []
         for job in jobs:
-            if job.get("id") != job_id:
+            if (
+                job.get("id") != job_id
+                or job.get("status") in {JOB_PROCESSING, JOB_DELIVERING}
+                or (only_uncertain and job.get("status") != JOB_UNCERTAIN)
+            ):
                 updated.append(job)
                 continue
             changed = dict(job)
             changed.update(status=JOB_PENDING, publish_at=int(publish_at))
             changed.pop("lease_owner", None)
             changed.pop("lease_until", None)
+            changed.pop("delivery_started_at", None)
+            changed.pop("uncertain_at", None)
             updated.append(changed)
             found = True
         return found, _sort_jobs(updated)
+
+    return await _locked_mutate(context, mutate)
+
+
+async def _mark_delivery_started(
+    context,
+    *,
+    job_id: str,
+    owner: str,
+    now: int,
+) -> bool:
+    """Durably cross the point after which an automatic retry is unsafe."""
+
+    def mutate(jobs: list[dict]):
+        started = False
+        updated: list[dict] = []
+        for job in jobs:
+            if (
+                job.get("id") == job_id
+                and job.get("lease_owner") == owner
+                and job.get("status") == JOB_PROCESSING
+            ):
+                changed = dict(job)
+                changed.update(
+                    status=JOB_DELIVERING,
+                    delivery_started_at=now,
+                )
+                updated.append(changed)
+                started = True
+            else:
+                updated.append(job)
+        return started, updated
+
+    return await _locked_mutate(context, mutate)
+
+
+async def _recover_uncertain_jobs(context, *, now: int) -> list[dict]:
+    """Quarantine expired in-flight deliveries instead of sending them twice."""
+
+    def mutate(jobs: list[dict]):
+        recovered: list[dict] = []
+        updated: list[dict] = []
+        for job in jobs:
+            lease_expired = int(job.get("lease_until") or 0) <= now
+            if job.get("status") != JOB_DELIVERING or not lease_expired:
+                updated.append(job)
+                continue
+            changed = dict(job)
+            changed.update(status=JOB_UNCERTAIN, uncertain_at=now)
+            changed.pop("lease_owner", None)
+            changed.pop("lease_until", None)
+            updated.append(changed)
+            recovered.append(changed)
+        return recovered, updated
 
     return await _locked_mutate(context, mutate)
 
@@ -276,6 +370,7 @@ async def _finish_job(
     owner: str,
     delivered: bool,
     now: int,
+    confirmed_not_sent: bool = False,
 ) -> tuple[str, dict | None]:
     """Commit the result only if this worker still owns the job lease."""
 
@@ -289,6 +384,18 @@ async def _finish_job(
                 continue
             if delivered:
                 outcome = "published"
+                continue
+
+            if job.get("status") == JOB_DELIVERING and not confirmed_not_sent:
+                uncertain = dict(job)
+                uncertain.update(status=JOB_UNCERTAIN, uncertain_at=now)
+                uncertain.pop("lease_owner", None)
+                uncertain.pop("lease_until", None)
+                updated.append(uncertain)
+                outcome = "uncertain"
+                failed_draft = (
+                    job.get("draft") if isinstance(job.get("draft"), dict) else None
+                )
                 continue
 
             attempts = int(job.get("attempts") or 0) + 1
@@ -318,20 +425,38 @@ async def _finish_job(
 async def process_due_jobs(context, *, now: int | None = None) -> int:
     """Lease, publish and finalize every due job.
 
-    A process crash leaves the job in ``processing`` instead of deleting it;
-    another worker can safely reclaim it when ``lease_until`` expires.
+    A crash before delivery starts leaves a reclaimable ``processing`` lease.
+    Once a Telegram request starts, an expired job is quarantined as
+    ``uncertain`` and requires an explicit administrator retry, preventing a
+    blind duplicate when Telegram accepted a request before the worker died.
     """
     from music_links_bot.publication_service import PublicationService
     from music_links_bot.publication_state import mark_posted
 
-    now_ts = int(now if now is not None else time.time())
+    fixed_now = int(now) if now is not None else None
+
+    def current_time() -> int:
+        return fixed_now if fixed_now is not None else int(time.time())
+
+    started_at = current_time()
+    kv = context.application.bot_data.get("kv_store")
+    if kv is not None:
+        await kv.set_json(
+            QUEUE_TICK_KV_KEY, {"started_at": started_at}, ttl_seconds=86400
+        )
     owner = secrets.token_hex(12)
     published = 0
+    try:
+        recovered = await _recover_uncertain_jobs(context, now=started_at)
+    except (QueueBusyError, QueueStorageError):
+        recovered = []
+    for job in recovered:
+        await _alert_uncertain_job(context, job.get("draft"))
     for _ in range(MAX_JOBS_PER_TICK):
         try:
             claimed = await _claim_due_jobs(
                 context,
-                now=now_ts,
+                now=current_time(),
                 owner=owner,
                 limit=1,
             )
@@ -344,13 +469,22 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
         prepared = prepare_publication_draft(draft)
         valid = prepared is not None
         delivered = None
+        service = None
         if prepared is not None:
             draft = prepared.data
             try:
-                delivered = await PublicationService(
+                started = await _mark_delivery_started(
                     context,
-                    channel_username="stonerhand",
-                ).publish(draft, notify_failure=False)
+                    job_id=str(job.get("id")),
+                    owner=owner,
+                    now=current_time(),
+                )
+                if started:
+                    service = PublicationService(
+                        context,
+                        channel_username="stonerhand",
+                    )
+                    delivered = await service.publish(draft, notify_failure=False)
             except Exception:
                 LOGGER.exception("Scheduled publish crashed for job %s", job.get("id"))
 
@@ -360,7 +494,8 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
                 job_id=str(job.get("id")),
                 owner=owner,
                 delivered=bool(delivered),
-                now=now_ts,
+                now=current_time(),
+                confirmed_not_sent=service is not None and service.confirmed_not_sent,
             )
         except (QueueBusyError, QueueStorageError):
             LOGGER.warning(
@@ -381,6 +516,8 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
             )
         elif outcome == "exhausted" and failed_draft is not None:
             await _alert_job_failure(context, failed_draft)
+        elif outcome == "uncertain":
+            await _alert_uncertain_job(context, failed_draft)
 
     return published
 
@@ -403,3 +540,24 @@ async def _alert_job_failure(context, draft: dict) -> None:
         )
     except Exception:
         LOGGER.debug("Queue failure alert failed", exc_info=True)
+
+
+async def _alert_uncertain_job(context, draft: object) -> None:
+    """Surface an ambiguous Telegram outcome without risking an automatic duplicate."""
+    admin_chat_id = context.application.bot_data.get("admin_chat_id")
+    if not admin_chat_id:
+        return
+    item = draft.get("item") if isinstance(draft, dict) else None
+    item = item if isinstance(item, dict) else {}
+    label = f"{item.get('artist') or '?'} — {item.get('title') or '?'}"
+    try:
+        await context.bot.send_message(
+            chat_id=admin_chat_id,
+            text=(
+                "⚠️ Не удалось подтвердить результат отложенной публикации: "
+                f"{label}. Автоповтор остановлен, чтобы не создать дубль. "
+                "Проверь канал и повтори задачу вручную в очереди, если поста нет."
+            ),
+        )
+    except Exception:
+        LOGGER.debug("Uncertain queue alert failed", exc_info=True)

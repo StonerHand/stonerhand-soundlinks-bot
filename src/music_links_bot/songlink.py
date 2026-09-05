@@ -13,7 +13,7 @@ from music_links_bot.kvstore import KVStore
 from music_links_bot.models import TrackMatch
 from music_links_bot.release_hubs import canonical_release_hub_url
 from music_links_bot.spotify import SpotifyClient, SpotifyLookupError
-from music_links_bot.url_utils import cache_key_for_url
+from music_links_bot.url_utils import cache_key_for_url, is_platform_destination_url
 
 KV_TTL_SECONDS = 7 * 24 * 3600
 FALLBACK_TTL_SECONDS = 15 * 60
@@ -372,7 +372,9 @@ class SonglinkClient:
                     continue
 
                 url = raw_entry.get("url")
-                if isinstance(url, str) and url.strip():
+                if isinstance(url, str) and is_platform_destination_url(
+                    output_key, url
+                ):
                     resolved[output_key] = url.strip()
                     break
 

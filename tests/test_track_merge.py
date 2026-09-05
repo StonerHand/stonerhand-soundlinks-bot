@@ -22,7 +22,7 @@ def test_same_release_from_multiple_services_becomes_one_card() -> None:
 
     assert len(merged) == 1
     assert merged[0].artist == "Slowdive"
-    assert set(merged[0].links) == {"spotify", "apple_music"}
+    assert set(merged[0].links) == {"spotify", "appleMusic"}
     assert merged[0].thumbnail_url == "https://img/cover.jpg"
     assert merged[0].page_url == "https://song.link/kisses"
 
@@ -73,7 +73,7 @@ def test_synthetic_search_link_does_not_block_cross_service_merge() -> None:
     merged = coalesce_equivalent_tracks(tracks)
 
     assert len(merged) == 1
-    assert set(merged[0].links) == {"spotify", "apple_music"}
+    assert set(merged[0].links) == {"spotify", "appleMusic"}
     assert "/track/" in merged[0].links["spotify"]
 
 
@@ -92,3 +92,29 @@ def test_synthetic_search_link_is_removed_without_a_direct_match() -> None:
     )
 
     assert merged[0].links == {"soundcloud": "https://soundcloud.com/artist/dj-set"}
+
+
+def test_merged_release_cannot_smuggle_a_wrong_platform_host() -> None:
+    merged = coalesce_equivalent_tracks(
+        [
+            TrackMatch(
+                title="Kisses",
+                artist="Slowdive",
+                links={"spotify": "https://open.spotify.com/track/abc"},
+            ),
+            TrackMatch(
+                title="Kisses",
+                artist="Slowdive",
+                links={
+                    "apple_music": "https://open.spotify.com/track/wrong",
+                    "soundcloud": "https://soundcloud.com/slowdive/kisses",
+                },
+            ),
+        ]
+    )
+
+    assert len(merged) == 1
+    assert merged[0].links == {
+        "spotify": "https://open.spotify.com/track/abc",
+        "soundcloud": "https://soundcloud.com/slowdive/kisses",
+    }

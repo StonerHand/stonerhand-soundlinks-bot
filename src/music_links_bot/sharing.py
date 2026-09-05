@@ -34,7 +34,7 @@ from music_links_bot.publication_contract import (
 from music_links_bot.telegram_buttons import button as InlineKeyboardButton
 from music_links_bot.url_utils import (
     cache_key_for_url,
-    is_direct_platform_url,
+    direct_platform_links,
     is_supported_music_url,
 )
 
@@ -66,13 +66,14 @@ class InlineShareCard:
 
 def track_share_url(track: TrackMatch) -> str | None:
     """Choose a stable source URL which the inline lookup can resolve again."""
+    links = direct_platform_links(track.links)
     for platform in DEFAULT_PLATFORM_ORDER:
-        url = track.links.get(platform)
-        if is_direct_platform_url(url) and is_supported_music_url(url):
+        url = links.get(platform)
+        if url and is_supported_music_url(url):
             return cache_key_for_url(url)
 
-    for url in track.links.values():
-        if is_direct_platform_url(url) and is_supported_music_url(url):
+    for url in links.values():
+        if is_supported_music_url(url):
             return cache_key_for_url(url)
 
     return None

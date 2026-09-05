@@ -2,6 +2,8 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
+from telegram.error import BadRequest
+
 from music_links_bot.models import TrackMatch
 from music_links_bot.publication_service import PublicationService
 
@@ -133,7 +135,13 @@ class PublicationServiceTests(unittest.IsolatedAsyncioTestCase):
             bot=SimpleNamespace(),
         )
         service = PublicationService(context, channel_username="stonerhand")
-        draft = {"item": {"artist": "Sleep", "title": "Dragonaut", "links": {}}}
+        draft = {
+            "item": {
+                "artist": "Sleep",
+                "title": "Dragonaut",
+                "links": {"spotify": "https://open.spotify.com/track/abc"},
+            }
+        }
 
         with patch.object(service, "_send", new=AsyncMock(return_value=False)):
             result = await service.deliver(
@@ -143,6 +151,38 @@ class PublicationServiceTests(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertIsNone(result)
+
+    async def test_retry_safety_state_is_reset_for_every_delivery(self) -> None:
+        context = SimpleNamespace(
+            application=SimpleNamespace(bot_data={}),
+            bot=SimpleNamespace(),
+        )
+        service = PublicationService(context, channel_username="stonerhand")
+        draft = {
+            "item": {
+                "artist": "Sleep",
+                "title": "Dragonaut",
+                "links": {"spotify": "https://open.spotify.com/track/abc"},
+            }
+        }
+
+        with patch.object(
+            service,
+            "_send",
+            new=AsyncMock(side_effect=[SimpleNamespace(), BadRequest("rejected")]),
+        ):
+            first = await service.deliver(
+                draft, target=7, channel_style=False, notify_failure=False
+            )
+            self.assertIsNotNone(first)
+            self.assertFalse(service.confirmed_not_sent)
+
+            second = await service.deliver(
+                draft, target=7, channel_style=False, notify_failure=False
+            )
+
+        self.assertIsNone(second)
+        self.assertTrue(service.confirmed_not_sent)
 
     async def test_channel_delivery_respects_hashtags_disabled_in_editor(self) -> None:
         sent = SimpleNamespace()

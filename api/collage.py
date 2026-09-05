@@ -18,12 +18,12 @@ if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
 from music_links_bot.collection_collage import (
+    MAX_ARTWORK_BYTES,
     compose_collection_collage,
     decode_collage_payload,
 )
 from music_links_bot.constants import HTTP_USER_AGENT
 
-MAX_ARTWORK_BYTES = 6 * 1024 * 1024
 FETCH_TIMEOUT_SECONDS = 6
 _HTTP_CLIENT = httpx.Client(
     headers={"User-Agent": HTTP_USER_AGENT},
@@ -60,7 +60,7 @@ class handler(BaseHTTPRequestHandler):
             self.end_headers()
             return
 
-        with ThreadPoolExecutor(max_workers=len(urls)) as executor:
+        with ThreadPoolExecutor(max_workers=min(2, len(urls))) as executor:
             images = [image for image in executor.map(_fetch_artwork, urls) if image]
         collage = compose_collection_collage(images)
         if collage is None:
@@ -132,10 +132,10 @@ def _fetch_artwork(url: str) -> bytes | None:
             if content_length > MAX_ARTWORK_BYTES:
                 return None
             body = bytearray()
-            for chunk in response.iter_bytes():
-                body.extend(chunk)
-                if len(body) > MAX_ARTWORK_BYTES:
+            for chunk in response.iter_bytes(chunk_size=65_536):
+                if len(body) + len(chunk) > MAX_ARTWORK_BYTES:
                     return None
+                body.extend(chunk)
     except (httpx.HTTPError, TypeError, ValueError):
         return None
     return bytes(body)

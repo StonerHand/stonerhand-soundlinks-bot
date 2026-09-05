@@ -5,7 +5,7 @@ from typing import Any
 
 from telegram import Message
 from telegram.constants import ParseMode
-from telegram.error import TelegramError
+from telegram.error import BadRequest, Forbidden, RetryAfter, TelegramError
 
 from music_links_bot.bot_builder import (
     MESSAGE_TEXT_LIMIT,
@@ -39,6 +39,7 @@ class PublicationService:
         self.context = context
         self.channel_username = channel_username.lstrip("@")
         self.branding_hooks = branding_hooks
+        self.confirmed_not_sent = True
 
     async def publish(
         self,
@@ -91,6 +92,9 @@ class PublicationService:
         channel_style: bool,
         notify_failure: bool = True,
     ) -> Message | bool | None:
+        # The service may be reused. Retry safety describes this delivery only,
+        # never the outcome of an earlier call on the same instance.
+        self.confirmed_not_sent = True
         prepared = prepare_publication_draft(draft)
         if prepared is None:
             self._record_publication(False)
@@ -116,6 +120,7 @@ class PublicationService:
                 await self._persist_metrics()
                 return None
 
+        self.confirmed_not_sent = False
         try:
             sent = await self._send(
                 draft,
@@ -124,6 +129,11 @@ class PublicationService:
                 channel_style=channel_style,
             )
         except Exception as exc:
+            # These are explicit Bot API rejections. A network failure can
+            # occur after Telegram accepted the post and must stay ambiguous.
+            self.confirmed_not_sent = isinstance(
+                exc, (BadRequest, Forbidden, RetryAfter)
+            )
             LOGGER.warning(
                 "Could not deliver %s — %s to %s",
                 track.artist,
@@ -144,7 +154,12 @@ class PublicationService:
         delivered = sent is not None and sent is not False
         self._record_publication(delivered)
         if channel_style and delivered:
-            await save_channel_template(self.context, target, draft)
+            try:
+                await save_channel_template(self.context, target, draft)
+            except Exception:  # noqa: BLE001
+                LOGGER.warning(
+                    "Post delivered, but channel template could not be saved"
+                )
         await self._persist_metrics()
         return sent if delivered else None
 
@@ -292,6 +307,10 @@ class PublicationService:
                 self._record_rich(ok=True)
             return True, sent
         except TelegramError as exc:
+            # Falling back after a lost HTTP response could publish twice.
+            # Only a definitive API rejection permits another send method.
+            if not isinstance(exc, BadRequest):
+                raise
             if record_metrics:
                 self._record_rich(ok=False, fallback=True)
             LOGGER.info(
@@ -396,7 +415,10 @@ class PublicationService:
     async def _persist_metrics(self) -> None:
         runtime = self.context.application.bot_data.get("runtime")
         if runtime is not None and hasattr(runtime, "persist_metrics"):
-            await runtime.persist_metrics()
+            try:
+                await runtime.persist_metrics()
+            except Exception:  # noqa: BLE001
+                LOGGER.debug("Publication metrics could not be persisted")
 
     async def _report_failure(
         self,

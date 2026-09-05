@@ -13,6 +13,7 @@ from music_links_bot.url_utils import (
     is_apple_music_playlist_url,
     is_direct_platform_url,
     is_nts_url,
+    is_platform_destination_url,
     is_playlist_url,
     is_soundcloud_url,
     is_spotify_artist_url,
@@ -43,6 +44,55 @@ class UrlUtilsTests(unittest.TestCase):
             ),
             {"soundcloud": "https://soundcloud.com/artist/title"},
         )
+
+    def test_direct_platform_links_migrates_legacy_platform_keys(self) -> None:
+        self.assertEqual(
+            direct_platform_links(
+                {
+                    "apple_music": "https://music.apple.com/us/song/title/1",
+                    "youtube-music": "https://music.youtube.com/watch?v=abc",
+                    "yandex music": "https://music.yandex.ru/album/1/track/2",
+                }
+            ),
+            {
+                "appleMusic": "https://music.apple.com/us/song/title/1",
+                "youtubeMusic": "https://music.youtube.com/watch?v=abc",
+                "yandexMusic": "https://music.yandex.ru/album/1/track/2",
+            },
+        )
+
+    def test_platform_destinations_reject_mislabeled_or_unsafe_hosts(self) -> None:
+        self.assertTrue(
+            is_platform_destination_url(
+                "spotify", "https://open.spotify.com/track/verified"
+            )
+        )
+        self.assertFalse(
+            is_platform_destination_url(
+                "spotify", "https://evil.example/track/verified"
+            )
+        )
+        self.assertFalse(
+            is_platform_destination_url(
+                "spotify", "https://open.spotify.com.evil.example/track/verified"
+            )
+        )
+        self.assertFalse(
+            is_platform_destination_url(
+                "spotify", "https://user@open.spotify.com/track/verified"
+            )
+        )
+        self.assertFalse(
+            is_platform_destination_url(
+                "spotify", "https://open.spotify.com:8443/track/verified"
+            )
+        )
+
+    def test_direct_urls_require_the_default_port_for_their_scheme(self) -> None:
+        self.assertTrue(is_direct_platform_url("https://open.spotify.com:443/track/a"))
+        self.assertTrue(is_direct_platform_url("http://open.spotify.com:80/track/a"))
+        self.assertFalse(is_direct_platform_url("https://open.spotify.com:80/track/a"))
+        self.assertFalse(is_direct_platform_url("http://open.spotify.com:443/track/a"))
 
     def test_is_supported_music_url_accepts_supported_hosts(self) -> None:
         self.assertTrue(is_supported_music_url("https://open.spotify.com/track/123"))

@@ -3,6 +3,9 @@ import sys
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
+
+from telegram.error import BadRequest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -127,6 +130,64 @@ class PublishQueueTests(unittest.TestCase):
         self.assertEqual(len(jobs), 20)
         self.assertEqual(len({job["id"] for job in jobs}), 20)
 
+    def test_sent_post_is_not_repeated_if_finalization_is_lost(self) -> None:
+        context = make_context()
+
+        async def scenario():
+            await publish_queue.add_job(context, make_draft(), 100)
+            with patch.object(
+                publish_queue,
+                "_finish_job",
+                side_effect=publish_queue.QueueStorageError("offline after delivery"),
+            ):
+                await publish_queue.process_due_jobs(context, now=200)
+            await publish_queue.process_due_jobs(context, now=400)
+            await publish_queue.process_due_jobs(context, now=600)
+            return await publish_queue.load_jobs(context)
+
+        jobs = asyncio.run(scenario())
+        self.assertEqual(len(context.bot.sent), 1)
+        self.assertEqual(jobs[0]["status"], publish_queue.JOB_UNCERTAIN)
+
+    def test_manual_retry_cannot_reclaim_an_active_delivery(self) -> None:
+        context = make_context()
+
+        async def scenario():
+            job = await publish_queue.add_job(context, make_draft(), 100)
+            await publish_queue._claim_due_jobs(context, now=200, owner="worker")
+            await publish_queue._mark_delivery_started(
+                context, job_id=job["id"], owner="worker", now=200
+            )
+            active = await publish_queue.reschedule_job(context, job["id"], 201)
+            await publish_queue._recover_uncertain_jobs(context, now=400)
+            resumed = await publish_queue.reschedule_job(
+                context, job["id"], 401, only_uncertain=True
+            )
+            duplicate = await publish_queue.reschedule_job(
+                context, job["id"], 401, only_uncertain=True
+            )
+            return active, resumed, duplicate
+
+        self.assertEqual(asyncio.run(scenario()), (False, True, False))
+
+    def test_lost_telegram_response_quarantines_job_without_retry(self) -> None:
+        context = make_context()
+
+        async def accepted_then_timeout(**kwargs):
+            context.bot.sent.append(kwargs)
+            raise TimeoutError("response lost after Telegram accepted the message")
+
+        async def scenario():
+            await publish_queue.add_job(context, make_draft(), 100)
+            with patch.object(context.bot, "send_message", accepted_then_timeout):
+                await publish_queue.process_due_jobs(context, now=200)
+                await publish_queue.process_due_jobs(context, now=500)
+            return await publish_queue.load_jobs(context)
+
+        jobs = asyncio.run(scenario())
+        self.assertEqual(len(context.bot.sent), 1)
+        self.assertEqual(jobs[0]["status"], publish_queue.JOB_UNCERTAIN)
+
     def test_busy_redis_lock_never_falls_back_to_unsafe_mutation(self) -> None:
         class BusyKV:
             async def set(self, *args, **kwargs):
@@ -192,6 +253,22 @@ class PublishQueueTests(unittest.TestCase):
         self.assertFalse(missing)
         self.assertEqual(jobs, [])
 
+    def test_active_delivery_cannot_be_cancelled_under_the_sender(self) -> None:
+        context = make_context()
+
+        async def scenario():
+            job = await publish_queue.add_job(context, make_draft(), 100)
+            claimed = await publish_queue._claim_due_jobs(
+                context, now=200, owner="test-worker"
+            )
+            self.assertEqual(len(claimed), 1)
+            with self.assertRaises(publish_queue.QueueBusyError):
+                await publish_queue.remove_job(context, job["id"])
+            return await publish_queue.load_jobs(context)
+
+        jobs = asyncio.run(scenario())
+        self.assertEqual(jobs[0]["status"], publish_queue.JOB_PROCESSING)
+
     def test_remove_user_jobs_keeps_other_users_schedule(self) -> None:
         context = make_context()
 
@@ -209,6 +286,44 @@ class PublishQueueTests(unittest.TestCase):
         self.assertEqual(removed, 1)
         self.assertEqual(len(jobs), 1)
         self.assertEqual(jobs[0]["draft"]["chat_id"], 8)
+
+    def test_remove_user_jobs_cannot_delete_an_active_delivery(self) -> None:
+        context = make_context()
+
+        async def scenario():
+            own = make_draft()
+            own["chat_id"] = 7
+            job = await publish_queue.add_job(context, own, 100)
+            await publish_queue._claim_due_jobs(context, now=200, owner="privacy-race")
+            with self.assertRaises(publish_queue.QueueBusyError):
+                await publish_queue.remove_user_jobs(context, 7)
+            return job, await publish_queue.load_jobs(context)
+
+        job, jobs = asyncio.run(scenario())
+        self.assertEqual([item["id"] for item in jobs], [job["id"]])
+        self.assertEqual(jobs[0]["status"], publish_queue.JOB_PROCESSING)
+
+    def test_remove_user_jobs_ignores_a_corrupt_legacy_owner(self) -> None:
+        context = make_context()
+
+        async def scenario():
+            own = make_draft()
+            own["chat_id"] = 7
+            await publish_queue.add_job(context, own, 1000)
+            context.application.bot_data[publish_queue.QUEUE_MEMORY_KEY].append(
+                {
+                    "id": "legacy-corrupt",
+                    "status": publish_queue.JOB_PENDING,
+                    "publish_at": 2000,
+                    "draft": {"chat_id": "not-an-id"},
+                }
+            )
+            removed = await publish_queue.remove_user_jobs(context, 7)
+            return removed, await publish_queue.load_jobs(context)
+
+        removed, jobs = asyncio.run(scenario())
+        self.assertEqual(removed, 1)
+        self.assertEqual([job["id"] for job in jobs], ["legacy-corrupt"])
 
     def test_process_due_jobs_publishes_and_keeps_future(self) -> None:
         context = make_context()
@@ -276,7 +391,7 @@ class FailingBot:
         self.sent.append(kwargs)
         if kwargs.get("chat_id") == self._admin_id:
             return SimpleNamespace(message_id=1)
-        raise RuntimeError("channel unavailable")
+        raise BadRequest("channel unavailable")
 
 
 class RetryTests(unittest.TestCase):

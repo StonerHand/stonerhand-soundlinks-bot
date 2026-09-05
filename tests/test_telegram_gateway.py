@@ -1,9 +1,16 @@
 from __future__ import annotations
 
 import unittest
+from datetime import timedelta
 from unittest.mock import patch
 
-from music_links_bot.telegram_gateway import TelegramApiGateway, feature_enabled
+from telegram.error import BadRequest, Forbidden, RetryAfter, TelegramError
+
+from music_links_bot.telegram_gateway import (
+    TelegramApiGateway,
+    _telegram_api_error,
+    feature_enabled,
+)
 
 
 class _Bot:
@@ -16,6 +23,26 @@ class _Bot:
 
 
 class TelegramGatewayTests(unittest.IsolatedAsyncioTestCase):
+    async def test_raw_gateway_preserves_definitive_api_rejections(self) -> None:
+        self.assertIsInstance(
+            _telegram_api_error(400, {"description": "bad"}), BadRequest
+        )
+        self.assertIsInstance(
+            _telegram_api_error(403, {"description": "forbidden"}), Forbidden
+        )
+        limited = _telegram_api_error(
+            429,
+            {"description": "slow down", "parameters": {"retry_after": 7}},
+        )
+        self.assertIsInstance(limited, RetryAfter)
+        self.assertEqual(limited._retry_after, timedelta(seconds=7))
+
+    async def test_raw_gateway_keeps_server_failures_ambiguous(self) -> None:
+        error = _telegram_api_error(502, {"description": "upstream failed"})
+
+        self.assertIs(type(error), TelegramError)
+        self.assertIn("upstream failed", str(error))
+
     async def test_safe_mode_disables_optional_capabilities(self) -> None:
         with patch.dict(
             "os.environ",

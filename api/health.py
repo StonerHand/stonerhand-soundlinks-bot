@@ -9,7 +9,6 @@ from concurrent.futures import ThreadPoolExecutor
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
-from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -18,7 +17,6 @@ if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
 from music_links_bot import __version__
-from music_links_bot.alerts import send_admin_alert
 from music_links_bot.logging_config import quiet_transport_logs
 
 LOGGER = logging.getLogger(__name__)
@@ -27,31 +25,20 @@ TIMEOUT_SECONDS = 8
 
 
 class handler(BaseHTTPRequestHandler):
-    """GET /api/health — the bot's pulse.
-
-    Checks the Telegram API, the webhook registration and Redis, then ticks
-    the publish queue through its protected worker. Returns 503 when a critical
-    check fails, so a free uptime monitor pointed here covers everything at once:
-    outage detection, owner alerts, scheduled-post precision and warm
-    instances. On failure the bot owner gets a Telegram DM (deduplicated,
-    at most one per hour per problem).
-    """
+    """Read-only Telegram, storage and queue diagnostics; never publish a post."""
 
     def do_GET(self) -> None:
-        # Telegram diagnostics and the independent queue worker are network
-        # calls, so run them together. Read Redis afterwards to report the
-        # queue state produced by this exact tick, including retries.
         with ThreadPoolExecutor(max_workers=2) as executor:
             telegram_check = executor.submit(_check_telegram)
             webhook_check = executor.submit(_check_webhook)
             webhook = webhook_check.result()
-            # The registered Telegram webhook is the authoritative public
-            # production origin even when optional Vercel hostname variables
-            # are not exposed to the Python runtime.
-            queue_tick = executor.submit(_tick_queue, webhook.get("detail"))
             telegram = telegram_check.result()
-            queue_worker = queue_tick.result()
         redis, queue, metrics = _storage_snapshot()
+        queue_worker = {
+            "configured": bool(queue.get("configured")),
+            "ok": not queue.get("worker_stale", False),
+            "detail": "stale" if queue.get("worker_stale") else "read-only snapshot",
+        }
         providers = evaluate_provider_metrics(metrics)
         checks: dict[str, dict] = {
             "telegram": telegram,
@@ -60,28 +47,7 @@ class handler(BaseHTTPRequestHandler):
             "queue_worker": queue_worker,
             "providers": providers,
         }
-        healthy = overall_ok(checks)
         service_healthy = overall_service_ok(checks, queue)
-
-        if not healthy:
-            failing = ", ".join(sorted(describe_failures(checks)))
-            send_admin_alert(
-                f"Health check failed: {failing}. https://{self.headers.get('host')}/api/health",
-                dedup_key=f"health:{failing}",
-            )
-        elif queue.get("overdue"):
-            send_admin_alert(
-                f"Очередь не разгружается: {queue['overdue']} просроченных из "
-                f"{queue['size']}. Проверь права бота и логи Vercel.",
-                dedup_key="queue-stuck",
-            )
-        if providers.get("degraded"):
-            send_admin_alert(
-                "Музыкальные площадки работают нестабильно: "
-                f"{', '.join(providers['degraded'])}. Основной бот и резервные "
-                "сценарии остаются доступны.",
-                dedup_key=f"providers:{','.join(providers['degraded'])}",
-            )
 
         body = json.dumps(
             {
@@ -89,7 +55,6 @@ class handler(BaseHTTPRequestHandler):
                 "checks": checks,
                 "queue": queue,
                 "metrics": metrics,
-                "queue_published": int(queue_worker.get("published") or 0),
                 "release": release_info(),
                 "ts": int(time.time()),
             },
@@ -125,7 +90,9 @@ def overall_ok(checks: dict[str, dict]) -> bool:
 
 def overall_service_ok(checks: dict[str, dict], queue: dict) -> bool:
     """A configured queue with overdue work is a production failure too."""
-    queue_ok = not queue.get("configured") or not queue.get("overdue")
+    queue_ok = not queue.get("configured") or not (
+        queue.get("overdue") or queue.get("uncertain")
+    )
     return overall_ok(checks) and queue_ok
 
 
@@ -259,7 +226,7 @@ def _storage_snapshot() -> tuple[dict, dict, dict]:
 
     from music_links_bot.bot_runtime import METRICS_KV_KEY
     from music_links_bot.kvstore import KVStore
-    from music_links_bot.publish_queue import QUEUE_KV_KEY
+    from music_links_bot.publish_queue import QUEUE_KV_KEY, QUEUE_TICK_KV_KEY
 
     kv = KVStore.from_env()
     if kv is None:
@@ -269,19 +236,22 @@ def _storage_snapshot() -> tuple[dict, dict, dict]:
             {"configured": False},
         )
 
-    async def read() -> tuple[bool, object, object]:
+    async def read() -> tuple[bool, object, object, object]:
         try:
-            ping, jobs, metrics = await asyncio.gather(
-                kv.set("health:ping", str(int(time.time())), ttl_seconds=300),
-                kv.get_json(QUEUE_KV_KEY),
+            ping, jobs, metrics, tick = await asyncio.gather(
+                kv.ping(),
+                kv.get_json_required(QUEUE_KV_KEY),
                 kv.get_json(METRICS_KV_KEY),
+                kv.get_json(QUEUE_TICK_KV_KEY),
             )
-            return bool(ping), jobs, metrics
+            if jobs is not None and not isinstance(jobs, list):
+                raise ValueError("Invalid queue snapshot")
+            return bool(ping), jobs, metrics, tick
         finally:
             await kv.aclose()
 
     try:
-        ping, jobs, metrics = asyncio.run(read())
+        ping, jobs, metrics, tick = asyncio.run(read())
     # Health must degrade to structured JSON even if an unexpected Redis
     # adapter or event-loop failure escapes the soft KV methods.
     except Exception:  # noqa: BLE001
@@ -292,6 +262,12 @@ def _storage_snapshot() -> tuple[dict, dict, dict]:
         )
 
     queue = _summarize_queue_jobs(jobs if isinstance(jobs, list) else [])
+    queue["last_tick_at"] = (
+        _safe_int(tick.get("started_at")) if isinstance(tick, dict) else 0
+    )
+    queue["worker_stale"] = bool(
+        queue["overdue"] and queue["last_tick_at"] < time.time() - 900
+    )
     metrics_status = (
         {"configured": True, "available": True, **metrics}
         if isinstance(metrics, dict)
@@ -312,6 +288,7 @@ def _summarize_queue_jobs(jobs: list, *, now: float | None = None) -> dict:
     """Ignore corrupt queue entries so monitoring itself stays available."""
     current = now if now is not None else time.time()
     overdue = 0
+    uncertain = 0
     valid_jobs = 0
     for job in jobs:
         if not isinstance(job, dict):
@@ -328,69 +305,17 @@ def _summarize_queue_jobs(jobs: list, *, now: float | None = None) -> dict:
             lease_until = int(job.get("lease_until") or 0)
         except (TypeError, ValueError):
             lease_until = 0
-        actively_processing = status == "processing" and lease_until > current
-        if publish_at < current - 120 and not actively_processing:
-            overdue += 1
-    return {"configured": True, "size": valid_jobs, "overdue": overdue}
-
-
-def _tick_queue(webhook_url: object = None) -> dict[str, object]:
-    """Piggyback the scheduled-posts tick on every health ping, so one
-    uptime monitor keeps the queue delivering on time."""
-    host = (
-        os.getenv("WEBHOOK_BASE_URL", "").strip()
-        or os.getenv("VERCEL_PROJECT_PRODUCTION_URL", "").strip()
-        or os.getenv("VERCEL_URL", "").strip()
-        or _webhook_host(webhook_url)
-    )
-    from music_links_bot.webhook_secret import queue_worker_secret
-
-    secret = queue_worker_secret()
-    if not host or not secret:
-        return {
-            "ok": True,
-            "configured": False,
-            "published": 0,
-            "detail": "not configured",
-        }
-    host = host.removeprefix("https://").removeprefix("http://").split("/", 1)[0]
-
-    try:
-        request = Request(
-            f"https://{host}/api/queue_worker",
-            headers={"Authorization": f"Bearer {secret}"},
+        if status == "uncertain":
+            uncertain += 1
+            continue
+        actively_processing = (
+            status in {"processing", "delivering"} and lease_until > current
         )
-        # The deployment hostname comes from Vercel environment and HTTPS is forced.
-        with urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # nosec B310
-            payload = json.loads(response.read().decode("utf-8"))
-        if isinstance(payload, dict) and payload.get("ok") is True:
-            return {
-                "ok": True,
-                "configured": True,
-                "published": int(payload.get("published") or 0),
-                "detail": "reachable",
-            }
-    except Exception:
-        LOGGER.debug("Queue tick via health failed", exc_info=True)
-
+        if publish_at <= current - 900 and not actively_processing:
+            overdue += 1
     return {
-        "ok": False,
         "configured": True,
-        "published": 0,
-        "detail": "unreachable",
+        "size": valid_jobs,
+        "overdue": overdue,
+        "uncertain": uncertain,
     }
-
-
-def _webhook_host(value: object) -> str:
-    """Accept only the public HTTPS origin returned by Telegram itself."""
-    if not isinstance(value, str):
-        return ""
-    parsed = urlparse(value.strip())
-    if (
-        parsed.scheme != "https"
-        or not parsed.netloc
-        or parsed.username
-        or not parsed.path.endswith("/api/telegram")
-    ):
-        return ""
-    return parsed.netloc

@@ -6,7 +6,7 @@
 
 [Open the bot](https://t.me/StonerHandBot) · [See the channel](https://t.me/stonerhand) · [Русская версия](README.ru.md)
 
-![Release](https://img.shields.io/badge/release-1.14.1-5b5bd6?style=flat-square)
+![Release](https://img.shields.io/badge/release-1.15.0-5b5bd6?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
@@ -54,8 +54,9 @@ is omitted instead of guessed.
   templates, custom artwork, history and named collections.
 - Sends an exact clean preview as a separate publication, while the editor
   stays in place and never adds controls to the preview itself.
-- Publishes immediately or through a durable scheduled queue with duplicate
-  protection, access checks and failure notifications.
+- Publishes immediately or through a durable queue with duplicate protection.
+  A lost Telegram response is never blindly retried: the job asks an admin to
+  check the channel before an explicit manual retry.
 - Works inline with `@StonerHandBot artist — track` in any conversation.
 - Uses Bot API 10.3 Rich Messages when supported and falls back to a complete
   classic card without losing artwork, text or platform links.
@@ -147,8 +148,8 @@ and tags — without repeating the title below the cover. Semantic styles,
 disabled progress, ephemeral notices and Rich content remain capability-gated;
 older Telegram clients always receive the full classic experience.
 Button labels remain descriptive and are not governed by an arbitrary 28–32
-character rule; shortening is reserved for labels that would actually overflow
-Telegram. Color is never the only cue and rows contain at most two actions.
+character rule: a long title gets its own row without losing text. Color is
+never the only cue and rows contain at most two actions.
 
 ## Architecture
 
@@ -214,6 +215,10 @@ Required production values:
 | `UPSTASH_REDIS_REST_TOKEN` | durable Redis credential |
 | `CRON_SECRET` | protects the queue worker |
 
+`queue-worker.yml` ticks the worker every five minutes and the daily Vercel Cron
+remains a backup. The GitHub `CRON_SECRET` must match production. `/api/health`
+is strictly read-only and reports the latest worker tick.
+
 `ADMIN_CHAT_ID`, `PUBLISH_CHAT_ID`, `SONGLINK_API_KEY` and presentation flags
 are optional and documented in [.env.example](.env.example).
 
@@ -232,7 +237,9 @@ python -m ruff check src api tests
 python -m ruff format --check src api tests
 python -m bandit -q -r src api -x tests
 python -m pip_audit -r requirements.txt --progress-spinner off
-python -m pytest -q
+python -m coverage run -m pytest -q
+python -m coverage report
+python -m mypy
 ```
 
 CI also checks Python 3.10–3.12, dependency pins, secrets, generated files, compilation and the
@@ -240,6 +247,8 @@ Vercel route/build/cron contract. A production canary verifies the exact commit,
 the collection-artwork service and the complete publication smoke matrix before
 it allows the guarded automatic rollback decision. A separate provider canary
 checks live public music-provider contracts without coupling their outages to rollback.
+The opt-in `telegram_canary.py --chat-id <ID>` verifies real Classic, Rich,
+collage and SoundCloud-only cards, then deletes every confirmed test message.
 
 </details>
 

@@ -36,6 +36,21 @@ class SharingTests(unittest.TestCase):
             "https://soundcloud.com/stoner-hand/dj-set",
         )
 
+    def test_share_source_ignores_a_mislabeled_platform_destination(self) -> None:
+        track = TrackMatch(
+            title="Track",
+            artist="Artist",
+            links={
+                "spotify": "https://soundcloud.com/artist/wrong-label",
+                "appleMusic": "https://music.apple.com/us/song/track/1",
+            },
+        )
+
+        self.assertEqual(
+            track_share_url(track),
+            "https://music.apple.com/us/song/track/1",
+        )
+
     def test_collection_titles_are_compact_and_use_correct_plural(self) -> None:
         self.assertEqual(collection_title("ru", 1), "Подборка · 1 релиз")
         self.assertEqual(collection_title("ru", 4), "Подборка · 4 релиза")
@@ -145,7 +160,7 @@ class SharingTests(unittest.TestCase):
                 title=f"Track {index}",
                 artist="Artist",
                 links={"spotify": f"https://open.spotify.com/track/{index}"},
-                thumbnail_url=f"https://images.example/{index}.jpg",
+                thumbnail_url=f"https://i.scdn.co/{index}.jpg",
             )
             for index in range(2)
         ]
@@ -182,7 +197,7 @@ class SharingTests(unittest.TestCase):
                 title=f"Track {index}",
                 artist="Artist",
                 links={"spotify": f"https://open.spotify.com/track/{index}"},
-                thumbnail_url=f"https://images.example/{index}.jpg",
+                thumbnail_url=f"https://i.scdn.co/{index}.jpg",
             )
             for index in range(6)
         ]

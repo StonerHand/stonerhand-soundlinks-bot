@@ -835,6 +835,14 @@
     "en": "Refresh",
     "ru": "Обновить"
   },
+  "queue_retried": {
+    "en": "Queued for a manual retry",
+    "ru": "Поставлено на ручной повтор"
+  },
+  "queue_retry_item": {
+    "en": "Post absent — retry #{index}",
+    "ru": "Поста нет — повторить №{index}"
+  },
   "queue_title": {
     "en": "🕒 <b>Queue · {count}</b>",
     "ru": "🕒 <b>Очередь · {count}</b>"
@@ -842,6 +850,10 @@
   "queue_unavailable": {
     "en": "The queue is temporarily unavailable. Try again.",
     "ru": "Очередь временно недоступна. Попробуй ещё раз."
+  },
+  "queue_uncertain": {
+    "en": "⚠️ Delivery could not be confirmed. Check the channel before retrying.",
+    "ru": "⚠️ Результат отправки не подтверждён. Перед повтором проверь канал."
   },
   "queue_unknown": {
     "en": "Untitled card",

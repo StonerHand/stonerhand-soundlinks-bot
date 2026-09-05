@@ -172,7 +172,9 @@ def lookup_cache_key(
     # Version the aggregate key whenever completeness semantics change so an
     # old partial result cannot look like a complete collection after deploy.
     scoped = f"{namespace}\0{canonical}"
-    return "lookup:v8:" + hashlib.sha256(scoped.encode()).hexdigest()
+    # v9 invalidates cached SoundCloud cross-service guesses. Direct
+    # SoundCloud URLs are now resolved only by the authoritative provider.
+    return "lookup:v9:" + hashlib.sha256(scoped.encode()).hexdigest()
 
 
 def _lookup_cache_namespace(bot_data: dict) -> str:

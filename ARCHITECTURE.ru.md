@@ -2,7 +2,7 @@
 
 Документ описывает текущую production-архитектуру Telegram-бота.
 
-> Актуальная схема для релиза 1.14.1. Все пользовательские сценарии сходятся в
+> Актуальная схема для релиза 1.15.0. Все пользовательские сценарии сходятся в
 > одном конвейере публикации и остаются внутри Telegram.
 
 ## Контур системы
@@ -17,7 +17,7 @@ flowchart LR
     PUB --> CONTRACT["Final publication contract"]
     CONTRACT --> GW["Telegram API Gateway"]
     GW --> TG
-    CRON["Vercel Cron"] --> WORKER["api/queue_worker.py"]
+    CRON["GitHub schedule + Vercel backup"] --> WORKER["api/queue_worker.py"]
     WORKER --> PUB
     BOT <--> REDIS["Upstash Redis"]
 ```
@@ -306,11 +306,12 @@ Webhook worker не запускает: пользовательский update 
   одного Telegram-вызова не блокирует остальные поля;
 - durable draft удаляет неизвестные поля, ограничивает размеры и принимает
   только HTTP(S)-ссылки до создания строгой модели релиза;
-- health endpoint параллельно проверяет Telegram, webhook и queue worker,
-  считает недоступный worker ошибкой, одним Redis-снимком читает
-  очередь/метрики и возвращает version/commit;
-- внутренний health-to-worker вызов использует отдельный производный ключ,
-  если `CRON_SECRET` сохранён пустым; явный секрет всегда имеет приоритет;
+- health endpoint параллельно и без побочных эффектов проверяет Telegram и
+  webhook, выполняет Redis PING, читает очередь/метрики и возвращает version/commit;
+- отдельный GitHub workflow вызывает защищённый queue worker каждые пять минут,
+  а Vercel Cron остаётся суточным резервом; последний tick хранится в Redis;
+- перед вызовом Telegram задача переходит в `delivering`: подтверждённый отказ
+  получает backoff, а потерянный ответ становится `uncertain` без слепого повтора;
 - production canary проверяет реальные API, commit deploy, просроченную очередь,
   сервис коллажей, все финальные форматы и UI/UX-контракт главных экранов;
 - независимый provider canary каждые шесть часов запускает настоящие read-only

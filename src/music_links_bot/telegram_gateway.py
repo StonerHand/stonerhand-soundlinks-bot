@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import logging
 import os
+import warnings
 from dataclasses import dataclass
+from datetime import timedelta
 from time import monotonic
 from typing import Any
 
 import httpx
-from telegram.error import BadRequest, TelegramError
+from telegram.error import BadRequest, Forbidden, RetryAfter, TelegramError
+from telegram.warnings import PTBDeprecationWarning
 
 from music_links_bot.constants import HTTP_USER_AGENT
 
@@ -24,6 +27,33 @@ class CapabilityState:
 
 _CAPABILITIES: dict[str, CapabilityState] = {}
 _TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
+
+
+def _telegram_api_error(status_code: int, payload: object) -> TelegramError:
+    """Preserve definitive Bot API rejections for safe retry decisions."""
+    description = "Telegram API request failed"
+    if isinstance(payload, dict):
+        description = str(payload.get("description") or description)
+    if status_code == 400:
+        return BadRequest(description)
+    if status_code == 403:
+        return Forbidden(description)
+    if status_code == 429:
+        parameters = payload.get("parameters") if isinstance(payload, dict) else None
+        retry_after = (
+            parameters.get("retry_after") if isinstance(parameters, dict) else 1
+        )
+        try:
+            delay = max(1, int(retry_after))
+        except (TypeError, ValueError):
+            delay = 1
+        # PTB 22.x warns inside the constructor while it transitions this
+        # field from int to timedelta. We already pass the forward-compatible
+        # shape and keep that library-only compatibility warning out of logs.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", PTBDeprecationWarning)
+            return RetryAfter(timedelta(seconds=delay))
+    return TelegramError(description)
 
 
 def feature_enabled(name: str, *, default: bool = True) -> bool:
@@ -100,7 +130,7 @@ class TelegramApiGateway:
         if callable(post):
             return await post(method, data=data)
         if not self.token:
-            raise TelegramError("Telegram bot token is unavailable")
+            raise BadRequest("Telegram bot token is unavailable")
 
         async with httpx.AsyncClient(
             timeout=httpx.Timeout(self.timeout, connect=3.0),
@@ -115,14 +145,7 @@ class TelegramApiGateway:
         except ValueError as exc:
             raise TelegramError("Telegram returned invalid JSON") from exc
         if not isinstance(payload, dict) or not payload.get("ok"):
-            description = (
-                str(payload.get("description") or "Telegram API request failed")
-                if isinstance(payload, dict)
-                else "Telegram API request failed"
-            )
-            if response.status_code == 400:
-                raise BadRequest(description)
-            raise TelegramError(description)
+            raise _telegram_api_error(response.status_code, payload)
         return payload.get("result")
 
     async def send_rich_message(

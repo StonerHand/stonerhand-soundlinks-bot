@@ -3,13 +3,16 @@ from __future__ import annotations
 import time
 from dataclasses import asdict, dataclass
 from typing import Any, TypedDict
-from urllib.parse import urlparse
 
 from music_links_bot.constants import PLATFORM_LABELS
 from music_links_bot.metadata_cleaning import clean_spotify_metadata_title
 from music_links_bot.models import TrackMatch
 from music_links_bot.release_presentation import normalize_preset
-from music_links_bot.url_utils import is_direct_platform_url
+from music_links_bot.url_utils import (
+    canonical_platform_key,
+    is_direct_platform_url,
+    is_platform_destination_url,
+)
 
 CURRENT_DRAFT_VERSION = 5
 MAX_TRACK_FIELD_LENGTH = 512
@@ -28,8 +31,7 @@ def _safe_http_url(value: object) -> str | None:
     if not isinstance(value, str):
         return None
     clean = value.strip()[:MAX_TRACK_URL_LENGTH]
-    parsed = urlparse(clean)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+    if not is_direct_platform_url(clean):
         return None
     return clean
 
@@ -40,9 +42,9 @@ def _normalize_track_item(value: dict) -> DraftTrackItem:
     raw_links = value.get("links")
     if isinstance(raw_links, dict):
         for raw_key, raw_url in raw_links.items():
-            key = str(raw_key or "").strip()[:64]
+            key = canonical_platform_key(raw_key)
             url = _safe_http_url(raw_url)
-            if not key or url is None or not is_direct_platform_url(url):
+            if not key or url is None or not is_platform_destination_url(key, url):
                 continue
             links[key] = url
             if len(links) >= MAX_TRACK_LINKS:

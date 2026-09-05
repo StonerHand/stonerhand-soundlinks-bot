@@ -5,9 +5,12 @@ from __future__ import annotations
 import asyncio
 import sys
 
+from music_links_bot.bot_lookup import _lookup_tracks
 from music_links_bot.musicbrainz import MusicBrainzClient
 from music_links_bot.nts import NTSClient
 from music_links_bot.playlist import PlaylistClient
+from music_links_bot.search import SearchClient
+from music_links_bot.songlink import SonglinkClient
 from music_links_bot.soundcloud import SoundCloudClient
 from music_links_bot.spotify import SpotifyClient, SpotifyLookupError
 from music_links_bot.youtube import YouTubeClient
@@ -34,6 +37,16 @@ async def verify() -> list[str]:
     playlist = PlaylistClient(timeout=10)
     nts = NTSClient(timeout=10)
     musicbrainz = MusicBrainzClient(timeout=10)
+    songlink = SonglinkClient(
+        user_countries=("US", "GB", "DE"),
+        timeout=10,
+        spotify_client=spotify,
+    )
+    search = SearchClient(
+        timeout=10,
+        country="US",
+        musicbrainz_client=musicbrainz,
+    )
     try:
         try:
             track = await spotify.lookup_release(SPOTIFY_TRACK)
@@ -59,6 +72,26 @@ async def verify() -> list[str]:
             )
 
         try:
+            candidates = await search.search_release_candidates("Deftones - Rickets")
+            exact = next(
+                (
+                    candidate
+                    for candidate in candidates
+                    if candidate.artist == "Deftones" and candidate.title == "Rickets"
+                ),
+                None,
+            )
+            enriched = (
+                await search.lookup_release_fallback(exact.url) if exact else None
+            )
+            if exact is None or enriched is None or "spotify" not in enriched.links:
+                failures.append(
+                    "text search did not produce the exact enriched release"
+                )
+        except Exception as exc:  # noqa: BLE001
+            failures.append(f"exact text search failed: {type(exc).__name__}")
+
+        try:
             await spotify.lookup_release(SPOTIFY_REMOVED_ALBUM)
         except SpotifyLookupError:
             pass
@@ -73,6 +106,21 @@ async def verify() -> list[str]:
                 failures.append("soundcloud metadata or artwork is incomplete")
         except Exception as exc:  # noqa: BLE001
             failures.append(f"soundcloud lookup failed: {type(exc).__name__}")
+
+        try:
+            tracks, unavailable = await _lookup_tracks(
+                songlink,
+                [SOUNDCLOUD_TRACK],
+                soundcloud_client=soundcloud,
+            )
+            if (
+                unavailable
+                or len(tracks) != 1
+                or tracks[0].links != {"soundcloud": SOUNDCLOUD_TRACK}
+            ):
+                failures.append("soundcloud-only flow invented another platform")
+        except Exception as exc:  # noqa: BLE001
+            failures.append(f"soundcloud-only flow failed: {type(exc).__name__}")
 
         try:
             video = await youtube.lookup_video(YOUTUBE_VIDEO)
@@ -101,6 +149,8 @@ async def verify() -> list[str]:
             youtube.aclose(),
             playlist.aclose(),
             nts.aclose(),
+            songlink.aclose(),
+            search.aclose(),
             musicbrainz.aclose(),
         )
     return failures

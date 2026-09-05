@@ -11,7 +11,7 @@ from music_links_bot.models import TrackMatch
 from music_links_bot.release_presentation import PRESET_ORDER, apply_preset
 from music_links_bot.telegram_text import telegram_text_length
 from music_links_bot.text_utils import normalize_hashtag
-from music_links_bot.url_utils import is_direct_platform_url
+from music_links_bot.url_utils import is_platform_destination_url
 
 MESSAGE_TEXT_LIMIT = 4096
 PHOTO_CAPTION_LIMIT = 1024
@@ -70,7 +70,8 @@ def available_platforms(track: TrackMatch, platform_order: list[str]) -> list[st
     return [
         key
         for key in platform_order
-        if key in PLATFORM_LABELS and is_direct_platform_url(track.links.get(key))
+        if key in PLATFORM_LABELS
+        and is_platform_destination_url(key, track.links.get(key))
     ][:MAX_SELECTED_PLATFORMS]
 
 

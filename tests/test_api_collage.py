@@ -23,7 +23,8 @@ class _Response:
     def __exit__(self, *_args) -> None:
         return None
 
-    def iter_bytes(self):
+    def iter_bytes(self, *, chunk_size):
+        assert chunk_size <= 65_536
         yield self.body
 
 

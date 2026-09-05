@@ -73,7 +73,6 @@ from music_links_bot.bot_ui import (
 from music_links_bot.config import Settings
 from music_links_bot.i18n import get_text
 from music_links_bot.keyboards import (
-    MAX_BUTTON_TEXT_LENGTH,
     _build_artist_keyboard,
     _build_collection_keyboard,
     _build_link_keyboard,
@@ -848,8 +847,8 @@ class BotKeyboardTests(unittest.TestCase):
                 "spotify": "https://open.spotify.com/track/1",
                 "appleMusic": "https://music.apple.com/song/1",
                 "soundcloud": "https://soundcloud.com/artist/track",
-                "deezer": "https://deezer.example/track/1",
-                "tidal": "https://tidal.example/track/1",
+                "deezer": "https://deezer.com/track/1",
+                "tidal": "https://tidal.com/track/1",
             },
             include_channel_button=False,
             platform_selection=[
@@ -1088,6 +1087,24 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertIsNone(rows[0][0].style)
         self.assertEqual(rows[0][1].text, "📺 2. Live Session")
         self.assertIsNone(rows[0][1].style)
+
+    def test_mixed_collection_repairs_an_untrusted_release_page(self) -> None:
+        keyboard = _build_mixed_collection_keyboard(
+            [
+                TrackMatch(
+                    title="Transitions",
+                    artist="Youth Code",
+                    links={"spotify": "https://open.spotify.com/track/abc123"},
+                    page_url="https://wrong.example/track/abc123",
+                )
+            ],
+            [],
+        )
+
+        self.assertEqual(
+            keyboard.inline_keyboard[0][0].url,
+            "https://song.link/s/abc123",
+        )
 
     def test_publication_cards_do_not_repeat_channel_navigation(self) -> None:
         self.assertFalse(_should_include_channel_button(ChannelMessageStub()))
@@ -1353,7 +1370,7 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(nts_urls, ["https://www.nts.live/shows/example"])
         self.assertEqual(music_urls, ["https://open.spotify.com/track/123"])
 
-    def test_collection_keyboard_shortens_long_button_text(self) -> None:
+    def test_collection_keyboard_preserves_long_button_in_its_own_row(self) -> None:
         keyboard = _build_collection_keyboard(
             [
                 TrackMatch(
@@ -1366,8 +1383,12 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         button_text = keyboard.inline_keyboard[0][0].text
-        self.assertLessEqual(len(button_text), MAX_BUTTON_TEXT_LENGTH)
-        self.assertTrue(button_text.endswith("…"))
+        self.assertIn(
+            "A Very Long Track Title That Would Make A Telegram Button Too Wide",
+            button_text,
+        )
+        self.assertEqual(len(keyboard.inline_keyboard[0]), 1)
+        self.assertNotIn("…", button_text)
 
     def test_spotify_episode_fallback_builds_podcast_match(self) -> None:
         source_url = "https://open.spotify.com/episode/abc?si=123"
@@ -1714,7 +1735,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
                     artist="Artist",
                     links={"spotify": source_url},
                     page_url=f"https://song.link/{track_id}",
-                    thumbnail_url=f"https://images.example/{track_id}.jpg",
+                    thumbnail_url=f"https://i.scdn.co/{track_id}.jpg",
                 )
 
         with patch.dict(
@@ -3157,6 +3178,31 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(unavailable_urls, [])
         self.assertEqual(len(tracks), 1)
+        self.assertEqual(tracks[0].links, {"soundcloud": source_url})
+
+    async def test_soundcloud_source_never_uses_a_false_songlink_match(self) -> None:
+        source_url = "https://soundcloud.com/artist/exclusive-dj-set"
+
+        class FalseSonglinkMatch:
+            called = False
+
+            async def lookup_track(self, _source_url: str) -> TrackMatch:
+                self.called = True
+                return TrackMatch(
+                    title="Different Track",
+                    artist="Different Artist",
+                    links={"spotify": "https://open.spotify.com/track/wrong"},
+                )
+
+        songlink = FalseSonglinkMatch()
+        tracks, unavailable_urls = await _lookup_tracks(
+            songlink,
+            [source_url],
+            soundcloud_client=SoundCloudClientStub(),
+        )
+
+        self.assertFalse(songlink.called)
+        self.assertEqual(unavailable_urls, [])
         self.assertEqual(tracks[0].links, {"soundcloud": source_url})
 
     def test_release_keyboard_hides_legacy_provider_search_links(self) -> None:

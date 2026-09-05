@@ -6,16 +6,17 @@ from urllib.parse import urlparse
 from telegram import InlineKeyboardMarkup
 
 from music_links_bot.bot_builder import MESSAGE_TEXT_LIMIT, PHOTO_CAPTION_LIMIT
+from music_links_bot.constants import PLATFORM_LABELS
 from music_links_bot.publication_budget import visible_length
 from music_links_bot.release_hubs import is_universal_release_url
 from music_links_bot.url_utils import (
     extract_supported_urls,
     is_direct_platform_url,
+    is_platform_destination_url,
 )
 
 MAX_INLINE_BUTTONS = 100
 MAX_INLINE_BUTTONS_PER_ROW = 8
-MAX_BUTTON_TEXT_LENGTH = 64
 MAX_CALLBACK_DATA_BYTES = 64
 MAX_INLINE_QUERY_LENGTH = 256
 _CAPTION_MODES = frozenset({"audio", "photo"})
@@ -177,7 +178,7 @@ def _keyboard_issues(
         for button_index, button in enumerate(row):
             location = f"{row_index}:{button_index}"
             label = str(button.text or "")
-            if not label or len(label) > MAX_BUTTON_TEXT_LENGTH:
+            if not label.strip():
                 issues.append(ContractIssue("invalid_button_text", location))
 
             callback_data = getattr(button, "callback_data", None)
@@ -204,18 +205,39 @@ def _keyboard_issues(
 
             url = getattr(button, "url", None)
             if url:
-                if not is_direct_platform_url(url):
+                if not _safe_http_url(url):
                     issues.append(ContractIssue("invalid_button_url", location))
                 elif _is_universal_label(label) and not is_universal_release_url(url):
                     issues.append(ContractIssue("universal_button_mismatch", location))
+                else:
+                    platform_key = _platform_key_for_label(label)
+                    if platform_key and not is_platform_destination_url(
+                        platform_key, url
+                    ):
+                        issues.append(
+                            ContractIssue("platform_button_mismatch", location)
+                        )
     return issues
 
 
 def _safe_http_url(value: str) -> bool:
-    parsed = urlparse(str(value))
-    return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+    if not is_direct_platform_url(value):
+        return False
+    try:
+        return urlparse(str(value)).scheme == "https"
+    except ValueError:
+        return False
 
 
 def _is_universal_label(label: str) -> bool:
     normalized = " ".join(label.casefold().split())
     return any(marker in normalized for marker in _UNIVERSAL_LABEL_MARKERS)
+
+
+def _platform_key_for_label(label: str) -> str | None:
+    normalized = " ".join(label.casefold().split())
+    for platform_key, platform_label in PLATFORM_LABELS.items():
+        provider_name = platform_label.split(maxsplit=1)[-1].casefold()
+        if normalized in {platform_label.casefold(), provider_name}:
+            return platform_key
+    return None

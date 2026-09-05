@@ -27,4 +27,9 @@ jobs:
       - name: Verify public provider contracts
         env:
           PYTHONPATH: src
-        run: python tests/e2e/provider_canary.py
+        run: |
+          for attempt in 1 2 3; do
+            python tests/e2e/provider_canary.py && exit 0
+            sleep 15
+          done
+          exit 1

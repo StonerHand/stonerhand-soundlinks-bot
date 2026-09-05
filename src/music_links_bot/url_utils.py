@@ -2,7 +2,15 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
-from urllib.parse import parse_qs, parse_qsl, urlencode, urlparse, urlunparse
+from urllib.parse import (
+    ParseResult,
+    parse_qs,
+    parse_qsl,
+    unquote,
+    urlencode,
+    urlparse,
+    urlunparse,
+)
 
 from music_links_bot.constants import SUPPORTED_INPUT_HOSTS
 
@@ -12,6 +20,22 @@ YOUTUBE_MUSIC_HOST = "music.youtube.com"
 YOUTUBE_VIDEO_HOSTS = {"youtube.com", "m.youtube.com", "youtu.be"}
 SOUNDCLOUD_HOSTS = {"soundcloud.com", "m.soundcloud.com", "on.soundcloud.com"}
 NTS_HOSTS = {"nts.live", "www.nts.live"}
+PLATFORM_DESTINATION_HOSTS = {
+    "spotify": frozenset({"open.spotify.com", "spotify.com"}),
+    "appleMusic": frozenset(
+        {"music.apple.com", "geo.music.apple.com", "itunes.apple.com"}
+    ),
+    "applePodcasts": frozenset({"podcasts.apple.com"}),
+    "youtubeMusic": frozenset(
+        {"music.youtube.com", "youtube.com", "m.youtube.com", "youtu.be"}
+    ),
+    "soundcloud": frozenset(
+        {"soundcloud.com", "m.soundcloud.com", "on.soundcloud.com"}
+    ),
+    "deezer": frozenset({"deezer.com"}),
+    "tidal": frozenset({"tidal.com", "listen.tidal.com"}),
+    "yandexMusic": frozenset({"music.yandex.ru", "music.yandex.com"}),
+}
 TRACKING_QUERY_KEYS = {
     "fbclid",
     "feature",
@@ -35,8 +59,21 @@ def normalize_host(host: str | None) -> str:
     return (host or "").lower().removeprefix("www.")
 
 
+def _parse_url(value: object) -> ParseResult | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        return urlparse(value)
+    except ValueError:
+        return None
+
+
 def is_supported_music_url(url: str) -> bool:
-    parsed = urlparse(url)
+    if not is_direct_platform_url(url):
+        return False
+    parsed = _parse_url(url)
+    if parsed is None:
+        return False
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         return False
 
@@ -62,23 +99,107 @@ def is_direct_platform_url(value: object) -> bool:
     if not isinstance(value, str) or not value.strip():
         return False
 
-    parsed = urlparse(value.strip())
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+    value = value.strip()
+    if any(char.isspace() or ord(char) < 32 for char in value) or "\\" in value:
+        return False
+    try:
+        parsed = _parse_url(value)
+        if (
+            parsed is None
+            or parsed.scheme not in {"http", "https"}
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or (
+                parsed.port is not None
+                and not (
+                    (parsed.scheme == "https" and parsed.port == 443)
+                    or (parsed.scheme == "http" and parsed.port == 80)
+                )
+            )
+        ):
+            return False
+    except ValueError:
         return False
 
-    path_parts = [part.casefold() for part in parsed.path.split("/") if part]
+    path_parts = [part.casefold() for part in unquote(parsed.path).split("/") if part]
     return "search" not in path_parts
+
+
+def canonical_platform_key(value: object) -> str | None:
+    key = (
+        str(value or "")
+        .strip()
+        .casefold()
+        .replace(" ", "")
+        .replace("-", "")
+        .replace("_", "")
+    )
+    aliases = {
+        "apple": "appleMusic",
+        "applemusic": "appleMusic",
+        "itunes": "appleMusic",
+        "applepodcasts": "applePodcasts",
+        "itunespodcast": "applePodcasts",
+        "podcastapple": "applePodcasts",
+        "podcasts": "applePodcasts",
+        "youtube": "youtubeMusic",
+        "youtubemusic": "youtubeMusic",
+        "yandex": "yandexMusic",
+        "yandexmusic": "yandexMusic",
+    }
+    return aliases.get(key) or next(
+        (
+            name
+            for name in PLATFORM_DESTINATION_HOSTS
+            if name.casefold().replace("_", "").replace("-", "") == key
+        ),
+        None,
+    )
+
+
+def is_platform_destination_url(platform_key: object, value: object) -> bool:
+    """Validate that a trusted platform label points to its own HTTPS host."""
+    if not isinstance(platform_key, str) or not is_direct_platform_url(value):
+        return False
+    if not isinstance(value, str):
+        return False
+
+    allowed_hosts = PLATFORM_DESTINATION_HOSTS.get(
+        canonical_platform_key(platform_key) or ""
+    )
+    if not allowed_hosts:
+        return False
+    parsed = _parse_url(value.strip())
+    if parsed is None:
+        return False
+    try:
+        port = parsed.port
+    except ValueError:
+        return False
+    return (
+        parsed.scheme == "https"
+        and not parsed.username
+        and not parsed.password
+        and port in {None, 443}
+        and normalize_host(parsed.hostname) in allowed_hosts
+    )
 
 
 def direct_platform_links(value: object) -> dict[str, str]:
     """Return only direct HTTP(S) release links from provider metadata."""
     if not isinstance(value, Mapping):
         return {}
-    return {
-        str(key): url.strip()
-        for key, url in value.items()
-        if key and isinstance(url, str) and is_direct_platform_url(url)
-    }
+    links: dict[str, str] = {}
+    for key, url in value.items():
+        canonical_key = canonical_platform_key(key)
+        if (
+            canonical_key
+            and isinstance(url, str)
+            and is_platform_destination_url(canonical_key, url)
+        ):
+            links[canonical_key] = url.strip()
+    return links
 
 
 def extract_supported_urls(text: str | None) -> list[str]:
@@ -100,7 +221,9 @@ def extract_supported_urls(text: str | None) -> list[str]:
 
 
 def cache_key_for_url(url: str) -> str:
-    parsed = urlparse(url)
+    parsed = _parse_url(url)
+    if parsed is None:
+        return url
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         return url
 
@@ -212,7 +335,9 @@ def _line_has_content(line: list[tuple[str, int]]) -> bool:
 
 
 def is_youtube_video_url(url: str) -> bool:
-    parsed = urlparse(url)
+    parsed = _parse_url(url)
+    if parsed is None:
+        return False
     normalized_host = normalize_host(parsed.hostname)
     if normalized_host == YOUTUBE_MUSIC_HOST:
         return False
@@ -234,7 +359,9 @@ def is_youtube_video_url(url: str) -> bool:
 
 
 def is_soundcloud_url(url: str) -> bool:
-    parsed = urlparse(url)
+    parsed = _parse_url(url)
+    if parsed is None:
+        return False
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         return False
 
@@ -245,7 +372,9 @@ def is_soundcloud_url(url: str) -> bool:
 
 
 def is_nts_url(url: str) -> bool:
-    parsed = urlparse(url)
+    parsed = _parse_url(url)
+    if parsed is None:
+        return False
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         return False
 
@@ -254,7 +383,11 @@ def is_nts_url(url: str) -> bool:
 
 
 def spotify_url_type(url: str) -> str | None:
-    parsed = urlparse(url)
+    if not is_direct_platform_url(url):
+        return None
+    parsed = _parse_url(url)
+    if parsed is None:
+        return None
     if normalize_host(parsed.hostname) not in {"open.spotify.com", "spotify.com"}:
         return None
 
@@ -272,7 +405,11 @@ def is_spotify_playlist_url(url: str) -> bool:
 
 
 def apple_music_url_type(url: str) -> str | None:
-    parsed = urlparse(url)
+    if not is_direct_platform_url(url):
+        return None
+    parsed = _parse_url(url)
+    if parsed is None:
+        return None
     if normalize_host(parsed.hostname) != "music.apple.com":
         return None
 
@@ -296,7 +433,11 @@ def is_spotify_artist_url(url: str) -> bool:
 
 
 def apple_podcasts_url_type(url: str) -> str | None:
-    parsed = urlparse(url)
+    if not is_direct_platform_url(url):
+        return None
+    parsed = _parse_url(url)
+    if parsed is None:
+        return None
     if normalize_host(parsed.hostname) != "podcasts.apple.com":
         return None
 

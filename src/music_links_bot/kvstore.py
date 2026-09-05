@@ -58,6 +58,9 @@ class KVStore:
         result = await self._command(["GET", key])
         return result if isinstance(result, str) else None
 
+    async def ping(self) -> bool:
+        return await self._command_or_raise(["PING"]) == "PONG"
+
     async def set(
         self,
         key: str,

@@ -25,14 +25,14 @@ from music_links_bot.telegram_buttons import (
     button as InlineKeyboardButton,
     url_button,
 )
-from music_links_bot.url_utils import is_direct_platform_url
+from music_links_bot.url_utils import (
+    is_platform_destination_url,
+)
 
 CHANNEL_USERNAME = "stonerhand"
 CHANNEL_URL = f"https://t.me/{CHANNEL_USERNAME}"
 CHANNEL_BUTTON_TEXT = "🪨 Открыть канал"
 DEFAULT_UI_MODE = "stonerhand"
-MAX_BUTTON_TEXT_LENGTH = 64
-MAX_COLLECTION_BUTTON_TEXT_LENGTH = 42
 MAX_TWO_COLUMN_BUTTON_TEXT_LENGTH = 24
 MAX_VISIBLE_PLATFORM_BUTTONS = 1
 DEFAULT_PLATFORM_ORDER = (
@@ -72,7 +72,7 @@ def _select_preview_url(
     platform_order = _get_platform_order(context)
     for platform in platform_order:
         url = links.get(platform)
-        if is_direct_platform_url(url):
+        if is_platform_destination_url(platform, url):
             return url
 
     return None
@@ -121,7 +121,7 @@ def _build_link_keyboard(
             platform_key
             for platform_key in platform_selection
             if platform_key in PLATFORM_LABELS
-            and is_direct_platform_url(links.get(platform_key))
+            and is_platform_destination_url(platform_key, links.get(platform_key))
         ]
     else:
         selected_platforms = []
@@ -135,13 +135,13 @@ def _build_link_keyboard(
             platform_key
             for platform_key in platform_order
             if platform_key in PLATFORM_LABELS
-            and is_direct_platform_url(links.get(platform_key))
+            and is_platform_destination_url(platform_key, links.get(platform_key))
         ]
         remaining_platforms = [
             platform_key
             for platform_key in PLATFORM_LABELS
             if platform_key not in ordered_platforms
-            and is_direct_platform_url(links.get(platform_key))
+            and is_platform_destination_url(platform_key, links.get(platform_key))
         ]
         final_platforms = [*ordered_platforms, *remaining_platforms]
 
@@ -225,10 +225,7 @@ def _build_collection_keyboard(
             text = f"{index} · {title}"
             if not omit_artist:
                 text = f"{index} · {track.artist} — {title}"
-            text = _shorten_button_text(
-                text,
-                max_length=MAX_COLLECTION_BUTTON_TEXT_LENGTH,
-            )
+            text = _button_label(text)
         buttons.append(
             _url_button(
                 text=text,
@@ -305,7 +302,7 @@ def _build_youtube_collection_keyboard(
     for index, video in enumerate(videos, start=1):
         buttons.append(
             _url_button(
-                text=_shorten_button_text(f"📺 {index}. {video.title}"),
+                text=_button_label(f"📺 {index}. {video.title}"),
                 url=video.url,
                 style=None,
             )
@@ -325,7 +322,7 @@ def _build_nts_collection_keyboard(
     for index, radio in enumerate(radios, start=1):
         buttons.append(
             _url_button(
-                text=_shorten_button_text(f"📻 {index}. {radio.title}"),
+                text=_button_label(f"📻 {index}. {radio.title}"),
                 url=radio.url,
                 style=None,
             )
@@ -345,7 +342,7 @@ def _build_playlist_collection_keyboard(
     for index, playlist in enumerate(playlists, start=1):
         buttons.append(
             _url_button(
-                text=_shorten_button_text(f"🎛 {index}. {playlist.title}"),
+                text=_button_label(f"🎛 {index}. {playlist.title}"),
                 url=playlist.url,
                 style=None,
             )
@@ -365,7 +362,7 @@ def _build_artist_collection_keyboard(
     for index, artist in enumerate(artists, start=1):
         buttons.append(
             _url_button(
-                text=_shorten_button_text(f"🧬 {index}. {artist.title}"),
+                text=_button_label(f"🧬 {index}. {artist.title}"),
                 url=artist.url,
                 style=None,
             )
@@ -399,7 +396,11 @@ def _build_mixed_collection_keyboard(
     index = 1
 
     for track in tracks:
-        destination = track.page_url or _select_preview_url(track.links)
+        destination = resolve_release_hub_url(
+            track.page_url,
+            track.links,
+            release_kind=track.kind,
+        ) or _select_preview_url(track.links)
         if not destination:
             continue
 
@@ -408,7 +409,7 @@ def _build_mixed_collection_keyboard(
                 text=(
                     "🎧 Слушать песню"
                     if is_track_video_pair
-                    else _shorten_button_text(
+                    else _button_label(
                         f"{_track_button_icon(track)} {index}. {track.artist} - {track.title}"
                     )
                 ),
@@ -421,7 +422,7 @@ def _build_mixed_collection_keyboard(
     for playlist in playlists:
         buttons.append(
             _url_button(
-                text=_shorten_button_text(f"🎛 {index}. {playlist.title}"),
+                text=_button_label(f"🎛 {index}. {playlist.title}"),
                 url=playlist.url,
                 style=None,
             )
@@ -431,7 +432,7 @@ def _build_mixed_collection_keyboard(
     for artist in artists:
         buttons.append(
             _url_button(
-                text=_shorten_button_text(f"🧬 {index}. {artist.title}"),
+                text=_button_label(f"🧬 {index}. {artist.title}"),
                 url=artist.url,
                 style=None,
             )
@@ -441,7 +442,7 @@ def _build_mixed_collection_keyboard(
     for radio in radios:
         buttons.append(
             _url_button(
-                text=_shorten_button_text(f"📻 {index}. {radio.title}"),
+                text=_button_label(f"📻 {index}. {radio.title}"),
                 url=radio.url,
                 style=None,
             )
@@ -454,7 +455,7 @@ def _build_mixed_collection_keyboard(
                 text=(
                     "📺 Смотреть клип"
                     if is_track_video_pair
-                    else _shorten_button_text(f"📺 {index}. {video.title}")
+                    else _button_label(f"📺 {index}. {video.title}")
                 ),
                 url=video.url,
                 style=None,
@@ -502,19 +503,9 @@ def _normalize_platform_key(platform: str) -> str | None:
     return PRIMARY_PLATFORM_ALIASES.get(compact_value)
 
 
-def _shorten_button_text(
-    text: str,
-    *,
-    max_length: int = MAX_BUTTON_TEXT_LENGTH,
-) -> str:
-    if len(text) <= max_length:
-        return text
-
-    shortened = text[: max(1, max_length - 1)].rstrip()
-    boundary = shortened.rfind(" ")
-    if boundary >= max(8, max_length // 2):
-        shortened = shortened[:boundary]
-    return shortened.rstrip(" -–—·") + "…"
+def _button_label(text: str) -> str:
+    """Preserve the complete name; use row layout, not destructive truncation."""
+    return " ".join(text.split())
 
 
 def _adaptive_collection_rows(

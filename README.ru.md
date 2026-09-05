@@ -6,7 +6,7 @@
 
 [Открыть бота](https://t.me/StonerHandBot) · [Посмотреть канал](https://t.me/stonerhand) · [English](README.md)
 
-![Release](https://img.shields.io/badge/release-1.14.1-5b5bd6?style=flat-square)
+![Release](https://img.shields.io/badge/release-1.15.0-5b5bd6?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
@@ -54,8 +54,9 @@ StonerHand — музыкальный редактор, который полн�
   сохранять шаблоны, историю и именованные подборки.
 - Отправляет точное чистое превью отдельным постом, не закрывая конструктор и
   не добавляя редакторские кнопки в саму публикацию.
-- Публикует сразу или через долговечную очередь с защитой от дублей, проверкой
-  прав и уведомлением об ошибке.
+- Публикует сразу или через долговечную очередь с защитой от дублей. Потерянный
+  ответ Telegram не вызывает слепую повторную отправку: такой пост явно просит
+  администратора проверить канал и только потом разрешает ручной повтор.
 - Работает inline: `@StonerHandBot артист — трек` в любой переписке.
 - Использует Rich Messages из Bot API 10.3 там, где они доступны, и без потери
   обложки, текста или ссылок возвращается к полной классической карточке.
@@ -148,8 +149,8 @@ UI-тексты хранятся в отдельном RU/EN-каталоге: �
 и Rich-контент включаются по возможностям клиента; старые версии Telegram всегда
 получают полноценную классическую карточку.
 Подписи кнопок остаются смысловыми и не ограничиваются искусственным правилом
-«28–32 символа»; сокращение применяется только у фактически переполненной
-Telegram-кнопки. Цвет никогда не является единственным признаком действия,
+«28–32 символа»: длинное название получает отдельную строку без потери текста.
+Цвет никогда не является единственным признаком действия,
 а в одном ряду остаётся не больше двух кнопок.
 
 ## Архитектура
@@ -216,6 +217,10 @@ python -m music_links_bot
 | `UPSTASH_REDIS_REST_TOKEN` | доступ к Redis |
 | `CRON_SECRET` | защита worker очереди |
 
+Workflow `queue-worker.yml` вызывает worker каждые пять минут; суточный Vercel
+Cron остаётся резервом. GitHub secret `CRON_SECRET` должен совпадать с production.
+`/api/health` ничего не публикует и только читает состояние последнего tick.
+
 `ADMIN_CHAT_ID`, `PUBLISH_CHAT_ID`, `SONGLINK_API_KEY` и параметры оформления
 необязательны и описаны в [.env.example](.env.example).
 
@@ -234,7 +239,9 @@ python -m ruff check src api tests
 python -m ruff format --check src api tests
 python -m bandit -q -r src api -x tests
 python -m pip_audit -r requirements.txt --progress-spinner off
-python -m pytest -q
+python -m coverage run -m pytest -q
+python -m coverage report
+python -m mypy
 ```
 
 CI дополнительно проверяет Python 3.10–3.12, зависимости, секреты,
@@ -242,6 +249,8 @@ CI дополнительно проверяет Python 3.10–3.12, завис�
 подтверждает точный commit, сервис коллажей и полную матрицу публикации до
 решения о защищённом автоматическом rollback. Отдельный provider canary
 проверяет живые публичные контракты площадок, не связывая их сбои с откатом.
+Opt-in `telegram_canary.py --chat-id <ID>` проверяет настоящие Classic, Rich,
+коллаж и SoundCloud-only карточки и удаляет все подтверждённые тестовые сообщения.
 
 </details>
 

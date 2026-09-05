@@ -8,19 +8,33 @@ import ipaddress
 import json
 import os
 import zlib
+from contextlib import ExitStack
 from urllib.parse import urlencode, urlparse
 
 from music_links_bot.models import TrackMatch
 from music_links_bot.telegram_gateway import feature_enabled
 
-COLLAGE_VERSION = "v1"
+COLLAGE_VERSION = "v2"
 MIN_COLLAGE_ITEMS = 2
 MAX_COLLAGE_ITEMS = 6
+MAX_ARTWORK_BYTES = 3 * 1024 * 1024
+MAX_TOTAL_ARTWORK_BYTES = MAX_COLLAGE_ITEMS * MAX_ARTWORK_BYTES
+MAX_ARTWORK_PIXELS = 12_000_000
+MAX_COLLAGE_SIZE = 1_200
 MAX_SOURCE_URL_LENGTH = 2_048
 MAX_PAYLOAD_LENGTH = 12_000
 MAX_DECODED_PAYLOAD_BYTES = 10_000
 MAX_PREVIEW_URL_LENGTH = 2_048
 _COMPRESSED_PAYLOAD_PREFIX = b"z"
+_ARTWORK_HOST_SUFFIXES = (
+    "dzcdn.net",
+    "mzstatic.com",
+    "ntslive.co.uk",
+    "scdn.co",
+    "sndcdn.com",
+    "spotifycdn.com",
+    "ytimg.com",
+)
 
 
 def collection_collage_preview_url(
@@ -35,17 +49,15 @@ def collection_collage_preview_url(
     if not MIN_COLLAGE_ITEMS <= len(tracks) <= MAX_COLLAGE_ITEMS:
         return None
 
-    artwork_urls = list(
-        dict.fromkeys(
-            track.thumbnail_url.strip()
-            for track in tracks
-            if track.thumbnail_url and _safe_source_url(track.thumbnail_url.strip())
-        )
-    )
+    artwork_urls: list[str] = []
+    for track in tracks:
+        thumbnail = str(track.thumbnail_url or "").strip()
+        if thumbnail and _safe_source_url(thumbnail) and thumbnail not in artwork_urls:
+            artwork_urls.append(thumbnail)
     if len(artwork_urls) < MIN_COLLAGE_ITEMS:
         return None
     public_origin = _public_origin(base_url)
-    secret = (signing_secret or os.getenv("BOT_TOKEN", "")).strip()
+    secret = str(signing_secret or os.getenv("BOT_TOKEN") or "").strip()
     if not public_origin or not secret:
         return None
 
@@ -112,40 +124,57 @@ def compose_collection_collage(
     except ImportError:
         return None
 
-    images = []
-    for raw in artwork_images[:MAX_COLLAGE_ITEMS]:
-        try:
-            image = Image.open(io.BytesIO(raw))
-            if image.width * image.height > 40_000_000:
+    if not 32 <= size <= MAX_COLLAGE_SIZE or not 0 <= gap <= size // 12:
+        return None
+    sources = artwork_images[:MAX_COLLAGE_ITEMS]
+    if sum(len(raw) for raw in sources) > MAX_TOTAL_ARTWORK_BYTES:
+        return None
+
+    with ExitStack() as resources:
+        images = []
+        for raw in sources:
+            if len(raw) > MAX_ARTWORK_BYTES:
                 continue
-            image.load()
-            images.append(ImageOps.exif_transpose(image))
-        except (OSError, TypeError, ValueError, Image.DecompressionBombError):
-            continue
-    if len(images) < MIN_COLLAGE_ITEMS:
-        return None
+            try:
+                with Image.open(io.BytesIO(raw)) as source:
+                    if source.width * source.height > MAX_ARTWORK_PIXELS:
+                        continue
+                    # Keep only reduced images across iterations, not six
+                    # full-resolution decoded originals at once.
+                    source.thumbnail((size, size), Image.Resampling.LANCZOS)
+                    images.append(
+                        resources.enter_context(ImageOps.exif_transpose(source))
+                    )
+            except (OSError, TypeError, ValueError, Image.DecompressionBombError):
+                continue
+        if len(images) < MIN_COLLAGE_ITEMS:
+            return None
 
-    try:
-        canvas = Image.new("RGB", (size, size), (18, 18, 20))
-        for image, box in zip(
-            images, _layout_boxes(len(images), size, gap), strict=True
-        ):
-            left, top, right, bottom = box
-            target_size = (right - left, bottom - top)
-            fitted = ImageOps.fit(
-                image.convert("RGBA"),
-                target_size,
-                method=Image.Resampling.LANCZOS,
+        try:
+            canvas = resources.enter_context(
+                Image.new("RGB", (size, size), (18, 18, 20))
             )
-            tile = Image.new("RGB", target_size, (18, 18, 20))
-            tile.paste(fitted, mask=fitted.getchannel("A"))
-            canvas.paste(tile, (left, top))
+            for image, box in zip(
+                images, _layout_boxes(len(images), size, gap), strict=True
+            ):
+                left, top, right, bottom = box
+                target_size = (right - left, bottom - top)
+                with (
+                    image.convert("RGBA") as rgba,
+                    ImageOps.fit(
+                        rgba, target_size, method=Image.Resampling.LANCZOS
+                    ) as fitted,
+                    Image.new("RGB", target_size, (18, 18, 20)) as tile,
+                    fitted.getchannel("A") as mask,
+                ):
+                    tile.paste(fitted, mask=mask)
+                    canvas.paste(tile, (left, top))
 
-        output = io.BytesIO()
-        canvas.save(output, "JPEG", quality=88, optimize=True)
-        return output.getvalue()
-    except (OSError, TypeError, ValueError):
-        return None
+            output = io.BytesIO()
+            canvas.save(output, "JPEG", quality=88, optimize=True)
+            return output.getvalue()
+        except (OSError, TypeError, ValueError):
+            return None
 
 
 def _layout_boxes(count: int, size: int, gap: int) -> list[tuple[int, int, int, int]]:
@@ -243,24 +272,43 @@ def _public_origin(explicit: str | None) -> str | None:
         return None
     if "://" not in raw:
         raw = f"https://{raw}"
-    parsed = urlparse(raw)
-    if parsed.scheme != "https" or not parsed.netloc or parsed.username:
+    try:
+        parsed = urlparse(raw)
+        port = parsed.port
+    except ValueError:
         return None
-    return f"https://{parsed.netloc}"
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username
+        or parsed.password
+        or port not in {None, 443}
+    ):
+        return None
+    return f"https://{parsed.hostname}"
 
 
 def _safe_source_url(value: str) -> bool:
     if not value or len(value) > MAX_SOURCE_URL_LENGTH:
         return False
-    parsed = urlparse(value)
+    try:
+        parsed = urlparse(value)
+        port = parsed.port
+    except ValueError:
+        return False
     hostname = (parsed.hostname or "").casefold().rstrip(".")
     if (
         parsed.scheme != "https"
         or not hostname
         or parsed.username
         or parsed.password
+        or port not in {None, 443}
         or hostname == "localhost"
         or hostname.endswith((".local", ".internal"))
+        or not any(
+            hostname == suffix or hostname.endswith(f".{suffix}")
+            for suffix in _ARTWORK_HOST_SUFFIXES
+        )
     ):
         return False
     try:

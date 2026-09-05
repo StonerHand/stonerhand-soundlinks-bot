@@ -111,6 +111,8 @@ ACTION_SPECS = tuple(
         ("privacy", "confirm", "confirm_delete_data", ActionKind.NAVIGATION),
         ("privacy", "delete", "delete_data", ActionKind.DESTRUCTIVE),
         ("queue", "open", "open_queue", ActionKind.NAVIGATION),
+        ("queue", "cancel", "cancel_queued_post", ActionKind.DESTRUCTIVE),
+        ("queue", "retry", "retry_queued_post", ActionKind.DELIVERY),
         ("playlist", "import", "import_playlist", ActionKind.DELIVERY),
     )
 )
@@ -120,7 +122,6 @@ _DYNAMIC_ACTIONS = (
     re.compile(r"^menu:onboard(?:[123]|done)$"),
     re.compile(r"^editor:l\d+$"),
     re.compile(r"^editor:t[ad]\d+$"),
-    re.compile(r"^queue:cancel$"),
 )
 
 

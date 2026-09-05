@@ -8,7 +8,6 @@ from music_links_bot.models import TrackMatch
 from music_links_bot.url_utils import (
     cache_key_for_url,
     direct_platform_links,
-    is_direct_platform_url,
 )
 
 _NON_WORD_RE = re.compile(r"[^\w]+", re.UNICODE)
@@ -53,9 +52,7 @@ def coalesce_equivalent_tracks(tracks: list[TrackMatch]) -> list[TrackMatch]:
 
         current = merged[position]
         links = direct_platform_links(current.links)
-        for key, value in track.links.items():
-            if not is_direct_platform_url(value):
-                continue
+        for key, value in direct_platform_links(track.links).items():
             existing = links.get(key)
             if not existing:
                 links[key] = value
@@ -78,16 +75,8 @@ def _same_release_destination(first: TrackMatch, second: TrackMatch) -> bool:
         and cache_key_for_url(first.page_url) == cache_key_for_url(second.page_url)
     ):
         return True
-    first_links = {
-        key: value
-        for key, value in first.links.items()
-        if is_direct_platform_url(value)
-    }
-    second_links = {
-        key: value
-        for key, value in second.links.items()
-        if is_direct_platform_url(value)
-    }
+    first_links = direct_platform_links(first.links)
+    second_links = direct_platform_links(second.links)
     shared_platforms = set(first_links) & set(second_links)
     if any(
         cache_key_for_url(first_links[key]) == cache_key_for_url(second_links[key])

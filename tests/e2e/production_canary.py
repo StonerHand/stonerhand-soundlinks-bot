@@ -5,10 +5,16 @@ from __future__ import annotations
 import json
 import os
 import sys
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 BASE_URL = os.getenv("CANARY_BASE_URL", "https://tg-bot-sh.vercel.app").rstrip("/")
 EXPECTED_COMMIT = os.getenv("CANARY_EXPECT_COMMIT", "").strip()
+RELEASE_ONLY = os.getenv("CANARY_RELEASE_ONLY", "").strip().casefold() in {
+    "1",
+    "true",
+    "yes",
+}
 TIMEOUT_SECONDS = 20
 
 
@@ -17,12 +23,53 @@ def fetch(path: str) -> tuple[int, bytes, str]:
         BASE_URL + path,
         headers={"User-Agent": "StonerHand-production-canary/1.0"},
     )
-    with urlopen(request, timeout=TIMEOUT_SECONDS) as response:
+    try:
+        with urlopen(request, timeout=TIMEOUT_SECONDS) as response:
+            return (
+                int(response.status),
+                response.read(),
+                response.headers.get("content-type", ""),
+            )
+    except HTTPError as error:
+        # Health intentionally uses 503 for structured operational state.
+        # Preserve its JSON so the guarded release check can distinguish a
+        # queue incident from a regression in the newly deployed code.
         return (
-            int(response.status),
-            response.read(),
-            response.headers.get("content-type", ""),
+            int(error.code),
+            error.read(),
+            error.headers.get("content-type", ""),
         )
+
+
+def health_response_is_acceptable(
+    status: int,
+    payload: object,
+    *,
+    release_only: bool,
+) -> bool:
+    """Avoid rolling code back for an operational queue item from an older build."""
+    if not isinstance(payload, dict):
+        return False
+    if status == 200 and payload.get("ok") is True:
+        return True
+    if not release_only or status != 503:
+        return False
+
+    checks = payload.get("checks") or {}
+    redis = checks.get("redis") or {}
+    critical_ok = (
+        bool((checks.get("telegram") or {}).get("ok"))
+        and bool((checks.get("webhook") or {}).get("ok"))
+        and (not redis.get("configured") or bool(redis.get("ok")))
+    )
+    queue = payload.get("queue") or {}
+    worker = checks.get("queue_worker") or {}
+    queue_only_failure = bool(
+        queue.get("overdue")
+        or queue.get("uncertain")
+        or (worker.get("configured") and not worker.get("ok"))
+    )
+    return critical_ok and queue_only_failure
 
 
 def main() -> int:
@@ -30,7 +77,9 @@ def main() -> int:
     try:
         status, raw, content_type = fetch("/api/health")
         payload = json.loads(raw)
-        if status != 200 or not payload.get("ok"):
+        if not health_response_is_acceptable(
+            status, payload, release_only=RELEASE_ONLY
+        ):
             failures.append(f"health status={status} ok={payload.get('ok')}")
         checks = payload.get("checks") or {}
         failures.extend(

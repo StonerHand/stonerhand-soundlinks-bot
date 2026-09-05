@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from html import escape
 
 from telegram import InlineKeyboardMarkup
@@ -9,10 +10,12 @@ from music_links_bot.bot_builder import format_schedule_datetime
 from music_links_bot.bot_runtime import CallbackAction, encode_callback
 from music_links_bot.i18n import get_text, resolve_lang
 from music_links_bot.publish_queue import (
+    JOB_UNCERTAIN,
     QueueBusyError,
     QueueStorageError,
     load_jobs,
     remove_job,
+    reschedule_job,
 )
 from music_links_bot.telegram_buttons import button as InlineKeyboardButton
 
@@ -89,6 +92,18 @@ async def render_queue(
         lines.append(
             f"\n\n<b>{index}. {escape(label[:120])}</b>\n<code>{escape(when)}</code>"
         )
+        if job.get("status") == JOB_UNCERTAIN:
+            lines.append("\n" + get_text(lang, "queue_uncertain"))
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        get_text(lang, "queue_retry_item").format(index=index),
+                        callback_data=encode_callback(
+                            "queue", "retry", f"{page}:{job.get('id') or ''}"
+                        ),
+                    )
+                ]
+            )
         rows.append(
             [
                 InlineKeyboardButton(
@@ -148,19 +163,34 @@ async def dispatch_queue_action(query, context, action: CallbackAction) -> None:
         await query.answer(get_text(lang, "ed_admin_only"), show_alert=True)
         return
     page = _page_number(action.payload if action.action == "open" else None)
-    if action.action == "cancel" and action.payload:
+    if action.action in {"cancel", "retry"} and action.payload:
         raw_page, separator, job_id = action.payload.partition(":")
         if separator:
             page = _page_number(raw_page)
         else:
             job_id = action.payload
         try:
-            removed = await remove_job(context, job_id)
+            changed = (
+                await remove_job(context, job_id)
+                if action.action == "cancel"
+                else await reschedule_job(
+                    context, job_id, int(time.time()), only_uncertain=True
+                )
+            )
         except (QueueBusyError, QueueStorageError):
             await query.answer(get_text(lang, "queue_unavailable"), show_alert=True)
             return
         await query.answer(
-            get_text(lang, "queue_cancelled" if removed else "queue_missing")
+            get_text(
+                lang,
+                (
+                    "queue_cancelled"
+                    if action.action == "cancel" and changed
+                    else "queue_retried"
+                    if changed
+                    else "queue_missing"
+                ),
+            )
         )
     else:
         await query.answer()

@@ -79,6 +79,49 @@ class PublicationContractTests(unittest.TestCase):
 
         self.assertIn("universal_button_mismatch", result.blocking_codes)
 
+    def test_platform_label_must_match_destination_host(self) -> None:
+        result = validate_rendered_publication(
+            RenderedPublication(
+                text="Artist — Song",
+                keyboard=InlineKeyboardMarkup(
+                    [
+                        [
+                            InlineKeyboardButton(
+                                "🟢 Spotify",
+                                url="https://evil.example/track/abc",
+                            )
+                        ]
+                    ]
+                ),
+            )
+        )
+
+        self.assertIn("platform_button_mismatch", result.blocking_codes)
+
+    def test_release_title_ending_in_platform_name_is_not_a_platform_button(
+        self,
+    ) -> None:
+        result = validate_rendered_publication(
+            RenderedPublication(
+                text="Подборка · 1 релиз",
+                keyboard=InlineKeyboardMarkup(
+                    [
+                        [
+                            InlineKeyboardButton(
+                                "1 · Artist — Lost on Spotify",
+                                url="https://song.link/s/abc",
+                            )
+                        ]
+                    ]
+                ),
+                found_count=1,
+                requested_count=1,
+                content_kind="collection",
+            )
+        )
+
+        self.assertTrue(result.ready)
+
     def test_rejects_oversized_callback_data(self) -> None:
         result = validate_rendered_publication(
             RenderedPublication(

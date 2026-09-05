@@ -178,163 +178,6 @@ class OverallHealthTests(unittest.TestCase):
         self.assertEqual(queue, {"configured": False, "size": 0, "overdue": 0})
         self.assertEqual(metrics, {"configured": False})
 
-    def test_queue_tick_uses_protected_worker_and_trusted_host(self) -> None:
-        import os
-        from unittest.mock import MagicMock, patch
-
-        from api.health import _tick_queue
-
-        response = MagicMock()
-        response.__enter__.return_value.read.return_value = b'{"ok":true,"published":2}'
-        with (
-            patch.dict(
-                os.environ,
-                {
-                    "VERCEL_PROJECT_PRODUCTION_URL": "bot.example",
-                    "CRON_SECRET": "secret",
-                },
-                clear=True,
-            ),
-            patch("api.health.urlopen", return_value=response) as open_mock,
-        ):
-            result = _tick_queue("https://attacker.example/api/telegram")
-
-        self.assertEqual(result["published"], 2)
-        self.assertTrue(result["ok"])
-        self.assertTrue(result["configured"])
-
-        request = open_mock.call_args.args[0]
-        self.assertEqual(request.full_url, "https://bot.example/api/queue_worker")
-        self.assertEqual(request.get_header("Authorization"), "Bearer secret")
-
-    def test_queue_tick_prefers_explicit_production_base_url(self) -> None:
-        import os
-        from unittest.mock import MagicMock, patch
-
-        from api.health import _tick_queue
-
-        response = MagicMock()
-        response.__enter__.return_value.read.return_value = b'{"ok":true}'
-        with (
-            patch.dict(
-                os.environ,
-                {
-                    "WEBHOOK_BASE_URL": "https://public.example/path",
-                    "VERCEL_URL": "preview.example",
-                    "CRON_SECRET": "secret",
-                },
-                clear=True,
-            ),
-            patch("api.health.urlopen", return_value=response) as open_mock,
-        ):
-            result = _tick_queue("https://attacker.example/api/telegram")
-
-        self.assertTrue(result["ok"])
-        request = open_mock.call_args.args[0]
-        self.assertEqual(request.full_url, "https://public.example/api/queue_worker")
-
-    def test_queue_tick_is_disabled_without_secret(self) -> None:
-        import os
-        from unittest.mock import patch
-
-        from api.health import _tick_queue
-
-        with patch.dict(
-            os.environ,
-            {"VERCEL_PROJECT_PRODUCTION_URL": "bot.example"},
-            clear=True,
-        ):
-            self.assertEqual(
-                _tick_queue("https://bot.example/api/telegram"),
-                {
-                    "ok": True,
-                    "configured": False,
-                    "published": 0,
-                    "detail": "not configured",
-                },
-            )
-
-    def test_queue_tick_uses_registered_webhook_when_env_host_is_missing(self) -> None:
-        import os
-        from unittest.mock import MagicMock, patch
-
-        from api.health import _tick_queue
-
-        response = MagicMock()
-        response.__enter__.return_value.read.return_value = b'{"ok":true}'
-        with (
-            patch.dict(os.environ, {"CRON_SECRET": "secret"}, clear=True),
-            patch("api.health.urlopen", return_value=response) as open_mock,
-        ):
-            result = _tick_queue("https://bot.example/api/telegram")
-
-        self.assertTrue(result["ok"])
-        request = open_mock.call_args.args[0]
-        self.assertEqual(request.full_url, "https://bot.example/api/queue_worker")
-
-    def test_queue_tick_uses_derived_worker_secret_when_cron_value_is_empty(
-        self,
-    ) -> None:
-        import os
-        from unittest.mock import MagicMock, patch
-
-        from api.health import _tick_queue
-        from music_links_bot.webhook_secret import queue_worker_secret
-
-        response = MagicMock()
-        response.__enter__.return_value.read.return_value = b'{"ok":true}'
-        with (
-            patch.dict(
-                os.environ,
-                {"BOT_TOKEN": "123456:test", "CRON_SECRET": ""},
-                clear=True,
-            ),
-            patch("api.health.urlopen", return_value=response) as open_mock,
-        ):
-            expected_secret = queue_worker_secret()
-            result = _tick_queue("https://bot.example/api/telegram")
-
-        self.assertTrue(result["ok"])
-        request = open_mock.call_args.args[0]
-        self.assertEqual(
-            request.get_header("Authorization"),
-            f"Bearer {expected_secret}",
-        )
-
-    def test_queue_tick_rejects_untrusted_webhook_origin(self) -> None:
-        import os
-        from unittest.mock import patch
-
-        from api.health import _tick_queue
-
-        with patch.dict(os.environ, {"CRON_SECRET": "secret"}, clear=True):
-            result = _tick_queue("http://internal.example/api/telegram")
-
-        self.assertFalse(result["configured"])
-
-    def test_queue_tick_failure_is_visible(self) -> None:
-        import os
-        from unittest.mock import patch
-
-        from api.health import _tick_queue
-
-        with (
-            patch.dict(
-                os.environ,
-                {
-                    "VERCEL_PROJECT_PRODUCTION_URL": "bot.example",
-                    "CRON_SECRET": "secret",
-                },
-                clear=True,
-            ),
-            patch("api.health.urlopen", side_effect=TimeoutError),
-        ):
-            result = _tick_queue("https://bot.example/api/telegram")
-
-        self.assertFalse(result["ok"])
-        self.assertTrue(result["configured"])
-        self.assertEqual(result["published"], 0)
-
     def test_queue_summary_skips_corrupt_jobs(self) -> None:
         from api.health import _summarize_queue_jobs
 
@@ -349,7 +192,7 @@ class OverallHealthTests(unittest.TestCase):
                 ],
                 now=1000,
             ),
-            {"configured": True, "size": 2, "overdue": 1},
+            {"configured": True, "size": 2, "overdue": 1, "uncertain": 0},
         )
 
     def test_queue_summary_does_not_flag_an_active_processing_lease(self) -> None:
@@ -366,7 +209,7 @@ class OverallHealthTests(unittest.TestCase):
                 ],
                 now=1000,
             ),
-            {"configured": True, "size": 1, "overdue": 0},
+            {"configured": True, "size": 1, "overdue": 0, "uncertain": 0},
         )
 
 

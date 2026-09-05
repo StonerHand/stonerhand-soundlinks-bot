@@ -48,7 +48,7 @@ def build_release_smoke_report() -> dict[str, object]:
         "Lime Garden",
         spotify_id="3E4MuCjetGIkeu2N8fFHgr",
         apple_id="1780000001",
-        artwork="https://images.example/lime-garden.jpg",
+        artwork="https://i.scdn.co/lime-garden.jpg",
     )
     soundcloud = TrackMatch(
         title="Ethan Kath DJ Set — Park Live 2013",
@@ -59,26 +59,26 @@ def build_release_smoke_report() -> dict[str, object]:
                 "ethan-kath-dj-set-park-live-moscow-30062013"
             )
         },
-        thumbnail_url="https://images.example/park-live.jpg",
+        thumbnail_url="https://i1.sndcdn.com/park-live.jpg",
     )
     collection = [
         _track(
             "A Torinói Ló",
             "Kokomo",
             spotify_id="2eaZjrZAYZsDf1UHa0Uw0A",
-            artwork="https://images.example/kokomo-1.jpg",
+            artwork="https://i.scdn.co/kokomo-1.jpg",
         ),
         _track(
             "The Lonesome Foghorn Blows",
             "Kokomo",
             spotify_id="3M7ea9TwGB5uy0cqmVQeu7",
-            artwork="https://images.example/kokomo-2.jpg",
+            artwork="https://i.scdn.co/kokomo-2.jpg",
         ),
         _track(
             "1758 Times of Weird Sadness",
             "Kokomo",
             spotify_id="2Px01k5PAKhbfF8KCAKN7I",
-            artwork="https://images.example/kokomo-3.jpg",
+            artwork="https://i.scdn.co/kokomo-3.jpg",
         ),
     ]
 
