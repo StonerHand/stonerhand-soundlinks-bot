@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hmac
 import json
 import logging
 import os
@@ -25,6 +24,7 @@ from music_links_bot.bot_app import (
 )
 from music_links_bot.config import Settings
 from music_links_bot.logging_config import quiet_transport_logs
+from music_links_bot.webhook_secret import secrets_match
 
 ALLOWED_UPDATES = (
     "message",
@@ -33,6 +33,7 @@ ALLOWED_UPDATES = (
     "inline_query",
     "stopped_message_generation",
 )
+
 LOGGER = logging.getLogger(__name__)
 quiet_transport_logs()
 WEBHOOK_SECRET_RE = re.compile(r"^[A-Za-z0-9_-]{1,256}$")
@@ -213,7 +214,7 @@ def _telegram_json_call(url: str, *, label: str) -> dict[str, object]:
 def _is_authorized(path: str, authorization_header: str | None) -> bool:
     expected_secret = os.getenv("SET_WEBHOOK_SECRET", "").strip()
     query = parse_qs(urlparse(path).query)
-    if hmac.compare_digest(query.get("secret", [""])[0], expected_secret):
+    if secrets_match(query.get("secret", [""])[0], expected_secret):
         return True
 
     return _is_authorized_cron_request(authorization_header)
@@ -225,7 +226,7 @@ def _is_authorized_cron_request(authorization_header: str | None) -> bool:
         return False
 
     received = (authorization_header or "").strip()
-    return hmac.compare_digest(received, f"Bearer {cron_secret}")
+    return secrets_match(received, f"Bearer {cron_secret}")
 
 
 def _setup_secret_is_configured() -> bool:

@@ -112,7 +112,9 @@ ACTION_SPECS = tuple(
         ("privacy", "delete", "delete_data", ActionKind.DESTRUCTIVE),
         ("queue", "open", "open_queue", ActionKind.NAVIGATION),
         ("queue", "cancel", "cancel_queued_post", ActionKind.DESTRUCTIVE),
-        ("queue", "retry", "retry_queued_post", ActionKind.DELIVERY),
+        ("queue", "retry", "review_queued_post", ActionKind.NAVIGATION),
+        ("queue", "retry_confirm", "retry_queued_post", ActionKind.DELIVERY),
+        ("queue", "cancel_confirm", "cancel_queued_post", ActionKind.DESTRUCTIVE),
         ("playlist", "import", "import_playlist", ActionKind.DELIVERY),
     )
 )

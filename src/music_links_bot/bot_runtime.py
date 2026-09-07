@@ -261,7 +261,7 @@ class BotRuntime:
         self.kv = kv
         self.sessions: dict[int, UserSession] = {}
         self.seen_callbacks: dict[str, float] = {}
-        self.action_locks: dict[str, float] = {}
+        self.action_locks: dict[str, tuple[float, str]] = {}
         self.recent_intents: dict[str, float] = {}
         self.request_windows: dict[int, tuple[int, float]] = {}
         self.request_tokens: dict[int, str] = {}
@@ -455,15 +455,20 @@ class BotRuntime:
             if await self.kv.get(redis_key) is not None:
                 return None
         now = monotonic()
-        self._drop_expired(self.action_locks, now)
+        for expired_key, (deadline, _owner) in list(self.action_locks.items()):
+            if deadline <= now:
+                self.action_locks.pop(expired_key, None)
         if key in self.action_locks:
             return None
-        self._cap(self.action_locks, MAX_MEMORY_KEYS)
-        self.action_locks[key] = now + ACTION_LOCK_SECONDS
+        if len(self.action_locks) >= MAX_MEMORY_KEYS:
+            return None
+        self.action_locks[key] = (now + ACTION_LOCK_SECONDS, token)
         return token
 
     async def release_action(self, key: str, token: str) -> None:
-        self.action_locks.pop(key, None)
+        current = self.action_locks.get(key)
+        if current is not None and current[1] == token:
+            self.action_locks.pop(key, None)
         if self.kv is not None:
             await self.kv.delete_if_value(f"action:v1:{key}", token)
 

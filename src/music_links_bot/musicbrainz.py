@@ -86,7 +86,7 @@ class MusicBrainzClient:
 
         pending = self._inflight.get(cache_key)
         if pending is not None:
-            return await pending
+            return await asyncio.shield(pending)
 
         task = asyncio.create_task(
             self._lookup_and_cache(
@@ -102,7 +102,7 @@ class MusicBrainzClient:
             lambda completed, key=cache_key: self._finish_inflight(key, completed)
         )
         try:
-            return await task
+            return await asyncio.shield(task)
         finally:
             if task.done():
                 self._finish_inflight(cache_key, task)

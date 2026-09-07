@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import hmac
 import json
 import logging
 from http import HTTPStatus
@@ -11,7 +10,7 @@ from types import SimpleNamespace
 from api.telegram import _ensure_application
 from music_links_bot.loop_runner import run_on_loop
 from music_links_bot.publish_queue import process_due_jobs
-from music_links_bot.webhook_secret import queue_worker_secret
+from music_links_bot.webhook_secret import queue_worker_secret, secrets_match
 
 LOGGER = logging.getLogger(__name__)
 QUEUE_TICK_TIMEOUT_SECONDS = 20
@@ -21,7 +20,7 @@ def is_authorized(authorization_header: str | None) -> bool:
     secret = queue_worker_secret()
     if not secret:
         return False
-    return hmac.compare_digest(
+    return secrets_match(
         (authorization_header or "").strip(),
         f"Bearer {secret}",
     )

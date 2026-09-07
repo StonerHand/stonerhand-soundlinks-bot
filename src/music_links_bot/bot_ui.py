@@ -498,6 +498,12 @@ def editor_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
             ),
             crate_button,
         ],
+        [
+            InlineKeyboardButton(
+                get_text(lang, "ed_clean_preview"),
+                callback_data=encode_callback("editor", "pv", draft_id),
+            )
+        ],
     ]
 
 

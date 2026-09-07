@@ -114,6 +114,10 @@ async def consume_pending_input(
             await _clear_pending(runtime, session)
             await message.reply_text(get_text(lang, "ed_owner_only"))
             return True
+        if draft.get("deleted_at"):
+            await _clear_pending(runtime, session)
+            await message.reply_text(get_text(lang, "ed_deleted_recovery"))
+            return True
         result = await _apply_draft_input(
             message,
             context,

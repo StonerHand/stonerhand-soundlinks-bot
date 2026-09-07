@@ -13,6 +13,9 @@
     [
       ["Изменить", "v2|editor|m|draft123", null, null],
       ["＋ В подборку", "v2|editor|c|draft123", null, null]
+    ],
+    [
+      ["Превью", "v2|editor|pv|draft123", null, null]
     ]
   ]
 }

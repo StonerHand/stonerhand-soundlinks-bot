@@ -1,7 +1,18 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import os
+
+
+def secrets_match(received: object, expected: str) -> bool:
+    """Compare credentials without crashing on malformed Unicode input."""
+    if not isinstance(received, str) or not expected:
+        return False
+    try:
+        return hmac.compare_digest(received.encode("utf-8"), expected.encode("utf-8"))
+    except UnicodeEncodeError:
+        return False
 
 
 def _derived_secret(purpose: str) -> str:

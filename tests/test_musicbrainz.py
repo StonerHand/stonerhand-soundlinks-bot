@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import httpx
 
@@ -154,6 +155,49 @@ class MusicBrainzParsingTests(unittest.TestCase):
 
 
 class MusicBrainzClientTests(unittest.IsolatedAsyncioTestCase):
+    async def test_cancelled_waiter_does_not_cancel_another_users_lookup(self):
+        for cancelled_index in (0, 1):
+            with self.subTest(cancelled_index=cancelled_index):
+                client = MusicBrainzClient()
+                entered = asyncio.Event()
+                release = asyncio.Event()
+                spotify = "https://open.spotify.com/track/7Ca5yTC81P0AtRnNKHKzwJ"
+
+                async def resolve(
+                    *, entered=entered, release=release, spotify=spotify, **_kwargs
+                ):
+                    entered.set()
+                    await release.wait()
+                    return spotify
+
+                tasks = []
+                try:
+                    with patch.object(
+                        client, "_lookup_and_cache", AsyncMock(side_effect=resolve)
+                    ) as resolver:
+                        tasks.append(
+                            asyncio.create_task(
+                                client.lookup_spotify_release("Deftones", "Rickets")
+                            )
+                        )
+                        await asyncio.wait_for(entered.wait(), 1)
+                        tasks.append(
+                            asyncio.create_task(
+                                client.lookup_spotify_release("Deftones", "Rickets")
+                            )
+                        )
+                        await asyncio.sleep(0)
+                        tasks[cancelled_index].cancel()
+                        with self.assertRaises(asyncio.CancelledError):
+                            await tasks[cancelled_index]
+                        release.set()
+                        self.assertEqual(await tasks[1 - cancelled_index], spotify)
+                        resolver.assert_awaited_once()
+                finally:
+                    release.set()
+                    await client.aclose()
+                    await asyncio.gather(*tasks, return_exceptions=True)
+
     async def test_exact_relation_is_resolved_and_cached(self) -> None:
         class ResponseStub:
             def __init__(self, payload: dict) -> None:

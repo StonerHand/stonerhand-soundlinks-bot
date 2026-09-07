@@ -13,6 +13,7 @@ from urllib.parse import urlencode, urlparse
 
 from music_links_bot.models import TrackMatch
 from music_links_bot.telegram_gateway import feature_enabled
+from music_links_bot.webhook_secret import secrets_match
 
 COLLAGE_VERSION = "v2"
 MIN_COLLAGE_ITEMS = 2
@@ -75,9 +76,15 @@ def decode_collage_payload(
     signing_secret: str,
 ) -> list[str] | None:
     """Verify a collage request and return only safe HTTPS artwork URLs."""
-    if not signing_secret or not payload or len(payload) > MAX_PAYLOAD_LENGTH:
+    if (
+        not signing_secret
+        or not isinstance(payload, str)
+        or not payload
+        or not payload.isascii()
+        or len(payload) > MAX_PAYLOAD_LENGTH
+    ):
         return None
-    if not hmac.compare_digest(signature, _signature(payload, signing_secret)):
+    if not secrets_match(signature, _signature(payload, signing_secret)):
         return None
 
     try:

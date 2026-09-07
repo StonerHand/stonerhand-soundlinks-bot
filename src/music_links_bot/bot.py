@@ -971,6 +971,9 @@ async def _open_editor_publish_confirmation(request: EditorActionRequest) -> boo
 async def _run_locked_editor_action(request: EditorActionRequest) -> bool:
     if request.action in _SCHEDULE_EDITOR_ACTIONS:
         lock_action = "schedule"
+    elif request.action in {"pc", "r", "x"}:
+        # Publish, repeat and replace all affect the same channel post.
+        lock_action = "publish"
     elif request.action in _PRIMARY_EDITOR_ACTIONS:
         lock_action = request.action
     else:
@@ -984,9 +987,9 @@ async def _run_locked_editor_action(request: EditorActionRequest) -> bool:
             show_alert=True,
         )
         return True
-    if request.action in _PRIMARY_EDITOR_ACTIONS:
-        await _show_action_busy(request.query, request.lang)
     try:
+        if request.action in _PRIMARY_EDITOR_ACTIONS:
+            await _show_action_busy(request.query, request.lang)
         if request.action in _SCHEDULE_EDITOR_ACTIONS:
             await _schedule_editor_draft(
                 request.query,
@@ -1055,8 +1058,11 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
         return
 
     lang = draft.get("lang") or user_lang
-    if query.from_user is not None and not _draft_owned_by(draft, query.from_user.id):
+    if query.from_user is None or not _draft_owned_by(draft, query.from_user.id):
         await query.answer(get_text(lang, "ed_owner_only"), show_alert=True)
+        return
+    if draft.get("deleted_at") and action != "du":
+        await query.answer(get_text(lang, "ed_deleted_recovery"), show_alert=True)
         return
     spec = action_spec("editor", action)
     if spec is not None and spec.mutating:

@@ -840,8 +840,8 @@
     "ru": "Поставлено на ручной повтор"
   },
   "queue_retry_item": {
-    "en": "Post absent — retry #{index}",
-    "ru": "Поста нет — повторить №{index}"
+    "ru": "Проверить отправку №{index}",
+    "en": "Review delivery #{index}"
   },
   "queue_title": {
     "en": "🕒 <b>Queue · {count}</b>",
@@ -1022,5 +1022,37 @@
   "welcome_demo_caption": {
     "en": "Link → exact release → finished post",
     "ru": "Ссылка → точный релиз → готовый пост"
+  },
+  "ed_deleted_recovery": {
+    "ru": "Черновик удалён. Нажми «Восстановить» в сообщении об удалении или создай новый пост.",
+    "en": "This draft was deleted. Use Restore in the deletion message or create a new post."
+  },
+  "queue_cancel_confirm": {
+    "ru": "<b>Убрать пост из очереди?</b>\n\n{release}\n\nОтложенная отправка будет отменена.",
+    "en": "<b>Remove this scheduled post?</b>\n\n{release}\n\nThe scheduled delivery will be cancelled."
+  },
+  "queue_cancel_confirm_button": {
+    "ru": "Убрать из очереди",
+    "en": "Remove from queue"
+  },
+  "queue_next": {
+    "ru": "Вперёд →",
+    "en": "Next →"
+  },
+  "queue_previous": {
+    "ru": "← Назад",
+    "en": "← Previous"
+  },
+  "queue_retry_confirm": {
+    "ru": "<b>Сначала проверь канал</b>\n\n{release}\n\nTelegram мог отправить пост, хотя подтверждение не пришло. Повторяй отправку, только если публикации в канале нет.",
+    "en": "<b>Check the channel first</b>\n\n{release}\n\nTelegram may have sent the post without returning confirmation. Retry only if the post is missing from the channel."
+  },
+  "queue_retry_confirm_button": {
+    "ru": "Поста нет — отправить повторно",
+    "en": "Post is missing — retry delivery"
+  },
+  "queue_sending": {
+    "ru": "⏳ Отправляется · дождись результата",
+    "en": "⏳ Sending · waiting for confirmation"
   }
 }

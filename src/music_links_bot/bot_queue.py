@@ -5,11 +5,14 @@ from html import escape
 
 from telegram import InlineKeyboardMarkup
 from telegram.constants import ParseMode
+from telegram.error import BadRequest
 
 from music_links_bot.bot_builder import format_schedule_datetime
 from music_links_bot.bot_runtime import CallbackAction, encode_callback
 from music_links_bot.i18n import get_text, resolve_lang
 from music_links_bot.publish_queue import (
+    JOB_DELIVERING,
+    JOB_PROCESSING,
     JOB_UNCERTAIN,
     QueueBusyError,
     QueueStorageError,
@@ -71,7 +74,7 @@ async def render_queue(
         )
     rows: list[list[InlineKeyboardButton]] = []
     if not jobs:
-        lines.extend(["", get_text(lang, "queue_empty")])
+        lines.extend(["\n\n", get_text(lang, "queue_empty")])
     for index, job in enumerate(visible_jobs, start=page_start + 1):
         draft = job.get("draft") if isinstance(job.get("draft"), dict) else {}
         item = draft.get("item") if isinstance(draft.get("item"), dict) else {}
@@ -92,6 +95,9 @@ async def render_queue(
         lines.append(
             f"\n\n<b>{index}. {escape(label[:120])}</b>\n<code>{escape(when)}</code>"
         )
+        if job.get("status") in {JOB_PROCESSING, JOB_DELIVERING}:
+            lines.append("\n" + get_text(lang, "queue_sending"))
+            continue
         if job.get("status") == JOB_UNCERTAIN:
             lines.append("\n" + get_text(lang, "queue_uncertain"))
             rows.append(
@@ -119,20 +125,14 @@ async def render_queue(
         if page > 0:
             navigation.append(
                 InlineKeyboardButton(
-                    "‹",
+                    get_text(lang, "queue_previous"),
                     callback_data=encode_callback("queue", "open", str(page - 1)),
                 )
             )
-        navigation.append(
-            InlineKeyboardButton(
-                f"{page + 1} / {page_count}",
-                callback_data=encode_callback("queue", "open", str(page)),
-            )
-        )
         if page + 1 < page_count:
             navigation.append(
                 InlineKeyboardButton(
-                    "›",
+                    get_text(lang, "queue_next"),
                     callback_data=encode_callback("queue", "open", str(page + 1)),
                 )
             )
@@ -156,6 +156,56 @@ async def render_queue(
     return "".join(lines), InlineKeyboardMarkup(rows)
 
 
+async def _edit_queue_message(query, text: str, keyboard: InlineKeyboardMarkup) -> None:
+    try:
+        await query.edit_message_text(
+            text=text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=keyboard,
+        )
+    except BadRequest as exc:
+        if "message is not modified" not in str(exc).casefold():
+            raise
+
+
+async def _confirm_queue_action(
+    query, context, *, action: str, job_id: str, page: int, lang: str
+) -> None:
+    jobs = await load_jobs(context)
+    job = next((item for item in jobs if item.get("id") == job_id), None)
+    if job is None or job.get("status") in {JOB_PROCESSING, JOB_DELIVERING}:
+        await query.answer(get_text(lang, "queue_missing"), show_alert=True)
+        return
+    if action == "retry" and job.get("status") != JOB_UNCERTAIN:
+        await query.answer(get_text(lang, "queue_missing"), show_alert=True)
+        return
+    draft = job.get("draft") if isinstance(job.get("draft"), dict) else {}
+    item = draft.get("item") if isinstance(draft.get("item"), dict) else {}
+    label = " — ".join(str(item.get(key) or "").strip() for key in ("artist", "title"))
+    text = get_text(lang, f"queue_{action}_confirm").format(release=escape(label[:160]))
+    keyboard = InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(
+                    get_text(lang, f"queue_{action}_confirm_button"),
+                    callback_data=encode_callback(
+                        "queue", f"{action}_confirm", f"{page}:{job_id}"
+                    ),
+                    style="danger" if action == "cancel" else "primary",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "back"),
+                    callback_data=encode_callback("queue", "open", str(page)),
+                )
+            ],
+        ]
+    )
+    await query.answer()
+    await _edit_queue_message(query, text, keyboard)
+
+
 async def dispatch_queue_action(query, context, action: CallbackAction) -> None:
     user = query.from_user
     lang = resolve_lang(user.language_code if user else None)
@@ -163,16 +213,29 @@ async def dispatch_queue_action(query, context, action: CallbackAction) -> None:
         await query.answer(get_text(lang, "ed_admin_only"), show_alert=True)
         return
     page = _page_number(action.payload if action.action == "open" else None)
-    if action.action in {"cancel", "retry"} and action.payload:
+    if (
+        action.action in {"cancel", "retry", "cancel_confirm", "retry_confirm"}
+        and action.payload
+    ):
         raw_page, separator, job_id = action.payload.partition(":")
         if separator:
             page = _page_number(raw_page)
         else:
             job_id = action.payload
         try:
+            if action.action in {"cancel", "retry"}:
+                await _confirm_queue_action(
+                    query,
+                    context,
+                    action=action.action,
+                    job_id=job_id,
+                    page=page,
+                    lang=lang,
+                )
+                return
             changed = (
                 await remove_job(context, job_id)
-                if action.action == "cancel"
+                if action.action == "cancel_confirm"
                 else await reschedule_job(
                     context, job_id, int(time.time()), only_uncertain=True
                 )
@@ -183,20 +246,14 @@ async def dispatch_queue_action(query, context, action: CallbackAction) -> None:
         await query.answer(
             get_text(
                 lang,
-                (
-                    "queue_cancelled"
-                    if action.action == "cancel" and changed
-                    else "queue_retried"
-                    if changed
-                    else "queue_missing"
-                ),
+                "queue_cancelled"
+                if action.action == "cancel_confirm" and changed
+                else "queue_retried"
+                if changed
+                else "queue_missing",
             )
         )
     else:
         await query.answer()
     text, keyboard = await render_queue(context, lang=lang, page=page)
-    await query.edit_message_text(
-        text=text,
-        parse_mode=ParseMode.HTML,
-        reply_markup=keyboard,
-    )
+    await _edit_queue_message(query, text, keyboard)

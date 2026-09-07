@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import hmac
 import json
 import logging
 import sys
@@ -30,6 +29,7 @@ from music_links_bot.loop_runner import (
     start_background_loop,
     stop_background_loop,
 )
+from music_links_bot.webhook_secret import secrets_match
 
 LOGGER = logging.getLogger(__name__)
 MAX_UPDATE_BYTES = 1024 * 1024
@@ -338,4 +338,4 @@ def _is_telegram_request_authorized(received_secret: str | None) -> bool:
         # meaningful to compare against (local development only).
         return True
 
-    return hmac.compare_digest(received_secret or "", expected_secret)
+    return secrets_match(received_secret or "", expected_secret)

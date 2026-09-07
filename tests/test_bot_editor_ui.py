@@ -54,7 +54,7 @@ class PostEditorTests(unittest.TestCase):
         rows = _editor_rows("abc123", self._draft(can_publish=True))
 
         labels = [button.text for row in rows for button in row]
-        self.assertEqual(labels, ["📤 В канал", "Изменить", "＋ В подборку"])
+        self.assertEqual(labels, ["📤 В канал", "Изменить", "＋ В подборку", "Превью"])
         self.assertEqual(rows[0][0].style, "success")
 
     def test_editor_rows_turn_added_item_into_crate_shortcut(self) -> None:
@@ -112,7 +112,7 @@ class PostEditorTests(unittest.TestCase):
     def test_editor_rows_keep_one_compact_action_row(self) -> None:
         rows = _editor_rows("abc123", self._draft())
 
-        self.assertEqual([len(row) for row in rows], [1, 2])
+        self.assertEqual([len(row) for row in rows], [1, 2, 1])
         self.assertEqual(rows[0][0].text, "Отправить себе")
 
     def test_render_track_draft_respects_toggles(self) -> None:
@@ -170,12 +170,13 @@ class PostEditorTests(unittest.TestCase):
         _, keyboard = _render_track_draft(draft, None, draft_id="abc123")
         buttons = [button for row in keyboard.inline_keyboard for button in row]
 
-        self.assertEqual(len(buttons), 5)
+        self.assertEqual(len(buttons), 6)
         self.assertEqual(buttons[0].text, "🪩 Все платформы")
         self.assertEqual(buttons[1].text, "🟢 Spotify")
         self.assertEqual(buttons[2].text, "Отправить себе")
         self.assertEqual(buttons[3].text, "Изменить")
         self.assertEqual(buttons[4].text, "＋ В подборку")
+        self.assertEqual(buttons[5].callback_data, "v2|editor|pv|abc123")
 
 
 class PublicationOverrideTests(unittest.TestCase):
