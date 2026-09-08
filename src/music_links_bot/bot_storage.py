@@ -39,6 +39,7 @@ async def store_draft(context, draft_id: str, draft: dict) -> None:
     normalized = normalize_track_draft(draft)
     if normalized is not None:
         draft = normalized
+    draft["editor_draft_id"] = draft_id
     drafts: dict = context.application.bot_data.setdefault("drafts", {})
     remember_bounded(
         drafts,
@@ -65,6 +66,7 @@ async def load_draft(context, draft_id: str) -> dict | None:
     if isinstance(draft, dict):
         normalized = normalize_track_draft(draft)
         if normalized is not None:
+            normalized["editor_draft_id"] = draft_id
             drafts[draft_id] = normalized
             return normalized
         return draft
@@ -75,6 +77,7 @@ async def load_draft(context, draft_id: str) -> dict | None:
     draft = await kv.get_json(f"draft:{draft_id}")
     normalized = normalize_track_draft(draft)
     if normalized is not None:
+        normalized["editor_draft_id"] = draft_id
         remember_bounded(
             drafts,
             draft_id,

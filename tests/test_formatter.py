@@ -17,7 +17,6 @@ from music_links_bot.formatter import (
     format_video_collection_message,
     format_video_message,
     genre_hashtags,
-    pick_track_emoji,
     prepend_user_html,
     prepend_user_text,
 )
@@ -74,7 +73,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             message,
-            "🎧 · <b>Deftones</b>\nRickets\n\n#stonerhand #track #hardrock",
+            "<b>Deftones</b>\nRickets\n\n#stonerhand #track #hardrock",
         )
 
     def test_track_heading_stays_plain_when_release_hub_exists(self) -> None:
@@ -102,9 +101,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            f"{pick_track_emoji(track)} · <b>Artist</b>\n"
-            "Song\n\n"
-            "#stonerhand #track #single",
+            "<b>Artist</b>\nSong\n\n#stonerhand #track #single",
         )
 
     def test_format_track_message_without_metadata_stays_compact(self) -> None:
@@ -116,7 +113,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            f"{pick_track_emoji(track)} · <b>Artist</b>\nSong\n\n#stonerhand #track",
+            "<b>Artist</b>\nSong\n\n#stonerhand #track",
         )
 
     def test_format_track_message_normalizes_untrusted_metadata(self) -> None:
@@ -141,7 +138,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track, include_hashtags=False),
-            f"{pick_track_emoji(track)} · <b>Artist</b>\nSong",
+            "<b>Artist</b>\nSong",
         )
 
     def test_format_track_message_marks_album(self) -> None:
@@ -155,7 +152,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "💿 · <b>Artist</b>\nAlbum\n\n#stonerhand #album",
+            "<b>Artist</b>\nAlbum\n\n#stonerhand #album",
         )
 
     def test_format_track_message_marks_ep(self) -> None:
@@ -169,7 +166,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "💿 · <b>Artist</b>\nEP\n\n#stonerhand #album #ep",
+            "<b>Artist</b>\nEP\n\n#stonerhand #album #ep",
         )
 
     def test_format_track_message_marks_podcast(self) -> None:
@@ -182,7 +179,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "🎙️ · <b>Podcast Show</b>\nEpisode\n\n#stonerhand #podcast",
+            "<b>Podcast Show</b>\nEpisode\n\n#stonerhand #podcast",
         )
 
     def test_format_track_message_marks_podcast_show(self) -> None:
@@ -196,7 +193,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "🎙️ · <b>Spotify</b>\nPodcast show\n\n#stonerhand #podcast #show",
+            "<b>Spotify</b>\nPodcast show\n\n#stonerhand #podcast #show",
         )
 
     def test_format_collection_message_lists_tracks(self) -> None:
@@ -460,7 +457,7 @@ class FormatterTests(unittest.TestCase):
         message = format_mixed_collection_message(tracks, videos)
 
         self.assertIn("<b>Песня + клип</b>", message)
-        self.assertIn("🎧 · <b>Artist</b> — Song", message)
+        self.assertIn("<b>Artist</b> — Song", message)
         self.assertIn("📺 · <b>Live</b>", message)
         self.assertNotIn("<a href=", message)
         self.assertIn("#stonerhand #track #video", message)

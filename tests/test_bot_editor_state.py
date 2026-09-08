@@ -47,14 +47,16 @@ class BotEditorStateTests(unittest.TestCase):
 
     def test_status_and_recent_drafts_stay_bounded(self) -> None:
         session = SimpleNamespace(active_draft_id="", recent_draft_ids=[])
-        for index in range(7):
+        for index in range(35):
             remember_draft(session, str(index))
 
-        self.assertEqual(session.active_draft_id, "6")
-        self.assertEqual(session.recent_draft_ids, ["6", "5", "4", "3", "2"])
+        self.assertEqual(session.active_draft_id, "34")
+        self.assertEqual(
+            session.recent_draft_ids, [str(value) for value in range(34, 4, -1)]
+        )
         self.assertEqual(
             draft_status({"preset": "cover"}, self.track, lang="ru"),
-            "Обложка ✓ · Теги авто · 2 площадки · Авто",
+            "С обложкой ✓ · Теги авто · 2 площадки · Авто",
         )
         self.assertEqual(
             draft_status(
@@ -85,7 +87,7 @@ class BotEditorStateTests(unittest.TestCase):
 
     def test_five_setting_changes_can_be_restored_in_order(self) -> None:
         draft = {"hashtags": True}
-        for index in range(7):
+        for index in range(35):
             remember_setting_state(draft)
             draft["hashtags"] = bool(index % 2)
         expires_at = draft["undo_state"]["expires_at"]

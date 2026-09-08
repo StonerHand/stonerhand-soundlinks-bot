@@ -52,7 +52,7 @@ class PublicationGoldenTests(unittest.TestCase):
 
         self.assertEqual(
             text,
-            "🎧 · <b>Sleep</b>\nDopesmoker\n\n#stonerhand #track",
+            "<b>Sleep</b>\nDopesmoker\n\n#stonerhand #track",
         )
         self.assertEqual(draft["v"], CURRENT_DRAFT_VERSION)
         labels = [button.text for row in keyboard.inline_keyboard for button in row]
@@ -333,7 +333,7 @@ class EditorFlowContractTests(unittest.IsolatedAsyncioTestCase):
             ),
         )
         await _dispatch_menu_action(query, context, CallbackAction("menu", "create"))
-        self.assertIn("Новая карточка", query.edits[-1]["text"])
+        self.assertIn("Новый пост", query.edits[-1]["text"])
         self.assertEqual(
             query.edits[-1]["reply_markup"].inline_keyboard[-1][0].callback_data,
             "v2|menu|start",

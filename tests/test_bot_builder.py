@@ -70,7 +70,9 @@ class BuilderJourneyTests(unittest.TestCase):
             active_draft_id="abc",
             active_draft_label="Deftones — Rickets",
         )
-        self.assertEqual(keyboard.inline_keyboard[1][0].text, "↩ Deftones — Rickets")
+        self.assertEqual(
+            keyboard.inline_keyboard[1][0].text, "Продолжить · Deftones — Rickets"
+        )
         self.assertEqual(
             active_card_label({"item": {"artist": "A", "title": "B"}}, "fallback"),
             "A — B",
@@ -116,17 +118,27 @@ class BuilderJourneyTests(unittest.TestCase):
         platform_rows = editor_platform_rows("abc", self.draft, self.track, self.order)
         self.assertEqual(platform_rows[0][0].callback_data, "v2|editor|l0|abc")
         tag_rows = editor_hashtag_rows("abc", self.draft)
-        self.assertEqual(tag_rows[-1][0].callback_data, "v2|editor|m|abc")
+        self.assertEqual(tag_rows[-1][0].callback_data, "v2|editor|tx|abc")
 
     def test_schedule_and_telegram_limits_are_deterministic(self) -> None:
         now = datetime(2026, 8, 10, 10, 0, tzinfo=timezone.utc)
         self.assertEqual(schedule_timestamp("q1", now=now), int(now.timestamp()) + 3600)
         evening = schedule_timestamp(
             "qe",
+            timezone_name="UTC",
             now=datetime(2026, 8, 10, 19, 0, tzinfo=timezone.utc),
         )
         self.assertEqual(
             evening, int(datetime(2026, 8, 10, 20, 0, tzinfo=timezone.utc).timestamp())
+        )
+        moscow_evening = schedule_timestamp(
+            "qe",
+            timezone_name="Europe/Moscow",
+            now=datetime(2026, 8, 10, 19, 0, tzinfo=timezone.utc),
+        )
+        self.assertEqual(
+            moscow_evening,
+            int(datetime(2026, 8, 11, 17, 0, tzinfo=timezone.utc).timestamp()),
         )
         local_now = datetime(2026, 8, 10, 18, 0, tzinfo=timezone.utc)
         custom = parse_schedule_datetime("15.08 19:30", now=local_now)

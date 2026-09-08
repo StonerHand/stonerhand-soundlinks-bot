@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
+from contextvars import ContextVar
 from importlib.resources import files
 from string import Formatter
 
@@ -9,6 +11,18 @@ EN = "en"
 _SUPPORTED_LANGUAGES = (RU, EN)
 _RU_FAMILY_PREFIXES = ("ru", "uk", "be", "kk")
 _CATALOG_RESOURCE = "locales/catalog.json"
+preferred_language: ContextVar[str | None] = ContextVar("ui_language", default=None)
+
+
+@contextmanager
+def language_context(language: str | None):
+    token = preferred_language.set(
+        language if language in _SUPPORTED_LANGUAGES else None
+    )
+    try:
+        yield
+    finally:
+        preferred_language.reset(token)
 
 
 def _load_catalog() -> dict[str, dict[str, str]]:
@@ -26,6 +40,8 @@ STRINGS: dict[str, dict[str, str]] = _load_catalog()
 
 def resolve_lang(language_code: str | None) -> str:
     """Resolve the menu language without changing editorial post text."""
+    if preferred_language.get():
+        return preferred_language.get()
     if not language_code:
         return RU
     return RU if language_code.casefold().startswith(_RU_FAMILY_PREFIXES) else EN
@@ -33,7 +49,7 @@ def resolve_lang(language_code: str | None) -> str:
 
 def get_text(lang: str, key: str) -> str:
     entry = STRINGS[key]
-    return entry.get(lang) or entry[RU]
+    return entry.get(preferred_language.get() or lang) or entry[RU]
 
 
 def validate_catalog() -> tuple[str, ...]:

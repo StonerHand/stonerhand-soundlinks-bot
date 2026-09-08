@@ -48,7 +48,7 @@ class ReleaseReadinessTests(unittest.TestCase):
         )
         self.assertEqual(
             metadata["tool"]["setuptools"]["package-data"]["music_links_bot"],
-            ["assets/*.gif", "locales/*.json"],
+            ["assets/*.gif", "assets/*.png", "locales/*.json"],
         )
         self.assertTrue((ROOT / "src/music_links_bot/locales/catalog.json").is_file())
 

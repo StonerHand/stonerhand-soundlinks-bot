@@ -1,21 +1,51 @@
 {
-  "text": "🎧 · <b>Sleep</b>\nDopesmoker\n\n#stonerhand #track",
+  "text": "<b>Sleep</b>\nDopesmoker\n\n#stonerhand #track",
   "rows": [
     [
-      ["🪩 Все платформы", null, "https://song.link/sleep", null]
+      [
+        "🪩 Все платформы",
+        null,
+        "https://song.link/sleep",
+        null
+      ]
     ],
     [
-      ["🟢 Spotify", null, "https://open.spotify.com/track/1", null]
+      [
+        "🟢 Spotify",
+        null,
+        "https://open.spotify.com/track/1",
+        null
+      ]
     ],
     [
-      ["Отправить себе", "v2|editor|s|draft123", null, "primary"]
+      [
+        "Отправить себе",
+        "v2|editor|s|draft123",
+        null,
+        "primary"
+      ]
     ],
     [
-      ["Изменить", "v2|editor|m|draft123", null, null],
-      ["＋ В подборку", "v2|editor|c|draft123", null, null]
+      [
+        "Изменить",
+        "v2|editor|m|draft123",
+        null,
+        null
+      ],
+      [
+        "В подборку",
+        "v2|editor|c|draft123",
+        null,
+        null
+      ]
     ],
     [
-      ["Превью", "v2|editor|pv|draft123", null, null]
+      [
+        "Превью",
+        "v2|editor|pv|draft123",
+        null,
+        null
+      ]
     ]
   ]
 }

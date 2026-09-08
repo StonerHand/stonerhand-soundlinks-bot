@@ -295,6 +295,7 @@ async def _schedule_custom_time(
     except (QueueBusyError, QueueStorageError):
         await message.reply_text(get_text(lang, "ed_queue_unavailable"))
         return DraftInputResult()
+    draft["scheduled_at"] = publish_at
     return DraftInputResult(
         "schedule_done",
         format_schedule_datetime(publish_at, timezone_name=timezone_name),

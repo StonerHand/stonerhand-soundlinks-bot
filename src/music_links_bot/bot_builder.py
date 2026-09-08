@@ -25,6 +25,9 @@ MAX_SCHEDULE_DAYS = 90
 
 class BuilderScreen(str, Enum):
     MAIN = "main"
+    APPEARANCE = "appearance"
+    TEXT = "text"
+    TOOLS = "tools"
     STYLE = "style"
     PLATFORMS = "platforms"
     INTRO = "intro"
@@ -38,6 +41,9 @@ class BuilderScreen(str, Enum):
 
 SCREEN_ACTIONS = {
     "m": BuilderScreen.MAIN,
+    "ap": BuilderScreen.APPEARANCE,
+    "tx": BuilderScreen.TEXT,
+    "tools": BuilderScreen.TOOLS,
     "zs": BuilderScreen.STYLE,
     "ls": BuilderScreen.PLATFORMS,
     "ts": BuilderScreen.INTRO,
@@ -202,6 +208,7 @@ def schedule_timestamp(
     current = now or datetime.now(_timezone(timezone_name))
     if current.tzinfo is None:
         current = current.replace(tzinfo=timezone.utc)
+    current = current.astimezone(_timezone(timezone_name))
     if option == "q1":
         result = current + timedelta(hours=1)
     elif option == "q3":  # compatibility with already-sent keyboards

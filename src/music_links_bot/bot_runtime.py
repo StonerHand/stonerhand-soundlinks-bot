@@ -34,7 +34,8 @@ RATE_LIMIT_WINDOW_SECONDS = 60
 RATE_LIMIT_MAX_REQUESTS = 12
 ACTIVE_REQUEST_TTL_SECONDS = 5 * 60
 SESSION_TTL_SECONDS = 30 * 24 * 3600
-SESSION_SCHEMA_VERSION = 7
+SESSION_SCHEMA_VERSION = 8
+MAX_RECENT_DRAFTS = 30
 COLLECTION_STATE_VERSION = 2
 MAX_SESSION_TEXT_LENGTH = 2_048
 MAX_COLLECTION_INTRO_HTML_LENGTH = 20_000
@@ -139,6 +140,9 @@ def _normalize_collection_intro_html(value: object) -> str:
 class UserSession:
     user_id: int
     lang: str = "ru"
+    preferred_lang: str = ""
+    default_preset: str = ""
+    default_hashtags: str = ""
     onboarding_seen: bool = False
     welcome_seen: bool = False
     last_query: str = ""
@@ -158,6 +162,13 @@ class UserSession:
             return cls(
                 user_id=int(payload["user_id"]),
                 lang=str(payload.get("lang") or "ru"),
+                preferred_lang=_choice(payload.get("preferred_lang"), {"ru", "en"}),
+                default_preset=_choice(
+                    payload.get("default_preset"), {"minimal", "cover", "longread"}
+                ),
+                default_hashtags=_choice(
+                    payload.get("default_hashtags"), {"auto", "off"}
+                ),
                 onboarding_seen=bool(payload.get("onboarding_seen")),
                 welcome_seen=bool(payload.get("welcome_seen")),
                 last_query=str(payload.get("last_query") or "")[
@@ -182,7 +193,7 @@ class UserSession:
                         payload.get("recent_draft_ids")
                         if isinstance(payload.get("recent_draft_ids"), list)
                         else []
-                    )[:5]
+                    )[:MAX_RECENT_DRAFTS]
                     if value
                 ],
                 home_chat_id=_optional_int(payload.get("home_chat_id")),
@@ -191,6 +202,10 @@ class UserSession:
             )
         except (KeyError, TypeError, ValueError):
             return None
+
+
+def _choice(value: object, allowed: set[str]) -> str:
+    return value if isinstance(value, str) and value in allowed else ""
 
 
 def _optional_int(value: object) -> int | None:

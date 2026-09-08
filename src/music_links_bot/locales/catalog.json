@@ -8,8 +8,8 @@
     "ru": "Уже готово — повторно ничего не отправлял."
   },
   "back": {
-    "en": "← Back",
-    "ru": "← Назад"
+    "ru": "← Назад",
+    "en": "← Back"
   },
   "cancel": {
     "en": "Cancel",
@@ -104,8 +104,8 @@
     "ru": "Открыть подборку"
   },
   "create_prompt": {
-    "en": "🔎 <b>New card</b>\n\nSend your next message with:\n• a track, album, playlist or artist link\n• a title as <code>artist — track</code>\n• several links, one per line, for a collection\n\n<blockquote><code>Deftones — Rickets</code></blockquote>\nText above a link becomes the post intro.",
-    "ru": "🔎 <b>Новая карточка</b>\n\nОтправь следующим сообщением:\n• ссылку на трек, альбом, плейлист или артиста\n• название в формате <code>артист — трек</code>\n• несколько ссылок, каждую с новой строки — для подборки\n\n<blockquote><code>Deftones — Rickets</code></blockquote>\nСвой текст над ссылкой станет подводкой к посту."
+    "ru": "<b>Новый пост</b>\n\nПришли ссылку или название: <code>Deftones — Rickets</code>.\n\nДля подборки — несколько ссылок, каждую с новой строки. Свой текст над ссылками станет подводкой.",
+    "en": "<b>New post</b>\n\nSend a link or a title: <code>Deftones — Rickets</code>.\n\nFor a collection, send one link per line. Your text above the links becomes the intro."
   },
   "duplicate_open": {
     "en": "Open old post",
@@ -120,8 +120,8 @@
     "ru": "Открыть"
   },
   "drafts_title": {
-    "en": "<b>Drafts</b>\n<i>Editable cards are kept separately from published history.</i>",
-    "ru": "<b>Черновики</b>\n<i>Карточки для редактирования хранятся отдельно от истории.</i>"
+    "ru": "<b>Черновики</b>\n<i>Нажми на релиз, чтобы продолжить. Хранятся до 48 часов.</i>",
+    "en": "<b>Drafts</b>\n<i>Choose a release to continue. Kept for up to 48 hours.</i>"
   },
   "duplicate_repeat": {
     "en": "Publish again",
@@ -132,12 +132,12 @@
     "ru": "Заменить старый пост"
   },
   "ed_actions_title": {
-    "en": "🚀 <b>Delivery</b>\n<i>Choose where to send the finished post.</i>",
-    "ru": "🚀 <b>Отправка</b>\n<i>Выбери, куда отправить готовый пост.</i>"
+    "ru": "<b>Куда отправить пост?</b>",
+    "en": "<b>Where should this post go?</b>"
   },
   "ed_add_crate": {
-    "en": "＋ Add to crate",
-    "ru": "＋ В подборку"
+    "ru": "В подборку",
+    "en": "Add to collection"
   },
   "ed_admin_only": {
     "en": "Only the bot owner can publish to the channel",
@@ -148,12 +148,12 @@
     "ru": "Превью"
   },
   "ed_constructor_hint": {
-    "en": "Tap a setting to update the preview instantly",
-    "ru": "Нажимай параметры — превью обновится сразу"
+    "ru": "Изменения сохраняются автоматически",
+    "en": "Changes are saved automatically"
   },
   "ed_constructor_title": {
-    "en": "Card builder",
-    "ru": "Конструктор карточки"
+    "ru": "Редактор поста",
+    "en": "Post editor"
   },
   "ed_cover_auto": {
     "en": "Artwork · auto",
@@ -192,8 +192,8 @@
     "ru": "Уже в подборке · {count}/10"
   },
   "ed_create_more": {
-    "en": "+ Create another",
-    "ru": "+ Создать ещё"
+    "ru": "Создать ещё",
+    "en": "Create another"
   },
   "ed_delete": {
     "en": "🗑 Delete",
@@ -212,28 +212,28 @@
     "ru": "<b>Карточка удалена</b>\n\nОтменить можно в течение 15 секунд."
   },
   "ed_delivery_auto": {
-    "en": "Telegram · auto",
-    "ru": "Telegram · авто"
+    "ru": "Сообщение · Адаптивное",
+    "en": "Message · Adaptive"
   },
   "ed_delivery_auto_name": {
-    "en": "Auto — modern card",
-    "ru": "Авто — современная карточка"
+    "ru": "Адаптивное",
+    "en": "Adaptive"
   },
   "ed_delivery_classic": {
-    "en": "Telegram · classic",
-    "ru": "Telegram · классика"
+    "ru": "Сообщение · Обычное",
+    "en": "Message · Standard"
   },
   "ed_delivery_classic_name": {
-    "en": "Classic — regular message",
-    "ru": "Классика — обычное сообщение"
+    "ru": "Обычное",
+    "en": "Standard"
   },
   "ed_delivery_title": {
-    "en": "📨 <b>Telegram format</b>\n<i>Auto uses the new format and safely falls back to a classic message.</i>",
-    "ru": "📨 <b>Формат Telegram</b>\n<i>Авто использует новый формат и безопасно откатывается к обычному сообщению.</i>"
+    "ru": "<b>Вид сообщения</b>\n<b>Адаптивное</b> — оформление подстраивается под содержимое.\n<b>Обычное</b> — текст с preview обложки и кнопками.",
+    "en": "<b>Message format</b>\n<b>Adaptive</b> — presentation adjusts to the content.\n<b>Standard</b> — text with artwork preview and buttons."
   },
   "ed_done": {
-    "en": "✓ Done",
-    "ru": "✓ Готово"
+    "ru": "Готово · к карточке",
+    "en": "Done · back to card"
   },
   "ed_duplicate": {
     "en": "⚠️ Already published on {date}. Tap 📤 again to publish anyway",
@@ -304,8 +304,8 @@
     "ru": "Прошлый формат восстановлен"
   },
   "ed_more": {
-    "en": "Send",
-    "ru": "Отправить"
+    "ru": "Отправить…",
+    "en": "Send…"
   },
   "ed_open_publication": {
     "en": "Open publication",
@@ -356,32 +356,32 @@
     "ru": "Чистое превью отправлено ниже"
   },
   "ed_preset_cover": {
-    "en": "Style · Cover",
-    "ru": "Стиль · Обложка"
+    "ru": "Вид · С обложкой",
+    "en": "Layout · With artwork"
   },
   "ed_preset_longread": {
-    "en": "Style · Longread",
-    "ru": "Стиль · Лонгрид"
+    "ru": "Вид · С историей",
+    "en": "Layout · With a story"
   },
   "ed_preset_minimal": {
-    "en": "Style · Minimal",
-    "ru": "Стиль · Минимал"
+    "ru": "Вид · Компактно",
+    "en": "Layout · Compact"
   },
   "ed_preset_name_cover": {
-    "en": "Cover — large preview",
-    "ru": "Обложка — крупное превью"
+    "ru": "С обложкой",
+    "en": "With artwork"
   },
   "ed_preset_name_longread": {
-    "en": "Longread — editorial post",
-    "ru": "Лонгрид — текстовая публикация"
+    "ru": "С историей",
+    "en": "With a story"
   },
   "ed_preset_name_minimal": {
-    "en": "Minimal — compact preview",
-    "ru": "Минимал — компактное превью"
+    "ru": "Компактно",
+    "en": "Compact"
   },
   "ed_publish": {
-    "en": "📤 To channel",
-    "ru": "📤 В канал"
+    "ru": "Опубликовать",
+    "en": "Publish"
   },
   "ed_publish_failed": {
     "en": "Could not publish — check the bot's rights in the channel",
@@ -404,8 +404,8 @@
     "ru": "Очередь временно недоступна — попробуй ещё раз через несколько секунд"
   },
   "ed_schedule": {
-    "en": "🕒 Schedule",
-    "ru": "🕒 Запланировать"
+    "ru": "Запланировать",
+    "en": "Schedule"
   },
   "ed_send_self": {
     "en": "Send to me",
@@ -452,8 +452,8 @@
     "ru": "Без тегов"
   },
   "ed_style_title": {
-    "en": "🎨 <b>Card style</b>\n<i>Choose one clear format.</i>",
-    "ru": "🎨 <b>Стиль карточки</b>\n<i>Выбери один понятный формат.</i>"
+    "ru": "<b>Вид карточки</b>\n<b>Компактно</b> — небольшой preview.\n<b>С обложкой</b> — крупный арт релиза.\n<b>С историей</b> — больше места для подводки.",
+    "en": "<b>Card layout</b>\n<b>Compact</b> — a small preview.\n<b>With artwork</b> — large release artwork.\n<b>With a story</b> — more room for your intro."
   },
   "ed_tags_auto": {
     "en": "Automatic",
@@ -580,36 +580,36 @@
     "ru": "Нужна короткая пауза"
   },
   "home_back": {
-    "en": "← Main menu",
-    "ru": "← Главное меню"
+    "ru": "← Главное меню",
+    "en": "← Main menu"
   },
   "home_body": {
-    "en": "{greeting}\n\n<b>Just send a message with:</b>\n• a track, album, playlist or artist link\n• <code>artist — title</code>\n• several links for a collection\n• your own text above a link for the intro\n\n<i>I will add artwork, platform buttons and verified hashtags automatically.</i>",
-    "ru": "{greeting}\n\n<b>Просто отправь сообщением:</b>\n• ссылку на трек, альбом, плейлист или артиста\n• <code>артист — название</code>\n• несколько ссылок — для подборки\n• свой текст над ссылкой — для подводки\n\n<i>Обложку, кнопки и точные хэштеги соберу автоматически.</i>"
+    "ru": "{greeting}\n\nПришли ссылку или <code>артист — название</code>.\nНесколько ссылок — подборка, текст над ссылкой — подводка.",
+    "en": "{greeting}\n\nSend a link or <code>artist — title</code>.\nSeveral links make a collection; text above a link becomes the intro."
   },
   "home_body_new": {
-    "en": "{greeting}\n\nI will find the release and prepare a finished Telegram post with <b>artwork, title, verified hashtags and platform buttons.</b>\n\n<b>What you can send</b>\n• a track, album, playlist or artist link\n• <code>Deftones — Rickets</code>\n• several links in one message for a collection\n\n<blockquote>Write your own text above a link to use it as the post intro.</blockquote>\n<i>{mode}</i>",
-    "ru": "{greeting}\n\nЯ найду релиз и подготовлю готовый Telegram-пост: <b>обложку, название, точные хэштеги и кнопки площадок.</b>\n\n<b>Что можно прислать</b>\n• ссылку на трек, альбом, плейлист или артиста\n• <code>Deftones — Rickets</code>\n• несколько ссылок одним сообщением — получится подборка\n\n<blockquote>Свой текст можно написать над ссылкой — он станет подводкой к посту.</blockquote>\n<i>{mode}</i>"
+    "ru": "{greeting}\n\nПришли ссылку или <code>артист — название</code> — получишь готовый пост с обложкой и кнопками площадок.\n\nНесколько ссылок — подборка. Свой текст над ссылкой — подводка.",
+    "en": "{greeting}\n\nSend a link or <code>artist — title</code> for a ready-to-share post with artwork and platform buttons.\n\nSeveral links make a collection. Your text above a link becomes the intro."
   },
   "home_continue": {
-    "en": "↩ Return to card",
-    "ru": "↩ Вернуться к карточке"
+    "ru": "Продолжить карточку",
+    "en": "Continue editing"
   },
   "home_continue_named": {
-    "en": "↩ {release}",
-    "ru": "↩ {release}"
+    "ru": "Продолжить · {release}",
+    "en": "Continue · {release}"
   },
   "home_crate": {
-    "en": "🧺 Crate · {count}",
-    "ru": "🧺 Подборка · {count}"
+    "ru": "Подборка · {count}",
+    "en": "Collection · {count}"
   },
   "home_drafts": {
-    "en": "📝 Drafts",
-    "ru": "📝 Черновики"
+    "ru": "Черновики",
+    "en": "Drafts"
   },
   "home_create": {
-    "en": "＋ Create post",
-    "ru": "＋ Создать пост"
+    "ru": "Создать пост",
+    "en": "Create post"
   },
   "home_mode_admin": {
     "en": "Editing, queueing and publishing are available right in the bot",
@@ -620,28 +620,28 @@
     "ru": "Карточку можно изменить и отправить прямо в этом чате"
   },
   "home_more": {
-    "en": "⚙️ Settings",
-    "ru": "⚙️ Настройки"
+    "ru": "Настройки",
+    "en": "Settings"
   },
   "home_queue": {
-    "en": "🕒 Publication queue",
-    "ru": "🕒 Очередь публикаций"
+    "ru": "Очередь публикаций",
+    "en": "Scheduled posts"
   },
   "home_recent": {
-    "en": "🕒 Recent",
-    "ru": "🕒 Недавние"
+    "ru": "Недавние",
+    "en": "Recent"
   },
   "home_title": {
-    "en": "🎧 <b>Music post editor{name}</b>",
-    "ru": "🎧 <b>Музыкальный редактор{name}</b>"
+    "ru": "<b>StonerHand{name}</b>",
+    "en": "<b>StonerHand{name}</b>"
   },
   "home_title_new": {
-    "en": "🎧 <b>StonerHandBot</b>\n<i>Music post builder</i>",
-    "ru": "🎧 <b>StonerHandBot</b>\n<i>Музыкальный конструктор постов</i>"
+    "ru": "<b>Музыка, которой хочется делиться</b>",
+    "en": "<b>Music worth sharing</b>"
   },
   "home_try_example": {
-    "en": "Try an example",
-    "ru": "Попробовать на примере"
+    "ru": "Попробовать на примере",
+    "en": "Try an example"
   },
   "inline_find_music": {
     "en": "Find music",
@@ -680,8 +680,8 @@
     "ru": "📣 <b>Бот для групп и каналов</b>\n<i>Настрой один раз — дальше просто присылай музыку.</i>\n\n<blockquote><b>1 · Добавь бота</b>\nВ группу или канал как администратора.\n\n<b>2 · Выдай права</b>\nНа публикацию; в группе — ещё и на удаление сообщений.\n\n<b>3 · Пришли ссылку</b>\nБот заменит её готовым музыкальным постом.</blockquote>\n\n<b>Автоматически</b>\n• подводка становится цитатой с автором;\n• добавляются хэштеги и площадки;\n• несколько ссылок собираются в подборку.\n\n<blockquote>🛡 Сначала публикуется готовый пост — и только потом удаляется исходное сообщение.</blockquote>"
   },
   "menu_help": {
-    "en": "❓ <b>How to build a post</b>\n<i>Three steps and the card is ready.</i>\n\n<blockquote><b>1 · Find a release</b>\nSend a link or type <code>artist — track</code>.\n\n<b>2 · Check the card</b>\nThe bot adds artwork, hashtags and platform buttons.\n\n<b>3 · Send it</b>\nTo yourself, a crate, the queue or your channel.</blockquote>\n\n<b>Useful shortcuts</b>\n• Text above a link becomes a <i>quote</i>.\n• Several links become a numbered collection.\n• Intro formatting is preserved.\n\n<blockquote>⚡ Inline in any chat:\n<code>@StonerHandBot Black Sabbath — Paranoid</code></blockquote>",
-    "ru": "❓ <b>Как собрать пост</b>\n<i>Три шага — и карточка готова.</i>\n\n<blockquote><b>1 · Найди релиз</b>\nПришли ссылку или напиши <code>артист — трек</code>.\n\n<b>2 · Проверь карточку</b>\nБот добавит обложку, хэштеги и кнопки площадок.\n\n<b>3 · Отправь</b>\nСебе, в подборку, очередь или канал.</blockquote>\n\n<b>Полезные приёмы</b>\n• Текст над ссылкой станет <i>цитатой</i>.\n• Несколько ссылок превратятся в нумерованную подборку.\n• Форматирование подводки сохранится.\n\n<blockquote>⚡ Inline в любом чате:\n<code>@StonerHandBot Black Sabbath — Paranoid</code></blockquote>"
+    "ru": "<b>Помощь</b>\n\nПришли ссылку или <code>артист — название</code>. Несколько ссылок станут подборкой, твой текст над ними — подводкой.\n\nВыбери раздел ниже.",
+    "en": "<b>Help</b>\n\nSend a link or <code>artist — title</code>. Several links become a collection; your text above them becomes the intro.\n\nChoose a guide below."
   },
   "menu_more": {
     "en": "⚙️ <b>Settings and help</b>\n<i>Reference pages and account controls.</i>\n\n<blockquote><b>Help</b> — a short guide\n<b>Services</b> — supported platforms\n<b>For channels</b> — automatic link replacement\n<b>Example</b> — a finished post preview\n<b>Privacy</b> — stored data and deletion controls</blockquote>",
@@ -820,8 +820,8 @@
     "ru": "Убрано из очереди"
   },
   "queue_empty": {
-    "en": "Nothing scheduled. Schedule a card from the Send menu.",
-    "ru": "Пока пусто. Запланируй карточку через меню «Отправить»."
+    "ru": "Пока пусто. Нажми «Запланировать» на карточке релиза.",
+    "en": "Nothing scheduled yet. Tap Schedule on a release card."
   },
   "queue_missing": {
     "en": "This item is already gone",
@@ -844,8 +844,8 @@
     "en": "Review delivery #{index}"
   },
   "queue_title": {
-    "en": "🕒 <b>Queue · {count}</b>",
-    "ru": "🕒 <b>Очередь · {count}</b>"
+    "ru": "<b>Очередь · {count}</b>",
+    "en": "<b>Scheduled posts · {count}</b>"
   },
   "queue_unavailable": {
     "en": "The queue is temporarily unavailable. Try again.",
@@ -864,24 +864,24 @@
     "ru": "🔎 Найти"
   },
   "quick_tour": {
-    "en": "How does it work?",
-    "ru": "Как это работает?"
+    "ru": "Как это работает",
+    "en": "How it works"
   },
   "recent_add": {
     "en": "+ To crate",
     "ru": "+ В подборку"
   },
   "recent_empty": {
-    "en": "<b>No recent posts yet</b>\n\nCreate your first card and it will appear here.",
-    "ru": "<b>Недавних постов пока нет</b>\n\nСоздай первую карточку — она появится здесь."
+    "ru": "<b>Здесь появятся недавние релизы</b>\n\nСоздай первую карточку.",
+    "en": "<b>Your recent releases will appear here</b>\n\nCreate your first card."
   },
   "recent_repeat": {
     "en": "Repeat",
     "ru": "Повторить"
   },
   "recent_title": {
-    "en": "<b>Recent posts</b>",
-    "ru": "<b>Недавние посты</b>"
+    "ru": "<b>Недавние релизы</b>\n<i>Выбери релиз, чтобы открыть его снова.</i>",
+    "en": "<b>Recent releases</b>\n<i>Choose a release to open it again.</i>"
   },
   "replace_source": {
     "en": "Replace #{index}",
@@ -948,8 +948,8 @@
     "ru": "<b>Жду дату и время</b>\nНапример: <code>15.08 19:30</code> или <code>21:00</code>\n<code>/cancel</code> — отменить"
   },
   "schedule_title": {
-    "en": "🕒 <b>When to publish?</b>\n<i>Fixed times use the bot timezone.</i>",
-    "ru": "🕒 <b>Когда опубликовать?</b>\n<i>Фиксированное время — по часовому поясу бота.</i>"
+    "ru": "<b>Когда опубликовать?</b>",
+    "en": "<b>When should this post go live?</b>"
   },
   "search_change": {
     "en": "Change query",
@@ -996,8 +996,8 @@
     "ru": "📣 Для каналов"
   },
   "tab_help": {
-    "en": "❓ Help",
-    "ru": "❓ Помощь"
+    "en": "Help",
+    "ru": "Помощь"
   },
   "tab_platforms": {
     "en": "🎛 Services",
@@ -1020,8 +1020,8 @@
     "ru": "Аудиофайл"
   },
   "welcome_demo_caption": {
-    "en": "Link → exact release → finished post",
-    "ru": "Ссылка → точный релиз → готовый пост"
+    "ru": "Твоя музыка. Твой взгляд. Готовый пост.",
+    "en": "Your music. Your perspective. Ready to share."
   },
   "ed_deleted_recovery": {
     "ru": "Черновик удалён. Нажми «Восстановить» в сообщении об удалении или создай новый пост.",
@@ -1054,5 +1054,137 @@
   "queue_sending": {
     "ru": "⏳ Отправляется · дождись результата",
     "en": "⏳ Sending · waiting for confirmation"
+  },
+  "ed_group_appearance": {
+    "ru": "Оформление",
+    "en": "Appearance"
+  },
+  "ed_group_text": {
+    "ru": "Текст",
+    "en": "Text"
+  },
+  "ed_group_buttons": {
+    "ru": "Кнопки площадок",
+    "en": "Platform buttons"
+  },
+  "ed_appearance_title": {
+    "ru": "<b>Оформление</b>\nОбложка, размер карточки и вид готового сообщения.",
+    "en": "<b>Appearance</b>\nArtwork, card size and the look of your finished post."
+  },
+  "ed_text_title": {
+    "ru": "<b>Текст</b>\nДобавь свою подводку и выбери хэштеги.",
+    "en": "<b>Text</b>\nAdd your intro and choose hashtags."
+  },
+  "ed_tools": {
+    "ru": "Действия с карточкой",
+    "en": "Card actions"
+  },
+  "ed_tools_title": {
+    "ru": "<b>Действия с карточкой</b>",
+    "en": "<b>Card actions</b>"
+  },
+  "ed_back_card": {
+    "ru": "← К карточке",
+    "en": "← Back to card"
+  },
+  "pref_title": {
+    "ru": "<b>Настройки</b>\n\nЯзык интерфейса и оформление новых карточек. Уже созданные посты сохраняют свои настройки.",
+    "en": "<b>Settings</b>\n\nInterface language and defaults for new cards. Existing posts keep their settings."
+  },
+  "pref_language": {
+    "ru": "Язык · {value}",
+    "en": "Language · {value}"
+  },
+  "pref_appearance": {
+    "ru": "Оформление · {value}",
+    "en": "Appearance · {value}"
+  },
+  "pref_tags": {
+    "ru": "Хэштеги · {value}",
+    "en": "Hashtags · {value}"
+  },
+  "pref_lang_auto": {
+    "ru": "Как в Telegram",
+    "en": "Match Telegram"
+  },
+  "pref_lang_ru": {
+    "ru": "Русский",
+    "en": "Русский"
+  },
+  "pref_lang_en": {
+    "ru": "English",
+    "en": "English"
+  },
+  "pref_inherit": {
+    "ru": "Последний шаблон",
+    "en": "Last template"
+  },
+  "pref_minimal": {
+    "ru": "Компактно",
+    "en": "Compact"
+  },
+  "pref_cover": {
+    "ru": "С обложкой",
+    "en": "With artwork"
+  },
+  "pref_longread": {
+    "ru": "С историей",
+    "en": "With a story"
+  },
+  "pref_tags_auto": {
+    "ru": "Автоматически",
+    "en": "Automatic"
+  },
+  "pref_tags_off": {
+    "ru": "Без хэштегов",
+    "en": "No hashtags"
+  },
+  "pref_language_title": {
+    "ru": "<b>Язык интерфейса</b>\nНазвания релизов и твоя подводка остаются в оригинале.",
+    "en": "<b>Interface language</b>\nRelease titles and your intro keep their original language."
+  },
+  "pref_appearance_title": {
+    "ru": "<b>Оформление новых карточек</b>\nКомпактно — маленький preview. С обложкой — крупный арт. С историей — больше места для текста.\n\nПоследний шаблон использует сохранённый стиль; для первой карточки — крупную обложку.",
+    "en": "<b>New card appearance</b>\nCompact — a small preview. With artwork — large artwork. With a story — more room for text.\n\nLast template uses your saved style; your first card gets large artwork."
+  },
+  "pref_tags_title": {
+    "ru": "<b>Хэштеги новых карточек</b>\nАвтоматически — подобрать по релизу. Без хэштегов — оставить только текст. Последний шаблон — сохранить прежний выбор.",
+    "en": "<b>Hashtags for new cards</b>\nAutomatic — based on the release. No hashtags — text only. Last template — keep your previous choice."
+  },
+  "draft_editable": {
+    "ru": "Черновик",
+    "en": "Draft"
+  },
+  "draft_scheduled": {
+    "ru": "Запланирован",
+    "en": "Scheduled"
+  },
+  "draft_published": {
+    "ru": "Опубликован",
+    "en": "Published"
+  },
+  "draft_sending": {
+    "ru": "Отправляется",
+    "en": "Sending"
+  },
+  "draft_uncertain": {
+    "ru": "Нужно проверить отправку",
+    "en": "Check delivery"
+  },
+  "draft_queue_unknown": {
+    "ru": "Статус очереди недоступен",
+    "en": "Queue status unavailable"
+  },
+  "schedule_timezone": {
+    "ru": "Время указано для {zone}",
+    "en": "Times are shown in {zone}"
+  },
+  "schedule_stale": {
+    "ru": "Это время уже недоступно. Открой планирование и выбери новое.",
+    "en": "This time is no longer available. Open scheduling and choose a new one."
+  },
+  "published_details": {
+    "ru": "Канал: <b>{target}</b>\n{date}",
+    "en": "Channel: <b>{target}</b>\n{date}"
   }
 }

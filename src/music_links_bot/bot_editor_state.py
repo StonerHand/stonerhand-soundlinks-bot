@@ -11,6 +11,7 @@ from music_links_bot.bot_builder import (
     toggle_platform,
     use_auto_tags,
 )
+from music_links_bot.bot_runtime import MAX_RECENT_DRAFTS
 from music_links_bot.constants import PLATFORM_LABELS
 from music_links_bot.i18n import get_text
 from music_links_bot.models import TrackMatch
@@ -97,11 +98,12 @@ def draft_owned_by(draft: dict, user_id: int) -> bool:
 
 
 def remember_draft(session, draft_id: str) -> None:
+    session.onboarding_seen = True
     session.active_draft_id = draft_id
     session.recent_draft_ids = [
         draft_id,
         *(value for value in session.recent_draft_ids if value != draft_id),
-    ][:5]
+    ][:MAX_RECENT_DRAFTS]
 
 
 def draft_status(draft: dict, track: TrackMatch, *, lang: str) -> str:

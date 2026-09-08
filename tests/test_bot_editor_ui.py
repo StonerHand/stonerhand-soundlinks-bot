@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import unittest
 
-from music_links_bot.bot import _editor_overflow_rows
 from music_links_bot.bot_ui import (
     editor_more_rows as _editor_more_rows,
     editor_rows as _editor_rows,
+    editor_text_rows,
+    editor_tools_rows,
 )
 from music_links_bot.editor_view import render_track_draft as _render_track_draft
 from music_links_bot.models import TrackMatch
@@ -44,17 +45,20 @@ class PostEditorTests(unittest.TestCase):
         self.assertEqual(rows[0][0].callback_data, "v2|editor|s|abc123")
         self.assertEqual(rows[1][0].text, "Изменить")
         self.assertEqual(rows[1][0].callback_data, "v2|editor|m|abc123")
-        self.assertEqual(rows[1][1].text, "＋ В подборку")
+        self.assertEqual(rows[1][1].text, "В подборку")
         self.assertEqual(rows[1][1].callback_data, "v2|editor|c|abc123")
         more = _editor_more_rows("abc123", self._draft(hashtags=True))
-        self.assertEqual(more[1][0].text, "# Хэштеги · авто")
-        self.assertEqual(more[1][0].callback_data, "v2|editor|hs|abc123")
+        self.assertEqual(more[1][0].text, "Текст")
+        self.assertEqual(more[1][0].callback_data, "v2|editor|tx|abc123")
 
     def test_editor_rows_make_admin_publication_immediately_visible(self) -> None:
         rows = _editor_rows("abc123", self._draft(can_publish=True))
 
         labels = [button.text for row in rows for button in row]
-        self.assertEqual(labels, ["📤 В канал", "Изменить", "＋ В подборку", "Превью"])
+        self.assertEqual(
+            labels,
+            ["Опубликовать", "Запланировать", "Изменить", "В подборку", "Превью"],
+        )
         self.assertEqual(rows[0][0].style, "success")
 
     def test_editor_rows_turn_added_item_into_crate_shortcut(self) -> None:
@@ -68,14 +72,14 @@ class PostEditorTests(unittest.TestCase):
         self.assertEqual(dict(rows[1][1].api_kwargs or {}), {})
 
     def test_editor_rows_keep_text_toggle_predictable(self) -> None:
-        rows_without_quote = _editor_more_rows("abc123", self._draft())
-        rows_with_quote = _editor_more_rows(
+        rows_without_quote = editor_text_rows("abc123", self._draft())
+        rows_with_quote = editor_text_rows(
             "abc123",
             self._draft(prefix="<blockquote>интро</blockquote>\n", quote=True),
         )
 
-        self.assertEqual(rows_without_quote[0][1].text, "Подводка · нет")
-        self.assertEqual(rows_with_quote[0][1].text, "Подводка · есть")
+        self.assertEqual(rows_without_quote[0][0].text, "Подводка · нет")
+        self.assertEqual(rows_with_quote[0][0].text, "Подводка · есть")
         self.assertFalse(
             any(
                 button.callback_data == "v2|editor|v|abc123"
@@ -91,11 +95,13 @@ class PostEditorTests(unittest.TestCase):
             self._draft(source_audio_file_id="telegram-audio"),
         )
 
-        self.assertEqual(rows[1][1].text, "Площадки · не нужны")
-        self.assertEqual(rows[1][1].callback_data, "v2|noop|busy")
+        self.assertNotIn(
+            "v2|editor|ls|abc123",
+            [button.callback_data for row in rows for button in row],
+        )
 
     def test_editor_offers_fast_search_correction_for_search_drafts(self) -> None:
-        rows = _editor_overflow_rows(
+        rows = editor_tools_rows(
             "abc123",
             self._draft(search_query="Sleep — Dragonaut"),
         )
@@ -157,11 +163,11 @@ class PostEditorTests(unittest.TestCase):
             show_status=True,
         )
 
-        self.assertTrue(text.startswith("🎛 <b>Конструктор карточки</b>"))
-        self.assertIn("превью обновится сразу", text)
+        self.assertTrue(text.startswith("<b>Редактор поста</b>"))
+        self.assertIn("Изменения сохраняются автоматически", text)
         labels = [button.text for row in keyboard.inline_keyboard for button in row]
-        self.assertIn("✓ Готово", labels)
-        self.assertIn("Отправить", labels)
+        self.assertIn("Готово · к карточке", labels)
+        self.assertIn("Отправить…", labels)
 
     def test_quick_card_is_capped_at_four_actions(self) -> None:
         draft = self._draft()
@@ -175,7 +181,7 @@ class PostEditorTests(unittest.TestCase):
         self.assertEqual(buttons[1].text, "🟢 Spotify")
         self.assertEqual(buttons[2].text, "Отправить себе")
         self.assertEqual(buttons[3].text, "Изменить")
-        self.assertEqual(buttons[4].text, "＋ В подборку")
+        self.assertEqual(buttons[4].text, "В подборку")
         self.assertEqual(buttons[5].callback_data, "v2|editor|pv|abc123")
 
 

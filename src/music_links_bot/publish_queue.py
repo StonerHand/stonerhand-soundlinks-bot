@@ -200,6 +200,17 @@ async def add_job(context, draft: dict, publish_at: int) -> dict:
     }
 
     def mutate(jobs: list[dict]):
+        editor_id = prepared.data.get("editor_draft_id")
+        if isinstance(editor_id, str) and editor_id:
+            for existing in jobs:
+                existing_draft = existing.get("draft") or {}
+                if (
+                    isinstance(existing_draft, dict)
+                    and existing_draft.get("editor_draft_id") == editor_id
+                    and existing_draft.get("chat_id") == prepared.data.get("chat_id")
+                    and existing.get("publish_at") == int(publish_at)
+                ):
+                    return existing, jobs
         if len(jobs) >= MAX_QUEUE_JOBS:
             # A full queue must be visible to the user. Silently deleting the
             # oldest scheduled publication is data loss, even if it is pending.
@@ -514,6 +525,18 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
                 message=delivered,
                 target=target,
             )
+            editor_id = draft.get("editor_draft_id")
+            if isinstance(editor_id, str):
+                from music_links_bot.bot_storage import load_draft, store_draft
+
+                current_draft = await load_draft(context, editor_id)
+                if (
+                    current_draft
+                    and not current_draft.get("deleted_at")
+                    and current_draft.get("chat_id") == draft.get("chat_id")
+                ):
+                    current_draft["published_at"] = current_time()
+                    await store_draft(context, editor_id, current_draft)
         elif outcome == "exhausted" and failed_draft is not None:
             await _alert_job_failure(context, failed_draft)
         elif outcome == "uncertain":

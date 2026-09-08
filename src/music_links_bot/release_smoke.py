@@ -234,11 +234,11 @@ def _build_ui_contract() -> dict[str, object]:
     screens = {
         "home_ru": _summarize_ui_keyboard(
             build_start_keyboard(None, lang="ru", crate_count=2),
-            expected_primary="＋ Создать пост",
+            expected_primary="Создать пост",
         ),
         "home_en": _summarize_ui_keyboard(
             build_start_keyboard(None, lang="en", crate_count=2),
-            expected_primary="＋ Create post",
+            expected_primary="Create post",
         ),
         "first_run": _summarize_ui_keyboard(
             build_start_keyboard(
@@ -247,7 +247,7 @@ def _build_ui_contract() -> dict[str, object]:
                 show_example=True,
                 show_tour=True,
             ),
-            expected_primary="＋ Создать пост",
+            expected_primary="Попробовать на примере",
         ),
         "error_change_query": _summarize_ui_keyboard(
             build_error_keyboard(
@@ -275,7 +275,7 @@ def _build_ui_contract() -> dict[str, object]:
                 lang="ru",
                 share_query="sh5|t3E4MuCjetGIkeu2N8fFHgr",
             ),
-            expected_primary="+ Создать ещё",
+            expected_primary="Создать ещё",
         ),
         "editor_actions": _summarize_ui_keyboard(
             InlineKeyboardMarkup(editor_rows("smoke", draft)),
@@ -283,8 +283,7 @@ def _build_ui_contract() -> dict[str, object]:
         ),
         "editor_settings": _summarize_ui_keyboard(
             InlineKeyboardMarkup(editor_more_rows("smoke", draft)),
-            expected_primary="✓ Готово",
-            expected_style="success",
+            expected_primary="Готово · к карточке",
         ),
     }
     home_text = build_home_text(
@@ -294,10 +293,10 @@ def _build_ui_contract() -> dict[str, object]:
     )
     create_text = get_text("ru", "create_prompt")
     copy_checks = {
-        "home_explains_link": "ссылку на трек" in home_text,
-        "home_explains_query": "Deftones — Rickets" in home_text,
-        "home_explains_collection": "несколько ссылок" in home_text,
-        "home_explains_intro": "подводкой" in home_text,
+        "home_explains_link": "ссылку" in home_text,
+        "home_explains_query": "артист — название" in home_text,
+        "home_explains_collection": "несколько ссылок" in home_text.casefold(),
+        "home_explains_intro": "подводка" in home_text,
         "create_explains_one_link_per_line": "каждую с новой строки" in create_text,
         "create_explains_intro": "подводкой" in create_text,
         "localized_hierarchy_matches": (

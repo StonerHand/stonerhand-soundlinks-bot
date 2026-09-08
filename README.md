@@ -6,7 +6,7 @@
 
 [Open the bot](https://t.me/StonerHandBot) · [See the channel](https://t.me/stonerhand) · [Русская версия](README.ru.md)
 
-![Release](https://img.shields.io/badge/release-1.15.3-5b5bd6?style=flat-square)
+![Release](https://img.shields.io/badge/release-1.16.0-5b5bd6?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
@@ -85,14 +85,18 @@ is omitted instead of guessed.
 ## Telegram UX
 
 The home screen starts with the full-width **Create post** action and explains
-every accepted input. An active card is recoverable by release name. Editable
-**Drafts** and already delivered **Recent** posts are separate destinations, so
-unfinished work is never mixed with publishing history. Settings and help live
-under one predictable **Settings** action.
-On the first private `/start`, a packaged five-second animation demonstrates
-the complete link → card → publish flow once; it never replaces or delays the
-normal menu on later visits. A **Try an example** action starts a working inline
-query immediately.
+every accepted input. An active card is recoverable by release name. **Drafts**
+shows up to 30 available cards with names and statuses, five per page;
+**Recent releases** contains music lookup history.
+The first private `/start` shows the original StonerHand claw-hand avatar and a
+short welcome. A focused menu offers a first card or **Try an example**, and
+the full menu becomes available after creating a card. The menu remains usable
+if the welcome image fails to load.
+
+**Settings** and `/settings` persist the RU/EN interface language, appearance
+of new cards and hashtag defaults across restarts, without rewriting existing
+cards. Initially the bot follows Telegram's language and the previous appearance
+settings. Help and privacy are available from settings.
 
 An empty inline screen shows up to three recent releases; a new user gets one
 live example and a **Find music** action. Configure the input hint once in
@@ -101,7 +105,7 @@ live example and a **Find music** action. Configure the input hint once in
 The editor is progressive rather than crowded:
 
 1. preview the finished card;
-2. change only what matters;
+2. open focused **Appearance**, **Text** or **Platform buttons** sections;
 3. run a final preflight check;
 4. send or publish with one explicit action.
 
@@ -119,8 +123,11 @@ Every error exposes contextual recovery without hiding the failed input. A
 not-found search repeats the exact query and offers both **Change query** and
 **Send direct link** before the route back home. Native callback toasts
 confirm settings, ordering and collection changes; short-lived undo covers
-editor changes and destructive collection actions. Successful delivery closes
-the editor with a compact **Post ready** state and a primary **Create another**.
+editor changes and destructive collection actions. Delivery to yourself offers
+**Create another**; channel publication shows the release, channel, date and
+an **Open post** action. **Schedule** is available directly on an admin's card:
+choices show exact dates and times with the time zone stated alongside them.
+Expired choices are rejected; repeated taps do not create duplicate jobs.
 
 Collection keyboards adapt to their content: a shared artist is not repeated,
 technical remaster suffixes do not consume button space, short titles share a

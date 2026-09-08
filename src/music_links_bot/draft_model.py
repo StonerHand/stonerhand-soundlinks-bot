@@ -126,6 +126,9 @@ class TrackDraft(TypedDict, total=False):
     undo_state: DraftUndoState
     undo_stack: list[DraftUndoState]
     created_at: int
+    editor_draft_id: str
+    scheduled_at: int
+    published_at: int
     intro_length: int
     intro_limit: int
     intro_truncated: bool

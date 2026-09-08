@@ -20,7 +20,7 @@
       ],
       "issues": [],
       "lines": [
-        "🎧 · Lime Garden",
+        "Lime Garden",
         "Love Song",
         "#stonerhand #track"
       ],
@@ -48,7 +48,7 @@
       ],
       "issues": [],
       "lines": [
-        "🎧 · Lime Garden",
+        "Lime Garden",
         "Love Song",
         "#stonerhand #track"
       ],
@@ -135,7 +135,7 @@
       ],
       "issues": [],
       "lines": [
-        "🎧 · Lime Garden",
+        "Lime Garden",
         "Love Song",
         "#stonerhand #track"
       ],
@@ -166,7 +166,7 @@
       ],
       "issues": [],
       "lines": [
-        "🎧 · Lime Garden",
+        "Lime Garden",
         "Love Song",
         "#stonerhand #track"
       ],
@@ -190,7 +190,7 @@
       ],
       "issues": [],
       "lines": [
-        "🎧 · StonerHand",
+        "StonerHand",
         "Ethan Kath DJ Set — Park Live 2013",
         "#stonerhand #track"
       ],
@@ -216,7 +216,7 @@
     "screens": {
       "delivery_success": {
         "buttons": [
-          "+ Создать ещё",
+          "Создать ещё",
           "Поделиться"
         ],
         "checks": {
@@ -239,7 +239,7 @@
         "buttons": [
           "Отправить себе",
           "Изменить",
-          "＋ В подборку",
+          "В подборку",
           "Превью"
         ],
         "checks": {
@@ -261,14 +261,13 @@
       },
       "editor_settings": {
         "buttons": [
-          "Стиль · Обложка",
-          "Подводка · есть",
-          "# Хэштеги · авто",
-          "Площадки · 2",
-          "Telegram · авто",
+          "Оформление",
+          "Текст",
+          "Кнопки площадок",
           "Шаблоны",
-          "✓ Готово",
-          "Отправить"
+          "Действия с карточкой",
+          "Готово · к карточке",
+          "Отправить…"
         ],
         "checks": {
           "callbacks_bounded": true,
@@ -282,10 +281,12 @@
         },
         "ok": true,
         "rows": [
+          1,
+          1,
+          1,
           2,
-          2,
-          2,
-          2
+          1,
+          1
         ]
       },
       "error_change_query": {
@@ -376,13 +377,10 @@
       },
       "first_run": {
         "buttons": [
-          "＋ Создать пост",
-          "🎧 Попробовать на примере",
-          "🧺 Подборка · 0",
-          "📝 Черновики",
-          "🕒 Недавние",
-          "⚙️ Настройки",
-          "Как это работает?"
+          "Попробовать на примере",
+          "Создать пост",
+          "Как это работает",
+          "RU / EN"
         ],
         "checks": {
           "callbacks_bounded": true,
@@ -398,18 +396,16 @@
         "rows": [
           1,
           1,
-          2,
-          2,
-          1
+          2
         ]
       },
       "home_en": {
         "buttons": [
-          "＋ Create post",
-          "🧺 Crate · 2",
-          "📝 Drafts",
-          "🕒 Recent",
-          "⚙️ Settings"
+          "Create post",
+          "Collection · 2",
+          "Drafts",
+          "Recent",
+          "Settings"
         ],
         "checks": {
           "callbacks_bounded": true,
@@ -430,11 +426,11 @@
       },
       "home_ru": {
         "buttons": [
-          "＋ Создать пост",
-          "🧺 Подборка · 2",
-          "📝 Черновики",
-          "🕒 Недавние",
-          "⚙️ Настройки"
+          "Создать пост",
+          "Подборка · 2",
+          "Черновики",
+          "Недавние",
+          "Настройки"
         ],
         "checks": {
           "callbacks_bounded": true,

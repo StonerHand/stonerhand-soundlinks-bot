@@ -38,10 +38,7 @@ def format_track_heading(track: TrackMatch) -> str:
 
 
 def format_release_heading(track: TrackMatch) -> str:
-    return (
-        f"{pick_track_emoji(track)} · <b>{_display_text(track.artist)}</b>\n"
-        f"{_display_text(track.title)}"
-    )
+    return f"<b>{_display_text(track.artist)}</b>\n{_display_text(track.title)}"
 
 
 def format_track_message(

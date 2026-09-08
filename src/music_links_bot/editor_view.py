@@ -7,7 +7,7 @@ from telegram import InlineKeyboardMarkup
 
 from music_links_bot.bot_editor_state import draft_status
 from music_links_bot.bot_ui import editor_more_rows, editor_rows
-from music_links_bot.i18n import get_text
+from music_links_bot.i18n import get_text, resolve_lang
 from music_links_bot.models import TrackMatch
 from music_links_bot.publication_preflight import validate_publication
 from music_links_bot.publication_view import build_publication_view
@@ -37,7 +37,7 @@ def render_track_draft(
     draft["intro_limit"] = view.intro.limit
     draft["intro_truncated"] = view.intro.truncated
 
-    lang = draft.get("lang") or "ru"
+    lang = resolve_lang(draft.get("lang") or "ru")
     if settings:
         status = draft_status(draft, track, lang=lang)
         preflight = validate_publication(draft, track)
@@ -64,7 +64,7 @@ def render_track_draft(
             f"\n<b>{escape(preflight_status)}</b>" if preflight_status else ""
         )
         text = (
-            f"🎛 <b>{escape(get_text(lang, 'ed_constructor_title'))}</b>\n"
+            f"<b>{escape(get_text(lang, 'ed_constructor_title'))}</b>\n"
             f"<i>{escape(get_text(lang, 'ed_constructor_hint'))}</i>\n"
             f"<i>{escape(status + intro_status)}</i>"
             f"{preflight_line}\n\n{text}"
@@ -92,7 +92,7 @@ def render_track_draft(
         ]
         for row in keyboard.inline_keyboard[:2]
     ]
-    rows = [row for row in link_rows if row]
+    rows = [] if settings else [row for row in link_rows if row]
     rows.extend(
         editor_more_rows(draft_id, draft) if settings else editor_rows(draft_id, draft)
     )

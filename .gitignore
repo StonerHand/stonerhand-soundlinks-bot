@@ -22,6 +22,7 @@ dist/
 .coverage.*
 coverage.xml
 htmlcov/
+output/ui-preview/
 
 # Runtime and temporary files
 data/*.json

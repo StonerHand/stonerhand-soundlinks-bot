@@ -31,6 +31,14 @@ class ActionSpec:
 ACTION_SPECS = tuple(
     ActionSpec(scope, code, name, kind)
     for scope, code, name, kind in (
+        ("prefs", "open", "preferences", ActionKind.NAVIGATION),
+        ("prefs", "language", "language", ActionKind.SETTING),
+        ("prefs", "appearance", "appearance", ActionKind.SETTING),
+        ("prefs", "tags", "tags", ActionKind.SETTING),
+        ("editor", "ap", "appearance", ActionKind.NAVIGATION),
+        ("editor", "tx", "text", ActionKind.NAVIGATION),
+        ("editor", "tools", "tools", ActionKind.NAVIGATION),
+        ("editor", "qt", "schedule_exact", ActionKind.DELIVERY),
         ("menu", "start", "home", ActionKind.NAVIGATION),
         ("menu", "create", "create", ActionKind.NAVIGATION),
         ("menu", "drafts", "drafts", ActionKind.NAVIGATION),

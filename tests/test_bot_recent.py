@@ -28,6 +28,7 @@ class RecentNavigationTests(unittest.IsolatedAsyncioTestCase):
             return {
                 "item": {"artist": "Draft Artist", "title": "Draft Track"},
                 "created_at": 1,
+                "chat_id": 7,
             }
 
         drafts_text, drafts_keyboard = await render_drafts_view(
@@ -71,7 +72,7 @@ class RecentNavigationTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertIn("Черновиков пока нет", text)
-        self.assertEqual(keyboard.inline_keyboard[0][0].text, "＋ Создать пост")
+        self.assertEqual(keyboard.inline_keyboard[0][0].text, "Создать пост")
         self.assertEqual(keyboard.inline_keyboard[0][0].style, "primary")
 
 

@@ -27,9 +27,11 @@ from music_links_bot.bot_batch import (
     send_partial_lookup_status as _send_partial_lookup_status_impl,
 )
 from music_links_bot.bot_builder import (
+    MAX_SCHEDULE_DAYS,
     BuilderScreen,
     builder_screen,
     fit_telegram_html,
+    format_schedule_datetime,
     schedule_timestamp,
 )
 from music_links_bot.bot_crate import (
@@ -72,6 +74,7 @@ from music_links_bot.bot_pending import (
     consume_pending_input as _consume_pending_input_impl,
 )
 from music_links_bot.bot_pipeline import LookupRequest, delivery_kind
+from music_links_bot.bot_preferences import apply_preferences, dispatch_preferences
 from music_links_bot.bot_progress import (
     adopt_progress_message as _adopt_progress_message,
     cancel_progress as _cancel_progress,
@@ -117,6 +120,7 @@ from music_links_bot.bot_ui import (
     build_error_keyboard as _build_error_keyboard_view,
     build_publish_confirmation as _build_publish_confirmation,
     build_section_keyboard as _build_section_keyboard,
+    editor_appearance_rows,
     editor_delivery_rows as _editor_delivery_rows,
     editor_hashtag_rows as _editor_hashtag_rows,
     editor_intro_rows as _editor_intro_rows,
@@ -125,6 +129,8 @@ from music_links_bot.bot_ui import (
     editor_schedule_rows as _editor_schedule_rows,
     editor_style_rows as _editor_style_rows,
     editor_template_rows as _editor_template_rows,
+    editor_text_rows,
+    editor_tools_rows,
 )
 from music_links_bot.branding import (
     brand_label,
@@ -234,15 +240,18 @@ _BYPASS_INTENT_GUARD: contextvars.ContextVar[bool] = contextvars.ContextVar(
 )
 
 _SIMPLE_EDITOR_SCREENS = {
+    BuilderScreen.APPEARANCE: ("ed_appearance_title", editor_appearance_rows),
+    BuilderScreen.TEXT: ("ed_text_title", editor_text_rows),
+    BuilderScreen.TOOLS: ("ed_tools_title", editor_tools_rows),
     BuilderScreen.STYLE: ("ed_style_title", _editor_style_rows),
     BuilderScreen.INTRO: ("ed_intro_title", _editor_intro_rows),
     BuilderScreen.HASHTAGS: ("ed_hashtags_title", _editor_hashtag_rows),
     BuilderScreen.DELIVERY: ("ed_delivery_title", _editor_delivery_rows),
 }
 _PREFLIGHT_EDITOR_ACTIONS = frozenset(
-    {"p", "q1", "q3", "qe", "qd", "pc", "r", "x", "s"}
+    {"p", "qt", "q1", "q3", "qe", "qd", "pc", "r", "x", "s"}
 )
-_SCHEDULE_EDITOR_ACTIONS = frozenset({"q1", "q3", "qe", "qd"})
+_SCHEDULE_EDITOR_ACTIONS = frozenset({"qt", "q1", "q3", "qe", "qd"})
 _PRIMARY_EDITOR_ACTIONS = frozenset({"pc", "r", "x", "s", "c"})
 _PENDING_EDITOR_INPUTS = {
     "ti": "intro",
@@ -262,6 +271,7 @@ class EditorActionRequest:
     draft: dict
     lang: str
     track: TrackMatch
+    schedule_at: int | None = None
 
     @property
     def user_id(self) -> int:
@@ -315,6 +325,7 @@ async def bot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         Callable[[object, ContextTypes.DEFAULT_TYPE, CallbackAction], Awaitable[None]],
     ] = {
         "menu": _dispatch_menu_action,
+        "prefs": dispatch_preferences,
         "select": _dispatch_selection_action,
         "editor": _dispatch_editor_action,
         "crate": _dispatch_crate_action,
@@ -378,6 +389,8 @@ async def _send_track_draft(
         )
         await apply_channel_template(context, target, draft)
 
+    session = await _runtime(context).get_session(user_id, lang=lang)
+    apply_preferences(draft, session)
     crate_items = await load_crate(context.application.bot_data, user_id)
     draft["in_crate"] = crate_contains_item(crate_items, draft["item"])
     draft["crate_count"] = len(crate_items)
@@ -446,6 +459,8 @@ async def _send_uploaded_audio_draft(
     draft["source_audio_file_id"] = str(audio.file_id)
     draft["source_audio_unique_id"] = str(audio.file_unique_id)
     draft["source_audio_duration"] = int(audio.duration or 0)
+    session = await _runtime(context).get_session(user_id, lang=lang)
+    apply_preferences(draft, session)
     draft["delivery_mode"] = "classic"
     draft["as_photo"] = False
     text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
@@ -648,26 +663,12 @@ async def _handle_editor_navigation(
             draft, context, draft_id=draft_id, settings=True, show_status=True
         )
     elif screen == BuilderScreen.ACTIONS:
-        text, base_keyboard = _render_track_draft(
+        text, _ = _render_track_draft(
             draft, context, draft_id=draft_id, show_status=True
         )
         text = f"{get_text(lang, 'ed_actions_title')}\n\n{text}"
         overflow_rows = _editor_overflow_rows(draft_id, draft)
-        share_query = build_share_query(
-            [url] if (url := track_share_url(track)) else []
-        )
-        if share_query:
-            overflow_rows.insert(
-                max(1, len(overflow_rows) - 2),
-                [
-                    InlineKeyboardButton(
-                        get_text(lang, "share_post"), switch_inline_query=share_query
-                    )
-                ],
-            )
-        keyboard = InlineKeyboardMarkup(
-            [*base_keyboard.inline_keyboard[:1], *overflow_rows]
-        )
+        keyboard = InlineKeyboardMarkup(overflow_rows)
     elif screen in _SIMPLE_EDITOR_SCREENS:
         title_key, row_builder = _SIMPLE_EDITOR_SCREENS[screen]
         text, _ = _render_track_draft(draft, context, draft_id=None)
@@ -704,7 +705,15 @@ async def _handle_editor_navigation(
             f"{get_text(lang, 'schedule_title')}\n\n"
             f"<blockquote><b>{escape(track.artist)}</b> — {escape(track.title)}</blockquote>"
         )
-        keyboard = InlineKeyboardMarkup(_editor_schedule_rows(draft_id, draft))
+        timezone_name = str(
+            context.application.bot_data.get("timezone_name") or "Europe/Moscow"
+        )
+        text += "\n\n" + get_text(lang, "schedule_timezone").format(
+            zone=escape(timezone_name)
+        )
+        keyboard = InlineKeyboardMarkup(
+            _editor_schedule_rows(draft_id, draft, timezone_name=timezone_name)
+        )
     elif screen == BuilderScreen.TEMPLATES:
         presets = await load_presets(
             context, query.from_user.id if query.from_user else 0
@@ -997,6 +1006,8 @@ async def _run_locked_editor_action(request: EditorActionRequest) -> bool:
                 request.action,
                 request.draft,
                 lang=request.lang,
+                publish_at=request.schedule_at,
+                draft_id=request.draft_id,
             )
         else:
             await _run_primary_editor_action(request)
@@ -1052,12 +1063,24 @@ async def _finish_editor_setting(request: EditorActionRequest) -> None:
 
 async def _handle_editor_action(query, context, action: str, draft_id: str) -> None:
     user_lang = resolve_lang(query.from_user.language_code if query.from_user else None)
+    schedule_at = None
+    if action == "qt":
+        draft_id, separator, raw_timestamp = draft_id.partition(":")
+        if (
+            not separator
+            or not raw_timestamp.isascii()
+            or not raw_timestamp.isdigit()
+            or len(raw_timestamp) > 11
+        ):
+            await query.answer(get_text(user_lang, "schedule_stale"), show_alert=True)
+            return
+        schedule_at = int(raw_timestamp)
     draft = await _load_draft(context, draft_id)
     if draft is None:
         await query.answer(get_text(user_lang, "ed_expired"), show_alert=True)
         return
 
-    lang = draft.get("lang") or user_lang
+    lang = resolve_lang(draft.get("lang") or user_lang)
     if query.from_user is None or not _draft_owned_by(draft, query.from_user.id):
         await query.answer(get_text(lang, "ed_owner_only"), show_alert=True)
         return
@@ -1095,6 +1118,7 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
         draft=draft,
         lang=lang,
         track=TrackMatch(**draft["item"]),
+        schedule_at=schedule_at,
     )
     for handler in (
         _apply_last_editor_template,
@@ -1155,7 +1179,14 @@ async def _start_pending_editor_input(
 
 
 async def _schedule_editor_draft(
-    query, context, action: str, draft: dict, *, lang: str
+    query,
+    context,
+    action: str,
+    draft: dict,
+    *,
+    lang: str,
+    publish_at: int | None = None,
+    draft_id: str | None = None,
 ) -> None:
     if query.from_user is None:
         await query.answer()
@@ -1167,7 +1198,11 @@ async def _schedule_editor_draft(
     timezone_name = str(
         context.application.bot_data.get("timezone_name") or "Europe/Moscow"
     )
-    publish_at = schedule_timestamp(action, timezone_name=timezone_name)
+    if publish_at is None:
+        publish_at = schedule_timestamp(action, timezone_name=timezone_name)
+    if not time.time() < publish_at <= time.time() + MAX_SCHEDULE_DAYS * 86400:
+        await query.answer(get_text(lang, "schedule_stale"), show_alert=True)
+        return
     try:
         await add_job(context, dict(draft), publish_at)
     except QueueFullError:
@@ -1176,15 +1211,10 @@ async def _schedule_editor_draft(
     except (QueueBusyError, QueueStorageError):
         await query.answer(get_text(lang, "ed_queue_unavailable"), show_alert=True)
         return
-    date = get_text(
-        lang,
-        {
-            "q1": "schedule_1h",
-            "q3": "schedule_3h",
-            "qe": "schedule_evening",
-            "qd": "schedule_1d",
-        }[action],
-    )
+    draft["scheduled_at"] = publish_at
+    if draft_id:
+        await _store_draft(context, draft_id, draft)
+    date = format_schedule_datetime(publish_at, timezone_name=timezone_name)
     await query.answer(
         get_text(lang, "schedule_done").format(date=date), show_alert=True
     )
@@ -1201,8 +1231,8 @@ async def _schedule_editor_draft(
             [
                 [
                     InlineKeyboardButton(
-                        get_text(lang, "home_back"),
-                        callback_data=encode_callback("menu", "start"),
+                        get_text(lang, "home_queue"),
+                        callback_data=encode_callback("queue", "open"),
                     )
                 ]
             ]
@@ -1391,6 +1421,8 @@ async def _finish_editor_publish(request: EditorActionRequest, published) -> Non
             message=published,
             target=target,
         )
+        request.draft["published_at"] = int(time.time())
+        await _store_draft(request.context, request.draft_id, request.draft)
         await _show_editor_publish_success(request, published)
         if request.user_id:
             session = await _runtime(request.context).get_session(
@@ -1424,27 +1456,44 @@ async def _show_editor_publish_success(
             InlineKeyboardButton(
                 get_text(request.lang, "ed_open_publication"),
                 url=published_link,
+                style="success",
             )
         ]
     else:
         secondary_row = [_channel_button()]
     keyboard = InlineKeyboardMarkup(
         [
+            secondary_row,
             [
                 InlineKeyboardButton(
                     get_text(request.lang, "ed_create_more"),
                     callback_data=encode_callback("menu", "create"),
-                    style="primary",
                 )
             ],
-            secondary_row,
         ]
+    )
+    target = str(
+        request.context.application.bot_data.get("publish_chat_id")
+        or f"@{CHANNEL_USERNAME}"
+    )
+    moment = format_schedule_datetime(
+        int(time.time()),
+        timezone_name=str(
+            request.context.application.bot_data.get("timezone_name") or "Europe/Moscow"
+        ),
+    )
+    success_text = (
+        _editor_success_text(request, "ed_published")
+        + "\n\n"
+        + get_text(request.lang, "published_details").format(
+            target=escape(target), date=escape(moment)
+        )
     )
     await _edit_editor_message(
         request.query,
         request.context,
         request.draft,
-        _editor_success_text(request, "ed_published"),
+        success_text,
         keyboard,
     )
 

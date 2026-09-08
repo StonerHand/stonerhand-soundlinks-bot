@@ -13,6 +13,7 @@ from telegram.ext import ContextTypes
 from music_links_bot.bot_admin import stats_text
 from music_links_bot.bot_builder import active_card_label
 from music_links_bot.bot_crate import load_crate
+from music_links_bot.bot_preferences import preferences_view
 from music_links_bot.bot_recent import render_drafts_view, render_recent_view
 from music_links_bot.bot_runtime import BotRuntime, CallbackAction, UserSession
 from music_links_bot.bot_storage import load_draft
@@ -142,12 +143,14 @@ async def home_view(query, context, *, lang: str) -> tuple[str, InlineKeyboardMa
             first_name=user.first_name if user else "",
             crate_count=crate_count,
             is_admin=is_admin,
+            first_visit=not session.onboarding_seen and not active_draft_id,
         ),
         build_start_keyboard(
             context.bot.username,
             lang=lang,
             crate_count=crate_count,
             is_admin=is_admin,
+            show_example=not session.onboarding_seen and not active_draft_id,
             active_draft_id=active_draft_id,
             active_draft_label=active_draft_label,
         ),
@@ -181,7 +184,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             else "",
             crate_count=crate_count,
             is_admin=is_admin,
-            first_visit=not session.onboarding_seen,
+            first_visit=not session.onboarding_seen and not session.active_draft_id,
         ),
         parse_mode=ParseMode.HTML,
         reply_markup=build_start_keyboard(
@@ -190,7 +193,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             crate_count=crate_count,
             is_admin=is_admin,
             show_tour=not session.onboarding_seen,
-            show_example=first_visit,
+            show_example=not session.onboarding_seen and not session.active_draft_id,
             active_draft_id=active_draft_id,
             active_draft_label=active_draft_label,
         ),
@@ -202,20 +205,16 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 async def _send_first_visit_demo(message: Message, *, lang: str) -> bool:
-    """Show the five-second product tour once; never block the real menu."""
-    reply_animation = getattr(message, "reply_animation", None)
-    if not callable(reply_animation):
-        return False
+    """A single branded introduction; the interactive menu still works on failure."""
     try:
-        resource = files("music_links_bot").joinpath("assets/onboarding-demo.gif")
-        with resource.open("rb") as animation:
-            await reply_animation(
-                animation=animation,
-                caption=get_text(lang, "welcome_demo_caption"),
+        resource = files("music_links_bot").joinpath("assets/brandmark.png")
+        with resource.open("rb") as photo:
+            await message.reply_photo(
+                photo=photo, caption=get_text(lang, "welcome_demo_caption")
             )
         return True
     except (AttributeError, OSError, TelegramError, TypeError):
-        LOGGER.debug("Could not send first-visit animation", exc_info=True)
+        LOGGER.debug("Could not send welcome artwork")
         return False
 
 
@@ -293,6 +292,16 @@ async def platforms_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         )
 
 
+async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user = update.effective_user
+    if message is None or user is None:
+        return
+    session = await runtime_for(context).get_session(user.id, lang=update_lang(update))
+    text, keyboard = preferences_view(session, lang=update_lang(update))
+    await message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+
+
 async def privacy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     if message is None:
@@ -350,18 +359,19 @@ async def channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 async def recent_view(
-    query, context: ContextTypes.DEFAULT_TYPE, *, lang: str
+    query, context: ContextTypes.DEFAULT_TYPE, *, lang: str, page: int = 0
 ) -> tuple[str, InlineKeyboardMarkup]:
     user_id = query.from_user.id if query.from_user else 0
     return await render_recent_view(
         context,
         user_id=user_id,
         lang=lang,
+        page=page,
     )
 
 
 async def drafts_view(
-    query, context: ContextTypes.DEFAULT_TYPE, *, lang: str
+    query, context: ContextTypes.DEFAULT_TYPE, *, lang: str, page: int = 0
 ) -> tuple[str, InlineKeyboardMarkup]:
     user_id = query.from_user.id if query.from_user else 0
     session = await runtime_for(context).get_session(user_id, lang=lang)
@@ -370,6 +380,7 @@ async def drafts_view(
         user_id=user_id,
         lang=lang,
         draft_ids=session.recent_draft_ids,
+        page=page,
         load_draft=load_draft,
     )
 
@@ -422,17 +433,24 @@ async def dispatch_menu_action(query, context, action: CallbackAction) -> None:
             ),
         )
         return
+    try:
+        page = max(0, int(action.payload or 0))
+    except ValueError:
+        page = 0
     if action.action == "start":
         text, keyboard = await home_view(query, context, lang=lang)
     elif action.action == "drafts":
-        text, keyboard = await drafts_view(query, context, lang=lang)
+        text, keyboard = await drafts_view(query, context, lang=lang, page=page)
     elif action.action == "recent":
-        text, keyboard = await recent_view(query, context, lang=lang)
+        text, keyboard = await recent_view(query, context, lang=lang, page=page)
     elif action.action == "create":
         text, keyboard = (
             get_text(lang, "create_prompt"),
             build_create_keyboard(lang=lang),
         )
+    elif action.action == "more":
+        session = await runtime_for(context).get_session(query.from_user.id, lang=lang)
+        text, keyboard = preferences_view(session, lang=lang)
     elif action.action == "privacy":
         text, keyboard = (
             get_text(lang, "privacy_title"),
@@ -471,6 +489,9 @@ async def legacy_menu_callback(
     menu_key = query.data if query.data in MENU_KEYS else MENU_START
     if menu_key == MENU_START:
         text, keyboard = await home_view(query, context, lang=lang)
+    elif menu_key == MENU_MORE:
+        session = await runtime_for(context).get_session(query.from_user.id, lang=lang)
+        text, keyboard = preferences_view(session, lang=lang)
     elif menu_key == MENU_DRAFTS:
         text, keyboard = await drafts_view(query, context, lang=lang)
     elif menu_key == MENU_RECENT:

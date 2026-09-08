@@ -25,8 +25,10 @@ from music_links_bot.bot_menu import (
     legacy_menu_callback,
     platforms_command,
     privacy_command,
+    settings_command,
     start_command,
 )
+from music_links_bot.bot_preferences import LocalizedApplication
 from music_links_bot.bot_runtime import BotRuntime
 from music_links_bot.config import Settings
 from music_links_bot.keyboards import _build_platform_order
@@ -39,12 +41,14 @@ LOGGER = logging.getLogger(__name__)
 PUBLIC_BOT_COMMANDS = (
     BotCommand("start", "меню и быстрый старт"),
     BotCommand("help", "как пользоваться"),
+    BotCommand("settings", "язык и оформление"),
     BotCommand("crate", "моя подборка"),
     BotCommand("privacy", "данные и приватность"),
 )
 PUBLIC_BOT_COMMANDS_EN = (
     BotCommand("start", "menu and quick start"),
     BotCommand("help", "how to use the bot"),
+    BotCommand("settings", "language and appearance"),
     BotCommand("crate", "my music crate"),
     BotCommand("privacy", "data and privacy"),
 )
@@ -100,6 +104,7 @@ def build_application(settings: Settings) -> Application:
     kv_store = KVStore.from_env()
     application = (
         Application.builder()
+        .application_class(LocalizedApplication)
         .token(settings.bot_token)
         .post_init(sync_application_commands)
         .post_shutdown(close_application_resources)
@@ -142,6 +147,7 @@ def build_application(settings: Settings) -> Application:
 
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("settings", settings_command))
     application.add_handler(CommandHandler("guide", guide_command))
     application.add_handler(CommandHandler("platforms", platforms_command))
     application.add_handler(CommandHandler("channel", channel_command))
