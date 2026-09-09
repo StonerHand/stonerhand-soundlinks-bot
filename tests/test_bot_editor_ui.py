@@ -40,36 +40,28 @@ class PostEditorTests(unittest.TestCase):
 
     def test_editor_rows_show_toggle_states_and_actions(self) -> None:
         rows = _editor_rows("abc123", self._draft(hashtags=True))
-
-        self.assertEqual(rows[0][0].text, "Отправить себе")
-        self.assertEqual(rows[0][0].callback_data, "v2|editor|s|abc123")
-        self.assertEqual(rows[1][0].text, "Изменить")
-        self.assertEqual(rows[1][0].callback_data, "v2|editor|m|abc123")
-        self.assertEqual(rows[1][1].text, "В подборку")
-        self.assertEqual(rows[1][1].callback_data, "v2|editor|c|abc123")
-        more = _editor_more_rows("abc123", self._draft(hashtags=True))
-        self.assertEqual(more[1][0].text, "Текст")
-        self.assertEqual(more[1][0].callback_data, "v2|editor|tx|abc123")
+        self.assertEqual(
+            [button.callback_data for button in rows[0]],
+            ["v2|editor|ti|abc123", "v2|editor|hs|abc123"],
+        )
+        self.assertEqual([button.text for button in rows[1]], ["Обложка", "Кнопки"])
+        self.assertEqual(_editor_more_rows("abc123", self._draft(hashtags=True)), rows)
 
     def test_editor_rows_make_admin_publication_immediately_visible(self) -> None:
         rows = _editor_rows("abc123", self._draft(can_publish=True))
-
         labels = [button.text for row in rows for button in row]
         self.assertEqual(
             labels,
-            ["Опубликовать", "Запланировать", "Изменить", "В подборку", "Превью"],
+            ["Текст", "Теги", "Обложка", "Кнопки", "Превью", "Ещё", "Опубликовать…"],
         )
-        self.assertEqual(rows[0][0].style, "success")
+        self.assertEqual(rows[-1][0].style, "primary")
+        self.assertEqual(rows[-1][0].callback_data, "v2|editor|p|abc123")
 
     def test_editor_rows_turn_added_item_into_crate_shortcut(self) -> None:
-        rows = _editor_rows(
-            "abc123",
-            self._draft(in_crate=True, crate_count=3),
-        )
-
-        self.assertEqual(rows[1][1].text, "В подборке · 3/10")
-        self.assertEqual(rows[1][1].callback_data, "v2|crate|open")
-        self.assertEqual(dict(rows[1][1].api_kwargs or {}), {})
+        rows = editor_tools_rows("abc123", self._draft(in_crate=True, crate_count=3))
+        self.assertEqual(rows[0][0].text, "В подборке · 3/10")
+        self.assertEqual(rows[0][0].callback_data, "v2|crate|open")
+        self.assertIsNone(rows[0][0].style)
 
     def test_editor_rows_keep_text_toggle_predictable(self) -> None:
         rows_without_quote = editor_text_rows("abc123", self._draft())
@@ -106,7 +98,9 @@ class PostEditorTests(unittest.TestCase):
             self._draft(search_query="Sleep — Dragonaut"),
         )
 
-        search_row = next(row for row in rows if len(row) == 2)
+        search_row = next(
+            row for row in rows if row[0].callback_data == "v2|editor|a|abc123"
+        )
         self.assertEqual(search_row[0].text, "Другой релиз")
         self.assertEqual(search_row[0].callback_data, "v2|editor|a|abc123")
         self.assertEqual(search_row[1].text, "Изменить запрос")
@@ -118,8 +112,8 @@ class PostEditorTests(unittest.TestCase):
     def test_editor_rows_keep_one_compact_action_row(self) -> None:
         rows = _editor_rows("abc123", self._draft())
 
-        self.assertEqual([len(row) for row in rows], [1, 2, 1])
-        self.assertEqual(rows[0][0].text, "Отправить себе")
+        self.assertEqual([len(row) for row in rows], [2, 2, 2, 1])
+        self.assertEqual(rows[-1][0].text, "Отправить…")
 
     def test_render_track_draft_respects_toggles(self) -> None:
         draft = self._draft(
@@ -138,7 +132,7 @@ class PostEditorTests(unittest.TestCase):
             for button in row
             if button.callback_data
         ]
-        self.assertIn("v2|editor|m|abc123", editor_buttons)
+        self.assertIn("v2|editor|ti|abc123", editor_buttons)
 
         draft["quote"] = False
         draft["hashtags"] = False
@@ -163,26 +157,20 @@ class PostEditorTests(unittest.TestCase):
             show_status=True,
         )
 
-        self.assertTrue(text.startswith("<b>Редактор поста</b>"))
-        self.assertIn("Изменения сохраняются автоматически", text)
+        self.assertTrue(text.startswith("<b>Youth Code</b>"))
+        self.assertIn("Изменения сохранены для этого поста.", text)
         labels = [button.text for row in keyboard.inline_keyboard for button in row]
-        self.assertIn("Готово · к карточке", labels)
+        self.assertIn("Текст", labels)
         self.assertIn("Отправить…", labels)
 
-    def test_quick_card_is_capped_at_four_actions(self) -> None:
+    def test_editor_keeps_seven_actions_and_no_external_links(self) -> None:
         draft = self._draft()
         draft["item"]["links"]["tidal"] = "https://tidal.com/track/1"
-
         _, keyboard = _render_track_draft(draft, None, draft_id="abc123")
         buttons = [button for row in keyboard.inline_keyboard for button in row]
-
-        self.assertEqual(len(buttons), 6)
-        self.assertEqual(buttons[0].text, "Выбрать площадку")
-        self.assertEqual(buttons[1].text, "Spotify")
-        self.assertEqual(buttons[2].text, "Отправить себе")
-        self.assertEqual(buttons[3].text, "Изменить")
-        self.assertEqual(buttons[4].text, "В подборку")
-        self.assertEqual(buttons[5].callback_data, "v2|editor|pv|abc123")
+        self.assertEqual(len(buttons), 7)
+        self.assertTrue(all(button.url is None for button in buttons))
+        self.assertEqual(buttons[-1].text, "Отправить…")
 
 
 class PublicationOverrideTests(unittest.TestCase):

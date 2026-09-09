@@ -1,25 +1,29 @@
 {
-  "text": "<b>Редактор поста</b>\n<i>Изменения сохраняются автоматически</i>\n<i>С обложкой ✓ · Теги авто · 2 площадки · Авто</i>\n\n<b>Sleep</b>\nDopesmoker\n\n#stonerhand #track",
+  "text": "<b>Sleep</b>\nDopesmoker\n\n#stonerhand #track\n\n<i>Изменения сохранены для этого поста.</i>",
   "rows": [
     [
       [
-        "Оформление",
+        "Текст",
+        "v2|editor|ti|draft123",
+        null,
+        null
+      ],
+      [
+        "Теги",
+        "v2|editor|hs|draft123",
+        null,
+        null
+      ]
+    ],
+    [
+      [
+        "Обложка",
         "v2|editor|ap|draft123",
         null,
         null
-      ]
-    ],
-    [
+      ],
       [
-        "Текст",
-        "v2|editor|tx|draft123",
-        null,
-        null
-      ]
-    ],
-    [
-      [
-        "Кнопки площадок",
+        "Кнопки",
         "v2|editor|ls|draft123",
         null,
         null
@@ -27,13 +31,13 @@
     ],
     [
       [
-        "Шаблоны",
-        "v2|editor|tp|draft123",
+        "Превью",
+        "v2|editor|pv|draft123",
         null,
         null
       ],
       [
-        "Действия с карточкой",
+        "Ещё",
         "v2|editor|tools|draft123",
         null,
         null
@@ -41,18 +45,10 @@
     ],
     [
       [
-        "Готово · к карточке",
-        "v2|editor|f|draft123",
-        null,
-        "primary"
-      ]
-    ],
-    [
-      [
         "Отправить…",
         "v2|editor|o|draft123",
         null,
-        null
+        "primary"
       ]
     ]
   ]

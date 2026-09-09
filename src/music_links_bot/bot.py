@@ -129,6 +129,7 @@ from music_links_bot.bot_ui import (
     editor_platform_rows as _editor_platform_rows,
     editor_schedule_rows as _editor_schedule_rows,
     editor_style_rows as _editor_style_rows,
+    editor_tag_options_rows,
     editor_template_rows as _editor_template_rows,
     editor_text_rows,
     editor_tools_rows,
@@ -142,7 +143,6 @@ from music_links_bot.branding import (
 from music_links_bot.channel_templates import (
     apply_channel_template,
     apply_template,
-    save_channel_template,
 )
 from music_links_bot.chat_access import check_publish_access
 from music_links_bot.collection_collage import collection_collage_preview_url
@@ -247,6 +247,7 @@ _SIMPLE_EDITOR_SCREENS = {
     BuilderScreen.STYLE: ("ed_style_title", _editor_style_rows),
     BuilderScreen.INTRO: ("ed_intro_title", _editor_intro_rows),
     BuilderScreen.HASHTAGS: ("ed_hashtags_title", _editor_hashtag_rows),
+    BuilderScreen.TAG_OPTIONS: ("ed_tag_options_title", editor_tag_options_rows),
     BuilderScreen.DELIVERY: ("ed_delivery_title", _editor_delivery_rows),
 }
 _PREFLIGHT_EDITOR_ACTIONS = frozenset(
@@ -789,12 +790,6 @@ async def _handle_editor_lifecycle(
 
 async def _save_editor_settings(request: EditorActionRequest) -> None:
     await _store_draft(request.context, request.draft_id, request.draft)
-    if request.user_id:
-        await save_channel_template(
-            request.context,
-            f"user:{request.user_id}",
-            request.draft,
-        )
 
 
 async def _apply_last_editor_template(request: EditorActionRequest) -> bool:
@@ -1042,7 +1037,7 @@ async def _handle_editor_delivery_setting(request: EditorActionRequest) -> bool:
     await _handle_editor_navigation(
         request.query,
         request.context,
-        action="rs",
+        action="ap" if request.action == "cr" else "rs",
         draft_id=request.draft_id,
         draft=request.draft,
         lang=request.lang,

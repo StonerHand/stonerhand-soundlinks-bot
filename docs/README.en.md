@@ -34,6 +34,19 @@ editable collection.
 Text above a link becomes the intro. Bold, italic and external links survive.
 The editor stays open while a separate preview shows the finished publication.
 
+### Edit directly below the post
+
+```text
+        Text           Tags
+       Artwork        Buttons
+       Preview         More
+             Publish…
+```
+
+Common edits are one tap away. More contains collections, templates and extra
+settings. Publish opens the channel, scheduling and send-to-self options;
+regular users see Send instead. Drafts and search history live in My library.
+
 ## Inside the editor
 
 | | Features |

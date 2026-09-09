@@ -529,9 +529,14 @@ class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 2)
         first_keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         second_keyboard = message.reply_kwargs[1]["reply_markup"].inline_keyboard
-        self.assertEqual(first_keyboard[0][0].text, "Попробовать на примере")
+        self.assertEqual(first_keyboard[0][0].text, "Создать пост")
         self.assertEqual(
-            first_keyboard[0][0].switch_inline_query_current_chat,
+            next(
+                button
+                for row in first_keyboard
+                for button in row
+                if button.text == "Попробовать на примере"
+            ).switch_inline_query_current_chat,
             "Deftones — Rickets",
         )
         self.assertIn(
@@ -618,7 +623,7 @@ class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 2)
         self.assertEqual(context.bot.edited_messages, [])
         self.assertEqual(context.bot.deleted_messages[0]["message_id"], 1000)
-        self.assertIn("Помощь", message.replies[-1])
+        self.assertIn("Как пользоваться", message.replies[-1])
 
     async def test_stale_home_delete_failure_does_not_hide_new_reply(self) -> None:
         message = PrivateMessageStub()
@@ -1219,15 +1224,13 @@ class BotKeyboardTests(unittest.TestCase):
         rows = keyboard.inline_keyboard
         self.assertEqual(rows[0][0].text, "Создать пост")
         self.assertEqual(rows[0][0].style, "primary")
-        self.assertEqual(rows[1][0].text, "Подборка · 3")
+        self.assertEqual(rows[1][0].text, "Мои материалы")
         self.assertIsNone(rows[1][0].style)
-        self.assertEqual(rows[1][1].text, "Черновики")
-        self.assertEqual(rows[2][0].text, "Недавние")
-        self.assertEqual(rows[2][1].text, "Настройки")
+        self.assertEqual(rows[1][1].text, "Настройки")
+        self.assertEqual(rows[2][0].text, "Очередь публикаций")
         self.assertEqual(rows[3][0].text, "Как это работает")
         self.assertIsNone(rows[3][0].style)
-        self.assertEqual(rows[4][0].text, "Очередь публикаций")
-        self.assertEqual(len(rows), 5)
+        self.assertEqual(len(rows), 4)
 
     def test_home_keeps_new_search_primary_when_a_card_can_be_restored(self) -> None:
         keyboard = _build_start_keyboard(
@@ -1239,7 +1242,7 @@ class BotKeyboardTests(unittest.TestCase):
         rows = keyboard.inline_keyboard
         self.assertEqual(rows[0][0].text, "Создать пост")
         self.assertEqual(rows[0][0].style, "primary")
-        self.assertEqual(rows[1][0].text, "Продолжить карточку")
+        self.assertEqual(rows[1][0].text, "Продолжить пост")
         self.assertIsNone(rows[1][0].style)
 
     def test_home_text_is_personal_and_escapes_telegram_html(self) -> None:
@@ -1271,7 +1274,7 @@ class BotKeyboardTests(unittest.TestCase):
 
     def test_menu_text_uses_compact_html_headings(self) -> None:
         self.assertTrue(_menu_text("menu:start").startswith("🎧 <b>"))
-        self.assertTrue(_menu_text("menu:help").startswith("<b>Помощь</b>"))
+        self.assertTrue(_menu_text("menu:help").startswith("<b>Как пользоваться</b>"))
 
     def test_menu_sections_use_semantic_telegram_formatting(self) -> None:
         for menu in (
@@ -2506,7 +2509,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             for button in row
             if button.callback_data
         ]
-        self.assertTrue(any(data.startswith("v2|editor|m|") for data in callback_data))
+        self.assertTrue(any(data.startswith("v2|editor|ti|") for data in callback_data))
         self.assertEqual(len(context.application.bot_data["drafts"]), 1)
 
     async def test_multiple_spotify_links_use_one_collection_post(self) -> None:
@@ -2671,12 +2674,10 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("<b>Youth Code</b>\nTransitions", message.replies[0])
         self.assertIn("#stonerhand #track", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
-        self.assertEqual(keyboard[0][0].text, "Выбрать площадку")
-        self.assertEqual(keyboard[0][0].url, "https://song.link/transitions")
-        self.assertEqual(keyboard[1][0].text, "Spotify")
-        self.assertEqual(keyboard[2][0].text, "Отправить себе")
-        self.assertEqual(keyboard[3][0].text, "Изменить")
-        self.assertEqual(keyboard[3][1].text, "В подборку")
+        self.assertEqual(keyboard[0][0].text, "Текст")
+        self.assertEqual(keyboard[0][1].text, "Теги")
+        self.assertEqual(keyboard[1][0].text, "Обложка")
+        self.assertEqual(keyboard[-1][0].text, "Отправить…")
         preview_options = message.reply_kwargs[0]["link_preview_options"]
         self.assertTrue(preview_options.prefer_large_media)
         self.assertFalse(bool(preview_options.prefer_small_media))
@@ -2737,11 +2738,8 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 1)
         self.assertIn("<b>Bondage Fairies</b>\nStar Signs", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
-        self.assertEqual(keyboard[0][0].text, "SoundCloud")
-        self.assertEqual(
-            keyboard[0][0].url,
-            "https://soundcloud.com/bondage-fairies/star-signs",
-        )
+        self.assertEqual(keyboard[0][0].text, "Текст")
+        self.assertTrue(keyboard[1][1].callback_data.startswith("v2|editor|ls|"))
         preview_options = message.reply_kwargs[0]["link_preview_options"]
         self.assertEqual(
             preview_options.url,

@@ -20,6 +20,7 @@ from music_links_bot.bot_storage import load_draft
 from music_links_bot.bot_ui import (
     build_create_keyboard,
     build_home_text,
+    build_library_keyboard,
     build_onboarding_keyboard,
     build_privacy_keyboard,
     build_section_keyboard,
@@ -439,6 +440,13 @@ async def dispatch_menu_action(query, context, action: CallbackAction) -> None:
         page = 0
     if action.action == "start":
         text, keyboard = await home_view(query, context, lang=lang)
+    elif action.action == "library":
+        user_id = query.from_user.id if query.from_user else 0
+        crate_count, _ = await home_state(context, user_id)
+        text, keyboard = (
+            get_text(lang, "library_title"),
+            build_library_keyboard(lang=lang, crate_count=crate_count),
+        )
     elif action.action == "drafts":
         text, keyboard = await drafts_view(query, context, lang=lang, page=page)
     elif action.action == "recent":

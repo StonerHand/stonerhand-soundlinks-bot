@@ -235,7 +235,7 @@ def apply_editor_shortcut(
     mutations = {
         "ha": (use_auto_tags, "hs"),
         "hn": (remove_tags, "hs"),
-        "t0": (remove_intro, "ts"),
+        "t0": (remove_intro, "b"),
     }
     mutation = mutations.get(action)
     if mutation is None:

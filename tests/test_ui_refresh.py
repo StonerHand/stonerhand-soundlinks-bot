@@ -108,7 +108,9 @@ class PreferencesTests(unittest.IsolatedAsyncioTestCase):
                 await dispatch_preferences(
                     query, context, CallbackAction("prefs", action, value)
                 )
-            self.assertIn("Hashtags", query.edit_message_text.call_args.kwargs["text"])
+            self.assertIn(
+                "New post tags", query.edit_message_text.call_args.kwargs["text"]
+            )
         restarted = BotRuntime(kv)
         saved = await restarted.get_session(7, lang="ru")
         self.assertEqual(
@@ -215,11 +217,11 @@ class EditorJourneyTests(unittest.IsolatedAsyncioTestCase):
         await store_draft(context, "card", draft_for())
         query = query_for()
         for action, heading in (
-            ("m", "Редактор поста"),
-            ("ap", "Оформление"),
+            ("m", "Sleep"),
+            ("ap", "Обложка поста"),
             ("tx", "Текст"),
-            ("ls", "Площадки"),
-            ("tools", "Действия с карточкой"),
+            ("ls", "Кнопки поста"),
+            ("tools", "Ещё"),
             ("o", "Куда отправить"),
         ):
             with self.subTest(action=action):
@@ -230,7 +232,7 @@ class EditorJourneyTests(unittest.IsolatedAsyncioTestCase):
             for row in editor_overflow_rows("card", draft_for())
             for button in row
         ]
-        self.assertEqual(actions, ["s", "p", "qs", "b"])
+        self.assertEqual(actions, ["s", "p", "b"])
         self.assertNotIn("dc", actions)
         rows = editor_more_rows("card", draft_for())
         self.assertTrue(all(len(row) <= 2 for row in rows))

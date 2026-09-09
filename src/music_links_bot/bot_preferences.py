@@ -64,7 +64,9 @@ def apply_preferences(draft: dict, session: UserSession) -> None:
         draft["hashtags"] = bool(saved)
 
 
-def preferences_view(session: UserSession, *, lang: str, section: str = "open"):
+def preferences_view(
+    session: UserSession, *, lang: str, section: str = "open", origin: str = ""
+):
     def cb(label, action, value="", **kwargs):
         return button(
             label, callback_data=encode_callback("prefs", action, value), **kwargs
@@ -121,12 +123,25 @@ def preferences_view(session: UserSession, *, lang: str, section: str = "open"):
                     ("✓ " if getattr(session, field) == value else "")
                     + get_text(lang, label),
                     section,
-                    value or "inherit",
+                    ("crate:" if origin == "crate" else "") + (value or "inherit"),
                 )
             ]
             for value, label in options
         ]
-        rows.append([cb(get_text(lang, "back"), "open")])
+        parent = "collection" if section in {"layout", "grouping"} else "defaults"
+        if section == "language":
+            parent = "open"
+        if origin == "crate":
+            rows.append(
+                [
+                    button(
+                        get_text(lang, "crate_back"),
+                        callback_data=encode_callback("crate", "open"),
+                    )
+                ]
+            )
+        else:
+            rows.append([cb(get_text(lang, "back"), parent)])
         return get_text(lang, f"pref_{section}_title"), InlineKeyboardMarkup(rows)
     language = get_text(lang, f"pref_lang_{session.preferred_lang or 'auto'}")
     preset = get_text(lang, f"pref_{session.default_preset or 'inherit'}")
@@ -135,52 +150,70 @@ def preferences_view(session: UserSession, *, lang: str, section: str = "open"):
         if session.default_hashtags
         else get_text(lang, "pref_inherit")
     )
-    rows = [
-        [cb(get_text(lang, "pref_language").format(value=language), "language")],
-        [cb(get_text(lang, "pref_appearance").format(value=preset), "appearance")],
-        [cb(get_text(lang, "pref_tags").format(value=tags), "tags")],
-        [
-            cb(
-                get_text(lang, "pref_layout").format(
-                    value=get_text(lang, "pref_layout_" + session.collection_layout)
+    if section == "defaults":
+        rows = [
+            [cb(get_text(lang, "pref_appearance").format(value=preset), "appearance")],
+            [cb(get_text(lang, "pref_tags").format(value=tags), "tags")],
+            [
+                cb(
+                    get_text(lang, "pref_artwork").format(
+                        value=get_text(lang, "pref_artwork_" + session.default_artwork)
+                    ),
+                    "artwork",
+                )
+            ],
+            [cb(get_text(lang, "back"), "open")],
+        ]
+    elif section == "collection":
+        rows = [
+            [
+                cb(
+                    get_text(lang, "pref_layout").format(
+                        value=get_text(lang, "pref_layout_" + session.collection_layout)
+                    ),
+                    "layout",
+                )
+            ],
+            [
+                cb(
+                    get_text(lang, "pref_grouping").format(
+                        value=get_text(
+                            lang, "pref_grouping_" + session.collection_grouping
+                        )
+                    ),
+                    "grouping",
+                )
+            ],
+            [cb(get_text(lang, "back"), "open")],
+        ]
+    else:
+        section = "open"
+        rows = [
+            [cb(get_text(lang, "pref_language").format(value=language), "language")],
+            [
+                cb(get_text(lang, "pref_defaults"), "defaults"),
+                cb(get_text(lang, "pref_collection"), "collection"),
+            ],
+            [
+                button(
+                    get_text(lang, "tab_help"),
+                    callback_data=encode_callback("menu", "help"),
                 ),
-                "layout",
-            )
-        ],
-        [
-            cb(
-                get_text(lang, "pref_grouping").format(
-                    value=get_text(lang, "pref_grouping_" + session.collection_grouping)
+                button(
+                    get_text(lang, "tab_privacy"),
+                    callback_data=encode_callback("menu", "privacy"),
                 ),
-                "grouping",
-            )
-        ],
-        [
-            cb(
-                get_text(lang, "pref_artwork").format(
-                    value=get_text(lang, "pref_artwork_" + session.default_artwork)
-                ),
-                "artwork",
-            )
-        ],
-        [
-            button(
-                get_text(lang, "tab_help"),
-                callback_data=encode_callback("menu", "help"),
-            ),
-            button(
-                get_text(lang, "tab_privacy"),
-                callback_data=encode_callback("menu", "privacy"),
-            ),
-        ],
-        [
-            button(
-                get_text(lang, "home_back"),
-                callback_data=encode_callback("menu", "start"),
-            )
-        ],
-    ]
-    return get_text(lang, "pref_title"), InlineKeyboardMarkup(rows)
+            ],
+            [
+                button(
+                    get_text(lang, "home_back"),
+                    callback_data=encode_callback("menu", "start"),
+                )
+            ],
+        ]
+    return get_text(
+        lang, "pref_title" if section == "open" else f"pref_{section}_title"
+    ), InlineKeyboardMarkup(rows)
 
 
 async def dispatch_preferences(query, context, action) -> None:
@@ -203,9 +236,13 @@ async def dispatch_preferences(query, context, action) -> None:
         "tags": ("default_hashtags", {"", "auto", "off"}),
     }
     changed = False
-    if action.action in choices and action.payload:
+    payload = action.payload or ""
+    origin = "crate" if payload == "crate" or payload.startswith("crate:") else ""
+    if origin:
+        payload = payload.partition(":")[2]
+    if action.action in choices and payload:
         field, allowed = choices[action.action]
-        value = "" if action.payload == "inherit" else action.payload
+        value = "" if payload == "inherit" else payload
         if value in allowed:
             setattr(session, field, value)
             await runtime.save_session(session)
@@ -213,7 +250,9 @@ async def dispatch_preferences(query, context, action) -> None:
     preferred_language.set(session.preferred_lang or None)
     current_presentation.set(preferences_from_session(session))
     lang = resolve_lang(query.from_user.language_code)
-    text, keyboard = preferences_view(session, lang=lang, section=action.action)
+    text, keyboard = preferences_view(
+        session, lang=lang, section=action.action, origin=origin
+    )
     await query.answer(get_text(lang, "settings_saved") if changed else None)
     # Import locally to keep menu rendering and settings independent at import.
     from music_links_bot.bot_menu import safe_edit

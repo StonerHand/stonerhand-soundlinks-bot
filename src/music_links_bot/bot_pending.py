@@ -29,7 +29,6 @@ from music_links_bot.bot_storage import (
     store_draft,
 )
 from music_links_bot.bot_ui import render_crate
-from music_links_bot.channel_templates import save_channel_template
 from music_links_bot.editor_view import draft_intro_limit, render_track_draft
 from music_links_bot.i18n import get_text
 from music_links_bot.keyboards import (
@@ -142,8 +141,6 @@ async def consume_pending_input(
         saved_key = result.saved_key
         schedule_label = result.schedule_label
         await store_draft(context, draft_id, draft)
-        if kind not in {"schedule", "cover", "template_name", "hashtags"}:
-            await save_channel_template(context, f"user:{user.id}", draft)
     elif kind in {"crate_note", "crate_section"}:
         release_key = str(pending.get("release_key") or "")
         entries = await load_crate(context.application.bot_data, user.id)

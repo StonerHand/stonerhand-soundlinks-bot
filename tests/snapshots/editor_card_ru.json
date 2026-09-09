@@ -3,38 +3,28 @@
   "rows": [
     [
       [
-        "Выбрать площадку",
-        null,
-        "https://song.link/sleep",
-        null
-      ]
-    ],
-    [
-      [
-        "Spotify",
-        null,
-        "https://open.spotify.com/track/1",
-        null
-      ]
-    ],
-    [
-      [
-        "Отправить себе",
-        "v2|editor|s|draft123",
-        null,
-        "primary"
-      ]
-    ],
-    [
-      [
-        "Изменить",
-        "v2|editor|m|draft123",
+        "Текст",
+        "v2|editor|ti|draft123",
         null,
         null
       ],
       [
-        "В подборку",
-        "v2|editor|c|draft123",
+        "Теги",
+        "v2|editor|hs|draft123",
+        null,
+        null
+      ]
+    ],
+    [
+      [
+        "Обложка",
+        "v2|editor|ap|draft123",
+        null,
+        null
+      ],
+      [
+        "Кнопки",
+        "v2|editor|ls|draft123",
         null,
         null
       ]
@@ -45,6 +35,20 @@
         "v2|editor|pv|draft123",
         null,
         null
+      ],
+      [
+        "Ещё",
+        "v2|editor|tools|draft123",
+        null,
+        null
+      ]
+    ],
+    [
+      [
+        "Отправить…",
+        "v2|editor|o|draft123",
+        null,
+        "primary"
       ]
     ]
   ]

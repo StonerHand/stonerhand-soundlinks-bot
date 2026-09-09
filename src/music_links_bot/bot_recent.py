@@ -177,5 +177,5 @@ def _empty_view(lang: str, key: str) -> tuple[str, InlineKeyboardMarkup]:
 
 def _home_button(lang: str) -> InlineKeyboardButton:
     return InlineKeyboardButton(
-        get_text(lang, "home_back"), callback_data=encode_callback("menu", "start")
+        get_text(lang, "library_back"), callback_data=encode_callback("menu", "library")
     )

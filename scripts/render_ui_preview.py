@@ -19,6 +19,7 @@ from music_links_bot.bot_ui import (
     build_create_keyboard,
     build_error_keyboard,
     build_home_text,
+    build_library_keyboard,
     build_publish_confirmation,
     build_start_keyboard,
     editor_appearance_rows,
@@ -29,6 +30,7 @@ from music_links_bot.bot_ui import (
     editor_platform_rows,
     editor_schedule_rows,
     editor_style_rows,
+    editor_tag_options_rows,
     editor_text_rows,
     editor_tools_rows,
     render_crate,
@@ -85,6 +87,7 @@ async def main():
             "appleMusic": "https://music.apple.com/us/album/example/1",
         },
         page_url="https://song.link/example",
+        thumbnail_url="https://example.com/artwork.png",
     )
     context = SimpleNamespace(
         application=SimpleNamespace(
@@ -110,6 +113,14 @@ async def main():
                 active_draft_id="demo",
                 active_draft_label="Sleep — Dopesmoker",
             ),
+        ),
+        "library": screen(
+            get_text("ru", "library_title"),
+            build_library_keyboard(lang="ru", crate_count=3),
+        ),
+        "intro_input": screen(
+            get_text("ru", "ed_intro_prompt").format(limit=3000),
+            InlineKeyboardMarkup([]),
         ),
         "create": screen(
             get_text("ru", "create_prompt"), build_create_keyboard(lang="ru")
@@ -154,6 +165,7 @@ async def main():
         ("format", "ed_delivery_title", editor_delivery_rows),
         ("intro", "ed_intro_title", editor_intro_rows),
         ("tags", "ed_hashtags_title", editor_hashtag_rows),
+        ("tag_options", "ed_tag_options_title", editor_tag_options_rows),
         ("tools", "ed_tools_title", editor_tools_rows),
     ):
         screens[name] = screen(
@@ -165,7 +177,16 @@ async def main():
             editor_platform_rows("demo", draft, track, ["spotify", "appleMusic"])
         ),
     )
-    for section in ("language", "appearance", "tags", "layout", "grouping", "artwork"):
+    for section in (
+        "language",
+        "appearance",
+        "tags",
+        "layout",
+        "grouping",
+        "artwork",
+        "defaults",
+        "collection",
+    ):
         screens["pref_" + section] = screen(
             *preferences_view(UserSession(user_id=7), lang="ru", section=section)
         )

@@ -39,13 +39,15 @@ async def apply_release_setting(request) -> str | None:
         if action == "ca" and (
             track.kind == "video"
             or draft.get("source_audio_file_id")
-            or not (track.thumbnail_url or draft.get("custom_cover_file_id"))
+            or not track.thumbnail_url
         ):
             await request.query.answer(
                 get_text(request.lang, "ed_clean_unavailable"), show_alert=True
             )
             return "answered"
         remember_setting_state(draft)
+        draft.pop("custom_cover_file_id", None)
+        draft.pop("custom_cover_unique_id", None)
         draft["as_photo"] = action == "ca"
         if action == "cn":
             draft["delivery_mode"] = "classic"

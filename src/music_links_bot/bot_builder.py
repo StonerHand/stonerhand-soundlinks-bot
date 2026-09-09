@@ -32,6 +32,7 @@ class BuilderScreen(str, Enum):
     PLATFORMS = "platforms"
     INTRO = "intro"
     HASHTAGS = "hashtags"
+    TAG_OPTIONS = "tag_options"
     PREVIEW = "preview"
     ACTIONS = "actions"
     SCHEDULE = "schedule"
@@ -48,6 +49,7 @@ SCREEN_ACTIONS = {
     "ls": BuilderScreen.PLATFORMS,
     "ts": BuilderScreen.INTRO,
     "hs": BuilderScreen.HASHTAGS,
+    "ht": BuilderScreen.TAG_OPTIONS,
     "pv": BuilderScreen.PREVIEW,
     "o": BuilderScreen.ACTIONS,
     "qs": BuilderScreen.SCHEDULE,

@@ -104,7 +104,10 @@ class BuilderJourneyTests(unittest.TestCase):
             for button in row
         }
         self.assertNotIn("✓", by_action["hi"].text)
-        self.assertTrue(by_action["hn"].text.startswith("✓"))
+        self.assertIn("ht", by_action)
+        self.assertFalse(
+            any(button.text.startswith("✓") for row in none_rows for button in row)
+        )
         use_auto_tags(self.draft)
         self.assertTrue(self.draft["hashtags"])
         self.assertNotIn("custom_tags", self.draft)
@@ -123,7 +126,7 @@ class BuilderJourneyTests(unittest.TestCase):
         platform_rows = editor_platform_rows("abc", self.draft, self.track, self.order)
         self.assertEqual(platform_rows[0][0].callback_data, "v2|editor|l0|abc")
         tag_rows = editor_hashtag_rows("abc", self.draft)
-        self.assertEqual(tag_rows[-1][0].callback_data, "v2|editor|tx|abc")
+        self.assertEqual(tag_rows[-1][0].callback_data, "v2|editor|b|abc")
 
     def test_schedule_and_telegram_limits_are_deterministic(self) -> None:
         now = datetime(2026, 8, 10, 10, 0, tzinfo=timezone.utc)

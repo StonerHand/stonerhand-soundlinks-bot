@@ -432,36 +432,12 @@
       },
       "editor_actions": {
         "buttons": [
-          "Отправить себе",
-          "Изменить",
-          "В подборку",
-          "Превью"
-        ],
-        "checks": {
-          "callbacks_bounded": true,
-          "destructive_actions_are_named": true,
-          "labels_descriptive": true,
-          "labels_present": true,
-          "mini_app_absent": true,
-          "single_primary_action": true,
-          "styled_actions_have_text": true,
-          "touch_friendly_rows": true
-        },
-        "ok": true,
-        "rows": [
-          1,
-          2,
-          1
-        ]
-      },
-      "editor_settings": {
-        "buttons": [
-          "Оформление",
           "Текст",
-          "Кнопки площадок",
-          "Шаблоны",
-          "Действия с карточкой",
-          "Готово · к карточке",
+          "Теги",
+          "Обложка",
+          "Кнопки",
+          "Превью",
+          "Ещё",
           "Отправить…"
         ],
         "checks": {
@@ -476,11 +452,37 @@
         },
         "ok": true,
         "rows": [
-          1,
-          1,
-          1,
           2,
-          1,
+          2,
+          2,
+          1
+        ]
+      },
+      "editor_settings": {
+        "buttons": [
+          "Текст",
+          "Теги",
+          "Обложка",
+          "Кнопки",
+          "Превью",
+          "Ещё",
+          "Отправить…"
+        ],
+        "checks": {
+          "callbacks_bounded": true,
+          "destructive_actions_are_named": true,
+          "labels_descriptive": true,
+          "labels_present": true,
+          "mini_app_absent": true,
+          "single_primary_action": true,
+          "styled_actions_have_text": true,
+          "touch_friendly_rows": true
+        },
+        "ok": true,
+        "rows": [
+          2,
+          2,
+          2,
           1
         ]
       },
@@ -572,10 +574,11 @@
       },
       "first_run": {
         "buttons": [
-          "Попробовать на примере",
           "Создать пост",
-          "Как это работает",
-          "RU / EN"
+          "Попробовать на примере",
+          "Мои материалы",
+          "Настройки",
+          "Как это работает"
         ],
         "checks": {
           "callbacks_bounded": true,
@@ -591,15 +594,14 @@
         "rows": [
           1,
           1,
-          2
+          2,
+          1
         ]
       },
       "home_en": {
         "buttons": [
           "Create post",
-          "Collection · 2",
-          "Drafts",
-          "Recent",
+          "My library",
           "Settings"
         ],
         "checks": {
@@ -615,16 +617,13 @@
         "ok": true,
         "rows": [
           1,
-          2,
           2
         ]
       },
       "home_ru": {
         "buttons": [
           "Создать пост",
-          "Подборка · 2",
-          "Черновики",
-          "Недавние",
+          "Мои материалы",
           "Настройки"
         ],
         "checks": {
@@ -640,7 +639,6 @@
         "ok": true,
         "rows": [
           1,
-          2,
           2
         ]
       }

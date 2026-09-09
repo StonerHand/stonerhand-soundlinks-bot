@@ -56,8 +56,8 @@ class PublicationGoldenTests(unittest.TestCase):
         )
         self.assertEqual(draft["v"], CURRENT_DRAFT_VERSION)
         labels = [button.text for row in keyboard.inline_keyboard for button in row]
-        self.assertEqual(labels[:2], ["Выбрать площадку", "Spotify"])
-        self.assertIn("Изменить", labels)
+        self.assertEqual(labels[:2], ["Текст", "Теги"])
+        self.assertIn("Ещё", labels)
 
     def test_editor_card_snapshots_are_stable(self) -> None:
         context = SimpleNamespace(application=SimpleNamespace(bot_data={}))
@@ -152,14 +152,14 @@ class PublicationGoldenTests(unittest.TestCase):
             "draft123", draft, _track(), target="@stonerhand", lang="ru"
         )
 
-        self.assertIn("Готово к публикации", text)
+        self.assertIn("Публикация", text)
         self.assertIn("Sleep", text)
-        self.assertEqual(keyboard.inline_keyboard[0][0].text, "✓ Опубликовать")
+        self.assertEqual(keyboard.inline_keyboard[0][0].text, "✓ Опубликовать сейчас")
         self.assertEqual(
             keyboard.inline_keyboard[0][0].callback_data,
             "v2|editor|pc|draft123",
         )
-        self.assertEqual(keyboard.inline_keyboard[-1][0].text, "← Назад")
+        self.assertEqual(keyboard.inline_keyboard[-1][0].text, "← К посту")
 
 
 class EditorFlowContractTests(unittest.IsolatedAsyncioTestCase):
@@ -385,7 +385,7 @@ class EditorFlowContractTests(unittest.IsolatedAsyncioTestCase):
         await _handle_editor_action(query, context, "p", "draft123")
 
         self.assertEqual(len(query.edits), 1)
-        self.assertIn("Готово к публикации", query.edits[0]["text"])
+        self.assertIn("Публикация", query.edits[0]["text"])
         keyboard = query.edits[0]["reply_markup"]
         self.assertEqual(
             keyboard.inline_keyboard[0][0].callback_data,
