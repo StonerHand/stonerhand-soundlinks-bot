@@ -570,7 +570,13 @@ def editor_appearance_rows(
     return [
         [
             InlineKeyboardButton(
-                get_text(lang, key),
+                (
+                    "✓ "
+                    if (action == "ca" and draft.get("as_photo"))
+                    or (action == "cn" and not draft.get("as_photo"))
+                    else ""
+                )
+                + get_text(lang, key),
                 callback_data=encode_callback("editor", action, draft_id),
             )
         ]
@@ -588,6 +594,8 @@ def editor_appearance_rows(
                 else "ed_cover_auto",
                 "ci",
             ),
+            ("ed_artwork_native", "cn"),
+            ("ed_artwork_clean", "ca"),
             ("back", "m"),
         )
     ]
@@ -850,6 +858,11 @@ def editor_intro_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardBut
 
 
 def editor_hashtag_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
+    from music_links_bot.bot_release_settings import tag_choices, tag_code
+    from music_links_bot.publication_view import resolve_draft_hashtags
+
+    track = TrackMatch(**draft["item"])
+    selected_tags = (resolve_draft_hashtags(draft, track) or "").split()
     lang = draft.get("lang") or "ru"
     custom = bool(draft.get("hashtags")) and bool(draft.get("custom_tags"))
     auto = bool(draft.get("hashtags", True)) and not custom
@@ -880,6 +893,32 @@ def editor_hashtag_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardB
             )
         ],
     ]
+    toggles = [
+        InlineKeyboardButton(
+            ("✓ " if tag in selected_tags else "") + tag,
+            callback_data=encode_callback("editor", tag_code(tag), draft_id),
+        )
+        for tag in tag_choices(draft, track)
+    ]
+    rows = [[*toggles[index : index + 2]] for index in range(0, len(toggles), 2)] + rows
+    rows.insert(
+        -1,
+        [
+            InlineKeyboardButton(
+                get_text(lang, "ed_tags_pin"),
+                callback_data=encode_callback("editor", "hp", draft_id),
+            )
+        ],
+    )
+    rows.insert(
+        -1,
+        [
+            InlineKeyboardButton(
+                get_text(lang, "ed_tags_reset"),
+                callback_data=encode_callback("editor", "hr", draft_id),
+            )
+        ],
+    )
     return append_setting_undo(rows, draft_id, draft)
 
 
@@ -1128,6 +1167,35 @@ def render_crate(
                     ),
                     style="danger",
                 )
+            ]
+        )
+        from music_links_bot.release_preferences import release_preference_key
+
+        selected_key = release_preference_key(
+            TrackMatch(**{"links": {}, **items[selected_index]["item"]})
+        )
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "crate_note"),
+                    callback_data=encode_callback("crate", "note", selected_key),
+                ),
+                InlineKeyboardButton(
+                    get_text(lang, "crate_section"),
+                    callback_data=encode_callback("crate", "section", selected_key),
+                ),
+            ]
+        )
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "crate_layout"),
+                    callback_data=encode_callback("prefs", "layout"),
+                ),
+                InlineKeyboardButton(
+                    get_text(lang, "crate_grouping"),
+                    callback_data=encode_callback("prefs", "grouping"),
+                ),
             ]
         )
         footer: list[InlineKeyboardButton] = []

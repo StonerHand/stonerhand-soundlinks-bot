@@ -8,12 +8,9 @@ from urllib.parse import urlparse
 
 from telegram import InlineKeyboardMarkup
 
+from music_links_bot.formatter import format_collection_message
 from music_links_bot.models import TrackMatch, VideoMatch
 from music_links_bot.publication_model import MusicPublication
-from music_links_bot.release_presentation import (
-    compact_release_title,
-    shared_collection_artist,
-)
 from music_links_bot.telegram_gateway import (
     capability_available,
     feature_enabled,
@@ -451,6 +448,8 @@ def build_rich_inline_card_html(
     """
     title = MusicPublication.track_title(track)
     pieces = [f"<h1>{html.escape(title)}</h1>"]
+    if details := MusicPublication.track_details(track):
+        pieces.append(f"<p>{details}</p>")
     if media_id:
         safe_media_id = re.sub(r"[^A-Za-z0-9_-]", "", media_id)[:64]
         if safe_media_id:
@@ -497,20 +496,6 @@ def build_rich_collection_html(
         for track in tracks[:MAX_RICH_MEDIA]
         if track.thumbnail_url
     ]
-    shared_artist = shared_collection_artist(tracks)
-    if shared_artist:
-        items = "".join(
-            f"<li>{html.escape(compact_release_title(track.title))}</li>"
-            for track in tracks
-        )
-    else:
-        items = "".join(
-            "<li>"
-            f"<b>{html.escape(track.artist)}</b> — "
-            f"{html.escape(compact_release_title(track.title))}"
-            "</li>"
-            for track in tracks
-        )
     publication = MusicPublication(
         title=title,
         kind="collection",
@@ -522,10 +507,11 @@ def build_rich_collection_html(
     media_html = _media_block(publication)
     if media_html:
         pieces.append(media_html)
-    if shared_artist:
-        pieces.append(f"<p><b>{html.escape(shared_artist)}</b></p>")
-    if items:
-        pieces.append(f"<ol>{items}</ol>")
+    # Reuse the same complete, numbered text as the classic preview and delivery.
+    body = format_collection_message(tracks, title=title, include_hashtags=False)
+    body = body.split("\n\n", 1)[-1]
+    if body:
+        pieces.append("<p>" + body.replace("\n", "<br/>") + "</p>")
     buttons = rich_button_rows_html(reply_markup)
     if buttons:
         pieces.append(buttons)

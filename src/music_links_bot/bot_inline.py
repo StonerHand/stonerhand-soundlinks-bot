@@ -16,7 +16,7 @@ from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
 from music_links_bot import bot_lookup
-from music_links_bot.bot_crate import load_crate
+from music_links_bot.bot_crate import load_crate, load_crate_title
 from music_links_bot.constants import INLINE_EXAMPLE_QUERY, MAX_LINKS_PER_MESSAGE
 from music_links_bot.formatter import (
     build_auto_hashtags,
@@ -48,6 +48,7 @@ from music_links_bot.publication_contract import (
     RenderedPublication,
     require_valid_publication,
 )
+from music_links_bot.release_preferences import current_presentation
 from music_links_bot.rich_publications import (
     RICH_MESSAGE_CAPABILITY,
     build_rich_inline_card_html,
@@ -85,7 +86,7 @@ from music_links_bot.url_utils import (
 
 LOGGER = logging.getLogger(__name__)
 INLINE_CACHE_SECONDS = 1800
-INLINE_COLLECTION_RESULT_VERSION = "v5"
+INLINE_COLLECTION_RESULT_VERSION = "v6"
 INLINE_TRUNCATION_GUARD_LENGTH = 240
 
 
@@ -152,7 +153,6 @@ async def inline_query_handler(
         )
         return
 
-    personal_results = channel_safe
     history_mode = False
     if not source_urls:
         search_query = normalize_search_query(query_text)
@@ -161,7 +161,6 @@ async def inline_query_handler(
                 context.application.bot_data,
                 user_id,
             )
-            personal_results = True
             history_mode = True
             if not source_urls:
                 source_urls = await _search_source_urls(
@@ -180,7 +179,6 @@ async def inline_query_handler(
                 search_query,
                 lang=lang,
             )
-            personal_results = True
         if not source_urls:
             return
     else:
@@ -231,8 +229,8 @@ async def inline_query_handler(
 
     try:
         answer_kwargs = {
-            "cache_time": 0 if (channel_safe or empty_query) else INLINE_CACHE_SECONDS,
-            "is_personal": personal_results or empty_query,
+            "cache_time": 0,
+            "is_personal": True,
             "next_offset": next_offset,
         }
         if empty_query:
@@ -401,12 +399,8 @@ async def _answer_inline_collection(
     try:
         await inline_query.answer(
             [result],
-            cache_time=(
-                0
-                if (is_direct or channel_safe or user_id > 0)
-                else INLINE_CACHE_SECONDS
-            ),
-            is_personal=is_direct or channel_safe or user_id > 0,
+            cache_time=0,
+            is_personal=True,
         )
         if _result_uses_rich(result):
             record_capability_success(RICH_MESSAGE_CAPABILITY)
@@ -429,12 +423,8 @@ async def _answer_inline_collection(
                 try:
                     await inline_query.answer(
                         [classic_result],
-                        cache_time=(
-                            0
-                            if (is_direct or channel_safe or user_id > 0)
-                            else INLINE_CACHE_SECONDS
-                        ),
-                        is_personal=is_direct or channel_safe or user_id > 0,
+                        cache_time=0,
+                        is_personal=True,
                     )
                     return
                 except TelegramError:
@@ -677,12 +667,20 @@ async def _build_inline_result(
         ),
         text=format_track_message(track, include_hashtags=True),
         keyboard=keyboard,
-        preview_url=_select_preview_url(track.links, context) or track.thumbnail_url,
+        preview_url=(
+            track.thumbnail_url
+            if current_presentation.get().artwork == "clean"
+            and track.thumbnail_url
+            and track.kind != "video"
+            else _select_preview_url(track.links, context) or track.thumbnail_url
+        ),
         thumbnail_url=track.thumbnail_url,
         channel_safe=channel_safe,
         rich_html=rich_html,
         rich_media=rich_media,
-        force_classic=force_classic,
+        force_classic=force_classic
+        or track.kind == "video"
+        or current_presentation.get().artwork == "native",
     )
 
 
@@ -727,6 +725,26 @@ async def _build_inline_collection_result(
 
     share_query = build_share_query(source_urls)
     intro_html = ""
+    collection_name = None
+    if user_id > 0:
+        entries = await load_crate(context.application.bot_data, user_id)
+        crate_sources = []
+        for entry in entries:
+            try:
+                item = TrackMatch(**{"links": {}, **entry["item"]})
+            except (KeyError, TypeError, ValueError):
+                crate_sources = []
+                break
+            crate_sources.append(track_share_url(item))
+        if (
+            crate_sources
+            and all(crate_sources)
+            and [cache_key_for_url(url) for url in crate_sources]
+            == [cache_key_for_url(url) for url in source_urls]
+        ):
+            collection_name = await load_crate_title(
+                context.application.bot_data, user_id
+            )
     runtime = context.application.bot_data.get("runtime")
     get_collection_intro = getattr(runtime, "get_collection_intro", None)
     if user_id > 0 and callable(get_collection_intro):
@@ -743,6 +761,7 @@ async def _build_inline_collection_result(
         share_label=get_text(lang, "share_post"),
         requested_count=len(source_urls),
         intro_html=intro_html,
+        collection_name=collection_name,
     )
     return _inline_article(
         INLINE_COLLECTION_RESULT_VERSION + "|" + "|".join(source_urls),
@@ -879,7 +898,11 @@ def _inline_article(
         )
     )
     return InlineQueryResultArticle(
-        id=hashlib.sha256(source_url.encode("utf-8")).hexdigest()[:32],
+        id=hashlib.sha256(
+            (
+                source_url + text + keyboard.to_json() + str(input_message_content)
+            ).encode("utf-8")
+        ).hexdigest()[:32],
         title=title,
         description=description,
         thumbnail_url=thumbnail_url,

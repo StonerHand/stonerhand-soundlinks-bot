@@ -98,8 +98,13 @@ class BuilderJourneyTests(unittest.TestCase):
         remove_tags(self.draft)
         self.assertFalse(self.draft["hashtags"])
         none_rows = editor_hashtag_rows("abc", self.draft)
-        self.assertNotIn("✓", none_rows[1][0].text)
-        self.assertTrue(none_rows[2][0].text.startswith("✓"))
+        by_action = {
+            button.callback_data.split("|")[2]: button
+            for row in none_rows
+            for button in row
+        }
+        self.assertNotIn("✓", by_action["hi"].text)
+        self.assertTrue(by_action["hn"].text.startswith("✓"))
         use_auto_tags(self.draft)
         self.assertTrue(self.draft["hashtags"])
         self.assertNotIn("custom_tags", self.draft)

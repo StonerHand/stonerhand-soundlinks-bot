@@ -98,6 +98,10 @@ from music_links_bot.playlist import PlaylistLookupError
 from music_links_bot.publication_state import (
     release_fingerprint as _release_fingerprint,
 )
+from music_links_bot.release_preferences import (
+    PresentationPreferences,
+    presentation_context,
+)
 from music_links_bot.search import SearchCandidate, SearchLookupError
 from music_links_bot.sharing import (
     add_share_button,
@@ -791,7 +795,7 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[1][0].url, "https://song.link/track-2")
         self.assertEqual(len(rows), 2)
 
-    def test_same_artist_collection_uses_compact_adaptive_buttons(self) -> None:
+    def test_same_artist_collection_uses_column_and_preserves_versions(self) -> None:
         keyboard = _build_collection_keyboard(
             [
                 TrackMatch(
@@ -810,10 +814,10 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(len(rows), 1)
+        self.assertEqual(len(rows), 2)
         self.assertEqual(
-            [button.text for button in rows[0]],
-            ["1 · There's No Other Way", "2 · Fool"],
+            [button.text for row in rows for button in row],
+            ["1 · There's No Other Way - 2012 Remaster", "2 · Fool - 2012 Remaster"],
         )
 
     def test_collection_repairs_stale_apple_hub_to_direct_provider(self) -> None:
@@ -840,7 +844,7 @@ class BotKeyboardTests(unittest.TestCase):
         button_texts = [
             button.text for row in keyboard.inline_keyboard for button in row
         ]
-        self.assertEqual(button_texts, ["🪩 Все платформы", "🟢 Spotify"])
+        self.assertEqual(button_texts, ["Выбрать площадку", "Spotify"])
         self.assertEqual(keyboard.inline_keyboard[0][0].style, "primary")
         self.assertIsNone(keyboard.inline_keyboard[1][0].style)
 
@@ -864,12 +868,12 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(rows[0][0].text, "🪩 Все платформы")
-        self.assertEqual(rows[1][0].text, "🟢 Spotify")
-        self.assertEqual(rows[1][1].text, "⚪ Apple")
-        self.assertEqual(rows[2][0].text, "🟠 SoundCloud")
-        self.assertEqual(rows[2][1].text, "🟦 Deezer")
-        self.assertEqual(rows[3][0].text, "⚫ Tidal")
+        self.assertEqual(rows[0][0].text, "Выбрать площадку")
+        self.assertEqual(rows[1][0].text, "Spotify")
+        self.assertEqual(rows[1][1].text, "Apple Music")
+        self.assertEqual(rows[2][0].text, "SoundCloud")
+        self.assertEqual(rows[2][1].text, "Deezer")
+        self.assertEqual(rows[3][0].text, "Tidal")
         self.assertEqual(rows[0][0].style, "primary")
         self.assertTrue(all(button.style is None for row in rows[1:] for button in row))
 
@@ -884,11 +888,11 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(rows[0][0].text, "🪩 Все платформы")
+        self.assertEqual(rows[0][0].text, "Выбрать площадку")
         self.assertEqual(rows[0][0].url, "https://song.link/transitions")
         self.assertEqual(rows[0][0].style, "primary")
         self.assertFalse(rows[0][0].api_kwargs)
-        self.assertEqual(rows[1][0].text, "🟢 Spotify")
+        self.assertEqual(rows[1][0].text, "Spotify")
 
     def test_release_keyboard_repairs_spotify_fallback_to_songlink(self) -> None:
         keyboard = _build_link_keyboard(
@@ -899,9 +903,9 @@ class BotKeyboardTests(unittest.TestCase):
 
         rows = keyboard.inline_keyboard
         self.assertEqual(len(rows), 2)
-        self.assertEqual(rows[0][0].text, "🪩 Все платформы")
+        self.assertEqual(rows[0][0].text, "Выбрать площадку")
         self.assertEqual(rows[0][0].url, "https://song.link/s/1")
-        self.assertEqual(rows[1][0].text, "🟢 Spotify")
+        self.assertEqual(rows[1][0].text, "Spotify")
         self.assertEqual(rows[1][0].url, "https://open.spotify.com/track/1?si=tracking")
 
     def test_apple_only_fallback_does_not_show_false_universal_action(self) -> None:
@@ -912,7 +916,7 @@ class BotKeyboardTests(unittest.TestCase):
 
         rows = keyboard.inline_keyboard
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0][0].text, "⚪ Apple")
+        self.assertEqual(rows[0][0].text, "Apple Music")
         self.assertEqual(rows[0][0].style, "primary")
 
     def test_minimal_ui_mode_strips_platform_button_emoji(self) -> None:
@@ -927,7 +931,7 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(rows[0][0].text, "Все платформы")
+        self.assertEqual(rows[0][0].text, "Выбрать площадку")
         self.assertEqual(rows[1][0].text, "Spotify")
         self.assertFalse(rows[0][0].api_kwargs)
 
@@ -940,7 +944,7 @@ class BotKeyboardTests(unittest.TestCase):
             release_kind="album",
         )
 
-        self.assertEqual(keyboard.inline_keyboard[0][0].text, "💿 слушать целиком")
+        self.assertEqual(keyboard.inline_keyboard[0][0].text, "Выбрать площадку")
 
     def test_album_release_keyboard_uses_release_hub_label(self) -> None:
         keyboard = _build_link_keyboard(
@@ -950,7 +954,7 @@ class BotKeyboardTests(unittest.TestCase):
             release_kind="album",
         )
 
-        self.assertEqual(keyboard.inline_keyboard[0][0].text, "💿 Весь релиз")
+        self.assertEqual(keyboard.inline_keyboard[0][0].text, "Выбрать площадку")
 
     def test_podcast_release_keyboard_uses_podcast_hub_label(self) -> None:
         keyboard = _build_link_keyboard(
@@ -960,7 +964,7 @@ class BotKeyboardTests(unittest.TestCase):
             release_kind="podcast",
         )
 
-        self.assertEqual(keyboard.inline_keyboard[0][0].text, "🎙 Все площадки")
+        self.assertEqual(keyboard.inline_keyboard[0][0].text, "Выбрать площадку")
 
     def test_error_keyboard_points_to_supported_services(self) -> None:
         keyboard = _build_error_keyboard("StonerHandBot")
@@ -1002,7 +1006,7 @@ class BotKeyboardTests(unittest.TestCase):
         button_texts = [
             button.text for row in keyboard.inline_keyboard for button in row
         ]
-        self.assertEqual(button_texts, ["📺 Смотреть на YouTube"])
+        self.assertEqual(button_texts, ["Смотреть на YouTube"])
         self.assertEqual(keyboard.inline_keyboard[0][0].style, "primary")
 
     def test_nts_keyboard_can_hide_channel_button(self) -> None:
@@ -1014,7 +1018,7 @@ class BotKeyboardTests(unittest.TestCase):
         button_texts = [
             button.text for row in keyboard.inline_keyboard for button in row
         ]
-        self.assertEqual(button_texts, ["📻 Открыть на NTS"])
+        self.assertEqual(button_texts, ["Открыть на NTS"])
         self.assertEqual(keyboard.inline_keyboard[0][0].style, "primary")
 
     def test_playlist_keyboard_can_hide_channel_button(self) -> None:
@@ -1059,12 +1063,12 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(rows[0][0].text, "🎧 Слушать песню")
+        self.assertEqual(rows[0][0].text, "Слушать песню")
         self.assertEqual(rows[0][0].url, "https://song.link/transitions")
         self.assertEqual(rows[0][0].style, "primary")
-        self.assertEqual(rows[0][1].text, "📺 Смотреть клип")
-        self.assertEqual(rows[0][1].url, "https://youtu.be/1")
-        self.assertIsNone(rows[0][1].style)
+        self.assertEqual(rows[1][0].text, "Смотреть клип")
+        self.assertEqual(rows[1][0].url, "https://youtu.be/1")
+        self.assertIsNone(rows[1][0].style)
 
     def test_mixed_collection_keyboard_lists_radio_buttons(self) -> None:
         keyboard = _build_mixed_collection_keyboard(
@@ -1085,11 +1089,11 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(rows[0][0].text, "📻 1. Dark Energy")
+        self.assertEqual(rows[0][0].text, "1 · Dark Energy")
         self.assertEqual(rows[0][0].url, "https://www.nts.live/shows/example")
         self.assertIsNone(rows[0][0].style)
-        self.assertEqual(rows[0][1].text, "📺 2. Live Session")
-        self.assertIsNone(rows[0][1].style)
+        self.assertEqual(rows[1][0].text, "2 · Live Session")
+        self.assertIsNone(rows[1][0].style)
 
     def test_mixed_collection_repairs_an_untrusted_release_page(self) -> None:
         keyboard = _build_mixed_collection_keyboard(
@@ -1498,12 +1502,12 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(preview.is_disabled)
         self.assertTrue(preview.prefer_large_media)
         keyboard = result.reply_markup.inline_keyboard
-        self.assertEqual(keyboard[0][0].text, "🪩 Все платформы")
+        self.assertEqual(keyboard[0][0].text, "Выбрать площадку")
         all_platforms_button = next(
             button
             for row in keyboard
             for button in row
-            if button.text == "🪩 Все платформы"
+            if button.text == "Выбрать площадку"
         )
         self.assertEqual(all_platforms_button.url, "https://song.link/transitions")
         self.assertEqual(keyboard[-1][0].text, "Поделиться")
@@ -1519,14 +1523,17 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(result)
         self.assertIn("<b>Youth Code</b>", result.input_message_content.message_text)
         keyboard = result.reply_markup.inline_keyboard
-        self.assertEqual(keyboard[0][0].text, "🪩 Все платформы")
+        self.assertEqual(keyboard[0][0].text, "Выбрать площадку")
         self.assertEqual(keyboard[-1][0].text, "Поделиться")
         self.assertTrue(keyboard[-1][0].switch_inline_query.startswith("sh5|"))
 
     async def test_inline_rich_result_uses_cached_telegram_cover(self) -> None:
-        with patch(
-            "music_links_bot.bot_inline.get_cached_file_id",
-            AsyncMock(return_value="telegram-cover-file-id"),
+        with (
+            presentation_context(PresentationPreferences(artwork="clean")),
+            patch(
+                "music_links_bot.bot_inline.get_cached_file_id",
+                AsyncMock(return_value="telegram-cover-file-id"),
+            ),
         ):
             result = await _build_inline_result(
                 "https://open.spotify.com/track/abc",
@@ -1569,9 +1576,12 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         update = type("InlineUpdateStub", (), {"inline_query": inline_query})()
         reset_capabilities()
         try:
-            with patch(
-                "music_links_bot.bot_inline.get_cached_file_id",
-                AsyncMock(return_value="telegram-cover-file-id"),
+            with (
+                presentation_context(PresentationPreferences(artwork="clean")),
+                patch(
+                    "music_links_bot.bot_inline.get_cached_file_id",
+                    AsyncMock(return_value="telegram-cover-file-id"),
+                ),
             ):
                 await inline_query_handler(update, ContextStub())
         finally:
@@ -1588,7 +1598,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
             InputTextMessageContent,
         )
         self.assertIn(
-            "🪩 Все платформы",
+            "Выбрать площадку",
             [
                 button.text
                 for row in classic_result.reply_markup.inline_keyboard
@@ -1812,8 +1822,8 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
             inline_query.answers[0][0].title,
             "Подборка · 2 релиза",
         )
-        self.assertEqual(inline_query.answer_kwargs[0]["cache_time"], 1800)
-        self.assertFalse(inline_query.answer_kwargs[0]["is_personal"])
+        self.assertEqual(inline_query.answer_kwargs[0]["cache_time"], 0)
+        self.assertTrue(inline_query.answer_kwargs[0]["is_personal"])
 
     async def test_partial_inline_collection_is_never_selectable(self) -> None:
         from music_links_bot.bot_inline import inline_query_handler
@@ -2071,7 +2081,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(result)
         self.assertEqual(result.title, "SANSAE Live Session Vol.3 - Melon")
         keyboard = result.reply_markup.inline_keyboard
-        self.assertEqual(keyboard[0][0].text, "📺 Смотреть на YouTube")
+        self.assertEqual(keyboard[0][0].text, "Смотреть на YouTube")
 
     async def test_inline_text_search_offers_multiple_results(self) -> None:
         from music_links_bot.bot_inline import inline_query_handler
@@ -2616,14 +2626,14 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(message.replies), 1)
         self.assertIn("<b>SANSAE Live Session Vol.3 - Melon</b>", message.replies[0])
-        self.assertIn("канал: SANSAE", message.replies[0])
+        self.assertIn("Источник: SANSAE", message.replies[0])
         self.assertIn("#stonerhand #video", message.replies[0])
         # Private chats show an editable loading placeholder instead of a
         # typing action, so no chat action is expected here.
         self.assertEqual(context.bot.chat_actions, [])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         preview_options = message.reply_kwargs[0]["link_preview_options"]
-        self.assertEqual(keyboard[0][0].text, "📺 Смотреть на YouTube")
+        self.assertEqual(keyboard[0][0].text, "Смотреть на YouTube")
         self.assertEqual(keyboard[0][0].url, "https://www.youtube.com/watch?v=abc123")
         self.assertTrue(preview_options.prefer_large_media)
         self.assertFalse(bool(preview_options.prefer_small_media))
@@ -2643,7 +2653,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("#stonerhand #radio", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         preview_options = message.reply_kwargs[0]["link_preview_options"]
-        self.assertEqual(keyboard[0][0].text, "📻 Открыть на NTS")
+        self.assertEqual(keyboard[0][0].text, "Открыть на NTS")
         self.assertEqual(keyboard[0][0].url, "https://www.nts.live/shows/example")
         self.assertTrue(preview_options.prefer_large_media)
         self.assertFalse(bool(preview_options.prefer_small_media))
@@ -2661,9 +2671,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("<b>Youth Code</b>\nTransitions", message.replies[0])
         self.assertIn("#stonerhand #track", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
-        self.assertEqual(keyboard[0][0].text, "🪩 Все платформы")
+        self.assertEqual(keyboard[0][0].text, "Выбрать площадку")
         self.assertEqual(keyboard[0][0].url, "https://song.link/transitions")
-        self.assertEqual(keyboard[1][0].text, "🟢 Spotify")
+        self.assertEqual(keyboard[1][0].text, "Spotify")
         self.assertEqual(keyboard[2][0].text, "Отправить себе")
         self.assertEqual(keyboard[3][0].text, "Изменить")
         self.assertEqual(keyboard[3][1].text, "В подборку")
@@ -2727,7 +2737,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 1)
         self.assertIn("<b>Bondage Fairies</b>\nStar Signs", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
-        self.assertEqual(keyboard[0][0].text, "🟠 SoundCloud")
+        self.assertEqual(keyboard[0][0].text, "SoundCloud")
         self.assertEqual(
             keyboard[0][0].url,
             "https://soundcloud.com/bondage-fairies/star-signs",
@@ -2818,12 +2828,12 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("<b>Youth Code</b> — Transitions", caption)
         self.assertIn("<b>SANSAE Live Session Vol.3 - Melon</b>", caption)
         self.assertNotIn("<a href=", caption)
-        self.assertIn("#stonerhand #track #video", caption)
+        self.assertIn("#stonerhand #collection #track #video", caption)
         self.assertEqual(media[0].media, "https://img.example/a.jpg")
         self.assertEqual(media[1].media, "https://img.youtube.example/abc123.jpg")
         keyboard = context.bot.sent_messages[0]["reply_markup"].inline_keyboard
-        self.assertEqual(keyboard[0][0].text, "🎧 Слушать песню")
-        self.assertEqual(keyboard[0][1].text, "📺 Смотреть клип")
+        self.assertEqual(keyboard[0][0].text, "Слушать песню")
+        self.assertEqual(keyboard[1][0].text, "Смотреть клип")
         record_mixed.assert_called_once()
 
     async def test_mixed_playlist_and_youtube_links_keep_both_items(self) -> None:
@@ -2842,10 +2852,10 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             message.replies[0],
         )
         self.assertNotIn("<a href=", message.replies[0])
-        self.assertIn("#stonerhand #playlist #video", message.replies[0])
+        self.assertIn("#stonerhand #collection #playlist #video", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
-        self.assertEqual(keyboard[0][0].text, "🎛 1. Women of Punk")
-        self.assertEqual(keyboard[1][0].text, "📺 2. SANSAE Live Session Vol.3 - Melon")
+        self.assertEqual(keyboard[0][0].text, "1 · Women of Punk")
+        self.assertEqual(keyboard[1][0].text, "2 · SANSAE Live Session Vol.3 - Melon")
         record_mixed.assert_called_once()
 
     async def test_mixed_nts_and_youtube_links_keep_both_items(self) -> None:
@@ -2864,10 +2874,10 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             message.replies[0],
         )
         self.assertNotIn("<a href=", message.replies[0])
-        self.assertIn("#stonerhand #radio #video", message.replies[0])
+        self.assertIn("#stonerhand #collection #radio #video", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
-        self.assertEqual(keyboard[0][0].text, "📻 1. Dark Energy w/ Guest")
-        self.assertEqual(keyboard[1][0].text, "📺 2. SANSAE Live Session Vol.3 - Melon")
+        self.assertEqual(keyboard[0][0].text, "1 · Dark Energy w/ Guest")
+        self.assertEqual(keyboard[1][0].text, "2 · SANSAE Live Session Vol.3 - Melon")
         record_mixed.assert_called_once()
 
     async def test_youtube_lookup_uses_fallback_when_metadata_fails(self) -> None:
@@ -3004,7 +3014,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             [button.text for row in keyboard.inline_keyboard for button in row],
-            ["🪩 Все платформы", "🟢 Spotify"],
+            ["Выбрать площадку", "Spotify"],
         )
         self.assertEqual(
             tracks[0].thumbnail_url,
@@ -3156,7 +3166,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             {"appleMusic": "https://music.apple.com/album/paranoid"},
         )
         keyboard = _build_link_keyboard(tracks[0].links)
-        self.assertEqual(keyboard.inline_keyboard[0][0].text, "⚪ Apple")
+        self.assertEqual(keyboard.inline_keyboard[0][0].text, "Apple Music")
 
     async def test_lookup_tracks_uses_soundcloud_metadata_fallback(self) -> None:
         tracks, unavailable_urls = await _lookup_tracks(
@@ -3242,7 +3252,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         )
 
         buttons = [button for row in keyboard.inline_keyboard for button in row]
-        self.assertEqual([button.text for button in buttons], ["🟠 SoundCloud"])
+        self.assertEqual([button.text for button in buttons], ["SoundCloud"])
 
 
 if __name__ == "__main__":

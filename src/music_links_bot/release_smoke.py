@@ -24,6 +24,10 @@ from music_links_bot.publication_contract import (
     RenderedPublication,
     validate_rendered_publication,
 )
+from music_links_bot.release_preferences import (
+    PresentationPreferences,
+    presentation_context,
+)
 from music_links_bot.rich_publications import build_rich_card_html
 from music_links_bot.sharing import (
     add_share_button,
@@ -210,11 +214,64 @@ def build_release_smoke_report() -> dict[str, object]:
             },
         ),
     }
+    soundtrack = TrackMatch(
+        title="Scott Pilgrim vs. the World (Original Motion Picture Soundtrack) - Compilation by Various Artists | Spotify",
+        artist="Various Artists",
+        kind="album",
+        release_year="2010",
+        track_count=19,
+        links={"spotify": "https://open.spotify.com/album/scott"},
+        page_url="https://album.link/s/scott",
+    )
+    cases["soundtrack_metadata"] = _summarize(
+        RenderedPublication(
+            text=format_track_message(soundtrack),
+            keyboard=_build_link_keyboard(
+                soundtrack.links,
+                release_page_url=soundtrack.page_url,
+                release_kind="album",
+            ),
+            content_kind="album",
+        ),
+        extra_checks={
+            "exact_format": soundtrack.release_format == "soundtrack",
+            "count_confirmed": soundtrack.track_count == 19,
+            "seo_removed": "Compilation by" not in soundtrack.title,
+        },
+    )
+    ten = [
+        _track(
+            f"Track {index} (Live 2001)",
+            f"Artist {index}",
+            spotify_id=f"release{index}",
+            artwork=f"https://i.scdn.co/cover{index}.jpg",
+        )
+        for index in range(1, 11)
+    ]
+    for layout in ("column", "auto", "compact"):
+        with presentation_context(PresentationPreferences(layout=layout)):
+            text = format_collection_message(ten)
+            keyboard = _build_collection_keyboard(ten)
+        cases["ten_items_" + layout] = _summarize(
+            RenderedPublication(
+                text=text,
+                keyboard=keyboard,
+                found_count=10,
+                requested_count=10,
+                content_kind="collection",
+            ),
+            extra_checks={
+                "all_items_present": len(re.findall(r"^\d+\. ", text, re.M)) == 10,
+                "mandatory_type": "#collection" in text,
+                "all_buttons_present": sum(len(row) for row in keyboard.inline_keyboard)
+                == 10,
+            },
+        )
     ux = _build_ui_contract()
     return {
         "ok": all(bool(case["ok"]) for case in cases.values()) and bool(ux["ok"]),
         "service": "publication-release-smoke",
-        "contract": 5,
+        "contract": 6,
         "cases": cases,
         "ux": ux,
     }

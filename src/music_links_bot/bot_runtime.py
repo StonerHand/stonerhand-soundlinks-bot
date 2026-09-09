@@ -16,6 +16,10 @@ from music_links_bot.errors import (
     BotFlowError as _BotFlowError,
 )
 from music_links_bot.kvstore import KVStore
+from music_links_bot.release_preferences import (
+    normalize_annotations,
+    normalize_release_tags,
+)
 from music_links_bot.url_utils import (
     cache_key_for_url,
     is_direct_platform_url,
@@ -34,7 +38,7 @@ RATE_LIMIT_WINDOW_SECONDS = 60
 RATE_LIMIT_MAX_REQUESTS = 12
 ACTIVE_REQUEST_TTL_SECONDS = 5 * 60
 SESSION_TTL_SECONDS = 30 * 24 * 3600
-SESSION_SCHEMA_VERSION = 8
+SESSION_SCHEMA_VERSION = 9
 MAX_RECENT_DRAFTS = 30
 COLLECTION_STATE_VERSION = 2
 MAX_SESSION_TEXT_LENGTH = 2_048
@@ -143,6 +147,11 @@ class UserSession:
     preferred_lang: str = ""
     default_preset: str = ""
     default_hashtags: str = ""
+    collection_layout: str = "column"
+    collection_grouping: str = "none"
+    default_artwork: str = "native"
+    release_tags: dict[str, list[str]] = field(default_factory=dict)
+    collection_annotations: dict[str, dict[str, str]] = field(default_factory=dict)
     onboarding_seen: bool = False
     welcome_seen: bool = False
     last_query: str = ""
@@ -168,6 +177,22 @@ class UserSession:
                 ),
                 default_hashtags=_choice(
                     payload.get("default_hashtags"), {"auto", "off"}
+                ),
+                collection_layout=_choice(
+                    payload.get("collection_layout"), {"auto", "column", "compact"}
+                )
+                or "column",
+                collection_grouping=_choice(
+                    payload.get("collection_grouping"), {"none", "artist", "album"}
+                )
+                or "none",
+                default_artwork=_choice(
+                    payload.get("default_artwork"), {"native", "clean"}
+                )
+                or "native",
+                release_tags=normalize_release_tags(payload.get("release_tags")),
+                collection_annotations=normalize_annotations(
+                    payload.get("collection_annotations")
                 ),
                 onboarding_seen=bool(payload.get("onboarding_seen")),
                 welcome_seen=bool(payload.get("welcome_seen")),
@@ -223,6 +248,8 @@ def _normalize_pending_input(value: object) -> dict[str, Any]:
         "intro",
         "hashtags",
         "crate_title",
+        "crate_note",
+        "crate_section",
         "schedule",
         "replace_source",
         "cover",
@@ -242,6 +269,10 @@ def _normalize_pending_input(value: object) -> dict[str, Any]:
         parsed = _optional_int(value.get(key))
         if parsed is not None:
             result[key] = parsed
+    if kind in {"crate_note", "crate_section"}:
+        key = str(value.get("release_key") or "")
+        if len(key) == 24:
+            result["release_key"] = key
     if kind == "replace_source":
         retry_id = str(value.get("retry_id") or "")[:64]
         source_index = _optional_int(value.get("source_index"))

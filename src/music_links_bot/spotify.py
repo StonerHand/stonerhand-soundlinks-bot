@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from html.parser import HTMLParser
 
@@ -8,7 +9,11 @@ import httpx
 
 from music_links_bot.cache import TTLCache
 from music_links_bot.constants import HTTP_USER_AGENT
-from music_links_bot.metadata_cleaning import clean_spotify_metadata_title
+from music_links_bot.metadata_cleaning import (
+    clean_spotify_metadata_title,
+    infer_release_format,
+    positive_track_count,
+)
 from music_links_bot.models import TrackMatch
 from music_links_bot.release_hubs import canonical_release_hub_url
 from music_links_bot.url_utils import cache_key_for_url, spotify_url_type
@@ -199,6 +204,20 @@ def parse_spotify_page(source_url: str, html: str) -> TrackMatch:
         release_year = None
     thumbnail_url = parser.first("og:image") or None
     clean_url = cache_key_for_url(source_url)
+    description = parser.first("og:description")
+    parts = [part.strip() for part in description.split("·")]
+    release_format = (
+        infer_release_format(parser.first("og:title"), *parts[1:])
+        if normalized_kind == "album"
+        else None
+    )
+    count_match = re.search(
+        r"(?:^|·)\s*(\d+)\s+(?:songs?|tracks?|трек(?:а|ов)?)\b", description, re.I
+    )
+    if release_year is None:
+        release_year = next(
+            (part for part in parts[1:] if re.fullmatch(r"(?:19|20)\d{2}", part)), None
+        )
     return TrackMatch(
         title=title,
         artist=artist,
@@ -206,7 +225,9 @@ def parse_spotify_page(source_url: str, html: str) -> TrackMatch:
         page_url=canonical_release_hub_url(clean_url),
         release_year=release_year,
         kind=normalized_kind,
-        release_format="album" if normalized_kind == "album" else None,
+        release_format=release_format
+        or ("album" if normalized_kind == "album" else None),
+        track_count=positive_track_count(count_match.group(1)) if count_match else None,
         thumbnail_url=thumbnail_url,
     )
 
@@ -250,7 +271,13 @@ def parse_spotify_embed(source_url: str, html: str) -> TrackMatch:
         ),
         release_year=release_year,
         kind=normalized_kind,
-        release_format="album" if normalized_kind == "album" else None,
+        release_format=infer_release_format(title, entity.get("albumType"), "album")
+        if normalized_kind == "album"
+        else None,
+        album_title=str(entity.get("albumName") or "") or None,
+        track_count=positive_track_count(
+            entity.get("trackCount") or entity.get("totalTracks")
+        ),
         thumbnail_url=_spotify_thumbnail(entity),
     )
 

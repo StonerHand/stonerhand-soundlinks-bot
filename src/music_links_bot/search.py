@@ -137,7 +137,7 @@ class SearchClient:
             page_url=page_url,
             release_year=candidate.year,
             kind=kind,
-            release_format=candidate.album if kind == "song" else None,
+            album_title=candidate.album if kind == "song" else None,
             thumbnail_url=_large_artwork_url(candidate.artwork_url),
         )
 
@@ -365,6 +365,9 @@ def _extract_matching_genre(
     if not artist_key or not title_key:
         return None
 
+    matches = {}
+    from music_links_bot.release_tags import genre_hashtags
+
     for result in results:
         if not isinstance(result, dict):
             continue
@@ -380,9 +383,11 @@ def _extract_matching_genre(
             continue
         genre = result.get("primaryGenreName")
         if isinstance(genre, str) and genre.strip():
-            return genre.strip()
+            normalized = tuple(sorted(genre_hashtags(genre)))
+            if normalized:
+                matches[normalized] = genre.strip()
 
-    return None
+    return next(iter(matches.values())) if len(matches) == 1 else None
 
 
 def _metadata_match_key(value: object) -> str:

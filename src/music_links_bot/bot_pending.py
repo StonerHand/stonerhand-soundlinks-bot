@@ -13,10 +13,10 @@ from telegram.ext import ContextTypes
 
 from music_links_bot.bot_builder import (
     PENDING_INPUT_TTL_SECONDS,
-    apply_custom_tags,
     apply_intro_html,
     format_schedule_datetime,
     normalize_crate_title,
+    parse_custom_tags,
     parse_schedule_datetime,
 )
 from music_links_bot.bot_crate import load_crate, load_crate_title, save_crate_title
@@ -38,12 +38,20 @@ from music_links_bot.keyboards import (
 )
 from music_links_bot.models import TrackMatch
 from music_links_bot.publication_presets import save_named_preset
+from music_links_bot.publication_view import resolve_draft_hashtags
 from music_links_bot.publish_queue import (
     QueueBusyError,
     QueueFullError,
     QueueStorageError,
     add_job,
 )
+from music_links_bot.release_preferences import (
+    current_presentation,
+    normalize_annotations,
+    preferences_from_session,
+    release_preference_key,
+)
+from music_links_bot.release_tags import unique_tags
 from music_links_bot.sharing import build_crate_share_query
 from music_links_bot.telegram_text import format_user_note_html, telegram_text_length
 from music_links_bot.url_utils import extract_supported_urls, strip_supported_urls
@@ -134,8 +142,32 @@ async def consume_pending_input(
         saved_key = result.saved_key
         schedule_label = result.schedule_label
         await store_draft(context, draft_id, draft)
-        if kind not in {"schedule", "cover", "template_name"}:
+        if kind not in {"schedule", "cover", "template_name", "hashtags"}:
             await save_channel_template(context, f"user:{user.id}", draft)
+    elif kind in {"crate_note", "crate_section"}:
+        release_key = str(pending.get("release_key") or "")
+        entries = await load_crate(context.application.bot_data, user.id)
+        if not any(
+            release_preference_key(TrackMatch(**entry["item"])) == release_key
+            for entry in entries
+            if isinstance(entry.get("item"), dict)
+        ):
+            await _clear_pending(runtime, session)
+            await message.reply_text(get_text(lang, "ed_expired"))
+            return True
+        field = "note" if kind == "crate_note" else "section"
+        record = dict(session.collection_annotations.pop(release_key, {}))
+        record[field] = (
+            ""
+            if value == "-"
+            else " ".join(value.split())[: 140 if field == "note" else 64]
+        )
+        session.collection_annotations[release_key] = record
+        session.collection_annotations = normalize_annotations(
+            session.collection_annotations
+        )
+        current_presentation.set(preferences_from_session(session))
+        saved_key = "settings_saved"
     elif kind == "crate_title":
         await save_crate_title(
             context.application.bot_data,
@@ -149,7 +181,7 @@ async def consume_pending_input(
 
     await _clear_pending(runtime, session)
     await _delete_prompt(context, message, pending)
-    if kind == "crate_title":
+    if kind in {"crate_title", "crate_note", "crate_section"}:
         await _restore_crate_screen(
             message,
             context,
@@ -251,8 +283,15 @@ async def _apply_draft_input(
         )
         return DraftInputResult("ed_intro_saved")
     if kind == "hashtags":
+        track = TrackMatch(**draft["item"])
+        previous = (resolve_draft_hashtags(draft, track) or "").split()
+        combined = unique_tags([*previous, *parse_custom_tags(value)], limit=12)
+        if len(combined) > 5:
+            await message.reply_text(get_text(lang, "ed_tags_limit"))
+            return DraftInputResult()
         remember_setting_state(draft)
-        apply_custom_tags(draft, value)
+        draft["custom_tags"] = combined
+        draft["hashtags"] = bool(combined)
         return DraftInputResult("ed_tags_saved")
     return await _schedule_custom_time(
         message,

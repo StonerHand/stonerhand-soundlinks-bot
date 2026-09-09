@@ -29,6 +29,7 @@ _EDITABLE_FIELDS = (
     "quote",
     "hashtags",
     "custom_tags",
+    "tag_options",
     "platforms",
     "preset",
     "large_preview",

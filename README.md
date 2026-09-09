@@ -6,7 +6,7 @@
 
 [Open the bot](https://t.me/StonerHandBot) · [See the channel](https://t.me/stonerhand) · [Русская версия](README.ru.md)
 
-![Release](https://img.shields.io/badge/release-1.16.0-5b5bd6?style=flat-square)
+![Release](https://img.shields.io/badge/release-1.17.0-5b5bd6?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
@@ -97,6 +97,16 @@ if the welcome image fails to load.
 of new cards and hashtag defaults across restarts, without rewriting existing
 cards. Initially the bot follows Telegram's language and the previous appearance
 settings. Help and privacy are available from settings.
+
+Collections support saved **One column / Auto / Compact** layouts, optional
+artist/album sections and per-item notes. Up to ten entries remain in one post,
+with matching list and button numbers. Artwork can use the original cover or
+the provider preview; YouTube retains its playable preview.
+
+The tag editor offers individual toggles, custom additions and per-release
+corrections (up to 60 recent corrections and notes per user). Automatic tags
+prioritize publication type and verified metadata, with a five-tag limit.
+Collection genres require agreement across every musical entry.
 
 An empty inline screen shows up to three recent releases; a new user gets one
 live example and a **Find music** action. Configure the input hint once in

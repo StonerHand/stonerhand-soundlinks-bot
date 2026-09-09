@@ -30,6 +30,8 @@ _UNIVERSAL_LABEL_MARKERS = (
     "слушать целиком",
     "открыть все",
     "открыть выпуск",
+    "выбрать площадку",
+    "choose platform",
 )
 
 
@@ -235,9 +237,8 @@ def _is_universal_label(label: str) -> bool:
 
 
 def _platform_key_for_label(label: str) -> str | None:
-    normalized = " ".join(label.casefold().split())
+    normalized = " ".join(label.casefold().split()).lstrip("🟢⚪🟣🔴🟠🟦⚫🟡 ")
     for platform_key, platform_label in PLATFORM_LABELS.items():
-        provider_name = platform_label.split(maxsplit=1)[-1].casefold()
-        if normalized in {platform_label.casefold(), provider_name}:
+        if normalized == platform_label.casefold():
             return platform_key
     return None

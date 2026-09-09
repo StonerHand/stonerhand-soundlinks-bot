@@ -35,6 +35,7 @@ def coalesce_equivalent_tracks(tracks: list[TrackMatch]) -> list[TrackMatch]:
     one card with the union of all available platform buttons.
     """
     merged: list[TrackMatch] = []
+    conflicting_genres: set[int] = set()
     for track in tracks:
         identity = release_identity(track)
         position = next(
@@ -51,6 +52,12 @@ def coalesce_equivalent_tracks(tracks: list[TrackMatch]) -> list[TrackMatch]:
             continue
 
         current = merged[position]
+        if (
+            current.genre
+            and track.genre
+            and current.genre.casefold() != track.genre.casefold()
+        ):
+            conflicting_genres.add(position)
         links = direct_platform_links(current.links)
         for key, value in direct_platform_links(track.links).items():
             existing = links.get(key)
@@ -63,7 +70,11 @@ def coalesce_equivalent_tracks(tracks: list[TrackMatch]) -> list[TrackMatch]:
             thumbnail_url=current.thumbnail_url or track.thumbnail_url,
             release_year=current.release_year or track.release_year,
             release_format=current.release_format or track.release_format,
-            genre=current.genre or track.genre,
+            genre=None
+            if position in conflicting_genres
+            else current.genre or track.genre,
+            album_title=current.album_title or track.album_title,
+            track_count=current.track_count or track.track_count,
         )
     return merged
 

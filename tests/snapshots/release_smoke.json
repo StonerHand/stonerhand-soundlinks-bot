@@ -2,8 +2,8 @@
   "cases": {
     "channel_keyboard": {
       "buttons": [
-        "🪩 Все платформы",
-        "🟢 Spotify"
+        "Выбрать площадку",
+        "Spotify"
       ],
       "checks": {
         "channel_safe": true,
@@ -30,8 +30,8 @@
     },
     "classic_track": {
       "buttons": [
-        "🪩 Все платформы",
-        "🟢 Spotify"
+        "Выбрать площадку",
+        "Spotify"
       ],
       "checks": {
         "hub_is_primary": true,
@@ -75,11 +75,12 @@
       "issues": [],
       "lines": [
         "Подборка · 3 релиза",
+        "3 трека",
         "Kokomo",
         "1. A Torinói Ló",
         "2. The Lonesome Foghorn Blows",
         "3. 1758 Times of Weird Sadness",
-        "#stonerhand #track #collection"
+        "#stonerhand #collection #track #kokomo"
       ],
       "mode": "classic",
       "ok": true,
@@ -104,11 +105,12 @@
       "issues": [],
       "lines": [
         "⚠️ Подборка · 3 из 4",
+        "3 трека",
         "Kokomo",
         "1. A Torinói Ló",
         "2. The Lonesome Foghorn Blows",
         "3. 1758 Times of Weird Sadness",
-        "#stonerhand #track #collection"
+        "#stonerhand #collection #track #kokomo"
       ],
       "mode": "classic",
       "ok": true,
@@ -116,8 +118,8 @@
     },
     "inline_share": {
       "buttons": [
-        "🪩 Все платформы",
-        "🟢 Spotify",
+        "Выбрать площадку",
+        "Spotify",
         "Поделиться"
       ],
       "checks": {
@@ -145,8 +147,8 @@
     },
     "rich_card": {
       "buttons": [
-        "🪩 Все платформы",
-        "🟢 Spotify"
+        "Выбрать площадку",
+        "Spotify"
       ],
       "checks": {
         "has_buttons": true,
@@ -176,7 +178,7 @@
     },
     "soundcloud_source_only": {
       "buttons": [
-        "🟠 SoundCloud"
+        "SoundCloud"
       ],
       "checks": {
         "forbidden_buttons_absent": true
@@ -197,9 +199,202 @@
       "mode": "classic",
       "ok": true,
       "preview_host": "i1.sndcdn.com"
+    },
+    "soundtrack_metadata": {
+      "buttons": [
+        "Выбрать площадку",
+        "Spotify"
+      ],
+      "checks": {
+        "count_confirmed": true,
+        "exact_format": true,
+        "hub_is_primary": true,
+        "provider_shortcuts_are_neutral": true,
+        "seo_removed": true
+      },
+      "count": [
+        1,
+        1
+      ],
+      "destinations": [
+        "album.link",
+        "open.spotify.com"
+      ],
+      "issues": [],
+      "lines": [
+        "Scott Pilgrim vs. the World (Original Motion Picture Soundtrack)",
+        "Various Artists",
+        "Саундтрек · 2010 · 19 треков",
+        "#stonerhand #soundtrack"
+      ],
+      "mode": "classic",
+      "ok": true,
+      "preview_host": ""
+    },
+    "ten_items_auto": {
+      "buttons": [
+        "1 · Artist 1 — Track 1 (Live 2001)",
+        "2 · Artist 2 — Track 2 (Live 2001)",
+        "3 · Artist 3 — Track 3 (Live 2001)",
+        "4 · Artist 4 — Track 4 (Live 2001)",
+        "5 · Artist 5 — Track 5 (Live 2001)",
+        "6 · Artist 6 — Track 6 (Live 2001)",
+        "7 · Artist 7 — Track 7 (Live 2001)",
+        "8 · Artist 8 — Track 8 (Live 2001)",
+        "9 · Artist 9 — Track 9 (Live 2001)",
+        "10 · Artist 10 — Track 10 (Live 2001)"
+      ],
+      "checks": {
+        "all_buttons_present": true,
+        "all_items_present": true,
+        "mandatory_type": true
+      },
+      "count": [
+        10,
+        10
+      ],
+      "destinations": [
+        "song.link",
+        "song.link",
+        "song.link",
+        "song.link",
+        "song.link",
+        "song.link",
+        "song.link",
+        "song.link",
+        "song.link",
+        "song.link"
+      ],
+      "issues": [],
+      "lines": [
+        "Подборка",
+        "10 треков",
+        "1. Artist 1 — Track 1 (Live 2001)",
+        "2. Artist 2 — Track 2 (Live 2001)",
+        "3. Artist 3 — Track 3 (Live 2001)",
+        "4. Artist 4 — Track 4 (Live 2001)",
+        "5. Artist 5 — Track 5 (Live 2001)",
+        "6. Artist 6 — Track 6 (Live 2001)",
+        "7. Artist 7 — Track 7 (Live 2001)",
+        "8. Artist 8 — Track 8 (Live 2001)",
+        "9. Artist 9 — Track 9 (Live 2001)",
+        "10. Artist 10 — Track 10 (Live 2001)",
+        "#stonerhand #collection #track"
+      ],
+      "mode": "classic",
+      "ok": true,
+      "preview_host": ""
+    },
+    "ten_items_column": {
+      "buttons": [
+        "1 · Artist 1 — Track 1 (Live 2001)",
+        "2 · Artist 2 — Track 2 (Live 2001)",
+        "3 · Artist 3 — Track 3 (Live 2001)",
+        "4 · Artist 4 — Track 4 (Live 2001)",
+        "5 · Artist 5 — Track 5 (Live 2001)",
+        "6 · Artist 6 — Track 6 (Live 2001)",
+        "7 · Artist 7 — Track 7 (Live 2001)",
+        "8 · Artist 8 — Track 8 (Live 2001)",
+        "9 · Artist 9 — Track 9 (Live 2001)",
+        "10 · Artist 10 — Track 10 (Live 2001)"
+      ],
+      "checks": {
+        "all_buttons_present": true,
+        "all_items_present": true,
+        "mandatory_type": true
+      },
+      "count": [
+        10,
+        10
+      ],
+      "destinations": [
+        "song.link",
+        "song.link",
+        "song.link",
+        "song.link",
+        "song.link",
+        "song.link",
+        "song.link",
+        "song.link",
+        "song.link",
+        "song.link"
+      ],
+      "issues": [],
+      "lines": [
+        "Подборка",
+        "10 треков",
+        "1. Artist 1 — Track 1 (Live 2001)",
+        "2. Artist 2 — Track 2 (Live 2001)",
+        "3. Artist 3 — Track 3 (Live 2001)",
+        "4. Artist 4 — Track 4 (Live 2001)",
+        "5. Artist 5 — Track 5 (Live 2001)",
+        "6. Artist 6 — Track 6 (Live 2001)",
+        "7. Artist 7 — Track 7 (Live 2001)",
+        "8. Artist 8 — Track 8 (Live 2001)",
+        "9. Artist 9 — Track 9 (Live 2001)",
+        "10. Artist 10 — Track 10 (Live 2001)",
+        "#stonerhand #collection #track"
+      ],
+      "mode": "classic",
+      "ok": true,
+      "preview_host": ""
+    },
+    "ten_items_compact": {
+      "buttons": [
+        "1 · Artist 1 — Track 1 (Live 2001)",
+        "2 · Artist 2 — Track 2 (Live 2001)",
+        "3 · Artist 3 — Track 3 (Live 2001)",
+        "4 · Artist 4 — Track 4 (Live 2001)",
+        "5 · Artist 5 — Track 5 (Live 2001)",
+        "6 · Artist 6 — Track 6 (Live 2001)",
+        "7 · Artist 7 — Track 7 (Live 2001)",
+        "8 · Artist 8 — Track 8 (Live 2001)",
+        "9 · Artist 9 — Track 9 (Live 2001)",
+        "10 · Artist 10 — Track 10 (Live 2001)"
+      ],
+      "checks": {
+        "all_buttons_present": true,
+        "all_items_present": true,
+        "mandatory_type": true
+      },
+      "count": [
+        10,
+        10
+      ],
+      "destinations": [
+        "song.link",
+        "song.link",
+        "song.link",
+        "song.link",
+        "song.link",
+        "song.link",
+        "song.link",
+        "song.link",
+        "song.link",
+        "song.link"
+      ],
+      "issues": [],
+      "lines": [
+        "Подборка",
+        "10 треков",
+        "1. Artist 1 — Track 1 (Live 2001)",
+        "2. Artist 2 — Track 2 (Live 2001)",
+        "3. Artist 3 — Track 3 (Live 2001)",
+        "4. Artist 4 — Track 4 (Live 2001)",
+        "5. Artist 5 — Track 5 (Live 2001)",
+        "6. Artist 6 — Track 6 (Live 2001)",
+        "7. Artist 7 — Track 7 (Live 2001)",
+        "8. Artist 8 — Track 8 (Live 2001)",
+        "9. Artist 9 — Track 9 (Live 2001)",
+        "10. Artist 10 — Track 10 (Live 2001)",
+        "#stonerhand #collection #track"
+      ],
+      "mode": "classic",
+      "ok": true,
+      "preview_host": ""
     }
   },
-  "contract": 5,
+  "contract": 6,
   "ok": true,
   "service": "publication-release-smoke",
   "ux": {

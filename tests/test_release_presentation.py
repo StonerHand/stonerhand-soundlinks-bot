@@ -33,12 +33,14 @@ class ReleasePresentationTests(unittest.TestCase):
         self.assertFalse(draft["as_photo"])
         self.assertEqual(draft["publication_mode"], "longread")
 
-    def test_compact_release_title_hides_only_trailing_remaster_metadata(self) -> None:
+    def test_compact_release_title_preserves_trailing_remaster_metadata(self) -> None:
         self.assertEqual(
             compact_release_title("There's No Other Way - 2012 Remaster"),
-            "There's No Other Way",
+            "There's No Other Way - 2012 Remaster",
         )
-        self.assertEqual(compact_release_title("Fool (Remastered 2012)"), "Fool")
+        self.assertEqual(
+            compact_release_title("Fool (Remastered 2012)"), "Fool (Remastered 2012)"
+        )
         self.assertEqual(
             compact_release_title("Remastering the Past"), "Remastering the Past"
         )

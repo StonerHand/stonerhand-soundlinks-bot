@@ -8,6 +8,7 @@ from telegram import (
 from telegram.ext import ContextTypes
 
 from music_links_bot.constants import PLATFORM_LABELS
+from music_links_bot.i18n import get_text, resolve_lang
 from music_links_bot.models import (
     ArtistMatch,
     PlaylistMatch,
@@ -16,6 +17,7 @@ from music_links_bot.models import (
     VideoMatch,
 )
 from music_links_bot.release_hubs import resolve_release_hub_url
+from music_links_bot.release_preferences import current_presentation
 from music_links_bot.release_presentation import (
     compact_release_title,
     shared_collection_artist,
@@ -26,6 +28,7 @@ from music_links_bot.telegram_buttons import (
     url_button,
 )
 from music_links_bot.url_utils import (
+    cache_key_for_url,
     is_platform_destination_url,
 )
 
@@ -153,7 +156,12 @@ def _build_link_keyboard(
         final_platforms = final_platforms[:MAX_VISIBLE_PLATFORM_BUTTONS]
 
     buttons = []
-    for index, platform_key in enumerate(final_platforms):
+    seen_urls = {cache_key_for_url(release_hub_url)} if release_hub_url else set()
+    for platform_key in final_platforms:
+        address = cache_key_for_url(links[platform_key])
+        if address in seen_urls:
+            continue
+        seen_urls.add(address)
         buttons.append(
             _url_button(
                 text=f"{prefix}{_platform_button_label(platform_key, context)}",
@@ -161,7 +169,7 @@ def _build_link_keyboard(
                 # The provider is a convenient shortcut; Songlink/Odesli is
                 # the canonical cross-platform destination and owns the only
                 # primary accent whenever it is available.
-                style="primary" if index == 0 and not release_hub_url else None,
+                style="primary" if not buttons and not release_hub_url else None,
             )
         )
     # The universal release hub is the canonical destination, so it owns the
@@ -186,12 +194,7 @@ def _platform_button_label(
     platform_key: str,
     context: ContextTypes.DEFAULT_TYPE | None = None,
 ) -> str:
-    label = PLATFORM_LABELS[platform_key]
-    if _get_ui_mode(context) != "minimal":
-        return label
-
-    parts = label.split(maxsplit=1)
-    return parts[1] if len(parts) == 2 else label
+    return PLATFORM_LABELS[platform_key]
 
 
 def _build_collection_keyboard(
@@ -219,7 +222,7 @@ def _build_collection_keyboard(
 
     for index, track, destination in available:
         if is_track_video_pair:
-            text = "📺 Смотреть клип" if track.kind == "video" else "🎧 Слушать песню"
+            text = "Смотреть клип" if track.kind == "video" else "Слушать песню"
         else:
             title = compact_release_title(track.title)
             text = f"{index} · {title}"
@@ -247,7 +250,7 @@ def _build_youtube_keyboard(
     include_channel_button: bool = False,
 ) -> InlineKeyboardMarkup:
     return _single_url_keyboard(
-        "📺 Смотреть на YouTube",
+        "Смотреть на YouTube",
         url=url,
         style="primary",
         include_channel_button=include_channel_button,
@@ -260,7 +263,7 @@ def _build_nts_keyboard(
     include_channel_button: bool = False,
 ) -> InlineKeyboardMarkup:
     return _single_url_keyboard(
-        "📻 Открыть на NTS",
+        "Открыть на NTS",
         url=url,
         style="primary",
         include_channel_button=include_channel_button,
@@ -302,7 +305,7 @@ def _build_youtube_collection_keyboard(
     for index, video in enumerate(videos, start=1):
         buttons.append(
             _url_button(
-                text=_button_label(f"📺 {index}. {video.title}"),
+                text=_button_label(f"{index} · {video.title}"),
                 url=video.url,
                 style=None,
             )
@@ -322,7 +325,7 @@ def _build_nts_collection_keyboard(
     for index, radio in enumerate(radios, start=1):
         buttons.append(
             _url_button(
-                text=_button_label(f"📻 {index}. {radio.title}"),
+                text=_button_label(f"{index} · {radio.title}"),
                 url=radio.url,
                 style=None,
             )
@@ -342,7 +345,7 @@ def _build_playlist_collection_keyboard(
     for index, playlist in enumerate(playlists, start=1):
         buttons.append(
             _url_button(
-                text=_button_label(f"🎛 {index}. {playlist.title}"),
+                text=_button_label(f"{index} · {playlist.title}"),
                 url=playlist.url,
                 style=None,
             )
@@ -362,7 +365,7 @@ def _build_artist_collection_keyboard(
     for index, artist in enumerate(artists, start=1):
         buttons.append(
             _url_button(
-                text=_button_label(f"🧬 {index}. {artist.title}"),
+                text=_button_label(f"{index} · {artist.title}"),
                 url=artist.url,
                 style=None,
             )
@@ -407,11 +410,9 @@ def _build_mixed_collection_keyboard(
         buttons.append(
             _url_button(
                 text=(
-                    "🎧 Слушать песню"
+                    "Слушать песню"
                     if is_track_video_pair
-                    else _button_label(
-                        f"{_track_button_icon(track)} {index}. {track.artist} - {track.title}"
-                    )
+                    else _button_label(f"{index} · {track.artist} — {track.title}")
                 ),
                 url=destination,
                 style="primary" if is_track_video_pair else None,
@@ -422,7 +423,7 @@ def _build_mixed_collection_keyboard(
     for playlist in playlists:
         buttons.append(
             _url_button(
-                text=_button_label(f"🎛 {index}. {playlist.title}"),
+                text=_button_label(f"{index} · {playlist.title}"),
                 url=playlist.url,
                 style=None,
             )
@@ -432,7 +433,7 @@ def _build_mixed_collection_keyboard(
     for artist in artists:
         buttons.append(
             _url_button(
-                text=_button_label(f"🧬 {index}. {artist.title}"),
+                text=_button_label(f"{index} · {artist.title}"),
                 url=artist.url,
                 style=None,
             )
@@ -442,7 +443,7 @@ def _build_mixed_collection_keyboard(
     for radio in radios:
         buttons.append(
             _url_button(
-                text=_button_label(f"📻 {index}. {radio.title}"),
+                text=_button_label(f"{index} · {radio.title}"),
                 url=radio.url,
                 style=None,
             )
@@ -453,9 +454,9 @@ def _build_mixed_collection_keyboard(
         buttons.append(
             _url_button(
                 text=(
-                    "📺 Смотреть клип"
+                    "Смотреть клип"
                     if is_track_video_pair
-                    else _button_label(f"📺 {index}. {video.title}")
+                    else _button_label(f"{index} · {video.title}")
                 ),
                 url=video.url,
                 style=None,
@@ -510,7 +511,15 @@ def _button_label(text: str) -> str:
 
 def _adaptive_collection_rows(
     buttons: list[InlineKeyboardButton],
+    *,
+    layout: str | None = None,
 ) -> list[list[InlineKeyboardButton]]:
+    layout = layout or current_presentation.get().layout
+    if layout == "column" or (
+        layout == "auto"
+        and any(len(b.text) > MAX_TWO_COLUMN_BUTTON_TEXT_LENGTH for b in buttons)
+    ):
+        return [[button] for button in buttons]
     rows: list[list[InlineKeyboardButton]] = []
     pending: InlineKeyboardButton | None = None
     for button in buttons:
@@ -548,36 +557,8 @@ def _release_hub_button_label(
     release_format: str | None,
     context: ContextTypes.DEFAULT_TYPE | None = None,
 ) -> str:
-    ui_mode = _get_ui_mode(context)
-
-    if ui_mode == "minimal":
-        if release_kind == "album":
-            return "Весь EP" if release_format == "ep" else "Весь релиз"
-
-        if release_kind == "podcast":
-            return "Все площадки"
-
-        return "Все платформы"
-
-    if ui_mode == "editorial":
-        if release_kind == "album":
-            return "💿 слушать EP" if release_format == "ep" else "💿 слушать целиком"
-
-        if release_kind == "podcast":
-            return "🎙 открыть выпуск"
-
-        return "🪩 открыть все"
-
-    if release_kind == "album":
-        if release_format == "ep":
-            return "💿 Весь EP"
-
-        return "💿 Весь релиз"
-
-    if release_kind == "podcast":
-        return "🎙 Все площадки"
-
-    return "🪩 Все платформы"
+    del context
+    return get_text(resolve_lang(None), "button_choose_platform")
 
 
 def _get_ui_mode(context: ContextTypes.DEFAULT_TYPE | None = None) -> str:

@@ -84,6 +84,7 @@ from music_links_bot.bot_progress import (
     update_progress_text as _update_progress_text,
 )
 from music_links_bot.bot_queue import dispatch_queue_action
+from music_links_bot.bot_release_settings import apply_release_setting
 from music_links_bot.bot_runtime import (
     BotErrorCode,
     BotFlowError,
@@ -839,6 +840,24 @@ async def _reject_failed_editor_preflight(request: EditorActionRequest) -> bool:
     return True
 
 
+async def _handle_release_setting(request: EditorActionRequest) -> bool:
+    screen = await apply_release_setting(request)
+    if screen is None:
+        return False
+    if screen == "answered":
+        return True
+    await _store_draft(request.context, request.draft_id, request.draft)
+    await _handle_editor_navigation(
+        request.query,
+        request.context,
+        action=screen,
+        draft_id=request.draft_id,
+        draft=request.draft,
+        lang=request.lang,
+    )
+    return True
+
+
 async def _handle_editor_shortcut(request: EditorActionRequest) -> bool:
     if request.action == "u":
         if not restore_setting_state(request.draft):
@@ -1123,6 +1142,7 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
     for handler in (
         _apply_last_editor_template,
         _reject_failed_editor_preflight,
+        _handle_release_setting,
         _handle_editor_shortcut,
         _handle_named_editor_template,
         _handle_pending_editor_action,

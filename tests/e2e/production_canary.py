@@ -126,13 +126,17 @@ def main() -> int:
             failures.append(f"publication smoke status={status} ok={payload.get('ok')}")
         if payload.get("service") != "publication-release-smoke":
             failures.append("publication smoke service identity is invalid")
-        if payload.get("contract") != 5:
+        if payload.get("contract") != 6:
             failures.append("publication smoke contract is outdated")
         cases = payload.get("cases") or {}
         expected_cases = {
             "classic_track",
             "soundcloud_source_only",
             "collection_complete",
+            "soundtrack_metadata",
+            "ten_items_column",
+            "ten_items_auto",
+            "ten_items_compact",
             "collection_partial",
             "inline_share",
             "channel_keyboard",

@@ -36,14 +36,14 @@ MAX_LINKS_PER_MESSAGE = 10
 INLINE_EXAMPLE_QUERY = "Deftones — Rickets"
 
 PLATFORM_LABELS = {
-    "spotify": "🟢 Spotify",
-    "appleMusic": "⚪ Apple",
-    "applePodcasts": "🟣 Podcasts",
-    "youtubeMusic": "🔴 YouTube",
-    "soundcloud": "🟠 SoundCloud",
-    "deezer": "🟦 Deezer",
-    "tidal": "⚫ Tidal",
-    "yandexMusic": "🟡 Yandex",
+    "spotify": "Spotify",
+    "appleMusic": "Apple Music",
+    "applePodcasts": "Apple Podcasts",
+    "youtubeMusic": "YouTube Music",
+    "soundcloud": "SoundCloud",
+    "deezer": "Deezer",
+    "tidal": "Tidal",
+    "yandexMusic": "Yandex Music",
 }
 
 PLATFORM_BUTTON_STYLES = {

@@ -3,7 +3,7 @@
   "rows": [
     [
       [
-        "🪩 Все платформы",
+        "Выбрать площадку",
         null,
         "https://song.link/sleep",
         null
@@ -11,7 +11,7 @@
     ],
     [
       [
-        "🟢 Spotify",
+        "Spotify",
         null,
         "https://open.spotify.com/track/1",
         null

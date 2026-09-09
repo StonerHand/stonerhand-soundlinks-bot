@@ -10,6 +10,7 @@ import httpx
 from music_links_bot.cache import TTLCache
 from music_links_bot.constants import HTTP_HEADERS, PLATFORM_ALIASES
 from music_links_bot.kvstore import KVStore
+from music_links_bot.metadata_cleaning import infer_release_format, positive_track_count
 from music_links_bot.models import TrackMatch
 from music_links_bot.release_hubs import canonical_release_hub_url
 from music_links_bot.spotify import SpotifyClient, SpotifyLookupError
@@ -326,6 +327,10 @@ class SonglinkClient:
             kind=entity_type,
             release_format=release_format,
             thumbnail_url=thumbnail_url,
+            album_title=str(entity.get("albumName") or "") or None,
+            track_count=positive_track_count(
+                entity.get("trackCount") or entity.get("totalTracks")
+            ),
         )
 
     def _merge_matches(self, matches: list[TrackMatch]) -> TrackMatch:
@@ -336,6 +341,12 @@ class SonglinkClient:
             merged_links.update(match.links)
 
         return TrackMatch(
+            album_title=next(
+                (match.album_title for match in matches if match.album_title), None
+            ),
+            track_count=next(
+                (match.track_count for match in matches if match.track_count), None
+            ),
             title=primary.title,
             artist=primary.artist,
             links=merged_links,
@@ -449,30 +460,13 @@ class SonglinkClient:
         return None
 
     def _extract_release_format(self, entity: Mapping[str, object]) -> str | None:
-        candidates = [
-            entity.get("albumType"),
-            entity.get("releaseType"),
-            entity.get("productType"),
-            entity.get("kind"),
-            entity.get("subtitle"),
-            entity.get("title"),
-        ]
-
-        for candidate in candidates:
-            value = str(candidate or "").strip().lower()
-            if not value:
-                continue
-
-            if re.search(r"\bep\b", value):
-                return "ep"
-
-            if re.search(r"\bsingle\b", value):
-                return "single"
-
-            if re.search(r"\balbum\b", value):
-                return "album"
-
-        return None
+        return infer_release_format(
+            str(entity.get("title") or ""),
+            *(
+                entity.get(key)
+                for key in ("albumType", "releaseType", "productType", "kind")
+            ),
+        )
 
 
 def _is_transient_status(status_code: int) -> bool:

@@ -35,8 +35,18 @@ from music_links_bot.bot_ui import (
 )
 from music_links_bot.draft_model import new_track_draft
 from music_links_bot.editor_view import render_track_draft
+from music_links_bot.formatter import (
+    format_collection_message,
+    format_track_message,
+    format_video_message,
+)
 from music_links_bot.i18n import get_text
-from music_links_bot.models import TrackMatch
+from music_links_bot.keyboards import (
+    _build_collection_keyboard,
+    _build_link_keyboard,
+    _build_youtube_keyboard,
+)
+from music_links_bot.models import TrackMatch, VideoMatch
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "output/ui-preview"
@@ -155,7 +165,7 @@ async def main():
             editor_platform_rows("demo", draft, track, ["spotify", "appleMusic"])
         ),
     )
-    for section in ("language", "appearance", "tags"):
+    for section in ("language", "appearance", "tags", "layout", "grouping", "artwork"):
         screens["pref_" + section] = screen(
             *preferences_view(UserSession(user_id=7), lang="ru", section=section)
         )
@@ -222,6 +232,57 @@ async def main():
     ]
     screens["collection"] = screen(
         *render_crate(items, lang="ru", title="Тяжёлый вечер")
+    )
+    soundtrack = TrackMatch(
+        title="Scott Pilgrim vs. the World (Original Motion Picture Soundtrack)",
+        artist="Various Artists",
+        kind="album",
+        release_format="soundtrack",
+        release_year="2010",
+        track_count=19,
+        links={"spotify": "https://open.spotify.com/album/example"},
+        page_url="https://album.link/s/example",
+    )
+    screens["soundtrack"] = screen(
+        format_track_message(soundtrack),
+        _build_link_keyboard(
+            soundtrack.links, release_page_url=soundtrack.page_url, release_kind="album"
+        ),
+    )
+    ten = [
+        TrackMatch(
+            artist="Mindless Self Indulgence" if index < 7 else "Другой артист",
+            title=name,
+            kind="album" if index > 6 else "song",
+            links={"spotify": f"https://open.spotify.com/track/{index}"},
+            page_url=f"https://song.link/s/{index}",
+        )
+        for index, name in enumerate(
+            (
+                "Pay For It",
+                "1989",
+                "Lights Out",
+                "Tom Sawyer",
+                "Seven Minutes in Heaven",
+                "Witness",
+                "Первый альбом",
+                "Второй альбом",
+                "Live Sessions",
+                "Remastered Collection",
+            ),
+            start=1,
+        )
+    ]
+    screens["ten_items"] = screen(
+        format_collection_message(ten), _build_collection_keyboard(ten)
+    )
+    video = VideoMatch(
+        title="Deadушки — Коллекционер (Maxidrom 2001)",
+        author="Aleksandr Doronin",
+        url="https://www.youtube.com/watch?v=example",
+    )
+    screens["video"] = screen(
+        format_video_message(video), _build_youtube_keyboard(video.url)
     )
     source = (ROOT / "scripts/ui_preview.html").read_text()
     source = source.replace(

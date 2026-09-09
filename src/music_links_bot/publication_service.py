@@ -277,7 +277,12 @@ class PublicationService:
         )
 
         # Explicit photo mode (including branded frames) remains authoritative.
-        if not rich_messages_enabled() or delivery_mode == "classic" or as_photo:
+        if (
+            not rich_messages_enabled()
+            or delivery_mode == "classic"
+            or as_photo
+            or track.kind == "video"
+        ):
             return False, None
         longread = is_longread(draft)
         rich_html = (

@@ -220,7 +220,8 @@ class SearchCacheTests(unittest.IsolatedAsyncioTestCase):
         assert track is not None
         self.assertEqual(track.artist, "Deftones")
         self.assertEqual(track.title, "Rickets")
-        self.assertEqual(track.release_format, "Around the Fur")
+        self.assertEqual(track.album_title, "Around the Fur")
+        self.assertIsNone(track.release_format)
         self.assertEqual(track.release_year, "1997")
         self.assertEqual(
             track.links,

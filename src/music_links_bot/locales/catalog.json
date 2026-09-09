@@ -260,8 +260,8 @@
     "ru": "# Без хэштегов"
   },
   "ed_hashtags_title": {
-    "en": "#️⃣ <b>Hashtags</b>\n<i>Auto adds the release type and only a verified genre. Uncertain genres are omitted.</i>",
-    "ru": "#️⃣ <b>Хэштеги</b>\n<i>Авто добавляет тип релиза и только подтверждённый жанр. Сомнительный жанр будет пропущен.</i>"
+    "ru": "<b>Теги релиза</b>\n\nНажми на тег, чтобы включить или убрать его. «Запомнить» сохранит выбранные теги для следующего поиска этого релиза.",
+    "en": "<b>Release tags</b>\n\nTap a tag to toggle it. Remember saves the selection for future lookups of this release."
   },
   "ed_intro_add": {
     "en": "+ Add intro",
@@ -460,16 +460,16 @@
     "ru": "Автоматические"
   },
   "ed_tags_custom": {
-    "en": "Custom hashtags",
-    "ru": "Свои хэштеги"
+    "ru": "Добавить свои",
+    "en": "Add tags"
   },
   "ed_tags_none": {
     "en": "No hashtags",
     "ru": "Без хэштегов"
   },
   "ed_tags_prompt": {
-    "en": "<b>Waiting for hashtags</b>\nSend up to five separated by spaces: <code>#stonerrock #newmusic</code>\n<code>/cancel</code> — cancel",
-    "ru": "<b>Жду хэштеги</b>\nПришли до пяти через пробел: <code>#stonerrock #newmusic</code>\n<code>/cancel</code> — отменить"
+    "ru": "Пришли теги через пробел. Они добавятся к выбранным; всего до 5.",
+    "en": "Send space-separated tags. They are added to your selection, up to 5 total."
   },
   "ed_tags_saved": {
     "en": "Hashtags saved",
@@ -1186,5 +1186,113 @@
   "published_details": {
     "ru": "Канал: <b>{target}</b>\n{date}",
     "en": "Channel: <b>{target}</b>\n{date}"
+  },
+  "button_choose_platform": {
+    "ru": "Выбрать площадку",
+    "en": "Choose platform"
+  },
+  "pref_layout": {
+    "ru": "Кнопки подборок · {value}",
+    "en": "Collection buttons · {value}"
+  },
+  "pref_layout_title": {
+    "ru": "<b>Кнопки подборок</b>\n\nВыбери расположение. Названия и порядок сохраняются.",
+    "en": "<b>Collection buttons</b>\n\nChoose a layout. Names and order are preserved."
+  },
+  "pref_layout_column": {
+    "ru": "Одна колонка",
+    "en": "One column"
+  },
+  "pref_layout_auto": {
+    "ru": "Авто",
+    "en": "Auto"
+  },
+  "pref_layout_compact": {
+    "ru": "Компактно",
+    "en": "Compact"
+  },
+  "pref_grouping": {
+    "ru": "Разделы подборок · {value}",
+    "en": "Collection sections · {value}"
+  },
+  "pref_grouping_title": {
+    "ru": "<b>Разделы подборок</b>\n\nЗаголовки разделяют соседние позиции. Порядок и номера остаются исходными.",
+    "en": "<b>Collection sections</b>\n\nHeadings separate adjacent entries. Order and numbering stay unchanged."
+  },
+  "pref_grouping_none": {
+    "ru": "Без разделов",
+    "en": "No sections"
+  },
+  "pref_grouping_artist": {
+    "ru": "По артистам",
+    "en": "By artist"
+  },
+  "pref_grouping_album": {
+    "ru": "По альбомам",
+    "en": "By album"
+  },
+  "pref_artwork": {
+    "ru": "Обложка новых постов · {value}",
+    "en": "New post artwork · {value}"
+  },
+  "pref_artwork_title": {
+    "ru": "<b>Обложка новых постов</b>\n\nЧистая обложка убирает описание площадки из музыкальной карточки. У YouTube сохраняется видеопревью.",
+    "en": "<b>New post artwork</b>\n\nClean artwork removes the platform description from music cards. YouTube retains its video preview."
+  },
+  "pref_artwork_native": {
+    "ru": "Превью площадки",
+    "en": "Platform preview"
+  },
+  "pref_artwork_clean": {
+    "ru": "Чистая обложка",
+    "en": "Clean artwork"
+  },
+  "ed_artwork_native": {
+    "ru": "Превью площадки",
+    "en": "Platform preview"
+  },
+  "ed_artwork_clean": {
+    "ru": "Чистая обложка",
+    "en": "Clean artwork"
+  },
+  "ed_clean_unavailable": {
+    "ru": "Для этого поста чистая обложка недоступна.",
+    "en": "Clean artwork is unavailable for this post."
+  },
+  "ed_tags_pin": {
+    "ru": "Запомнить для этого релиза",
+    "en": "Remember for this release"
+  },
+  "ed_tags_reset": {
+    "ru": "Сбросить поправку релиза",
+    "en": "Reset release correction"
+  },
+  "ed_tags_limit": {
+    "ru": "Можно выбрать до 5 тегов. Сначала отключи ненужный.",
+    "en": "Choose up to 5 tags. Deselect an unwanted tag first."
+  },
+  "crate_note": {
+    "ru": "Заметка к позиции",
+    "en": "Entry note"
+  },
+  "crate_section": {
+    "ru": "Название раздела",
+    "en": "Section heading"
+  },
+  "crate_layout": {
+    "ru": "Вид кнопок",
+    "en": "Button layout"
+  },
+  "crate_grouping": {
+    "ru": "Разделы",
+    "en": "Sections"
+  },
+  "crate_note_prompt": {
+    "ru": "Пришли заметку к выбранному релизу — до 140 символов. Она появится под ним в подборках. «-» уберёт заметку.",
+    "en": "Send a note for this release, up to 140 characters. It appears below it in collections. Send - to remove it."
+  },
+  "crate_section_prompt": {
+    "ru": "Пришли название раздела перед выбранным релизом — до 64 символов. «-» уберёт название.",
+    "en": "Send a section heading before this release, up to 64 characters. Send - to remove it."
   }
 }

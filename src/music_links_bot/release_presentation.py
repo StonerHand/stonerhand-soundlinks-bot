@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from typing import Final
 
 from music_links_bot.metadata_cleaning import clean_spotify_metadata_title
@@ -30,13 +29,6 @@ PRESET_PROFILES: Final = {
     },
 }
 
-_REMASTER_SUFFIX: Final = re.compile(
-    r"(?:\s*[-–—]\s*|\s*\()"
-    r"(?:(?:19|20)\d{2}\s+)?re-?master(?:ed)?"
-    r"(?:\s+(?:19|20)\d{2})?\)?$",
-    re.IGNORECASE,
-)
-
 
 def release_emoji(track: TrackMatch) -> str:
     if track.kind == "video":
@@ -50,9 +42,7 @@ def release_emoji(track: TrackMatch) -> str:
 
 def compact_release_title(value: str) -> str:
     """Hide provider presentation suffixes without changing stored metadata."""
-    title = clean_spotify_metadata_title(value)
-    compact = _REMASTER_SUFFIX.sub("", title).strip()
-    return compact or title
+    return clean_spotify_metadata_title(value)
 
 
 def shared_collection_artist(tracks: list[TrackMatch]) -> str | None:

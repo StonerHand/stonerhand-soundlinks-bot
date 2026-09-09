@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from music_links_bot.metadata_cleaning import clean_spotify_metadata_title
+from music_links_bot.metadata_cleaning import (
+    clean_spotify_metadata_title,
+    infer_release_format,
+    positive_track_count,
+)
 
 
 @dataclass(slots=True)
@@ -16,12 +20,24 @@ class TrackMatch:
     release_format: str | None = None
     thumbnail_url: str | None = None
     genre: str | None = None
+    album_title: str | None = None
+    track_count: int | None = None
 
     def __post_init__(self) -> None:
         # Spotify's public metadata sometimes returns an SEO page title such
         # as "Release - Album by Artist | Spotify". Keep that provider copy
         # out of every downstream surface, including restored legacy drafts.
-        self.title = clean_spotify_metadata_title(self.title)
+        if self.kind == "album":
+            self.release_format = (
+                infer_release_format(self.title, self.release_format)
+                or self.release_format
+            )
+        self.track_count = positive_track_count(self.track_count)
+        self.title = clean_spotify_metadata_title(
+            self.title,
+            artist=self.artist,
+            spotify_source=bool(self.links.get("spotify")),
+        )
 
 
 @dataclass(slots=True)

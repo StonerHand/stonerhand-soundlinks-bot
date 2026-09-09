@@ -22,6 +22,7 @@ from music_links_bot.formatter import format_collection_message
 from music_links_bot.i18n import get_text, resolve_lang
 from music_links_bot.keyboards import _build_collection_keyboard
 from music_links_bot.models import TrackMatch
+from music_links_bot.release_preferences import release_preference_key
 from music_links_bot.sharing import add_share_button, build_crate_share_query
 from music_links_bot.telegram_buttons import button as InlineKeyboardButton
 
@@ -60,6 +61,33 @@ async def dispatch_crate_action(query, context, action: CallbackAction) -> None:
     selected_index: int | None = None
     notice: str | None = None
 
+    if action.action in {"note", "section"}:
+        items = await load_crate(bot_data, user_id)
+        if query.message is None or not any(
+            release_preference_key(TrackMatch(**{"links": {}, **entry["item"]}))
+            == action.payload
+            for entry in items
+            if isinstance(entry.get("item"), dict)
+        ):
+            await query.answer(get_text(lang, "ed_expired"), show_alert=True)
+            return
+        prompt = await query.message.reply_text(
+            get_text(lang, "crate_" + action.action + "_prompt"),
+            reply_markup=ForceReply(selective=True),
+        )
+        runtime = runtime_for(context)
+        session = await runtime.get_session(user_id, lang=lang)
+        session.pending_input = {
+            "kind": "crate_" + action.action,
+            "release_key": action.payload,
+            "editor_chat_id": query.message.chat_id,
+            "editor_message_id": query.message.message_id,
+            "prompt_message_id": prompt.message_id,
+            "created_at": int(time.time()),
+        }
+        await runtime.save_session(session)
+        await query.answer()
+        return
     if action.action == "rename":
         await _start_rename(query, context, user_id=user_id, lang=lang)
         return
@@ -180,7 +208,7 @@ async def _start_rename(query, context, *, user_id: int, lang: str) -> None:
 async def _show_preview(query, context, *, user_id: int, lang: str, title: str) -> None:
     items = await load_crate(context.application.bot_data, user_id)
     tracks = [
-        TrackMatch(**entry["item"])
+        TrackMatch(**{"links": {}, **entry["item"]})
         for entry in items
         if isinstance(entry.get("item"), dict)
     ]

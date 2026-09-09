@@ -10,6 +10,13 @@ from music_links_bot.i18n import (
     preferred_language,
     resolve_lang,
 )
+from music_links_bot.models import TrackMatch
+from music_links_bot.release_preferences import (
+    current_presentation,
+    preferences_from_session,
+    presentation_context,
+    release_preference_key,
+)
 from music_links_bot.release_presentation import apply_preset
 from music_links_bot.telegram_buttons import button
 
@@ -20,7 +27,7 @@ class LocalizedApplication(Application):
     __slots__ = ()
 
     async def process_update(self, update: object) -> None:
-        with language_context(None):
+        with language_context(None), presentation_context():
             runtime = self.bot_data.get("runtime")
             user = update.effective_user if isinstance(update, Update) else None
             if user is not None and isinstance(runtime, BotRuntime):
@@ -28,6 +35,7 @@ class LocalizedApplication(Application):
                     user.id, lang=resolve_lang(user.language_code)
                 )
                 preferred_language.set(session.preferred_lang or None)
+                current_presentation.set(preferences_from_session(session))
             await super().process_update(update)
 
 
@@ -39,6 +47,21 @@ def apply_preferences(draft: dict, session: UserSession) -> None:
     if session.default_hashtags:
         draft["hashtags"] = session.default_hashtags == "auto"
         draft.pop("custom_tags", None)
+    if (
+        session.default_artwork == "clean"
+        and draft.get("item", {}).get("kind") != "video"
+    ):
+        draft["as_photo"] = bool(draft.get("item", {}).get("thumbnail_url"))
+    elif (
+        session.default_artwork == "native"
+        and draft.get("publication_mode") != "longread"
+    ):
+        draft["delivery_mode"] = "classic"
+    track = TrackMatch(**draft["item"])
+    saved = session.release_tags.get(release_preference_key(track))
+    if saved is not None:
+        draft["custom_tags"] = list(saved)
+        draft["hashtags"] = bool(saved)
 
 
 def preferences_view(session: UserSession, *, lang: str, section: str = "open"):
@@ -48,6 +71,26 @@ def preferences_view(session: UserSession, *, lang: str, section: str = "open"):
         )
 
     choices = {
+        "layout": (
+            "collection_layout",
+            [
+                ("column", "pref_layout_column"),
+                ("auto", "pref_layout_auto"),
+                ("compact", "pref_layout_compact"),
+            ],
+        ),
+        "grouping": (
+            "collection_grouping",
+            [
+                ("none", "pref_grouping_none"),
+                ("artist", "pref_grouping_artist"),
+                ("album", "pref_grouping_album"),
+            ],
+        ),
+        "artwork": (
+            "default_artwork",
+            [("native", "pref_artwork_native"), ("clean", "pref_artwork_clean")],
+        ),
         "language": (
             "preferred_lang",
             [("", "pref_lang_auto"), ("ru", "pref_lang_ru"), ("en", "pref_lang_en")],
@@ -97,6 +140,30 @@ def preferences_view(session: UserSession, *, lang: str, section: str = "open"):
         [cb(get_text(lang, "pref_appearance").format(value=preset), "appearance")],
         [cb(get_text(lang, "pref_tags").format(value=tags), "tags")],
         [
+            cb(
+                get_text(lang, "pref_layout").format(
+                    value=get_text(lang, "pref_layout_" + session.collection_layout)
+                ),
+                "layout",
+            )
+        ],
+        [
+            cb(
+                get_text(lang, "pref_grouping").format(
+                    value=get_text(lang, "pref_grouping_" + session.collection_grouping)
+                ),
+                "grouping",
+            )
+        ],
+        [
+            cb(
+                get_text(lang, "pref_artwork").format(
+                    value=get_text(lang, "pref_artwork_" + session.default_artwork)
+                ),
+                "artwork",
+            )
+        ],
+        [
             button(
                 get_text(lang, "tab_help"),
                 callback_data=encode_callback("menu", "help"),
@@ -128,6 +195,9 @@ async def dispatch_preferences(query, context, action) -> None:
         query.from_user.id, lang=resolve_lang(query.from_user.language_code)
     )
     choices = {
+        "layout": ("collection_layout", {"auto", "column", "compact"}),
+        "grouping": ("collection_grouping", {"none", "artist", "album"}),
+        "artwork": ("default_artwork", {"native", "clean"}),
         "language": ("preferred_lang", {"", "ru", "en"}),
         "appearance": ("default_preset", {"", "minimal", "cover", "longread"}),
         "tags": ("default_hashtags", {"", "auto", "off"}),
@@ -141,6 +211,7 @@ async def dispatch_preferences(query, context, action) -> None:
             await runtime.save_session(session)
             changed = True
     preferred_language.set(session.preferred_lang or None)
+    current_presentation.set(preferences_from_session(session))
     lang = resolve_lang(query.from_user.language_code)
     text, keyboard = preferences_view(session, lang=lang, section=action.action)
     await query.answer(get_text(lang, "settings_saved") if changed else None)

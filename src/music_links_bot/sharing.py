@@ -213,6 +213,7 @@ def render_inline_share_card(
     share_label: str,
     requested_count: int | None = None,
     intro_html: str = "",
+    collection_name: str | None = None,
 ) -> InlineShareCard:
     found_count = bundle.item_count
     total_count = max(found_count, int(requested_count or found_count))
@@ -227,7 +228,7 @@ def render_inline_share_card(
     )
 
     if bundle.content_type_count == 1 and bundle.tracks:
-        title = collection_result_title(
+        title = collection_name or collection_result_title(
             lang,
             found=len(bundle.tracks),
             total=total_count,

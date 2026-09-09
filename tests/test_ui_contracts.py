@@ -56,7 +56,7 @@ class PublicationGoldenTests(unittest.TestCase):
         )
         self.assertEqual(draft["v"], CURRENT_DRAFT_VERSION)
         labels = [button.text for row in keyboard.inline_keyboard for button in row]
-        self.assertEqual(labels[:2], ["🪩 Все платформы", "🟢 Spotify"])
+        self.assertEqual(labels[:2], ["Выбрать площадку", "Spotify"])
         self.assertIn("Изменить", labels)
 
     def test_editor_card_snapshots_are_stable(self) -> None:
@@ -200,7 +200,9 @@ class EditorFlowContractTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(await _consume_pending_input(update, context))
         stored = context.application.bot_data["drafts"]["draft123"]
-        self.assertEqual(stored["custom_tags"], ["#doom", "#stonerrock"])
+        self.assertEqual(
+            stored["custom_tags"], ["#stonerhand", "#track", "#doom", "#stonerrock"]
+        )
         self.assertEqual((await runtime.get_session(7)).pending_input, {})
         message.reply_text.assert_awaited_once()
 

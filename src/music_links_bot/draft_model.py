@@ -66,6 +66,7 @@ def _normalize_track_item(value: dict) -> DraftTrackItem:
         ("release_year", 16),
         ("release_format", 64),
         ("genre", 128),
+        ("album_title", 512),
     ):
         raw = value.get(key)
         if raw is None:
@@ -73,6 +74,10 @@ def _normalize_track_item(value: dict) -> DraftTrackItem:
         clean = str(raw).strip()[:limit]
         if clean:
             item[key] = clean
+    from music_links_bot.metadata_cleaning import positive_track_count
+
+    if count := positive_track_count(value.get("track_count")):
+        item["track_count"] = count
     return item
 
 
@@ -85,6 +90,8 @@ class DraftTrackItem(TypedDict, total=False):
     release_format: str | None
     release_year: str | None
     thumbnail_url: str | None
+    album_title: str | None
+    track_count: int | None
     genre: str | None
 
 

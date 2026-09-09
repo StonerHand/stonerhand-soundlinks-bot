@@ -32,7 +32,7 @@ from music_links_bot.models import (
 class FormatterTests(unittest.TestCase):
     def test_genre_hashtags_normalize_itunes_genres(self) -> None:
         self.assertEqual(genre_hashtags("Heavy Metal"), ["#heavymetal"])
-        self.assertEqual(genre_hashtags("Hip-Hop/Rap"), ["#hiphop", "#rap"])
+        self.assertEqual(genre_hashtags("Hip-Hop/Rap"), ["#hiphop"])
         self.assertEqual(genre_hashtags("R&B/Soul"), ["#rnb", "#soul"])
         self.assertEqual(genre_hashtags("Music"), [])
         self.assertEqual(genre_hashtags(None), [])
@@ -89,7 +89,7 @@ class FormatterTests(unittest.TestCase):
         self.assertNotIn("<a href=", message)
         self.assertIn("<b>Black Sabbath</b>\nParanoid", message)
 
-    def test_format_track_message_keeps_only_artist_title_and_hashtags(self) -> None:
+    def test_format_track_message_shows_verified_year_and_genre(self) -> None:
         track = TrackMatch(
             title="Song",
             artist="Artist",
@@ -101,7 +101,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "<b>Artist</b>\nSong\n\n#stonerhand #track #single",
+            "<b>Artist</b>\nSong\n<i>2006</i>\n\n#stonerhand #track #single #hardrock",
         )
 
     def test_format_track_message_without_metadata_stays_compact(self) -> None:
@@ -152,7 +152,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "<b>Artist</b>\nAlbum\n\n#stonerhand #album",
+            "<b>Artist</b>\nAlbum\n<i>Альбом · 2007</i>\n\n#stonerhand #album",
         )
 
     def test_format_track_message_marks_ep(self) -> None:
@@ -166,7 +166,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "<b>Artist</b>\nEP\n\n#stonerhand #album #ep",
+            "<b>Artist</b>\nEP\n<i>EP</i>\n\n#stonerhand #ep",
         )
 
     def test_format_track_message_marks_podcast(self) -> None:
@@ -205,10 +205,10 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_collection_message(tracks),
             (
-                "<b>Подборка</b>\n\n"
+                "<b>Подборка</b>\n\n<i>1 трек · 1 альбом</i>\n\n"
                 "1. <b>Artist</b> — Song\n"
                 "2. <b>Band</b> — Album\n\n"
-                "#stonerhand #track #album"
+                "#stonerhand #collection #track #album"
             ),
         )
 
@@ -229,7 +229,9 @@ class FormatterTests(unittest.TestCase):
         self.assertIn("2. The Lonesome Foghorn Blows", message)
         self.assertEqual(message.count("<b>Kokomo</b>"), 1)
 
-    def test_collection_keeps_release_count_and_hides_remaster_suffixes(self) -> None:
+    def test_collection_keeps_release_count_and_preserves_remaster_suffixes(
+        self,
+    ) -> None:
         tracks = [
             TrackMatch(
                 title="There's No Other Way - 2012 Remaster",
@@ -242,8 +244,11 @@ class FormatterTests(unittest.TestCase):
         message = format_collection_message(tracks, title="Подборка · 2 релиза")
 
         self.assertIn("<b>Подборка · 2 релиза</b>", message)
-        self.assertIn("<b>Blur</b>\n1. There&#x27;s No Other Way\n2. Fool", message)
-        self.assertNotIn("Remaster", message)
+        self.assertIn(
+            "<b>Blur</b>\n1. There&#x27;s No Other Way - 2012 Remaster\n2. Fool (Remastered 2012)",
+            message,
+        )
+        self.assertIn("Remaster", message)
         self.assertNotIn("🎧", message)
 
     def test_format_collection_message_includes_release_format_tags(self) -> None:
@@ -262,7 +267,7 @@ class FormatterTests(unittest.TestCase):
 
         message = format_collection_message(tracks)
 
-        self.assertIn("#stonerhand #track #album", message)
+        self.assertIn("#stonerhand #collection #track #ep", message)
 
     def test_collection_editor_formats_groups_notes_and_custom_copy(self) -> None:
         tracks = [
@@ -338,8 +343,8 @@ class FormatterTests(unittest.TestCase):
         )
         self.assertEqual(
             format_video_message(video),
-            "📺 · <b>SANSAE Live Session Vol.3 - Melon</b>\n"
-            "канал: SANSAE\n\n"
+            "<b>SANSAE Live Session Vol.3 - Melon</b>\n"
+            "<i>Источник: SANSAE</i>\n\n"
             "#stonerhand #video",
         )
 
@@ -460,7 +465,7 @@ class FormatterTests(unittest.TestCase):
         self.assertIn("<b>Artist</b> — Song", message)
         self.assertIn("📺 · <b>Live</b>", message)
         self.assertNotIn("<a href=", message)
-        self.assertIn("#stonerhand #track #video", message)
+        self.assertIn("#stonerhand #collection #track #video", message)
 
     def test_format_mixed_collection_message_lists_playlists(self) -> None:
         playlists = [
@@ -479,7 +484,7 @@ class FormatterTests(unittest.TestCase):
         self.assertIn("🎛 · <b>Women of Punk</b>", message)
         self.assertIn("📺 · <b>Live</b>", message)
         self.assertNotIn("<a href=", message)
-        self.assertIn("#stonerhand #playlist #video", message)
+        self.assertIn("#stonerhand #collection #playlist #video", message)
 
     def test_format_mixed_collection_message_lists_artists(self) -> None:
         artists = [
@@ -498,7 +503,7 @@ class FormatterTests(unittest.TestCase):
         self.assertIn("🧬 · <b>1.Kla$</b>", message)
         self.assertIn("📺 · <b>Live</b>", message)
         self.assertNotIn("<a href=", message)
-        self.assertIn("#stonerhand #artist #video", message)
+        self.assertIn("#stonerhand #collection #artist #video", message)
 
     def test_format_mixed_collection_message_lists_radios(self) -> None:
         radios = [
@@ -517,7 +522,7 @@ class FormatterTests(unittest.TestCase):
         self.assertIn("📻 · <b>Dark Energy</b>", message)
         self.assertIn("📺 · <b>Live</b>", message)
         self.assertNotIn("<a href=", message)
-        self.assertIn("#stonerhand #radio #video", message)
+        self.assertIn("#stonerhand #collection #radio #video", message)
 
 
 if __name__ == "__main__":

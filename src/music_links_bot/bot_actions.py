@@ -31,6 +31,15 @@ class ActionSpec:
 ACTION_SPECS = tuple(
     ActionSpec(scope, code, name, kind)
     for scope, code, name, kind in (
+        ("prefs", "layout", "collection_layout", ActionKind.SETTING),
+        ("prefs", "grouping", "collection_grouping", ActionKind.SETTING),
+        ("prefs", "artwork", "artwork", ActionKind.SETTING),
+        ("editor", "hp", "pin_release_tags", ActionKind.SETTING),
+        ("editor", "hr", "reset_release_tags", ActionKind.SETTING),
+        ("editor", "ca", "clean_artwork", ActionKind.SETTING),
+        ("editor", "cn", "native_artwork", ActionKind.SETTING),
+        ("crate", "note", "release_note", ActionKind.INPUT),
+        ("crate", "section", "release_section", ActionKind.INPUT),
         ("prefs", "open", "preferences", ActionKind.NAVIGATION),
         ("prefs", "language", "language", ActionKind.SETTING),
         ("prefs", "appearance", "appearance", ActionKind.SETTING),
@@ -131,6 +140,7 @@ ACTION_REGISTRY = {(spec.scope, spec.code): spec for spec in ACTION_SPECS}
 _DYNAMIC_ACTIONS = (
     re.compile(r"^menu:onboard(?:[123]|done)$"),
     re.compile(r"^editor:l\d+$"),
+    re.compile(r"^editor:hg[0-9a-f]{8}$"),
     re.compile(r"^editor:t[ad]\d+$"),
 )
 
