@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="../src/music_links_bot/assets/brandmark.png" width="88" alt="Original StonerHand avatar: a clawed hand on white and turquoise">
+  <img src="../src/music_links_bot/assets/brandmark.png?v=132ca07bddeb" width="88" alt="Original StonerHand avatar: a clawed hand on white and turquoise">
 </p>
 
 <h1 align="center">StonerHand</h1>
