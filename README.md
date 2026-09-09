@@ -1,297 +1,122 @@
-<div align="center">
+<p align="center">
+  <img src="src/music_links_bot/assets/brandmark.png" width="88" alt="Оригинальная аватарка StonerHand: когтистая рука на белом и бирюзовом фоне">
+</p>
 
-# StonerHand Soundlinks Bot
+<h1 align="center">StonerHand</h1>
+<p align="center"><strong>Музыка на входе. Готовый Telegram-пост на выходе.</strong></p>
 
-**Music discovery in. Publish-ready Telegram post out.**
+<p align="center">
+  <a href="https://t.me/StonerHandBot"><strong>Открыть бота ↗</strong></a> ·
+  <a href="https://t.me/stonerhand">Посмотреть канал</a> ·
+  <a href="docs/README.md">Документация</a> ·
+  <a href="docs/README.en.md">English</a>
+</p>
 
-[Open the bot](https://t.me/StonerHandBot) · [See the channel](https://t.me/stonerhand) · [Русская версия](README.ru.md)
+<p align="center">
+  <a href="https://github.com/StonerHand/stonerhand-soundlinks-bot/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/StonerHand/stonerhand-soundlinks-bot/ci.yml?branch=main&amp;style=flat-square&amp;label=CI&amp;color=00CDA8" alt="Статус CI для main"></a>
+  <a href="pyproject.toml"><img src="https://img.shields.io/badge/Python-3.10%2B-00CDA8?style=flat-square" alt="Python 3.10 и новее"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-00CDA8?style=flat-square" alt="Лицензия MIT"></a>
+</p>
 
-![Release](https://img.shields.io/badge/release-1.17.0-5b5bd6?style=flat-square)
-![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
-![Telegram](https://img.shields.io/badge/Telegram-Bot_API_10.3-26A5E4?style=flat-square&logo=telegram&logoColor=white)
-![Vercel](https://img.shields.io/badge/Vercel-production-000?style=flat-square&logo=vercel)
-[![CI](https://img.shields.io/github/actions/workflow/status/StonerHand/stonerhand-soundlinks-bot/ci.yml?style=flat-square&label=CI)](https://github.com/StonerHand/stonerhand-soundlinks-bot/actions/workflows/ci.yml)
+![Ссылка → карточка → публикация. Треки, альбомы и подборки в Telegram.](docs/assets/hero.svg)
 
-</div>
+**StonerHand — редактор музыкальных публикаций внутри Telegram.** Отправьте ссылку,
+название трека или аудиофайл: бот соберёт обложку, сведения о релизе и кнопки
+площадок. Добавьте свой текст, посмотрите готовый пост и отправьте его в чат
+или канал. Несколько ссылок превращаются в одну редактируемую подборку.
 
-StonerHand is a Telegram-native music publishing editor. Send one release,
-an `artist — track` query, an audio file or several links. The bot resolves the
-music, builds a clean card and keeps every publishing control inside Telegram.
+## От находки до публикации
 
-## One simple flow
+| 01 · Найдите | 02 · Оформите | 03 · Опубликуйте |
+| --- | --- | --- |
+| Ссылка, `исполнитель — название`, аудио или до 10 материалов | Подводка, обложка, теги, кнопки и чистое превью | Себе, в другой чат, в канал или по расписанию |
 
-| Send | Get | Adjust | Publish |
-| --- | --- | --- | --- |
-| Music link | Exact release and artwork | Intro, style, tags, cover, platforms | Yourself, another chat, queue or channel |
-| `artist — track` | Search and result picker | Live preview | A post with working buttons |
-| Several links | Ordered collection without duplicates | Title and order | One compact collection |
-| Song + video | One mixed publication | Music and clip actions | A clickable combined post |
+Свой текст над ссылкой становится подводкой. Жирный текст, курсив и внешние
+ссылки сохраняются. Редактор остаётся открыт, когда вы смотрите отдельное превью.
 
-Your own text above a link becomes the post intro. Automatic hashtags contain
-the release type and only a provider-verified genre; uncertain genre metadata
-is omitted instead of guessed.
+## Что внутри
 
-## Product highlights
+| | Возможности |
+| --- | --- |
+| **Карточки релизов** | Треки, альбомы, EP, сборники и саундтреки. Чистые названия без служебных приписок; версии и ремастеры сохраняются. |
+| **Подборки целиком** | До 10 позиций в одном посте: полный список, общий порядок и совпадающие номера кнопок. Разделы, заметки и импорт публичных плейлистов Spotify / Apple Music. |
+| **Осмысленные теги** | Приоритет типа публикации, до 5 автотегов без дублей. Жанр — при подтверждённых данных; отдельные переключатели, свои теги и сохранение исправлений для релиза. |
+| **Управляемое оформление** | Исходная обложка или превью площадки, коллаж подборки. Кнопки «Одна колонка / Авто / Компактно», сохранение настроек и шаблонов. |
+| **Видео и эфиры** | YouTube с видеопревью и страницы NTS Radio. Название записи и источник разделены; автор канала не подменяет исполнителя. |
+| **Рабочий редактор** | Черновики, история находок, отмена изменений, RU / EN, inline-отправка и очередь публикаций для администратора. |
 
-- Resolves tracks, albums, podcasts, playlists, artists, YouTube videos and NTS
-  Radio pages.
-- Builds large-artwork cards with the original service, a canonical
-  **All platforms** Songlink/Odesli action and compact secondary controls.
-- Shows a provider button only for a direct release URL returned by the
-  resolver; search suggestions never masquerade as confirmed availability.
-- Keeps exact text-search and direct Apple Music results publishable with
-  verified iTunes metadata and artwork, and restores a direct Spotify URL from
-  an exact Deezer ISRC plus its confirmed MusicBrainz relation.
-- Combines matching links from different services into one release rather than
-  publishing duplicate cards.
-- Removes Spotify page branding and SEO copy from release, artist and playlist
-  names, including cards restored from older drafts.
-- Imports public Spotify and Apple Music playlists into editable collections.
-- Preserves bold, italic and external linked text in author intros, removes
-  duplicate music-source links, and calculates the exact Telegram UTF-16
-  budget for each delivery format.
-- Keeps one clear primary action per editor screen, supports undo, reusable
-  templates, custom artwork, history and named collections.
-- Sends an exact clean preview as a separate publication, while the editor
-  stays in place and never adds controls to the preview itself.
-- Publishes immediately or through a durable queue with duplicate protection.
-  A lost Telegram response is never blindly retried: the job asks an admin to
-  check the channel before an explicit manual retry.
-- Works inline with `@StonerHandBot artist — track` in any conversation.
-- Uses Bot API 10.3 Rich Messages when supported and falls back to a complete
-  classic card without losing artwork, text or platform links.
-- Verifies Spotify, Deezer, MusicBrainz, SoundCloud, YouTube, Apple Music and NTS
-  public contracts every six hours, so upstream drift is detected automatically.
-- Validates every finished Classic, Rich, inline, channel, photo and audio post
-  through one release contract before Telegram receives it.
-- Guards the home screen and editor with a production UI/UX contract: one
-  primary action, compact rows, bounded callbacks and no stray web controls.
-- Exposes `/privacy` for transparent data controls and confirmed user-data
-  deletion.
+### Список остаётся списком
 
-## Supported sources
+Пример текстовой части подборки — обложка и кнопки площадок добавляются ботом:
 
-| Source | Links | Metadata | Collection import |
-| --- | :---: | :---: | :---: |
-| Spotify | ✓ | ✓ | ✓ |
-| Apple Music | ✓ | ✓ | ✓ |
-| YouTube / YouTube Music | ✓ | ✓ | — |
-| SoundCloud | ✓ | ✓ | — |
-| Deezer | ✓ | via Songlink | — |
-| Tidal | ✓ | via Songlink | — |
-| Yandex Music | ✓ | via Songlink | — |
-| NTS Radio | ✓ | ✓ | — |
+> **Подборка · 6 треков**
+>
+> **Mindless Self Indulgence**<br>
+> 1. Pay For It<br>
+> 2. 1989<br>
+> 3. Lights Out<br>
+> 4. Tom Sawyer<br>
+> 5. Seven Minutes in Heaven<br>
+> 6. Witness
+>
+> #stonerhand #collection #track
 
-## Telegram UX
+Номера кнопок соответствуют списку. Общий артист не повторяется на каждой
+кнопке; в смешанной подборке имена сохраняются. Длинным подписям выделяется
+отдельный ряд. Цвет, шрифт и обрезка текста зависят от клиента Telegram.
 
-The home screen starts with the full-width **Create post** action and explains
-every accepted input. An active card is recoverable by release name. **Drafts**
-shows up to 30 available cards with names and statuses, five per page;
-**Recent releases** contains music lookup history.
-The first private `/start` shows the original StonerHand claw-hand avatar and a
-short welcome. A focused menu offers a first card or **Try an example**, and
-the full menu becomes available after creating a card. The menu remains usable
-if the welcome image fails to load.
+## Откуда музыка
 
-**Settings** and `/settings` persist the RU/EN interface language, appearance
-of new cards and hashtag defaults across restarts, without rewriting existing
-cards. Initially the bot follows Telegram's language and the previous appearance
-settings. Help and privacy are available from settings.
+**Spotify · Apple Music · YouTube / YouTube Music · SoundCloud · Deezer · Tidal · Yandex Music · NTS Radio**
 
-Collections support saved **One column / Auto / Compact** layouts, optional
-artist/album sections and per-item notes. Up to ten entries remain in one post,
-with matching list and button numbers. Artwork can use the original cover or
-the provider preview; YouTube retains its playable preview.
+Songlink / Odesli связывает релиз с другими площадками. В пост попадают прямые
+ссылки на найденный материал; доступность зависит от источника и региона.
+Если подтверждена только одна площадка, карточка остаётся с одной кнопкой.
+Жанр подборки добавляется при согласованных данных всех музыкальных позиций.
 
-The tag editor offers individual toggles, custom additions and per-release
-corrections (up to 60 recent corrections and notes per user). Automatic tags
-prioritize publication type and verified metadata, with a five-tag limit.
-Collection genres require agreement across every musical entry.
+Для поиска в другом чате: `@StonerHandBot исполнитель — название`.
 
-An empty inline screen shows up to three recent releases; a new user gets one
-live example and a **Find music** action. Configure the input hint once in
-`@BotFather` with `/setinline` and `Artist — Title or link`.
+## Запустить свою копию
 
-The editor is progressive rather than crowded:
-
-1. preview the finished card;
-2. open focused **Appearance**, **Text** or **Platform buttons** sections;
-3. run a final preflight check;
-4. send or publish with one explicit action.
-
-The editor summary is deliberately compact — cover, tags, platform count and
-delivery mode fit on one scan line. **Preview** sends the exact finished post
-below the editor through the same publication service used by real delivery.
-Lookup progress uses a stable three-step checklist, and short failures in group
-chats use ephemeral replies when Telegram supports them.
-
-Native replies, editor callbacks and lookup orchestration are isolated from
-presentation. UI copy lives in a packaged RU/EN catalog, so wording can change
-without touching the execution path; placeholders and button hierarchy are
-verified by tests and the same read-only production smoke contract.
-Every error exposes contextual recovery without hiding the failed input. A
-not-found search repeats the exact query and offers both **Change query** and
-**Send direct link** before the route back home. Native callback toasts
-confirm settings, ordering and collection changes; short-lived undo covers
-editor changes and destructive collection actions. Delivery to yourself offers
-**Create another**; channel publication shows the release, channel, date and
-an **Open post** action. **Schedule** is available directly on an admin's card:
-choices show exact dates and times with the time zone stated alongside them.
-Expired choices are rejected; repeated taps do not create duplicate jobs.
-
-Collection keyboards adapt to their content: a shared artist is not repeated,
-technical remaster suffixes do not consume button space, short titles share a
-row and long labels receive the full width. The preview keeps the exact release
-count without repeating type icons, a shared artist or technical remaster text.
-A collection keeps the familiar Classic layout while a complete set of 2–6
-releases receives one square collage made from its distinct covers. If fewer
-than two safe covers are available, the first release remains the fallback.
-Incomplete collections use the same visual language so status is
-communicated by text rather than a second card design. Public replacement is
-atomic: if one source fails, the bot keeps the original message and never
-publishes a shortened collection. Collection sharing uses one compact query
-generated by the bot. The owner's latest complete collection and its formatted
-intro are stored independently from later UI actions, so both survive a restart
-and return only for the exact same ordered sources; an unverified list is rejected.
-
-When verified, the universal Songlink/Odesli action is the first, full-width
-primary CTA; direct providers follow as calm secondary shortcuts. If only one
-direct provider is confirmed, the bot shows it without promising unavailable
-services. The same hierarchy is used by classic cards, previews and editor
-screens. A shared icon vocabulary is
-used across native screens,
-with optional Bot API 10.3 custom emoji IDs and a complete regular-emoji
-fallback. Rich cards use a magazine order — title, artwork, lead, body, actions
-and tags — without repeating the title below the cover. Semantic styles,
-disabled progress, ephemeral notices and Rich content remain capability-gated;
-older Telegram clients always receive the full classic experience.
-Button labels remain descriptive and are not governed by an arbitrary 28–32
-character rule: a long title gets its own row without losing text. Color is
-never the only cue and rows contain at most two actions.
-
-## Architecture
-
-```mermaid
-flowchart LR
-    U[Telegram update] --> W[Vercel webhook]
-    W --> P[Lookup pipeline]
-    P --> S[Music providers]
-    P --> D[Canonical draft]
-    D --> V[Publication view]
-    V --> G[Final publication contract]
-    G --> R[Rich delivery]
-    G --> C[Classic fallback]
-    D <--> K[(Upstash Redis)]
-    K --> Q[Scheduled worker]
-    Q --> V
-```
-
-One immutable publication plan is shared by preview, direct send, channel
-publishing and the queue. A second, transport-neutral final contract verifies
-its text, counts, keyboard destinations, artwork and Telegram limits before any
-Classic, Rich or inline call. Durable drafts are
-normalized before queue storage and delivery. Redis stores sessions, history,
-templates, deduplication claims and queue state; bounded memory remains a
-development and degraded-mode fallback.
-
-See [Architecture](ARCHITECTURE.ru.md) for the complete data and failure model.
-
-## Run locally
+Нужны **Python 3.10+** и токен отдельного бота из [@BotFather](https://t.me/BotFather).
 
 ```bash
+git clone https://github.com/StonerHand/stonerhand-soundlinks-bot.git
+cd stonerhand-soundlinks-bot
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -e ".[dev]"
 cp .env.example .env
+```
+
+Запишите токен в `BOT_TOKEN` внутри `.env`, затем запустите:
+
+```bash
 python -m music_links_bot
 ```
 
-Only `BOT_TOKEN` is required for local polling. MusicBrainz and iTunes are
-keyless; Redis is only required for durable production state.
+Для локального запуска достаточно токена. Для постоянного хранения и работы
+на Vercel нужен Redis. Настройки Windows, канала, webhook и очереди —
+в [руководстве по запуску](docs/SETUP.ru.md).
 
-<details>
-<summary><strong>Production configuration</strong></summary>
+## Проверки и устройство
 
-The repository is configured for Vercel Functions:
+CI проверяет Python **3.10 / 3.11 / 3.12**, тесты с покрытием ветвлений,
+стиль и зависимости. Отдельные проверки следят за провайдерами и развёрнутой
+версией. Превью, отправка и очередь используют общий конвейер публикации.
 
-- `/api/telegram` — authenticated Telegram webhook;
-- `/api/set_webhook` — protected webhook maintenance;
-- `/api/queue_worker` — protected scheduled publishing worker;
-- `/api/collage` — backward-compatible rendering for collage URLs in older posts;
-- `/api/health` — Telegram, webhook, Redis, queue and release canary;
-- `/api/smoke` — Classic/Rich/inline/channel plus core UI/UX release matrix.
+При неизвестном результате отправки очередь просит администратора проверить
+канал перед повтором. Доступные резервные форматы сохраняют классические
+карточки, если расширенные возможности Telegram не поддерживаются.
 
-Required production values:
-
-| Variable | Purpose |
+| Подробнее | Содержание |
 | --- | --- |
-| `BOT_TOKEN` | Telegram bot token |
-| `TELEGRAM_WEBHOOK_SECRET` | verifies every incoming update |
-| `SET_WEBHOOK_SECRET` | protects webhook maintenance |
-| `WEBHOOK_BASE_URL` | public Vercel origin |
-| `UPSTASH_REDIS_REST_URL` | durable Redis endpoint |
-| `UPSTASH_REDIS_REST_TOKEN` | durable Redis credential |
-| `CRON_SECRET` | protects the queue worker |
-
-`queue-worker.yml` ticks the worker every five minutes and the daily Vercel Cron
-remains a backup. The GitHub `CRON_SECRET` must match production. `/api/health`
-is strictly read-only and reports the latest worker tick.
-
-`ADMIN_CHAT_ID`, `PUBLISH_CHAT_ID`, `SONGLINK_API_KEY` and presentation flags
-are optional and documented in [.env.example](.env.example).
-
-`COLLECTION_COLLAGE_ENABLED=0` disables collection collages immediately and
-falls back to the first-release preview without changing the Classic layout.
-`BOT_SAFE_MODE=1` disables every capability-gated enhancement and keeps the
-complete Classic fallback available.
-
-</details>
-
-<details>
-<summary><strong>Release quality gate</strong></summary>
-
-```bash
-python -m pyflakes src api tests
-python -m ruff check src api tests
-python -m ruff format --check src api tests
-python -m bandit -q -r src api -x tests
-python -m pip_audit -r requirements.txt --progress-spinner off
-python -m coverage run -m pytest -q
-python -m coverage report
-python -m mypy
-```
-
-CI also checks Python 3.10–3.12, dependency pins, secrets, generated files, compilation and the
-Vercel route/build/cron contract. A production canary verifies the exact commit,
-the collection-artwork service and the complete publication smoke matrix before
-it allows the guarded automatic rollback decision. A separate provider canary
-checks live public music-provider contracts without coupling their outages to rollback.
-The opt-in `telegram_canary.py --chat-id <ID>` verifies real Classic, Rich,
-collection and SoundCloud-only cards, then deletes every confirmed test message.
-
-</details>
-
-## Repository
-
-```text
-api/                    Vercel webhook, health, smoke, collage and queue endpoints
-src/music_links_bot/    application, providers, editor and publishing pipeline
-tests/                  unit, contract, snapshot, production and provider canaries
-.github/                CI, dependency updates and guarded release checks
-```
-
-Public documentation is intentionally limited to the product, architecture,
-release history and operations checklist. Generated state, credentials, local
-environments and tool caches are excluded from Git.
-
-## Documentation
-
-- [Russian README](README.ru.md)
-- [Architecture and state model](ARCHITECTURE.ru.md)
-- [Release checklist](RELEASE_CHECKLIST.ru.md)
-- [Changelog](CHANGELOG.md)
-- [MIT License](LICENSE)
+| [Документация](docs/README.md) | Навигация по проекту |
+| [Запуск и эксплуатация](docs/SETUP.ru.md) | Локальная среда, Vercel, Redis, проверки |
+| [Архитектура](docs/ARCHITECTURE.ru.md) | Поиск, редактор, хранение и доставка |
+| [Проверка релиза](docs/RELEASE_CHECKLIST.ru.md) | Автоматические и ручные проверки Telegram |
+| [История изменений](CHANGELOG.md) | Что изменилось в каждой версии |
 
 ---
 
-Built for music posts that should look finished before they are published.
+<p align="center"><a href="https://t.me/StonerHandBot"><strong>Соберите свой первый пост ↗</strong></a><br><sub>StonerHand · Оригинальные обложки. Свой текст. Своя музыка.</sub></p>

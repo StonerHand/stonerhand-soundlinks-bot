@@ -25,7 +25,11 @@ class ReleaseReadinessTests(unittest.TestCase):
     def test_public_docs_describe_the_telegram_only_product(self) -> None:
         docs = "\n".join(
             (ROOT / name).read_text(encoding="utf-8")
-            for name in ("README.md", "README.ru.md", "ARCHITECTURE.ru.md")
+            for name in (
+                "README.md",
+                "docs/README.en.md",
+                "docs/ARCHITECTURE.ru.md",
+            )
         ).casefold()
 
         self.assertIn("telegram", docs)
@@ -48,8 +52,9 @@ class ReleaseReadinessTests(unittest.TestCase):
         )
         self.assertEqual(
             metadata["tool"]["setuptools"]["package-data"]["music_links_bot"],
-            ["assets/*.gif", "assets/*.png", "locales/*.json"],
+            ["assets/*.png", "locales/*.json"],
         )
+        self.assertTrue((ROOT / "src/music_links_bot/assets/brandmark.png").is_file())
         self.assertTrue((ROOT / "src/music_links_bot/locales/catalog.json").is_file())
 
     def test_vercel_routes_builds_and_crons_stay_aligned(self) -> None:

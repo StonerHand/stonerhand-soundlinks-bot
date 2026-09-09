@@ -47,7 +47,7 @@ dev = [
 package-dir = {"" = "src"}
 
 [tool.setuptools.package-data]
-music_links_bot = ["assets/*.gif", "assets/*.png", "locales/*.json"]
+music_links_bot = ["assets/*.png", "locales/*.json"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
