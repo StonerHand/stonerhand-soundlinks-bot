@@ -61,6 +61,25 @@ class PublicationContractTests(unittest.TestCase):
         self.assertIn("missing_partial_count", result.blocking_codes)
 
     def test_universal_button_must_not_fall_back_to_provider(self) -> None:
+        for label in ("🪩 Все платформы", "🎧 Слушать трек", "💿 Listen to album"):
+            with self.subTest(label=label):
+                result = validate_rendered_publication(
+                    RenderedPublication(
+                        text="Artist — Song",
+                        keyboard=InlineKeyboardMarkup(
+                            [
+                                [
+                                    InlineKeyboardButton(
+                                        label, url="https://open.spotify.com/track/abc"
+                                    )
+                                ]
+                            ]
+                        ),
+                    )
+                )
+                self.assertIn("universal_button_mismatch", result.blocking_codes)
+
+    def test_numbered_release_title_can_contain_listen_action_words(self) -> None:
         result = validate_rendered_publication(
             RenderedPublication(
                 text="Artist — Song",
@@ -68,7 +87,7 @@ class PublicationContractTests(unittest.TestCase):
                     [
                         [
                             InlineKeyboardButton(
-                                "🪩 Все платформы",
+                                "1 · Artist — Слушать трек",
                                 url="https://open.spotify.com/track/abc",
                             )
                         ]
@@ -77,7 +96,7 @@ class PublicationContractTests(unittest.TestCase):
             )
         )
 
-        self.assertIn("universal_button_mismatch", result.blocking_codes)
+        self.assertTrue(result.ready)
 
     def test_platform_label_must_match_destination_host(self) -> None:
         result = validate_rendered_publication(

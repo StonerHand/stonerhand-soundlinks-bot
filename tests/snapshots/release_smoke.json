@@ -2,8 +2,8 @@
   "cases": {
     "channel_keyboard": {
       "buttons": [
-        "Выбрать площадку",
-        "Spotify"
+        "🎧 Слушать трек",
+        "🟢 Spotify"
       ],
       "checks": {
         "channel_safe": true,
@@ -30,8 +30,8 @@
     },
     "classic_track": {
       "buttons": [
-        "Выбрать площадку",
-        "Spotify"
+        "🎧 Слушать трек",
+        "🟢 Spotify"
       ],
       "checks": {
         "hub_is_primary": true,
@@ -118,9 +118,9 @@
     },
     "inline_share": {
       "buttons": [
-        "Выбрать площадку",
-        "Spotify",
-        "Поделиться"
+        "🎧 Слушать трек",
+        "🟢 Spotify",
+        "↗️ Поделиться"
       ],
       "checks": {
         "hub_is_primary": true,
@@ -147,8 +147,8 @@
     },
     "rich_card": {
       "buttons": [
-        "Выбрать площадку",
-        "Spotify"
+        "🎧 Слушать трек",
+        "🟢 Spotify"
       ],
       "checks": {
         "has_buttons": true,
@@ -178,7 +178,7 @@
     },
     "soundcloud_source_only": {
       "buttons": [
-        "SoundCloud"
+        "🟠 SoundCloud"
       ],
       "checks": {
         "forbidden_buttons_absent": true
@@ -202,8 +202,8 @@
     },
     "soundtrack_metadata": {
       "buttons": [
-        "Выбрать площадку",
-        "Spotify"
+        "💿 Слушать саундтрек",
+        "🟢 Spotify"
       ],
       "checks": {
         "count_confirmed": true,

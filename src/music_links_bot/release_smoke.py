@@ -230,6 +230,7 @@ def build_release_smoke_report() -> dict[str, object]:
                 soundtrack.links,
                 release_page_url=soundtrack.page_url,
                 release_kind="album",
+                release_format=soundtrack.release_format,
             ),
             content_kind="album",
         ),

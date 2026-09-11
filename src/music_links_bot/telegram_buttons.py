@@ -48,7 +48,7 @@ _ICON_FALLBACKS = {
     ButtonIcon.ADD: "＋",
     ButtonIcon.READY: "✓",
     ButtonIcon.WARNING: "⚠️",
-    ButtonIcon.SHARE: "↗",
+    ButtonIcon.SHARE: "↗️",
 }
 
 
@@ -69,7 +69,7 @@ def icon_label(text: str, icon: ButtonIcon | None) -> str:
         clean = clean[1:].lstrip()
     for known in _ICON_FALLBACKS.values():
         if clean.startswith(known):
-            clean = clean[len(known) :].lstrip()
+            clean = clean[len(known) :].removeprefix("\ufe0f").lstrip()
             break
     return clean if _custom_emoji_id(icon) else f"{fallback} {clean}"
 

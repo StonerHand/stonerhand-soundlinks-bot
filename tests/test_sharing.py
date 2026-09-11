@@ -374,6 +374,7 @@ class SharingTests(unittest.TestCase):
         )
 
         self.assertEqual(result.inline_keyboard[0][0].text, "Spotify")
+        self.assertEqual(result.inline_keyboard[1][0].text, "↗️ Поделиться с кнопками")
         self.assertEqual(result.inline_keyboard[1][0].switch_inline_query, "sh2|tabc")
 
     def test_channel_keyboard_keeps_urls_and_removes_inline_switches(self) -> None:

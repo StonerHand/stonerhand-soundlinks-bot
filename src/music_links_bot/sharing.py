@@ -32,7 +32,10 @@ from music_links_bot.publication_contract import (
     RenderedPublication,
     require_valid_publication,
 )
-from music_links_bot.telegram_buttons import button as InlineKeyboardButton
+from music_links_bot.telegram_buttons import (
+    button as InlineKeyboardButton,
+    share_button,
+)
 from music_links_bot.url_utils import (
     cache_key_for_url,
     direct_platform_links,
@@ -163,12 +166,7 @@ def add_share_button(
     return InlineKeyboardMarkup(
         [
             *keyboard.inline_keyboard,
-            [
-                InlineKeyboardButton(
-                    label,
-                    switch_inline_query=share_query,
-                )
-            ],
+            [share_button(label, share_query)],
         ]
     )
 

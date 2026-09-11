@@ -83,9 +83,11 @@ Colors, fonts and label clipping depend on the Telegram client.
 **Spotify · Apple Music · YouTube / YouTube Music · SoundCloud · Deezer · Tidal · Yandex Music · NTS Radio**
 
 Songlink / Odesli connects a release across services. Cards use direct links to
-resolved material; availability depends on the source and region. A release
-with one confirmed service keeps one button. Collection genres require
-agreement across all musical entries.
+resolved material; availability depends on the source and region. The main
+“🎧 Listen to track” or “💿 Listen to album” button opens the release page
+with available services; “🟢 Spotify” opens Spotify directly. If a release
+hub is unavailable, the card keeps verified direct links. Collection genres
+require agreement across all musical entries.
 
 Search from another conversation: `@StonerHandBot artist — title`.
 

@@ -1187,9 +1187,37 @@
     "ru": "Канал: <b>{target}</b>\n{date}",
     "en": "Channel: <b>{target}</b>\n{date}"
   },
-  "button_choose_platform": {
-    "ru": "Выбрать площадку",
-    "en": "Choose platform"
+  "button_listen_track": {
+    "ru": "Слушать трек",
+    "en": "Listen to track"
+  },
+  "button_listen_album": {
+    "ru": "Слушать альбом",
+    "en": "Listen to album"
+  },
+  "button_listen_ep": {
+    "ru": "Слушать EP",
+    "en": "Listen to EP"
+  },
+  "button_listen_single": {
+    "ru": "Слушать сингл",
+    "en": "Listen to single"
+  },
+  "button_listen_compilation": {
+    "ru": "Слушать сборник",
+    "en": "Listen to compilation"
+  },
+  "button_listen_soundtrack": {
+    "ru": "Слушать саундтрек",
+    "en": "Listen to soundtrack"
+  },
+  "button_listen_podcast": {
+    "ru": "Слушать подкаст",
+    "en": "Listen to podcast"
+  },
+  "button_watch_video": {
+    "ru": "Смотреть видео",
+    "en": "Watch video"
   },
   "pref_layout": {
     "ru": "Кнопки подборок · {value}",

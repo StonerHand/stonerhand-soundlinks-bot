@@ -38,6 +38,16 @@ CHANNEL_BUTTON_TEXT = "🪨 Открыть канал"
 DEFAULT_UI_MODE = "stonerhand"
 MAX_TWO_COLUMN_BUTTON_TEXT_LENGTH = 24
 MAX_VISIBLE_PLATFORM_BUTTONS = 1
+PLATFORM_BUTTON_ICONS = {
+    "spotify": "🟢",
+    "appleMusic": "⚪",
+    "applePodcasts": "🟣",
+    "youtubeMusic": "🔴",
+    "soundcloud": "🟠",
+    "deezer": "🟣",
+    "tidal": "⚫",
+    "yandexMusic": "🟡",
+}
 DEFAULT_PLATFORM_ORDER = (
     "spotify",
     "appleMusic",
@@ -194,7 +204,10 @@ def _platform_button_label(
     platform_key: str,
     context: ContextTypes.DEFAULT_TYPE | None = None,
 ) -> str:
-    return PLATFORM_LABELS[platform_key]
+    label = PLATFORM_LABELS[platform_key]
+    if _get_ui_mode(context) == "minimal":
+        return label
+    return f"{PLATFORM_BUTTON_ICONS[platform_key]} {label}"
 
 
 def _build_collection_keyboard(
@@ -222,7 +235,7 @@ def _build_collection_keyboard(
 
     for index, track, destination in available:
         if is_track_video_pair:
-            text = "Смотреть клип" if track.kind == "video" else "Слушать песню"
+            text = "📺 Смотреть клип" if track.kind == "video" else "🎧 Слушать песню"
         else:
             title = compact_release_title(track.title)
             text = f"{index} · {title}"
@@ -250,7 +263,7 @@ def _build_youtube_keyboard(
     include_channel_button: bool = False,
 ) -> InlineKeyboardMarkup:
     return _single_url_keyboard(
-        "Смотреть на YouTube",
+        "📺 Смотреть на YouTube",
         url=url,
         style="primary",
         include_channel_button=include_channel_button,
@@ -263,7 +276,7 @@ def _build_nts_keyboard(
     include_channel_button: bool = False,
 ) -> InlineKeyboardMarkup:
     return _single_url_keyboard(
-        "Открыть на NTS",
+        "📻 Открыть на NTS",
         url=url,
         style="primary",
         include_channel_button=include_channel_button,
@@ -410,7 +423,7 @@ def _build_mixed_collection_keyboard(
         buttons.append(
             _url_button(
                 text=(
-                    "Слушать песню"
+                    "🎧 Слушать песню"
                     if is_track_video_pair
                     else _button_label(f"{index} · {track.artist} — {track.title}")
                 ),
@@ -454,7 +467,7 @@ def _build_mixed_collection_keyboard(
         buttons.append(
             _url_button(
                 text=(
-                    "Смотреть клип"
+                    "📺 Смотреть клип"
                     if is_track_video_pair
                     else _button_label(f"{index} · {video.title}")
                 ),
@@ -557,8 +570,27 @@ def _release_hub_button_label(
     release_format: str | None,
     context: ContextTypes.DEFAULT_TYPE | None = None,
 ) -> str:
-    del context
-    return get_text(resolve_lang(None), "button_choose_platform")
+    lang = resolve_lang(None)
+    icon = "🎧"
+    label = get_text(lang, "button_listen_track")
+    if release_kind == "album":
+        icon = "💿"
+        label = get_text(lang, "button_listen_album")
+        if release_format == "ep":
+            label = get_text(lang, "button_listen_ep")
+        elif release_format == "single":
+            label = get_text(lang, "button_listen_single")
+        elif release_format == "compilation":
+            label = get_text(lang, "button_listen_compilation")
+        elif release_format == "soundtrack":
+            label = get_text(lang, "button_listen_soundtrack")
+    elif release_kind == "podcast":
+        icon = "🎙️"
+        label = get_text(lang, "button_listen_podcast")
+    elif release_kind == "video":
+        icon = "📺"
+        label = get_text(lang, "button_watch_video")
+    return label if _get_ui_mode(context) == "minimal" else f"{icon} {label}"
 
 
 def _get_ui_mode(context: ContextTypes.DEFAULT_TYPE | None = None) -> str:

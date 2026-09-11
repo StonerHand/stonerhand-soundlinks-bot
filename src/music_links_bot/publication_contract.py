@@ -7,6 +7,7 @@ from telegram import InlineKeyboardMarkup
 
 from music_links_bot.bot_builder import MESSAGE_TEXT_LIMIT, PHOTO_CAPTION_LIMIT
 from music_links_bot.constants import PLATFORM_LABELS
+from music_links_bot.i18n import STRINGS
 from music_links_bot.publication_budget import visible_length
 from music_links_bot.release_hubs import is_universal_release_url
 from music_links_bot.url_utils import (
@@ -32,6 +33,12 @@ _UNIVERSAL_LABEL_MARKERS = (
     "открыть выпуск",
     "выбрать площадку",
     "choose platform",
+)
+_RELEASE_ACTION_LABELS = frozenset(
+    label.casefold()
+    for key, translations in STRINGS.items()
+    if key.startswith("button_listen_") or key == "button_watch_video"
+    for label in translations.values()
 )
 
 
@@ -233,7 +240,9 @@ def _safe_http_url(value: str) -> bool:
 
 def _is_universal_label(label: str) -> bool:
     normalized = " ".join(label.casefold().split())
-    return any(marker in normalized for marker in _UNIVERSAL_LABEL_MARKERS)
+    return normalized.lstrip("🎧💿🎙️📺 ") in _RELEASE_ACTION_LABELS or any(
+        marker in normalized for marker in _UNIVERSAL_LABEL_MARKERS
+    )
 
 
 def _platform_key_for_label(label: str) -> str | None:

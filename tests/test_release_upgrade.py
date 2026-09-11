@@ -214,7 +214,7 @@ def test_long_labels_get_full_width_and_single_primary_action_is_deduplicated():
     apple = "https://music.apple.com/us/album/release/123?i=456"
     keyboard = _build_link_keyboard({"appleMusic": apple}, release_page_url=apple)
     buttons = [button for row in keyboard.inline_keyboard for button in row]
-    assert len(buttons) == 1 and buttons[0].text == "Apple Music"
+    assert len(buttons) == 1 and buttons[0].text == "⚪ Apple Music"
     keyboard = _build_link_keyboard(
         {"spotify": "https://open.spotify.com/track/1", "appleMusic": apple},
         release_page_url="https://song.link/s/1",
@@ -222,9 +222,9 @@ def test_long_labels_get_full_width_and_single_primary_action_is_deduplicated():
     )
     buttons = [button for row in keyboard.inline_keyboard for button in row]
     assert [button.text for button in buttons] == [
-        "Выбрать площадку",
-        "Spotify",
-        "Apple Music",
+        "🎧 Слушать трек",
+        "🟢 Spotify",
+        "⚪ Apple Music",
     ]
     assert sum(button.style == "primary" for button in buttons) == 1
     assert len({button.url for button in buttons}) == 3
