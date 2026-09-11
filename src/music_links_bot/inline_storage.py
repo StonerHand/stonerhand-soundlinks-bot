@@ -86,10 +86,10 @@ async def remember_inline_urls(
 
 async def load_inline_history(bot_data: dict, user_id: int) -> list[str]:
     memory = bot_data.setdefault("inline_history", {})
-    cached = memory.get(user_id)
+    kv: KVStore | None = bot_data.get("kv_store")
+    cached = memory.get(user_id) if kv is None else None
     if isinstance(cached, list):
         return [str(url) for url in cached if isinstance(url, str)]
-    kv: KVStore | None = bot_data.get("kv_store")
     payload = (
         await kv.get_json(f"inline:history:v1:{user_id}")
         if kv is not None and user_id > 0

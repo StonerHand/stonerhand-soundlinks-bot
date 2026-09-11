@@ -149,7 +149,7 @@ class BrandingSafetyTests(unittest.IsolatedAsyncioTestCase):
             patch("music_links_bot.branding.BRANDING_FETCH_SECONDS", 0.01),
         ):
             self.assertIsNone(
-                await build_branded_cover("https://images.example/a", label="test")
+                await build_branded_cover("https://i.scdn.co/image/a", label="test")
             )
         self.assertEqual(len(finished), 2)
 

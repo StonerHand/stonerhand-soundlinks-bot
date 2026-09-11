@@ -1,4 +1,12 @@
 {
+  "storage_unavailable_inline": {
+    "ru": "Временный сбой — открыть бота",
+    "en": "Temporarily unavailable — open bot"
+  },
+  "storage_temporarily_unavailable": {
+    "ru": "Не удалось подтвердить сохранение данных. Попробуй ещё раз чуть позже. Если отправлял пост — сначала проверь, появился ли он в чате.",
+    "en": "Could not confirm that your data was saved. Try again shortly. If you were sending a post, first check whether it appeared in the chat."
+  },
   "action_busy": {
     "en": "This action is already running. Give it a few seconds.",
     "ru": "Это действие уже выполняется. Подожди пару секунд."
@@ -182,6 +190,10 @@
   "ed_crate_added": {
     "en": "Added · {count}/10",
     "ru": "Добавлено · {count}/10"
+  },
+  "ed_crate_full": {
+    "ru": "В подборке уже 10 позиций. Удали одну, чтобы добавить этот релиз.",
+    "en": "The collection already has 10 items. Remove one to add this release."
   },
   "ed_crate_count": {
     "en": "In crate · {count}/10",

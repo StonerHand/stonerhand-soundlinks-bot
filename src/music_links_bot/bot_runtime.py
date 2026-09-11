@@ -11,6 +11,12 @@ from typing import Any
 
 from music_links_bot.bot_builder import MAX_INTRO_LENGTH, fit_telegram_html
 from music_links_bot.constants import MAX_LINKS_PER_MESSAGE
+from music_links_bot.durable_state import (
+    current_state,
+    delete_value,
+    read_json,
+    write_json,
+)
 from music_links_bot.errors import (
     BotErrorCode as _BotErrorCode,
     BotFlowError as _BotFlowError,
@@ -301,7 +307,7 @@ class ProviderDiagnostic:
 
 
 class BotRuntime:
-    """Cross-handler state with Redis-backed safety and memory fallback."""
+    """Cross-handler state with confirmed Redis storage or local-only mode."""
 
     def __init__(self, kv: KVStore | None = None) -> None:
         self.kv = kv
@@ -336,7 +342,13 @@ class BotRuntime:
         self._metrics_persisted_at = 0.0
 
     async def get_session(self, user_id: int, *, lang: str = "ru") -> UserSession:
-        cached = self.sessions.get(user_id)
+        scope = current_state.get()
+        cache_key = (id(self), user_id)
+        cached = (
+            self.sessions.get(user_id)
+            if self.kv is None
+            else (scope or {}).get(cache_key)
+        )
         if cached is not None:
             if lang:
                 cached.lang = lang
@@ -347,20 +359,22 @@ class BotRuntime:
         if self.kv is not None:
             current_key = f"session:v2:{user_id}"
             legacy_key = f"session:v1:{user_id}"
-            batch_reader = getattr(self.kv, "mget_json", None)
+            batch_reader = getattr(self.kv, "mget_json_required", None) or getattr(
+                self.kv, "mget_json", None
+            )
             if callable(batch_reader):
                 values = await batch_reader([current_key, legacy_key])
                 if isinstance(values, list) and len(values) == 2:
                     payload, legacy_payload = values
                 else:
-                    payload = await self.kv.get_json(current_key)
-                    legacy_payload = await self.kv.get_json(legacy_key)
+                    payload = await read_json(self.kv, current_key)
+                    legacy_payload = await read_json(self.kv, legacy_key)
             else:
                 # Compatibility with lightweight storage adapters and old
                 # workers during a rolling deployment.
-                payload = await self.kv.get_json(current_key)
+                payload = await read_json(self.kv, current_key)
                 if payload is None:
-                    legacy_payload = await self.kv.get_json(legacy_key)
+                    legacy_payload = await read_json(self.kv, legacy_key)
         if isinstance(payload, dict) and isinstance(payload.get("session"), dict):
             payload = payload["session"]
         migrated = False
@@ -374,19 +388,26 @@ class BotRuntime:
             session.lang = lang
         self._cap(self.sessions, MAX_MEMORY_SESSIONS)
         self.sessions[user_id] = session
+        if scope is not None:
+            scope[cache_key] = session
         if migrated:
             await self.save_session(session)
         return session
 
     async def save_session(self, session: UserSession) -> None:
         session.updated_at = int(time())
-        self.sessions[session.user_id] = session
         if self.kv is not None:
-            await self.kv.set_json(
+            await write_json(
+                self.kv,
                 f"session:v2:{session.user_id}",
                 {"v": SESSION_SCHEMA_VERSION, "session": asdict(session)},
                 ttl_seconds=SESSION_TTL_SECONDS,
             )
+        self._cap(self.sessions, MAX_MEMORY_SESSIONS)
+        self.sessions[session.user_id] = session
+        scope = current_state.get()
+        if scope is not None:
+            scope[(id(self), session.user_id)] = session
 
     async def remember_action(
         self, user_id: int, *, kind: str, value: str, lang: str = "ru"
@@ -498,8 +519,9 @@ class BotRuntime:
                 redis_key, token, ttl_seconds=ACTION_LOCK_SECONDS, nx=True
             ):
                 return token
-            if await self.kv.get(redis_key) is not None:
-                return None
+            # An unavailable shared lock cannot be replaced with a local one:
+            # another worker may already be sending this publication.
+            return None
         now = monotonic()
         for expired_key, (deadline, _owner) in list(self.action_locks.items()):
             if deadline <= now:
@@ -659,15 +681,18 @@ class BotRuntime:
         if task is not None and task is not current and not task.done():
             task.cancel()
         self.sessions.pop(user_id, None)
+        scope = current_state.get()
+        if scope is not None:
+            scope.pop((id(self), user_id), None)
         self.request_windows.pop(user_id, None)
         self.request_tokens.pop(user_id, None)
         self.active_tasks.pop(user_id, None)
         if self.kv is not None:
             wall_window = int(time()) // RATE_LIMIT_WINDOW_SECONDS
             await asyncio.gather(
-                self.kv.delete(f"session:v2:{user_id}"),
-                self.kv.delete(f"session:v1:{user_id}"),
-                self.kv.delete(f"collection:v1:{user_id}"),
+                delete_value(self.kv, f"session:v2:{user_id}"),
+                delete_value(self.kv, f"session:v1:{user_id}"),
+                delete_value(self.kv, f"collection:v1:{user_id}"),
                 self.kv.delete(f"rate:v1:{user_id}:{wall_window}"),
                 self.kv.delete(f"rate:v1:{user_id}:{wall_window - 1}"),
                 self.kv.delete(f"active-request:v1:{user_id}"),

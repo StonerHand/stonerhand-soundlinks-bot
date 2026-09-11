@@ -5,6 +5,7 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
+from music_links_bot.durable_state import read_text
 from music_links_bot.kvstore import KVStore
 from music_links_bot.models import TrackMatch
 from music_links_bot.url_utils import cache_key_for_url, direct_platform_links
@@ -53,11 +54,11 @@ async def find_posted_record(context, track: TrackMatch) -> dict[str, Any] | Non
     kv: KVStore | None = context.application.bot_data.get("kv_store")
     if kv is None:
         return None
-    raw = await kv.get(publication_key(context, track))
+    raw = await read_text(kv, publication_key(context, track))
     if not raw:
         # Read the pre-v3 key during the migration window. New records use the
         # stronger channel/kind/source identity below.
-        raw = await kv.get(release_fingerprint(track.artist, track.title))
+        raw = await read_text(kv, release_fingerprint(track.artist, track.title))
     if not raw:
         return None
     try:

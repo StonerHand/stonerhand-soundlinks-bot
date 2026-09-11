@@ -3,6 +3,13 @@ from __future__ import annotations
 from typing import Any
 
 from music_links_bot.bot_storage import remember_bounded
+from music_links_bot.durable_state import (
+    delete_value,
+    read_json,
+    read_text,
+    write_json,
+    write_text,
+)
 from music_links_bot.kvstore import KVStore
 
 CRATE_TTL_SECONDS = 14 * 24 * 3600
@@ -22,10 +29,10 @@ def _memory_titles(bot_data: dict) -> dict[int, str]:
 
 async def load_crate_title(bot_data: dict, user_id: int) -> str:
     memory = _memory_titles(bot_data)
-    if user_id in memory:
-        return memory[user_id]
     kv: KVStore | None = bot_data.get("kv_store")
-    value = await kv.get(f"bot-crate-title:v1:{user_id}") if kv else None
+    if kv is None and user_id in memory:
+        return memory[user_id]
+    value = await read_text(kv, f"bot-crate-title:v1:{user_id}") if kv else None
     title = str(value or "")[:72]
     remember_bounded(memory, user_id, title, max_size=MAX_MEMORY_CRATES)
     return title
@@ -33,33 +40,35 @@ async def load_crate_title(bot_data: dict, user_id: int) -> str:
 
 async def save_crate_title(bot_data: dict, user_id: int, title: str) -> None:
     value = str(title or "")[:72]
-    remember_bounded(
-        _memory_titles(bot_data), user_id, value, max_size=MAX_MEMORY_CRATES
-    )
     kv: KVStore | None = bot_data.get("kv_store")
     if kv is not None:
         if value:
-            await kv.set(
+            await write_text(
+                kv,
                 f"bot-crate-title:v1:{user_id}",
                 value,
                 ttl_seconds=CRATE_TITLE_TTL_SECONDS,
             )
         else:
-            await kv.delete(f"bot-crate-title:v1:{user_id}")
+            await delete_value(kv, f"bot-crate-title:v1:{user_id}")
+
+    remember_bounded(
+        _memory_titles(bot_data), user_id, value, max_size=MAX_MEMORY_CRATES
+    )
 
 
 async def load_crate(bot_data: dict, user_id: int) -> list[dict[str, Any]]:
     memory = _memory_crates(bot_data)
-    if user_id in memory:
+    kv: KVStore | None = bot_data.get("kv_store")
+    if kv is None and user_id in memory:
         return list(memory[user_id])
 
-    kv: KVStore | None = bot_data.get("kv_store")
-    payload = await kv.get_json(f"bot-crate:v2:{user_id}") if kv else None
+    payload = await read_json(kv, f"bot-crate:v2:{user_id}") if kv else None
     if isinstance(payload, dict):
         payload = payload.get("items")
     migrated = False
     if payload is None and kv is not None:
-        payload = await kv.get_json(f"bot-crate:v1:{user_id}")
+        payload = await read_json(kv, f"bot-crate:v1:{user_id}")
         migrated = isinstance(payload, list)
     items = (
         [item for item in payload if isinstance(item, dict)]
@@ -80,19 +89,21 @@ async def load_crate(bot_data: dict, user_id: int) -> list[dict[str, Any]]:
 
 async def save_crate(bot_data: dict, user_id: int, items: list[dict[str, Any]]) -> None:
     normalized = items[:MAX_CRATE_ITEMS]
+    kv: KVStore | None = bot_data.get("kv_store")
+    if kv is not None:
+        await write_json(
+            kv,
+            f"bot-crate:v2:{user_id}",
+            {"v": CRATE_SCHEMA_VERSION, "items": normalized},
+            ttl_seconds=CRATE_TTL_SECONDS,
+        )
+
     remember_bounded(
         _memory_crates(bot_data),
         user_id,
         normalized,
         max_size=MAX_MEMORY_CRATES,
     )
-    kv: KVStore | None = bot_data.get("kv_store")
-    if kv is not None:
-        await kv.set_json(
-            f"bot-crate:v2:{user_id}",
-            {"v": CRATE_SCHEMA_VERSION, "items": normalized},
-            ttl_seconds=CRATE_TTL_SECONDS,
-        )
 
 
 async def clear_crate(bot_data: dict, user_id: int) -> None:
@@ -100,9 +111,9 @@ async def clear_crate(bot_data: dict, user_id: int) -> None:
     _memory_titles(bot_data).pop(user_id, None)
     kv: KVStore | None = bot_data.get("kv_store")
     if kv is not None:
-        await kv.delete(f"bot-crate:v2:{user_id}")
-        await kv.delete(f"bot-crate:v1:{user_id}")
-        await kv.delete(f"bot-crate-title:v1:{user_id}")
+        await delete_value(kv, f"bot-crate:v2:{user_id}")
+        await delete_value(kv, f"bot-crate:v1:{user_id}")
+        await delete_value(kv, f"bot-crate-title:v1:{user_id}")
 
 
 async def add_to_crate(

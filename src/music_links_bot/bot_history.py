@@ -5,6 +5,7 @@ import secrets
 import time
 
 from music_links_bot.bot_storage import remember_bounded
+from music_links_bot.durable_state import delete_value, read_json
 from music_links_bot.formatter import pick_track_emoji
 from music_links_bot.kvstore import KVStore
 from music_links_bot.models import TrackMatch
@@ -68,7 +69,9 @@ async def record_history(
 async def load_history_items(context, user_id: int) -> list[dict]:
     kv: KVStore | None = context.application.bot_data.get("kv_store")
     if kv is not None:
-        items = await kv.get_json(f"hist:{user_id}")
+        items = await read_json(kv, f"hist:{user_id}")
+        if not isinstance(items, list):
+            return []
         if isinstance(items, list):
             return [item for item in items if isinstance(item, dict)][
                 :MAX_HISTORY_ITEMS
@@ -81,5 +84,5 @@ async def clear_history(context, user_id: int) -> None:
     context.application.bot_data.setdefault("bot_history", {}).pop(user_id, None)
     kv: KVStore | None = context.application.bot_data.get("kv_store")
     if kv is not None:
-        await kv.delete(f"hist:{user_id}")
+        await delete_value(kv, f"hist:{user_id}")
         await kv.delete(f"hist:lock:{user_id}")

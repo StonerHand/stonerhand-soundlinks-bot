@@ -73,3 +73,9 @@ jobs:
           python -m mypy
         env:
           PYTHONPATH: src
+
+      - name: Verify the distributable package
+        if: matrix.python-version == '3.12'
+        run: |
+          python -m pip wheel . --no-deps --wheel-dir dist
+          python tests/check_distribution.py dist/*.whl

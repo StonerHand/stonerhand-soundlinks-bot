@@ -17,6 +17,7 @@ from contextlib import ExitStack
 
 import httpx
 
+from music_links_bot.collection_collage import _safe_source_url
 from music_links_bot.constants import HTTP_USER_AGENT
 
 LOGGER = logging.getLogger(__name__)
@@ -168,7 +169,7 @@ async def build_branded_cover(
 ) -> bytes | None:
     """Download the artwork (and logo) and return branded JPEG bytes, or None to
     signal the caller should fall back to the plain artwork URL."""
-    if not artwork_url:
+    if not artwork_url or not _safe_source_url(artwork_url):
         return None
 
     try:

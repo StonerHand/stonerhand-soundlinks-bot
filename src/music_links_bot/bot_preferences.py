@@ -4,12 +4,14 @@ from telegram import InlineKeyboardMarkup, Update
 from telegram.ext import Application
 
 from music_links_bot.bot_runtime import BotRuntime, UserSession, encode_callback
+from music_links_bot.durable_state import state_scope
 from music_links_bot.i18n import (
     get_text,
     language_context,
     preferred_language,
     resolve_lang,
 )
+from music_links_bot.kvstore import KVUnavailableError
 from music_links_bot.models import TrackMatch
 from music_links_bot.release_preferences import (
     current_presentation,
@@ -27,13 +29,17 @@ class LocalizedApplication(Application):
     __slots__ = ()
 
     async def process_update(self, update: object) -> None:
-        with language_context(None), presentation_context():
+        with state_scope(), language_context(None), presentation_context():
             runtime = self.bot_data.get("runtime")
             user = update.effective_user if isinstance(update, Update) else None
             if user is not None and isinstance(runtime, BotRuntime):
-                session = await runtime.get_session(
-                    user.id, lang=resolve_lang(user.language_code)
-                )
+                try:
+                    session = await runtime.get_session(
+                        user.id, lang=resolve_lang(user.language_code)
+                    )
+                except KVUnavailableError as exc:
+                    await self.process_error(update, error=exc)
+                    return
                 preferred_language.set(session.preferred_lang or None)
                 current_presentation.set(preferences_from_session(session))
             await super().process_update(update)

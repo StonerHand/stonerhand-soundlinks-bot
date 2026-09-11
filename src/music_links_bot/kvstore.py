@@ -58,6 +58,12 @@ class KVStore:
         result = await self._command(["GET", key])
         return result if isinstance(result, str) else None
 
+    async def get_required(self, key: str) -> str | None:
+        result = await self._command_or_raise(["GET", key])
+        if result is not None and not isinstance(result, str):
+            raise KVUnavailableError("Redis returned an invalid value")
+        return result
+
     async def ping(self) -> bool:
         return await self._command_or_raise(["PING"]) == "PONG"
 
@@ -95,6 +101,11 @@ class KVStore:
 
     async def delete(self, key: str) -> None:
         await self._command(["DEL", key])
+
+    async def delete_required(self, key: str) -> None:
+        result = await self._command_or_raise(["DEL", key])
+        if not isinstance(result, int) or result < 0:
+            raise KVUnavailableError("Redis did not confirm the deletion")
 
     async def delete_if_value(self, key: str, expected_value: str) -> bool:
         """Release a lease only when it is still owned by ``expected_value``.
@@ -147,6 +158,19 @@ class KVStore:
             except ValueError:
                 decoded.append(None)
         return decoded
+
+    async def mget_json_required(self, keys: list[str]) -> list[Any | None]:
+        if not keys:
+            return []
+        values = await self._command_or_raise(["MGET", *keys])
+        if not isinstance(values, list) or len(values) != len(keys):
+            raise KVUnavailableError("Redis returned an invalid batch")
+        try:
+            return [
+                json.loads(value) if value is not None else None for value in values
+            ]
+        except (ValueError, TypeError) as exc:
+            raise KVUnavailableError("Redis contains invalid JSON") from exc
 
     async def get_json(self, key: str) -> Any | None:
         raw_value = await self.get(key)

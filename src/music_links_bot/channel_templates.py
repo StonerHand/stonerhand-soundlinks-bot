@@ -4,6 +4,7 @@ import hashlib
 
 from music_links_bot.bot_storage import remember_bounded
 from music_links_bot.constants import PLATFORM_LABELS
+from music_links_bot.durable_state import delete_value, read_json, write_json
 from music_links_bot.kvstore import KVStore
 from music_links_bot.release_presentation import apply_preset, normalize_preset
 
@@ -62,16 +63,16 @@ def template_from_draft(draft: dict) -> dict:
 async def load_channel_template(context, target: int | str) -> dict:
     key = _template_key(target)
     memory = context.application.bot_data.setdefault("channel_templates", {})
-    cached = memory.get(key)
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    cached = memory.get(key) if kv is None else None
     if isinstance(cached, dict):
         return dict(cached)
-    kv: KVStore | None = context.application.bot_data.get("kv_store")
-    stored = await kv.get_json(key) if kv is not None else None
+    stored = await read_json(kv, key) if kv is not None else None
     if isinstance(stored, dict) and isinstance(stored.get("template"), dict):
         stored = stored["template"]
     migrated = False
     if stored is None and kv is not None:
-        stored = await kv.get_json(_template_key(target, version=1))
+        stored = await read_json(kv, _template_key(target, version=1))
         migrated = isinstance(stored, dict)
     template = _sanitize_template(stored)
     if template:
@@ -82,7 +83,8 @@ async def load_channel_template(context, target: int | str) -> dict:
             max_size=MAX_MEMORY_TEMPLATES,
         )
     if migrated and template:
-        await kv.set_json(
+        await write_json(
+            kv,
             key,
             {"v": TEMPLATE_SCHEMA_VERSION, "template": template},
             ttl_seconds=CHANNEL_TEMPLATE_TTL_SECONDS,
@@ -123,7 +125,8 @@ async def save_channel_template(context, target: int | str, draft: dict) -> None
     )
     kv: KVStore | None = context.application.bot_data.get("kv_store")
     if kv is not None:
-        await kv.set_json(
+        await write_json(
+            kv,
             key,
             {"v": TEMPLATE_SCHEMA_VERSION, "template": template},
             ttl_seconds=CHANNEL_TEMPLATE_TTL_SECONDS,
@@ -135,5 +138,5 @@ async def clear_channel_template(context, target: int | str) -> None:
     context.application.bot_data.setdefault("channel_templates", {}).pop(key, None)
     kv: KVStore | None = context.application.bot_data.get("kv_store")
     if kv is not None:
-        await kv.delete(key)
-        await kv.delete(_template_key(target, version=1))
+        await delete_value(kv, key)
+        await delete_value(kv, _template_key(target, version=1))

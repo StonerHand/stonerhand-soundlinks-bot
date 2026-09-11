@@ -4,6 +4,7 @@ import re
 import secrets
 
 from music_links_bot.draft_model import normalize_track_draft
+from music_links_bot.durable_state import delete_value, read_json, write_json
 from music_links_bot.kvstore import KVStore
 
 DRAFT_TTL_SECONDS = 48 * 3600
@@ -40,6 +41,9 @@ async def store_draft(context, draft_id: str, draft: dict) -> None:
     if normalized is not None:
         draft = normalized
     draft["editor_draft_id"] = draft_id
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    if kv is not None:
+        await write_json(kv, f"draft:{draft_id}", draft, ttl_seconds=DRAFT_TTL_SECONDS)
     drafts: dict = context.application.bot_data.setdefault("drafts", {})
     remember_bounded(
         drafts,
@@ -47,22 +51,14 @@ async def store_draft(context, draft_id: str, draft: dict) -> None:
         draft,
         max_size=MAX_MEMORY_DRAFTS,
     )
-    kv: KVStore | None = context.application.bot_data.get("kv_store")
-    if kv is not None:
-        # Await the durable write: a serverless instance may freeze immediately
-        # after the handler returns and the next request can hit another region.
-        await kv.set_json(
-            f"draft:{draft_id}",
-            draft,
-            ttl_seconds=DRAFT_TTL_SECONDS,
-        )
 
 
 async def load_draft(context, draft_id: str) -> dict | None:
     if not valid_state_id(draft_id):
         return None
     drafts: dict = context.application.bot_data.setdefault("drafts", {})
-    draft = drafts.get(draft_id)
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    draft = drafts.get(draft_id) if kv is None else None
     if isinstance(draft, dict):
         normalized = normalize_track_draft(draft)
         if normalized is not None:
@@ -71,10 +67,9 @@ async def load_draft(context, draft_id: str) -> dict | None:
             return normalized
         return draft
 
-    kv: KVStore | None = context.application.bot_data.get("kv_store")
     if kv is None:
         return None
-    draft = await kv.get_json(f"draft:{draft_id}")
+    draft = await read_json(kv, f"draft:{draft_id}")
     normalized = normalize_track_draft(draft)
     if normalized is not None:
         normalized["editor_draft_id"] = draft_id
@@ -85,16 +80,17 @@ async def load_draft(context, draft_id: str) -> dict | None:
             max_size=MAX_MEMORY_DRAFTS,
         )
         return normalized
+    drafts.pop(draft_id, None)
     return None
 
 
 async def delete_draft(context, draft_id: str) -> None:
     if not valid_state_id(draft_id):
         return
-    context.application.bot_data.setdefault("drafts", {}).pop(draft_id, None)
     kv: KVStore | None = context.application.bot_data.get("kv_store")
     if kv is not None:
-        await kv.delete(f"draft:{draft_id}")
+        await delete_value(kv, f"draft:{draft_id}")
+    context.application.bot_data.setdefault("drafts", {}).pop(draft_id, None)
 
 
 async def store_search_selection(

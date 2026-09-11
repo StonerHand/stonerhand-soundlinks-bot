@@ -14,6 +14,7 @@ from telegram import (
     Bot,
     ForceReply,
     InlineKeyboardMarkup,
+    InlineQueryResultsButton,
     Message,
     Update,
 )
@@ -285,8 +286,30 @@ async def _application_error_handler(
     update: object,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
-    del update
     error = context.error
+    from music_links_bot.kvstore import KVUnavailableError
+
+    if isinstance(error, KVUnavailableError) and isinstance(update, Update):
+        user = update.effective_user
+        lang = resolve_lang(user.language_code if user else None)
+        text = get_text(lang, "storage_temporarily_unavailable")
+        try:
+            if update.callback_query is not None:
+                await update.callback_query.answer(text, show_alert=True)
+            elif update.inline_query is not None:
+                await update.inline_query.answer(
+                    [],
+                    cache_time=0,
+                    is_personal=True,
+                    button=InlineQueryResultsButton(
+                        text=get_text(lang, "storage_unavailable_inline"),
+                        start_parameter="start",
+                    ),
+                )
+            elif update.effective_message is not None:
+                await update.effective_message.reply_text(text)
+        except TelegramError:
+            LOGGER.warning("Could not display storage failure notice")
     if isinstance(error, BaseException):
         context.application.bot_data["last_error"] = {
             "type": type(error).__name__,
@@ -1310,6 +1333,12 @@ async def _add_editor_item_to_crate(request: EditorActionRequest) -> None:
         draft_id=request.draft_id,
         item=request.draft["item"],
     )
+    if not added and not crate_contains_item(items, request.draft["item"]):
+        await request.query.answer(
+            get_text(request.lang, "ed_crate_full"), show_alert=True
+        )
+        await _restore_editor_card(request)
+        return
     request.draft["in_crate"] = True
     request.draft["crate_count"] = len(items)
     await _store_draft(request.context, request.draft_id, request.draft)

@@ -1,0 +1,6 @@
+include .env.example .gitignore requirements.txt vercel.json CHANGELOG.md
+recursive-include .github *.yml
+recursive-include api *.py
+recursive-include docs *.md *.svg
+recursive-include scripts *.py *.html
+recursive-include tests *.py *.json

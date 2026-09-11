@@ -5,6 +5,7 @@ import time
 
 from music_links_bot.bot_storage import remember_bounded
 from music_links_bot.channel_templates import apply_template, template_from_draft
+from music_links_bot.durable_state import delete_value, read_json, write_json
 from music_links_bot.kvstore import KVStore
 
 PRESET_TTL_SECONDS = 365 * 24 * 3600
@@ -50,11 +51,11 @@ def _sanitize_presets(value: object) -> list[dict]:
 async def load_presets(context, user_id: int) -> list[dict]:
     key = _key(user_id)
     memory = context.application.bot_data.setdefault("publication_presets", {})
-    cached = memory.get(key)
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    cached = memory.get(key) if kv is None else None
     if isinstance(cached, list):
         return [dict(item) for item in cached]
-    kv: KVStore | None = context.application.bot_data.get("kv_store")
-    stored = await kv.get_json(key) if kv is not None else None
+    stored = await read_json(kv, key) if kv is not None else None
     presets = _sanitize_presets(stored)
     remember_bounded(memory, key, presets, max_size=MAX_MEMORY_USERS)
     return [dict(item) for item in presets]
@@ -71,7 +72,7 @@ async def _save_all(context, user_id: int, presets: list[dict]) -> None:
     )
     kv: KVStore | None = context.application.bot_data.get("kv_store")
     if kv is not None:
-        await kv.set_json(key, clean, ttl_seconds=PRESET_TTL_SECONDS)
+        await write_json(kv, key, clean, ttl_seconds=PRESET_TTL_SECONDS)
 
 
 async def save_named_preset(
@@ -126,4 +127,4 @@ async def clear_presets(context, user_id: int) -> None:
     context.application.bot_data.setdefault("publication_presets", {}).pop(key, None)
     kv: KVStore | None = context.application.bot_data.get("kv_store")
     if kv is not None:
-        await kv.delete(key)
+        await delete_value(kv, key)
