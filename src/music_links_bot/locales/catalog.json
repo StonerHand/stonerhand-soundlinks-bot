@@ -684,16 +684,16 @@
     "ru": "Сейчас бот ничего не ожидает"
   },
   "menu_demo": {
-    "en": "✨ <b>This is a finished post</b>\n<i>You send a link — the bot builds the rest.</i>\n\n<blockquote>📻 · <b>The Soft Moon</b>\n<i>Criminal</i>\n\n<code>#stonerhand #track</code>\n\n[🟢 Spotify] [⚪ Apple]\n[🪩 All platforms]</blockquote>\n\n<b>Inside the card:</b> artwork, a tappable title, hashtags and compact buttons.\n\nTry it now: send a link or a <code>track title</code>.",
-    "ru": "✨ <b>Так выглядит готовый пост</b>\n<i>Ты присылаешь ссылку — бот собирает остальное.</i>\n\n<blockquote>📻 · <b>The Soft Moon</b>\n<i>Criminal</i>\n\n<code>#stonerhand #track</code>\n\n[🟢 Spotify] [⚪ Apple]\n[🪩 Все платформы]</blockquote>\n\n<b>Внутри карточки:</b> обложка, чистый заголовок, хэштеги и компактные кнопки.\n\nПопробуй прямо сейчас: пришли ссылку или <code>название трека</code>."
+    "en": "✨ <b>This is a finished post</b>\n<i>You send a link — the bot builds the rest.</i>\n\n<blockquote>📻 · <b>The Soft Moon</b>\n<i>Criminal</i>\n\n<code>#stonerhand #track</code>\n\n[🟢 Spotify] [🍎 Apple Music]\n[🎧 Listen to track]</blockquote>\n\n<b>Inside the card:</b> artwork, a tappable title, hashtags and compact buttons.\n\nTry it now: send a link or a <code>track title</code>.",
+    "ru": "✨ <b>Так выглядит готовый пост</b>\n<i>Ты присылаешь ссылку — бот собирает остальное.</i>\n\n<blockquote>📻 · <b>The Soft Moon</b>\n<i>Criminal</i>\n\n<code>#stonerhand #track</code>\n\n[🟢 Spotify] [🍎 Apple Music]\n[🎧 Слушать трек]</blockquote>\n\n<b>Внутри карточки:</b> обложка, чистый заголовок, хэштеги и компактные кнопки.\n\nПопробуй прямо сейчас: пришли ссылку или <code>название трека</code>."
   },
   "menu_guide": {
     "en": "📣 <b>The bot for groups and channels</b>\n<i>Set it up once, then just send music.</i>\n\n<blockquote><b>1 · Add the bot</b>\nTo a group or channel as an administrator.\n\n<b>2 · Grant permissions</b>\nTo publish; in groups, also to delete messages.\n\n<b>3 · Send a link</b>\nThe bot replaces it with a finished music post.</blockquote>\n\n<b>Automatic touches</b>\n• intro text becomes a quote with attribution;\n• hashtags and platforms are added;\n• several links become a collection.\n\n<blockquote>🛡 The finished post is published before the original message is removed.</blockquote>",
     "ru": "📣 <b>Бот для групп и каналов</b>\n<i>Настрой один раз — дальше просто присылай музыку.</i>\n\n<blockquote><b>1 · Добавь бота</b>\nВ группу или канал как администратора.\n\n<b>2 · Выдай права</b>\nНа публикацию; в группе — ещё и на удаление сообщений.\n\n<b>3 · Пришли ссылку</b>\nБот заменит её готовым музыкальным постом.</blockquote>\n\n<b>Автоматически</b>\n• подводка становится цитатой с автором;\n• добавляются хэштеги и площадки;\n• несколько ссылок собираются в подборку.\n\n<blockquote>🛡 Сначала публикуется готовый пост — и только потом удаляется исходное сообщение.</blockquote>"
   },
   "menu_help": {
-    "ru": "<b>Как пользоваться</b>\n\n<b>1.</b> Пришли ссылку или <code>артист — название</code>. Для подборки — до 10 ссылок, по одной на строку.\n<b>2.</b> Измени текст, теги, обложку и кнопки прямо под постом.\n<b>3.</b> Открой превью и выбери отправку. Владельцу бота доступна публикация в канал и по расписанию.\n\nЧерновики и история — в «Моих материалах». Отменить ввод — <code>/cancel</code>.",
-    "en": "<b>How to use</b>\n\n<b>1.</b> Send a link or <code>artist — title</code>. For a collection, send up to 10 links, one per line.\n<b>2.</b> Edit text, tags, artwork and buttons directly below the post.\n<b>3.</b> Preview and send. The bot owner can publish to the channel now or later.\n\nFind drafts and history in My library. Cancel input with <code>/cancel</code>."
+    "ru": "<b>Как пользоваться</b>\n\n<b>1.</b> Пришли ссылку или <code>артист — название</code>. Для подборки — до 10 ссылок, по одной на строку.\n<b>2.</b> Нажми «Изменить»: там текст, теги, обложка и кнопки.\n<b>3.</b> Открой превью и выбери отправку. Владельцу бота доступна публикация в канал и по расписанию.\n\nЧерновики, сохранения и история — в «Моих постах». Отменить ввод — <code>/cancel</code>.",
+    "en": "<b>How to use</b>\n\n<b>1.</b> Send a link or <code>artist — title</code>. For a collection, send up to 10 links, one per line.\n<b>2.</b> Tap Edit for text, tags, artwork and buttons.\n<b>3.</b> Preview and send. The bot owner can publish to the channel now or later.\n\nFind drafts, saved posts and history in My posts. Cancel input with <code>/cancel</code>."
   },
   "menu_more": {
     "en": "⚙️ <b>Settings and help</b>\n<i>Reference pages and account controls.</i>\n\n<blockquote><b>Help</b> — a short guide\n<b>Services</b> — supported platforms\n<b>For channels</b> — automatic link replacement\n<b>Example</b> — a finished post preview\n<b>Privacy</b> — stored data and deletion controls</blockquote>",
@@ -1340,12 +1340,12 @@
     "en": "📚 My posts"
   },
   "library_title": {
-    "ru": "<b>Мои материалы</b>\n\nПродолжи черновик, собери подборку или вернись к недавнему поиску.",
-    "en": "<b>My library</b>\n\nContinue a draft, build a collection or revisit a recent search."
+    "ru": "<b>Мои посты</b>\n\nПродолжи черновик, собери подборку или вернись к недавнему поиску.",
+    "en": "<b>My posts</b>\n\nContinue a draft, build a collection or revisit a recent search."
   },
   "library_back": {
-    "ru": "← Мои материалы",
-    "en": "← My library"
+    "ru": "← Мои посты",
+    "en": "← My posts"
   },
   "ed_quick_text": {
     "ru": "✏️ Текст",

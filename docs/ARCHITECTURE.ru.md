@@ -188,8 +188,8 @@ preview первого релиза. Endpoint принимает только б
 | Данные | Redis key | TTL / fallback |
 | --- | --- | --- |
 | lookup cache | типизированные cache keys | TTL по провайдеру / bounded memory |
-| пользовательская сессия | `session:v2:<id>` | 30 дней / bounded memory |
-| последняя полная подборка для inline | `collection:v1:<id>` | 30 дней / session fallback |
+| пользовательская сессия | `session:v2:<id>` | 90 дней / bounded memory |
+| последняя полная подборка для inline | `collection:v1:<id>` | 90 дней / session fallback |
 | черновик schema v5 | `draft:<id>` | 7 дней; saved — 90 дней / bounded memory |
 | подборка | `bot-crate:v2:<id>` | 14 дней / bounded memory |
 | название подборки | `bot-crate-title:v1:<id>` | 14 дней / bounded memory |
