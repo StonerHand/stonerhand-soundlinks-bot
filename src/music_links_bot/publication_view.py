@@ -129,6 +129,9 @@ def build_publication_view(
         as_photo=bool(draft.get("as_photo")),
         prefer_large_preview=bool(draft.get("large_preview")),
         delivery_mode=(
-            "classic" if draft.get("delivery_mode") == "classic" else "auto"
+            "auto"
+            if draft.get("publication_mode") == "longread"
+            and draft.get("delivery_mode") != "classic"
+            else "classic"
         ),
     )

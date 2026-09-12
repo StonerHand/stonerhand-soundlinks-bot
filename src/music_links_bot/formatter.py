@@ -58,17 +58,18 @@ def format_track_heading(track: TrackMatch) -> str:
 
 def format_release_heading(track: TrackMatch) -> str:
     artist, title = _display_text(track.artist), _display_text(track.title)
-    if track.artist.casefold().strip() in {
-        "various artists",
-        "various",
-        "разные исполнители",
-    }:
-        lines = [f"<b>{title}</b>", artist]
-    else:
-        lines = [f"<b>{artist}</b>", title]
+    lines = [f"{release_emoji(track)} <b>{title}</b>"]
+    if artist:
+        lines.append(artist)
     details = release_details(track)
     if details:
-        lines.append(f"<i>{escape(details)}</i>")
+        lines.extend(["", escape(details)])
+    # Album membership is provider metadata, never inferred from the song title.
+    if track.kind == "song" and track.album_title:
+        album = _display_text(track.album_title)
+        if album:
+            label = "From the album" if resolve_lang(None) == "en" else "Из альбома"
+            lines.append(f"💿 {label} «{album}»")
     return "\n".join(lines)
 
 
@@ -534,6 +535,14 @@ def release_details(track: TrackMatch) -> str:
             if resolve_lang(None) == "en"
             else ru.get(kind, "Альбом")
         )
+    else:
+        en, ru = {
+            "song": ("Track", "Трек"),
+            "audio": ("Audio", "Аудио"),
+            "video": ("Video", "Видео"),
+            "podcast": ("Podcast", "Подкаст"),
+        }.get(track.kind, ("Release", "Релиз"))
+        details.append(en if resolve_lang(None) == "en" else ru)
     if track.release_year and re.fullmatch(r"(?:19|20)\d{2}", str(track.release_year)):
         details.append(str(track.release_year))
     if (

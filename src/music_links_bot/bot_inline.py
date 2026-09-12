@@ -19,7 +19,6 @@ from music_links_bot import bot_lookup
 from music_links_bot.bot_crate import load_crate, load_crate_title
 from music_links_bot.constants import INLINE_EXAMPLE_QUERY, MAX_LINKS_PER_MESSAGE
 from music_links_bot.formatter import (
-    build_auto_hashtags,
     format_artist_message,
     format_playlist_message,
     format_radio_message,
@@ -51,7 +50,6 @@ from music_links_bot.publication_contract import (
 from music_links_bot.release_preferences import current_presentation
 from music_links_bot.rich_publications import (
     RICH_MESSAGE_CAPABILITY,
-    build_rich_inline_card_html,
     rich_api_unavailable,
     rich_messages_enabled,
 )
@@ -73,7 +71,6 @@ from music_links_bot.telegram_gateway import (
     record_capability_failure,
     record_capability_success,
 )
-from music_links_bot.telegram_media_cache import get_cached_file_id
 from music_links_bot.url_utils import (
     cache_key_for_url,
     extract_supported_urls,
@@ -633,26 +630,6 @@ async def _build_inline_result(
         share_query=share_query,
         label=share_label,
     )
-    cached_cover_file_id = await get_cached_file_id(context, track.thumbnail_url)
-    rich_html = build_rich_inline_card_html(
-        track,
-        hashtags=build_auto_hashtags(track),
-        reply_markup=keyboard,
-        media_id="cover" if cached_cover_file_id else None,
-    )
-    rich_media = (
-        [
-            {
-                "id": "cover",
-                "media": {
-                    "type": "photo",
-                    "media": cached_cover_file_id,
-                },
-            }
-        ]
-        if cached_cover_file_id
-        else None
-    )
     return _inline_article(
         source_url,
         title=f"{track.artist} — {track.title}",
@@ -676,11 +653,7 @@ async def _build_inline_result(
         ),
         thumbnail_url=track.thumbnail_url,
         channel_safe=channel_safe,
-        rich_html=rich_html,
-        rich_media=rich_media,
-        force_classic=force_classic
-        or track.kind == "video"
-        or current_presentation.get().artwork == "native",
+        force_classic=True,
     )
 
 

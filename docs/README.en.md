@@ -53,6 +53,10 @@ replace or annotate it.
 
 ### In 1.19
 
+- In 1.19.1 the release title is bold, followed by the artist and a separate
+  type/year block. Album membership appears only when metadata provides it.
+  Standard cards and inline posts use ordinary Telegram messages; artwork
+  options remain available in the editor.
 - Links arriving during another edit get an explicit destination choice.
 - Partial lookup retries only failed sources, preserving successful results and order.
 - Concurrent edits cannot silently overwrite each other; stale controls refresh the card.

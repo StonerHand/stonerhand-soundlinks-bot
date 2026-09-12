@@ -1501,7 +1501,10 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.description, "Пост с кнопками всех площадок")
         self.assertEqual(len(result.id), 32)
         self.assertIsInstance(result.input_message_content, InputTextMessageContent)
-        self.assertIn("<b>Youth Code</b>", result.input_message_content.message_text)
+        self.assertIn(
+            "🎧 <b>Transitions</b>\nYouth Code",
+            result.input_message_content.message_text,
+        )
         preview = result.input_message_content.link_preview_options
         self.assertIsNotNone(preview)
         self.assertFalse(preview.is_disabled)
@@ -1526,41 +1529,33 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertIsNotNone(result)
-        self.assertIn("<b>Youth Code</b>", result.input_message_content.message_text)
+        self.assertIn(
+            "🎧 <b>Transitions</b>\nYouth Code",
+            result.input_message_content.message_text,
+        )
         keyboard = result.reply_markup.inline_keyboard
         self.assertEqual(keyboard[0][0].text, "🎧 Слушать трек")
         self.assertEqual(keyboard[-1][0].text, "↗️ Поделиться")
         self.assertTrue(keyboard[-1][0].switch_inline_query.startswith("sh5|"))
 
-    async def test_inline_rich_result_uses_cached_telegram_cover(self) -> None:
+    async def test_inline_clean_cover_stays_classic_with_cached_media(self) -> None:
         with (
             presentation_context(PresentationPreferences(artwork="clean")),
             patch(
-                "music_links_bot.bot_inline.get_cached_file_id",
+                "music_links_bot.telegram_media_cache.get_cached_file_id",
                 AsyncMock(return_value="telegram-cover-file-id"),
-            ),
+            ) as load_media,
         ):
             result = await _build_inline_result(
-                "https://open.spotify.com/track/abc",
-                ContextStub(),
+                "https://open.spotify.com/track/abc", ContextStub()
             )
 
-        self.assertIsNotNone(result)
-        rich_message = result.input_message_content["rich_message"]
-        self.assertIn('src="tg://photo?id=cover"', rich_message["html"])
-        self.assertIn('url="https://song.link/transitions"', rich_message["html"])
-        self.assertEqual(
-            rich_message["media"],
-            [
-                {
-                    "id": "cover",
-                    "media": {
-                        "type": "photo",
-                        "media": "telegram-cover-file-id",
-                    },
-                }
-            ],
-        )
+        self.assertIsInstance(result.input_message_content, InputTextMessageContent)
+        preview = result.input_message_content.link_preview_options
+        self.assertEqual(preview.url, result.thumbnail_url)
+        self.assertTrue(preview.show_above_text)
+        self.assertIsNotNone(result.reply_markup)
+        load_media.assert_not_awaited()
 
     async def test_inline_handler_retries_classic_when_rich_is_rejected(self) -> None:
         from music_links_bot.bot_inline import inline_query_handler
@@ -1579,14 +1574,19 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
 
         inline_query = InlineQueryStub()
         update = type("InlineUpdateStub", (), {"inline_query": inline_query})()
+        from telegram import InlineQueryResultArticle
+
+        classic = await _build_inline_result(inline_query.query, ContextStub())
+        rich = InlineQueryResultArticle(
+            id="rich-test",
+            title=classic.title,
+            input_message_content={"rich_message": {"html": "<h1>Transitions</h1>"}},
+        )
         reset_capabilities()
         try:
-            with (
-                presentation_context(PresentationPreferences(artwork="clean")),
-                patch(
-                    "music_links_bot.bot_inline.get_cached_file_id",
-                    AsyncMock(return_value="telegram-cover-file-id"),
-                ),
+            with patch(
+                "music_links_bot.bot_inline._build_inline_result",
+                AsyncMock(side_effect=[rich, classic]),
             ):
                 await inline_query_handler(update, ContextStub())
         finally:
@@ -2357,7 +2357,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(message.replies[0], "<deleted>")
-        self.assertIn("<b>Youth Code</b>\nTransitions", message.replies[1])
+        self.assertIn("🎧 <b>Transitions</b>\nYouth Code", message.replies[1])
 
     async def test_search_candidate_heading_escapes_user_html(self) -> None:
         class HtmlQueryMessageStub(PrivateMessageStub):
@@ -2676,7 +2676,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertIn("<b>Youth Code</b>\nTransitions", message.replies[0])
+        self.assertIn("🎧 <b>Transitions</b>\nYouth Code", message.replies[0])
         self.assertIn("#stonerhand #track", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "✏️ Изменить")
@@ -2741,7 +2741,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertIn("<b>Bondage Fairies</b>\nStar Signs", message.replies[0])
+        self.assertIn("🎧 <b>Star Signs</b>\nBondage Fairies", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "✏️ Изменить")
         self.assertTrue(keyboard[0][0].callback_data.startswith("v2|editor|m|"))
