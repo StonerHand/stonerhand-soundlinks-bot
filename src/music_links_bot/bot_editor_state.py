@@ -22,7 +22,7 @@ from music_links_bot.release_presentation import (
 )
 from music_links_bot.url_utils import is_platform_destination_url
 
-UNDO_SETTING_SECONDS = 30
+UNDO_SETTING_SECONDS = 300
 MAX_UNDO_STEPS = 5
 _EDITABLE_FIELDS = (
     "prefix",
@@ -39,6 +39,23 @@ _EDITABLE_FIELDS = (
     "custom_cover_file_id",
     "custom_cover_unique_id",
 )
+
+
+def setting_snapshot(draft: dict) -> dict:
+    return {key: deepcopy(draft.get(key)) for key in _EDITABLE_FIELDS}
+
+
+def reset_original(draft: dict) -> bool:
+    original = draft.get("original_state")
+    if not isinstance(original, dict):
+        return False
+    remember_setting_state(draft)
+    for key in _EDITABLE_FIELDS:
+        if original.get(key) is None:
+            draft.pop(key, None)
+        else:
+            draft[key] = deepcopy(original[key])
+    return True
 
 
 def remember_setting_state(draft: dict) -> None:

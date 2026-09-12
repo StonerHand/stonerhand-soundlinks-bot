@@ -47,7 +47,12 @@ class RecentNavigationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Draft Artist", drafts_text)
         self.assertNotIn("Published Artist", drafts_text)
         self.assertEqual(
-            drafts_keyboard.inline_keyboard[0][0].callback_data,
+            next(
+                b.callback_data
+                for row in drafts_keyboard.inline_keyboard
+                for b in row
+                if b.callback_data.startswith("v2|editor|")
+            ),
             "v2|editor|b|draft1",
         )
         self.assertIn("Published Artist", recent_text)
@@ -72,8 +77,18 @@ class RecentNavigationTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertIn("Черновиков пока нет", text)
-        self.assertEqual(keyboard.inline_keyboard[0][0].text, "Создать пост")
-        self.assertEqual(keyboard.inline_keyboard[0][0].style, "primary")
+        self.assertIn(
+            "➕ Новый пост", [b.text for row in keyboard.inline_keyboard for b in row]
+        )
+        self.assertEqual(
+            next(
+                b.style
+                for row in keyboard.inline_keyboard
+                for b in row
+                if b.callback_data == "v2|menu|create"
+            ),
+            "primary",
+        )
 
 
 if __name__ == "__main__":

@@ -68,7 +68,7 @@ def build_start_keyboard(
     active_draft_id: str | None = None,
     active_draft_label: str | None = None,
 ) -> InlineKeyboardMarkup:
-    del bot_username, crate_count
+    del bot_username
     rows = [
         [
             callback_button(
@@ -87,6 +87,8 @@ def build_start_keyboard(
         rows.append(
             [callback_button(label, encode_callback("editor", "b", active_draft_id))]
         )
+    if crate_count:
+        rows.append([_crate_button(lang, crate_count)])
     if show_example:
         rows.append(
             [
@@ -443,7 +445,9 @@ def build_onboarding_keyboard(step: int, lang: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(rows)
 
 
-def editor_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
+def editor_rows(
+    draft_id: str, draft: dict, *, settings: bool = False
+) -> list[list[InlineKeyboardButton]]:
     """The card is the editor; frequent changes require one tap."""
     lang = draft.get("lang") or "ru"
 
@@ -452,6 +456,32 @@ def editor_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
             get_text(lang, key), encode_callback("editor", action, draft_id), **kwargs
         )
 
+    if not settings:
+        collection_button = (
+            callback_button(
+                get_text(lang, "ed_crate_count").format(
+                    count=draft.get("crate_count", 0)
+                ),
+                encode_callback("crate", "open"),
+            )
+            if draft.get("in_crate")
+            else cb("ed_add_crate", "c")
+        )
+        rows = [
+            [cb("ed_edit_post", "m"), collection_button],
+            [
+                cb("ed_clean_preview", "pv"),
+                cb("ed_saved" if draft.get("saved_at") else "ed_save", "sv"),
+            ],
+            [
+                cb(
+                    "ed_publish_menu" if draft.get("can_publish") else "ed_send_menu",
+                    "p" if draft.get("can_publish") else "o",
+                    tone=ButtonTone.PRIMARY,
+                )
+            ],
+        ]
+        return rows
     rows = [[cb("ed_quick_text", "ti"), cb("ed_quick_tags", "hs")]]
     if not draft.get("source_audio_file_id"):
         media = []
@@ -459,22 +489,14 @@ def editor_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
             media.append(cb("ed_quick_cover", "ap"))
         media.append(cb("ed_quick_buttons", "ls"))
         rows.append(media)
-    rows.append([cb("ed_clean_preview", "pv"), cb("ed_quick_more", "tools")])
-    rows.append(
-        [
-            cb(
-                "ed_publish_menu" if draft.get("can_publish") else "ed_send_menu",
-                "p" if draft.get("can_publish") else "o",
-                tone=ButtonTone.PRIMARY,
-            )
-        ]
-    )
+    rows.append([cb("ed_reset_original", "reset"), cb("ed_quick_more", "tools")])
+    rows.append([cb("ed_done_editing", "b", tone=ButtonTone.PRIMARY)])
     return append_setting_undo(rows, draft_id, draft)
 
 
 def editor_more_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
     """Keep old settings callbacks compatible with the single editor."""
-    return editor_rows(draft_id, draft)
+    return editor_rows(draft_id, draft, settings=True)
 
 
 def editor_appearance_rows(
@@ -778,6 +800,14 @@ def editor_hashtag_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardB
     rows.append(
         [
             callback_button(
+                get_text(lang, "ed_why_tags"),
+                encode_callback("editor", "why_tags", draft_id),
+            )
+        ]
+    )
+    rows.append(
+        [
+            callback_button(
                 get_text(lang, "ed_tags_custom"),
                 encode_callback("editor", "hi", draft_id),
             ),
@@ -984,13 +1014,17 @@ def render_crate(
     title: str = "",
     share_query: str | None = None,
 ) -> tuple[str, InlineKeyboardMarkup]:
+    from music_links_bot.bot_crate import crate_item_key, crate_revision
+
     if confirm_clear:
         return get_text(lang, "crate_clear_confirm"), InlineKeyboardMarkup(
             [
                 [
                     InlineKeyboardButton(
                         get_text(lang, "crate_clear_confirm_button"),
-                        callback_data=encode_callback("crate", "clear_confirm"),
+                        callback_data=encode_callback(
+                            "crate", "clear_confirm", crate_revision(items)
+                        ),
                         style="danger",
                     )
                 ],
@@ -1021,69 +1055,87 @@ def render_crate(
         lines.extend(["", get_text(lang, "crate_hint")])
         text = "\n".join(lines)
 
-    rows: list[list[InlineKeyboardButton]] = []
+    rows: list[list[InlineKeyboardButton]] = [
+        [
+            InlineKeyboardButton(
+                get_text(lang, "crate_add_links"),
+                callback_data=encode_callback("crate", "add"),
+            )
+        ]
+    ]
     if items:
         selected_index = (
             selected_index
             if selected_index is not None and 0 <= selected_index < len(items)
-            else 0
+            else None
         )
         selectors = [
             InlineKeyboardButton(
                 _crate_item_button_label(
                     entry, index, selected=index == selected_index
                 ),
-                callback_data=encode_callback("crate", "select", str(index)),
+                callback_data=encode_callback("crate", "select", crate_item_key(entry)),
             )
             for index, entry in enumerate(items)
         ]
         rows.extend([button] for button in selectors)
 
-        controls: list[InlineKeyboardButton] = []
-        if selected_index > 0:
-            controls.append(
-                InlineKeyboardButton(
-                    get_text(lang, "crate_up"),
-                    callback_data=encode_callback("crate", "up", str(selected_index)),
+        if selected_index is not None:
+            controls: list[InlineKeyboardButton] = []
+            if selected_index > 0:
+                controls.append(
+                    InlineKeyboardButton(
+                        get_text(lang, "crate_up"),
+                        callback_data=encode_callback(
+                            "crate", "up", crate_item_key(items[selected_index])
+                        ),
+                    )
                 )
-            )
-        if selected_index < len(items) - 1:
-            controls.append(
-                InlineKeyboardButton(
-                    get_text(lang, "crate_down"),
-                    callback_data=encode_callback("crate", "down", str(selected_index)),
+            if selected_index < len(items) - 1:
+                controls.append(
+                    InlineKeyboardButton(
+                        get_text(lang, "crate_down"),
+                        callback_data=encode_callback(
+                            "crate", "down", crate_item_key(items[selected_index])
+                        ),
+                    )
                 )
-            )
-        if controls:
-            rows.append(controls)
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    get_text(lang, "crate_remove"),
-                    callback_data=encode_callback(
-                        "crate", "remove", str(selected_index)
+            if controls:
+                rows.append(controls)
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        get_text(lang, "crate_remove"),
+                        callback_data=encode_callback(
+                            "crate", "remove", crate_item_key(items[selected_index])
+                        ),
+                        style="danger",
                     ),
-                    style="danger",
-                )
-            ]
-        )
-        from music_links_bot.release_preferences import release_preference_key
+                    InlineKeyboardButton(
+                        get_text(lang, "crate_replace"),
+                        callback_data=encode_callback(
+                            "crate", "replace", crate_item_key(items[selected_index])
+                        ),
+                    ),
+                ]
+            )
+            from music_links_bot.release_preferences import release_preference_key
 
-        selected_key = release_preference_key(
-            TrackMatch(**{"links": {}, **items[selected_index]["item"]})
-        )
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    get_text(lang, "crate_note"),
-                    callback_data=encode_callback("crate", "note", selected_key),
-                ),
-                InlineKeyboardButton(
-                    get_text(lang, "crate_section"),
-                    callback_data=encode_callback("crate", "section", selected_key),
-                ),
-            ]
-        )
+            selected_key = release_preference_key(
+                TrackMatch(**{"links": {}, **items[selected_index]["item"]})
+            )
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        get_text(lang, "crate_note"),
+                        callback_data=encode_callback("crate", "note", selected_key),
+                    ),
+                    InlineKeyboardButton(
+                        get_text(lang, "crate_section"),
+                        callback_data=encode_callback("crate", "section", selected_key),
+                    ),
+                ]
+            )
         rows.append(
             [
                 InlineKeyboardButton(
@@ -1163,3 +1215,25 @@ def render_crate(
         ]
     )
     return text, InlineKeyboardMarkup(rows)
+
+
+def version_editor_keyboard(keyboard, draft):
+    if keyboard is None or "revision" not in draft:
+        return keyboard
+    from telegram import InlineKeyboardButton as TelegramButton
+
+    rows = []
+    for row in keyboard.inline_keyboard:
+        values = []
+        for item in row:
+            data = item.to_dict()
+            callback = data.get("callback_data")
+            if isinstance(callback, str) and callback.startswith("v2|editor|"):
+                data["callback_data"] = (
+                    callback.split("~", 1)[0] + "~" + str(draft["revision"])
+                )
+                if len(data["callback_data"].encode()) > 64:
+                    raise ValueError("Versioned editor callback exceeds Telegram limit")
+            values.append(TelegramButton.de_json(data, None))
+        rows.append(values)
+    return InlineKeyboardMarkup(rows)

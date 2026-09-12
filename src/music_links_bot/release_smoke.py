@@ -292,11 +292,11 @@ def _build_ui_contract() -> dict[str, object]:
     screens = {
         "home_ru": _summarize_ui_keyboard(
             build_start_keyboard(None, lang="ru", crate_count=2),
-            expected_primary="Создать пост",
+            expected_primary="➕ Новый пост",
         ),
         "home_en": _summarize_ui_keyboard(
             build_start_keyboard(None, lang="en", crate_count=2),
-            expected_primary="Create post",
+            expected_primary="➕ New post",
         ),
         "first_run": _summarize_ui_keyboard(
             build_start_keyboard(
@@ -305,7 +305,7 @@ def _build_ui_contract() -> dict[str, object]:
                 show_example=True,
                 show_tour=True,
             ),
-            expected_primary="Создать пост",
+            expected_primary="➕ Новый пост",
         ),
         "error_change_query": _summarize_ui_keyboard(
             build_error_keyboard(
@@ -337,11 +337,11 @@ def _build_ui_contract() -> dict[str, object]:
         ),
         "editor_actions": _summarize_ui_keyboard(
             InlineKeyboardMarkup(editor_rows("smoke", draft)),
-            expected_primary="Отправить…",
+            expected_primary="↗️ Отправить…",
         ),
         "editor_settings": _summarize_ui_keyboard(
             InlineKeyboardMarkup(editor_more_rows("smoke", draft)),
-            expected_primary="Отправить…",
+            expected_primary="✓ Готово",
         ),
     }
     home_text = build_home_text(

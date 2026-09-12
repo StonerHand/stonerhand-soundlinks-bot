@@ -5,7 +5,7 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
-from music_links_bot.durable_state import read_text
+from music_links_bot.durable_state import read_text, write_json
 from music_links_bot.kvstore import KVStore
 from music_links_bot.models import TrackMatch
 from music_links_bot.url_utils import cache_key_for_url, direct_platform_links
@@ -88,7 +88,8 @@ async def mark_posted(
         chat = getattr(message, "chat", None)
         target_value = getattr(chat, "username", None) or getattr(chat, "id", None)
     url = _message_url(target_value, message_id)
-    await kv.set_json(
+    await write_json(
+        kv,
         publication_key(context, track, target_value),
         {
             "date": posted_date,
@@ -96,6 +97,7 @@ async def mark_posted(
             "message_id": message_id,
             "url": url,
         },
+        ttl_seconds=None,
     )
 
 

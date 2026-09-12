@@ -1,15 +1,15 @@
 {
-  "text": "<b>Sleep</b>\nDopesmoker\n\n#stonerhand #track\n\n<i>Изменения сохранены для этого поста.</i>",
+  "text": "✏️ <b>Редактирование поста</b>\n\n<b>Sleep</b>\nDopesmoker\n\n#stonerhand #track\n\n<i>С обложкой ✓ · Теги авто · 2 площадки · Авто</i>",
   "rows": [
     [
       [
-        "Текст",
+        "✏️ Текст",
         "v2|editor|ti|draft123",
         null,
         null
       ],
       [
-        "Теги",
+        "# Теги",
         "v2|editor|hs|draft123",
         null,
         null
@@ -17,13 +17,13 @@
     ],
     [
       [
-        "Обложка",
+        "🖼 Обложка",
         "v2|editor|ap|draft123",
         null,
         null
       ],
       [
-        "Кнопки",
+        "🔗 Кнопки",
         "v2|editor|ls|draft123",
         null,
         null
@@ -31,8 +31,8 @@
     ],
     [
       [
-        "Превью",
-        "v2|editor|pv|draft123",
+        "↩️ Исходный вид",
+        "v2|editor|reset|draft123",
         null,
         null
       ],
@@ -45,8 +45,8 @@
     ],
     [
       [
-        "Отправить…",
-        "v2|editor|o|draft123",
+        "✓ Готово",
+        "v2|editor|b|draft123",
         null,
         "primary"
       ]

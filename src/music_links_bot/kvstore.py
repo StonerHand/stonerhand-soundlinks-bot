@@ -102,6 +102,33 @@ class KVStore:
     async def delete(self, key: str) -> None:
         await self._command(["DEL", key])
 
+    async def compare_set_required(
+        self, key: str, expected: str | None, value: str, *, ttl_seconds: int
+    ) -> bool:
+        """Commit only if the exact value read by this worker is still current."""
+        script = (
+            "local old = redis.call('get', KEYS[1]); "
+            "if (ARGV[1] == 'missing' and not old) or "
+            "(ARGV[1] == 'value' and old == ARGV[2]) then "
+            "redis.call('set', KEYS[1], ARGV[3], 'EX', ARGV[4]); return 1 "
+            "else return 0 end"
+        )
+        result = await self._command_or_raise(
+            [
+                "EVAL",
+                script,
+                "1",
+                key,
+                "missing" if expected is None else "value",
+                expected or "",
+                value,
+                str(ttl_seconds),
+            ]
+        )
+        if result not in (0, 1):
+            raise KVUnavailableError("Redis did not confirm compare-and-set")
+        return result == 1
+
     async def delete_required(self, key: str) -> None:
         result = await self._command_or_raise(["DEL", key])
         if not isinstance(result, int) or result < 0:

@@ -7,12 +7,14 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from music_links_bot.bot_crate import (
+    clear_crate_items,
+    item_index,
     load_crate,
     load_crate_title,
     move_crate_item,
-    remove_crate_item,
+    pop_crate_item,
     restore_crate_item,
-    save_crate,
+    restore_crate_items,
 )
 from music_links_bot.bot_menu import runtime_for, safe_edit, update_lang
 from music_links_bot.bot_runtime import CallbackAction, encode_callback
@@ -57,10 +59,70 @@ async def dispatch_crate_action(query, context, action: CallbackAction) -> None:
     title = await load_crate_title(bot_data, user_id)
     undo_map = bot_data.setdefault("crate_undo", {})
     undo_record = _active_undo(undo_map, user_id)
-    index = _item_index(action.payload)
+    current_items = await load_crate(bot_data, user_id)
+    reference = action.payload
+    if (
+        action.action in {"up", "down", "remove", "select"}
+        and reference.isdigit()
+        and len(reference) < 3
+    ):
+        # Old positional controls cannot safely identify an item after reordering.
+        await query.answer(get_text(lang, "state_conflict"), show_alert=True)
+        text, keyboard = render_crate(
+            current_items,
+            lang=lang,
+            title=title,
+            share_query=build_crate_share_query(current_items),
+        )
+        await safe_edit(query, text, keyboard)
+        return
+    index = item_index(current_items, reference)
     selected_index: int | None = None
     notice: str | None = None
 
+    if action.action in {"add", "replace"}:
+        if action.action == "replace" and index < 0:
+            await query.answer(get_text(lang, "ed_expired"), show_alert=True)
+            return
+        if query.message is None:
+            await query.answer()
+            return
+        runtime = runtime_for(context)
+        session = await runtime.get_session(user_id, lang=lang)
+        session.pending_input = {
+            "kind": "collection_links"
+            if action.action == "add"
+            else "collection_replace",
+            "release_key": reference,
+            "created_at": int(time.time()),
+        }
+        await runtime.save_session(session)
+        await query.answer()
+        await safe_edit(
+            query,
+            get_text(
+                lang,
+                "crate_links_prompt"
+                if action.action == "add"
+                else "crate_replace_prompt",
+            ),
+            InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton(
+                            get_text(lang, "cancel"),
+                            callback_data=encode_callback("crate", "open"),
+                        )
+                    ]
+                ]
+            ),
+        )
+        return
+    if action.action == "open":
+        runtime = runtime_for(context)
+        session = await runtime.get_session(user_id, lang=lang)
+        session.pending_input = {}
+        await runtime.save_session(session)
     if action.action in {"note", "section"}:
         items = await load_crate(bot_data, user_id)
         if query.message is None or not any(
@@ -95,12 +157,12 @@ async def dispatch_crate_action(query, context, action: CallbackAction) -> None:
         await _show_preview(query, context, user_id=user_id, lang=lang, title=title)
         return
     if action.action == "up":
-        items = await move_crate_item(bot_data, user_id, index, -1)
-        selected_index = max(0, index - 1)
+        items = await move_crate_item(bot_data, user_id, reference, -1)
+        selected_index = item_index(items, reference)
         notice = get_text(lang, "crate_order_updated")
     elif action.action == "down":
-        items = await move_crate_item(bot_data, user_id, index, 1)
-        selected_index = min(len(items) - 1, index + 1) if items else None
+        items = await move_crate_item(bot_data, user_id, reference, 1)
+        selected_index = item_index(items, reference) if items else None
         notice = get_text(lang, "crate_order_updated")
     elif action.action == "select":
         items = await load_crate(bot_data, user_id)
@@ -110,7 +172,7 @@ async def dispatch_crate_action(query, context, action: CallbackAction) -> None:
             bot_data,
             undo_map,
             user_id=user_id,
-            index=index,
+            index=reference,
             lang=lang,
         )
     elif action.action == "undo":
@@ -128,8 +190,7 @@ async def dispatch_crate_action(query, context, action: CallbackAction) -> None:
         await safe_edit(query, text, keyboard)
         return
     elif action.action == "clear_confirm":
-        previous_items = await load_crate(bot_data, user_id)
-        await save_crate(bot_data, user_id, [])
+        _, previous_items = await clear_crate_items(bot_data, user_id, action.payload)
         undo_record = {
             "kind": "clear",
             "items": previous_items,
@@ -257,9 +318,7 @@ async def _remove_item(
     index: int,
     lang: str,
 ) -> tuple[list[dict], dict | None, int | None, str | None]:
-    before = await load_crate(bot_data, user_id)
-    removed = before[index] if 0 <= index < len(before) else None
-    items = await remove_crate_item(bot_data, user_id, index)
+    items, (index, removed) = await pop_crate_item(bot_data, user_id, index)
     record = None
     notice = None
     if removed is not None:
@@ -290,9 +349,9 @@ async def _restore_last(
     if not record:
         return await load_crate(bot_data, user_id), None, None, None
     if record.get("kind") == "clear":
-        items = list(record.get("items") or [])
-        await save_crate(bot_data, user_id, items)
-        restored = bool(items)
+        items, restored = await restore_crate_items(
+            bot_data, user_id, list(record.get("items") or [])
+        )
     else:
         items, restored = await restore_crate_item(
             bot_data,

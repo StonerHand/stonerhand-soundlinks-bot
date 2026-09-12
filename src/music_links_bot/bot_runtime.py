@@ -4,7 +4,8 @@ import asyncio
 import hashlib
 import logging
 import secrets
-from dataclasses import asdict, dataclass, field
+from copy import deepcopy
+from dataclasses import asdict, dataclass, field, fields
 from math import ceil
 from time import monotonic, time
 from typing import Any
@@ -15,7 +16,6 @@ from music_links_bot.durable_state import (
     current_state,
     delete_value,
     read_json,
-    write_json,
 )
 from music_links_bot.errors import (
     BotErrorCode as _BotErrorCode,
@@ -25,6 +25,11 @@ from music_links_bot.kvstore import KVStore
 from music_links_bot.release_preferences import (
     normalize_annotations,
     normalize_release_tags,
+)
+from music_links_bot.state_mutations import (
+    StateConflictError,
+    merge_fields,
+    mutate_json,
 )
 from music_links_bot.url_utils import (
     cache_key_for_url,
@@ -43,7 +48,7 @@ INTENT_TTL_SECONDS = 4
 RATE_LIMIT_WINDOW_SECONDS = 60
 RATE_LIMIT_MAX_REQUESTS = 12
 ACTIVE_REQUEST_TTL_SECONDS = 5 * 60
-SESSION_TTL_SECONDS = 30 * 24 * 3600
+SESSION_TTL_SECONDS = 90 * 24 * 3600
 SESSION_SCHEMA_VERSION = 9
 MAX_RECENT_DRAFTS = 30
 COLLECTION_STATE_VERSION = 2
@@ -167,9 +172,21 @@ class UserSession:
     pending_input: dict[str, Any] = field(default_factory=dict)
     active_draft_id: str = ""
     recent_draft_ids: list[str] = field(default_factory=list)
+    saved_draft_ids: list[str] = field(default_factory=list)
+    draft_filter: str = "all"
+    draft_query: str = ""
     home_chat_id: int | None = None
     home_message_id: int | None = None
     updated_at: int = field(default_factory=lambda: int(time()))
+    _baseline: dict = field(default_factory=dict, repr=False, compare=False)
+    _exists: bool = field(default=False, repr=False, compare=False)
+
+    def payload(self) -> dict:
+        return {
+            f.name: deepcopy(getattr(self, f.name))
+            for f in fields(self)
+            if not f.name.startswith("_")
+        }
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> UserSession | None:
@@ -227,6 +244,21 @@ class UserSession:
                     )[:MAX_RECENT_DRAFTS]
                     if value
                 ],
+                saved_draft_ids=[
+                    str(v)[:32]
+                    for v in (
+                        payload.get("saved_draft_ids")
+                        if isinstance(payload.get("saved_draft_ids"), list)
+                        else []
+                    )
+                    if isinstance(v, str)
+                ][:30],
+                draft_filter=_choice(
+                    payload.get("draft_filter"),
+                    {"all", "draft", "scheduled", "published", "saved"},
+                )
+                or "all",
+                draft_query=str(payload.get("draft_query") or "")[:100],
                 home_chat_id=_optional_int(payload.get("home_chat_id")),
                 home_message_id=_optional_int(payload.get("home_message_id")),
                 updated_at=int(payload.get("updated_at") or time()),
@@ -260,6 +292,9 @@ def _normalize_pending_input(value: object) -> dict[str, Any]:
         "replace_source",
         "cover",
         "template_name",
+        "library_search",
+        "collection_links",
+        "collection_replace",
     }:
         return {}
     result: dict[str, Any] = {"kind": kind}
@@ -279,6 +314,10 @@ def _normalize_pending_input(value: object) -> dict[str, Any]:
         key = str(value.get("release_key") or "")
         if len(key) == 24:
             result["release_key"] = key
+    if "draft_revision" in value:
+        result["draft_revision"] = max(0, int(value.get("draft_revision") or 0))
+    if kind == "collection_replace":
+        result["release_key"] = str(value.get("release_key") or "")[:16]
     if kind == "replace_source":
         retry_id = str(value.get("retry_id") or "")[:64]
         source_index = _optional_int(value.get("source_index"))
@@ -375,6 +414,7 @@ class BotRuntime:
                 payload = await read_json(self.kv, current_key)
                 if payload is None:
                     legacy_payload = await read_json(self.kv, legacy_key)
+        exists = payload is not None
         if isinstance(payload, dict) and isinstance(payload.get("session"), dict):
             payload = payload["session"]
         migrated = False
@@ -384,7 +424,9 @@ class BotRuntime:
         session = UserSession.from_dict(payload) if isinstance(payload, dict) else None
         if session is None:
             session = UserSession(user_id=user_id, lang=lang)
-        elif lang:
+        session._baseline = session.payload()
+        session._exists = exists
+        if lang:
             session.lang = lang
         self._cap(self.sessions, MAX_MEMORY_SESSIONS)
         self.sessions[user_id] = session
@@ -396,13 +438,35 @@ class BotRuntime:
 
     async def save_session(self, session: UserSession) -> None:
         session.updated_at = int(time())
+        desired = session.payload()
         if self.kv is not None:
-            await write_json(
+
+            def merge(payload):
+                if payload is None and session._exists:
+                    raise StateConflictError("Session was deleted or expired")
+                current = (
+                    payload.get("session", payload)
+                    if isinstance(payload, dict)
+                    else session._baseline
+                )
+                data = (
+                    merge_fields(current, session._baseline, desired)
+                    if session._baseline
+                    else desired
+                )
+                return {"v": SESSION_SCHEMA_VERSION, "session": data}
+
+            stored = await mutate_json(
                 self.kv,
                 f"session:v2:{session.user_id}",
-                {"v": SESSION_SCHEMA_VERSION, "session": asdict(session)},
+                merge,
                 ttl_seconds=SESSION_TTL_SECONDS,
             )
+            for key, value in stored["session"].items():
+                if key in desired:
+                    setattr(session, key, deepcopy(value))
+        session._baseline = session.payload()
+        session._exists = True
         self._cap(self.sessions, MAX_MEMORY_SESSIONS)
         self.sessions[session.user_id] = session
         scope = current_state.get()

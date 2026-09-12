@@ -96,6 +96,15 @@ async def consume_pending_input(
     value = (message_text(message) or "").strip()
     if not value and kind != "cover":
         return True
+    if kind == "library_search":
+        session.draft_query = value[:100]
+        await _clear_pending(runtime, session)
+        from music_links_bot.bot_menu import drafts_view
+
+        text, keyboard = await drafts_view(message, context, lang=lang)
+        await message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+        await _delete_prompt(context, message, pending)
+        return True
     if kind == "replace_source":
         return await _replace_failed_source(
             message,
@@ -124,6 +133,12 @@ async def consume_pending_input(
         if draft.get("deleted_at"):
             await _clear_pending(runtime, session)
             await message.reply_text(get_text(lang, "ed_deleted_recovery"))
+            return True
+        if "draft_revision" in pending and pending["draft_revision"] != int(
+            draft.get("revision") or 0
+        ):
+            await _clear_pending(runtime, session)
+            await message.reply_text(get_text(lang, "state_conflict"))
             return True
         result = await _apply_draft_input(
             message,

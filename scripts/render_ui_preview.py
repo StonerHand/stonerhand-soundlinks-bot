@@ -19,7 +19,6 @@ from music_links_bot.bot_ui import (
     build_create_keyboard,
     build_error_keyboard,
     build_home_text,
-    build_library_keyboard,
     build_publish_confirmation,
     build_start_keyboard,
     editor_appearance_rows,
@@ -35,6 +34,7 @@ from music_links_bot.bot_ui import (
     editor_tools_rows,
     render_crate,
 )
+from music_links_bot.bot_workspace import tag_explanation
 from music_links_bot.draft_model import new_track_draft
 from music_links_bot.editor_view import render_track_draft
 from music_links_bot.formatter import (
@@ -97,6 +97,7 @@ async def main():
     draft = new_track_draft(track, chat_id=7, lang="ru", can_publish=True)
     draft["prefix"] = "<blockquote>Медленно, тяжело, на повторе.</blockquote>\n\n"
     draft["quote"] = True
+    draft["revision"] = 1
     screens = {
         "welcome": screen(
             build_home_text(lang="ru", first_visit=True),
@@ -113,10 +114,6 @@ async def main():
                 active_draft_id="demo",
                 active_draft_label="Sleep — Dopesmoker",
             ),
-        ),
-        "library": screen(
-            get_text("ru", "library_title"),
-            build_library_keyboard(lang="ru", crate_count=3),
         ),
         "intro_input": screen(
             get_text("ru", "ed_intro_prompt").format(limit=3000),
@@ -218,6 +215,12 @@ async def main():
             if index == 0
             else f"Live session {index} — A Very Long Release Title for a Narrow Screen"
         )
+        item["expires_at"] = int(item["created_at"]) + 7 * 86400
+        if index == 0:
+            item["saved_at"] = item["created_at"]
+            item["expires_at"] += 83 * 86400
+        if index == 1:
+            item["published_at"] = item["created_at"]
         demo_drafts[str(index)] = item
     context.application.bot_data["bot_history"] = {
         7: [
@@ -243,6 +246,24 @@ async def main():
                 page=page,
             )
         )
+    screens["library"] = screens["drafts0"]
+    for category in ("all", "draft", "scheduled", "published", "saved"):
+        screens["filter_" + category] = screen(
+            *await render_drafts_view(
+                context,
+                user_id=7,
+                lang="ru",
+                draft_ids=list(demo_drafts),
+                load_draft=load,
+                filter_by=category,
+            )
+        )
+    saved = {**draft, "saved_at": 1}
+    screens["saved_card"] = screen(*render_track_draft(saved, context, draft_id="demo"))
+    screens["tag_explanation"] = screen(
+        tag_explanation(draft, track, "ru"),
+        InlineKeyboardMarkup(editor_hashtag_rows("demo", draft)),
+    )
     items = [
         {"item": {"artist": artist, "title": title}}
         for artist, title in (
@@ -253,6 +274,9 @@ async def main():
     ]
     screens["collection"] = screen(
         *render_crate(items, lang="ru", title="Тяжёлый вечер")
+    )
+    screens["collection_item"] = screen(
+        *render_crate(items, lang="ru", title="Тяжёлый вечер", selected_index=1)
     )
     soundtrack = TrackMatch(
         title="Scott Pilgrim vs. the World (Original Motion Picture Soundtrack)",

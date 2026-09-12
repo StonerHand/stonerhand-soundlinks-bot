@@ -110,6 +110,30 @@ async def _send_track_video_pair_result(*args, **kwargs) -> bool:
 
 async def resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBundle:
     source_urls = _unique_source_urls(source_urls)
+    from music_links_bot.lookup_recovery import (
+        completed_sources,
+        merge_recovered,
+        restore_source,
+    )
+
+    completed = completed_sources.get() or {}
+    retained = {
+        cache_key_for_url(url): completed[cache_key_for_url(url)]
+        for url in source_urls
+        if restore_source(completed.get(cache_key_for_url(url)), url)
+    }
+    if retained:
+        missing = [url for url in source_urls if cache_key_for_url(url) not in retained]
+        token = completed_sources.set({})
+        try:
+            fresh = (
+                await resolve_sources(bot_data, missing)
+                if missing
+                else LookupBundle([], [], [], [], [], [])
+            )
+        finally:
+            completed_sources.reset(token)
+        return merge_recovered(source_urls, retained, fresh)
     cached = await get_cached_lookup(bot_data, source_urls)
     if cached is not None:
         restored = _bundle_from_cache(cached)

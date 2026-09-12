@@ -30,6 +30,7 @@ from music_links_bot.bot_batch import (
 from music_links_bot.bot_builder import (
     MAX_SCHEDULE_DAYS,
     BuilderScreen,
+    active_card_label,
     builder_screen,
     fit_telegram_html,
     format_schedule_datetime,
@@ -288,11 +289,17 @@ async def _application_error_handler(
 ) -> None:
     error = context.error
     from music_links_bot.kvstore import KVUnavailableError
+    from music_links_bot.state_mutations import StateConflictError
 
     if isinstance(error, KVUnavailableError) and isinstance(update, Update):
         user = update.effective_user
         lang = resolve_lang(user.language_code if user else None)
-        text = get_text(lang, "storage_temporarily_unavailable")
+        text = get_text(
+            lang,
+            "state_conflict"
+            if isinstance(error, StateConflictError)
+            else "storage_temporarily_unavailable",
+        )
         try:
             if update.callback_query is not None:
                 await update.callback_query.answer(text, show_alert=True)
@@ -345,11 +352,14 @@ async def bot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await query.answer(get_text(lang, "action_duplicate"))
         return
 
+    from music_links_bot.input_routing import dispatch_input_action
+
     handlers: dict[
         str,
         Callable[[object, ContextTypes.DEFAULT_TYPE, CallbackAction], Awaitable[None]],
     ] = {
         "menu": _dispatch_menu_action,
+        "input": dispatch_input_action,
         "prefs": dispatch_preferences,
         "select": _dispatch_selection_action,
         "editor": _dispatch_editor_action,
@@ -420,6 +430,7 @@ async def _send_track_draft(
     draft["in_crate"] = crate_contains_item(crate_items, draft["item"])
     draft["crate_count"] = len(crate_items)
 
+    await _store_draft(context, draft_id, draft)
     text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
     await _reply_with_track(
         message,
@@ -430,7 +441,6 @@ async def _send_track_draft(
         source_urls=tuple(track.links.values()),
         content_kind=track.kind,
     )
-    await _store_draft(context, draft_id, draft)
     session = await _runtime(context).get_session(user_id, lang=lang)
     _remember_session_draft(session, draft_id)
     await _runtime(context).save_session(session)
@@ -488,13 +498,13 @@ async def _send_uploaded_audio_draft(
     apply_preferences(draft, session)
     draft["delivery_mode"] = "classic"
     draft["as_photo"] = False
+    await _store_draft(context, draft_id, draft)
     text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
     await message.reply_text(
         text,
         parse_mode=ParseMode.HTML,
         reply_markup=keyboard,
     )
-    await _store_draft(context, draft_id, draft)
     session = await _runtime(context).get_session(user_id, lang=lang)
     _remember_session_draft(session, draft_id)
     await _runtime(context).save_session(session)
@@ -572,6 +582,7 @@ async def _dispatch_retry_action(query, context, action: CallbackAction) -> None
         await query.answer()
         return
 
+    completed = {}
     value = ""
     if action.action == "failed" and action.payload:
         payload = await _load_retry_sources(context, action.payload)
@@ -579,6 +590,7 @@ async def _dispatch_retry_action(query, context, action: CallbackAction) -> None
             isinstance(payload, dict)
             and int(payload.get("user_id") or 0) == query.from_user.id
         ):
+            completed = payload.get("completed") or {}
             value = "\n".join(
                 str(url) for url in payload.get("urls", []) if isinstance(url, str)
             )
@@ -590,11 +602,15 @@ async def _dispatch_retry_action(query, context, action: CallbackAction) -> None
         return
     await query.answer(get_text(lang, "progress_search"))
     _adopt_progress_message(query.message)
+    from music_links_bot.lookup_recovery import completed_sources
+
+    recovery_token = completed_sources.set(completed)
     token = _INPUT_OVERRIDE.set(value)
     guard_token = _BYPASS_INTENT_GUARD.set(True)
     try:
         await track_lookup_message(Update(update_id=0, callback_query=query), context)
     finally:
+        completed_sources.reset(recovery_token)
         _BYPASS_INTENT_GUARD.reset(guard_token)
         _INPUT_OVERRIDE.reset(token)
 
@@ -1024,6 +1040,8 @@ async def _run_locked_editor_action(request: EditorActionRequest) -> bool:
         lock_action = request.action
     else:
         return False
+    from music_links_bot.delivery_receipts import DeliveryBlockedError
+
     runtime = _runtime(request.context)
     lock_key = f"{request.user_id}:{lock_action}:{request.draft_id}"
     token = await runtime.acquire_action(lock_key)
@@ -1048,6 +1066,8 @@ async def _run_locked_editor_action(request: EditorActionRequest) -> bool:
             )
         else:
             await _run_primary_editor_action(request)
+    except DeliveryBlockedError as exc:
+        await _show_delivery_recovery(request, exc.receipt)
     finally:
         await runtime.release_action(lock_key, token)
     return True
@@ -1078,10 +1098,10 @@ async def _finish_editor_setting(request: EditorActionRequest) -> None:
     ):
         await request.query.answer()
         return
+    await _save_editor_settings(request)
     await request.query.answer(
         get_text(request.lang, "settings_saved") if request.action != "f" else None
     )
-    await _save_editor_settings(request)
     text, keyboard = _render_track_draft(
         request.draft,
         request.context,
@@ -1100,6 +1120,13 @@ async def _finish_editor_setting(request: EditorActionRequest) -> None:
 
 async def _handle_editor_action(query, context, action: str, draft_id: str) -> None:
     user_lang = resolve_lang(query.from_user.language_code if query.from_user else None)
+    revision = None
+    if "~" in draft_id:
+        draft_id, raw_revision = draft_id.rsplit("~", 1)
+        if not raw_revision.isdigit() or len(raw_revision) > 10:
+            await query.answer(get_text(user_lang, "ed_expired"), show_alert=True)
+            return
+        revision = int(raw_revision)
     schedule_at = None
     if action == "qt":
         draft_id, separator, raw_timestamp = draft_id.partition(":")
@@ -1124,6 +1151,18 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
     if draft.get("deleted_at") and action != "du":
         await query.answer(get_text(lang, "ed_deleted_recovery"), show_alert=True)
         return
+    if (
+        revision is not None
+        and revision != int(draft.get("revision") or 0)
+        and action not in {"b", "m", "pv", "ap", "hs", "ls", "why_tags"}
+    ):
+        await query.answer(get_text(lang, "state_conflict"), show_alert=True)
+        text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
+        await _edit_editor_message(query, context, draft, text, keyboard)
+        return
+    crate_items = await load_crate(context.application.bot_data, query.from_user.id)
+    draft["in_crate"] = crate_contains_item(crate_items, draft["item"])
+    draft["crate_count"] = len(crate_items)
     spec = action_spec("editor", action)
     if spec is not None and spec.mutating:
         _runtime(context).record_funnel("edited")
@@ -1157,7 +1196,10 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
         track=TrackMatch(**draft["item"]),
         schedule_at=schedule_at,
     )
+    from music_links_bot.bot_workspace import handle_workspace_action
+
     for handler in (
+        handle_workspace_action,
         _apply_last_editor_template,
         _reject_failed_editor_preflight,
         _handle_release_setting,
@@ -1198,6 +1240,14 @@ async def _start_pending_editor_input(
         prompt_text = prompt_text.format(
             limit=_draft_intro_limit(draft, context),
         )
+    if draft is not None:
+        prompt_text = (
+            get_text(lang, "pending_for_post").format(
+                release=escape(active_card_label(draft, ""))
+            )
+            + "\n\n"
+            + prompt_text
+        )
     prompt = await query.message.reply_text(
         prompt_text,
         parse_mode=ParseMode.HTML,
@@ -1211,6 +1261,7 @@ async def _start_pending_editor_input(
         "editor_message_id": query.message.message_id,
         "prompt_message_id": prompt.message_id,
         "created_at": int(time.time()),
+        "draft_revision": int((draft or {}).get("revision") or 0),
     }
     await _runtime(context).save_session(session)
     await query.answer()
@@ -1294,21 +1345,16 @@ async def _run_primary_editor_action(request: EditorActionRequest) -> None:
         await _restore_editor_card(request)
         return
 
+    if request.action in {"r", "x"}:
+        request.draft["repeat_delivery"] = True
     record = await _find_posted_record(request.context, request.track)
     if request.action == "pc" and record:
         await _show_duplicate_editor_post(request, record)
         return
-    if (
-        request.action == "x"
-        and record
-        and not await _delete_duplicate_editor_post(
-            request,
-            record,
-        )
-    ):
-        return
     published = await _publish_draft(request.context, request.draft)
     await _finish_editor_publish(request, published)
+    if request.action == "x" and record and published:
+        await _delete_duplicate_editor_post(request, record)
 
 
 async def _restore_editor_card(request: EditorActionRequest) -> None:
@@ -1367,6 +1413,8 @@ async def _send_editor_post_to_user(request: EditorActionRequest) -> None:
     if not sent:
         await _restore_editor_card(request)
         return
+    request.draft["sent_at"] = int(time.time())
+    await _store_draft(request.context, request.draft_id, request.draft)
     await _show_editor_delivery_success(request)
     if request.user_id:
         session = await _runtime(request.context).get_session(
@@ -1430,25 +1478,8 @@ async def _delete_duplicate_editor_post(
         )
         return True
     except TelegramError:
-        await request.query.answer(
-            get_text(request.lang, "ed_publish_failed"),
-            show_alert=True,
-        )
-        text, _ = _render_track_draft(
-            request.draft,
-            request.context,
-            draft_id=None,
-        )
-        await _edit_editor_message(
-            request.query,
-            request.context,
-            request.draft,
-            text,
-            _duplicate_post_keyboard(
-                request.draft_id,
-                record,
-                lang=request.lang,
-            ),
+        await request.query.message.reply_text(
+            get_text(request.lang, "old_post_not_removed")
         )
         return False
 
@@ -1602,6 +1633,9 @@ async def _show_action_busy(query, lang: str) -> None:
 async def _edit_editor_message(
     query, context, draft: dict, text: str, keyboard
 ) -> None:
+    from music_links_bot.bot_ui import version_editor_keyboard
+
+    keyboard = version_editor_keyboard(keyboard, draft)
     track = TrackMatch(**draft["item"])
     text = fit_telegram_html(text)
     try:
@@ -1619,11 +1653,18 @@ async def _edit_editor_message(
             raise
 
 
-async def _publish_draft(
-    context: ContextTypes.DEFAULT_TYPE,
-    draft: dict,
-) -> Message | bool | None:
-    return await PublicationService(
+async def _publish_draft(context, draft):
+    target = (
+        context.application.bot_data.get("publish_chat_id") or f"@{CHANNEL_USERNAME}"
+    )
+    return await _deliver_draft(context, draft, target=target, channel_style=True)
+
+
+async def _deliver_draft(context, draft, *, target, channel_style):
+    from music_links_bot.delivery_receipts import begin_delivery, finish_delivery
+
+    intent = await begin_delivery(context, draft, target)
+    service = PublicationService(
         context,
         channel_username=CHANNEL_USERNAME,
         branding_hooks=(
@@ -1632,29 +1673,62 @@ async def _publish_draft(
             brand_label,
             brand_logo_url,
         ),
-    ).publish(draft)
+    )
+    sent = await service.deliver(draft, target=target, channel_style=channel_style)
+    await finish_delivery(
+        context, intent, sent=sent, confirmed_not_sent=service.confirmed_not_sent
+    )
+    if not sent and not service.confirmed_not_sent and intent is not None:
+        from music_links_bot.delivery_receipts import DeliveryBlockedError
+
+        raise DeliveryBlockedError({**intent[1], "status": "uncertain"})
+    return sent
 
 
-async def _deliver_draft(
-    context: ContextTypes.DEFAULT_TYPE,
-    draft: dict,
-    *,
-    target: int | str,
-    channel_style: bool,
-) -> Message | bool | None:
-    return await PublicationService(
-        context,
-        channel_username=CHANNEL_USERNAME,
-        branding_hooks=(
-            photo_branding_enabled,
-            build_branded_cover,
-            brand_label,
-            brand_logo_url,
+async def _show_delivery_recovery(request, receipt):
+    from music_links_bot.publication_state import _message_url
+
+    uncertain = receipt.get("status") != "sent"
+    rows = []
+    url = _message_url(receipt.get("target"), receipt.get("message_id"))
+    if url:
+        rows.append(
+            [InlineKeyboardButton(get_text(request.lang, "duplicate_open"), url=url)]
+        )
+    if uncertain:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    get_text(request.lang, "delivery_review_retry"),
+                    callback_data=encode_callback(
+                        "editor", "retry_review", request.draft_id
+                    ),
+                )
+            ]
+        )
+    rows.append(
+        [
+            InlineKeyboardButton(
+                get_text(request.lang, "ed_back_card"),
+                callback_data=encode_callback("editor", "b", request.draft_id),
+            )
+        ]
+    )
+    await request.query.answer(
+        get_text(
+            request.lang, "delivery_uncertain" if uncertain else "delivery_already_sent"
         ),
-    ).deliver(
-        draft,
-        target=target,
-        channel_style=channel_style,
+        show_alert=True,
+    )
+    await _edit_editor_message(
+        request.query,
+        request.context,
+        request.draft,
+        get_text(
+            request.lang,
+            "delivery_uncertain_detail" if uncertain else "delivery_already_sent",
+        ),
+        InlineKeyboardMarkup(rows),
     )
 
 
@@ -1957,6 +2031,11 @@ async def _resolve_search_sources(
 async def track_lookup_message(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
+    from music_links_bot.input_routing import collection_input
+
+    route_token = collection_input.set(
+        collection_input.get() if _INPUT_OVERRIDE.get() else ""
+    )
     started = asyncio.get_running_loop().time()
     completed = False
     message = update.effective_message
@@ -1993,6 +2072,7 @@ async def track_lookup_message(
             await _cancel_progress(message.chat_id, _update_lang(update))
         raise
     finally:
+        collection_input.reset(route_token)
         runtime = _runtime(context)
         runtime.record_request(
             latency_ms=int((asyncio.get_running_loop().time() - started) * 1000),
@@ -2121,6 +2201,13 @@ async def _send_track_matches(
     allow_share: bool = True,
 ) -> None:
     """Deliver one release or a collection without mixing lookup concerns."""
+    if is_private:
+        from music_links_bot.input_routing import deliver_collection_input
+
+        if await deliver_collection_input(
+            message, context, tracks, user_id=user_id, lang=lang
+        ):
+            return
     total = max(len(tracks), int(requested_count or len(tracks)))
     if total > 1:
         title = collection_result_title(
@@ -2128,7 +2215,9 @@ async def _send_track_matches(
             found=len(tracks),
             total=total,
         )
-        if is_private:
+        from music_links_bot.input_routing import collection_input
+
+        if is_private and collection_input.get() != "new":
             await _add_track_drafts_to_crate(
                 message,
                 context,
@@ -2283,6 +2372,14 @@ async def _handle_lookup_input_mode(
     context: ContextTypes.DEFAULT_TYPE,
     message: Message,
 ) -> bool:
+    via_bot = getattr(message, "via_bot", None)
+    if via_bot is not None and via_bot.id == getattr(context.bot, "id", None):
+        return True
+    if not _INPUT_OVERRIDE.get():
+        from music_links_bot.input_routing import guard_input
+
+        if await guard_input(update, context, text=_message_text(message) or ""):
+            return True
     if await _consume_pending_input(update, context):
         return True
     if message.chat.type == "private" and getattr(message, "audio", None) is not None:
@@ -2551,6 +2648,9 @@ async def _deliver_lookup_bundle(
     # per-source statuses for retries and diagnostics, but show one merged card
     # with all discovered service buttons instead of duplicate releases.
     if bundle.tracks:
+        from music_links_bot.lookup_recovery import capture_sources
+
+        bundle.source_results = capture_sources(bundle)
         bundle.tracks = coalesce_equivalent_tracks(bundle.tracks)
     kind = delivery_kind(bundle)
     # ``build_user_prefix`` already removes supported source URLs while

@@ -71,7 +71,7 @@ class BuilderJourneyTests(unittest.TestCase):
             active_draft_label="Deftones — Rickets",
         )
         self.assertEqual(
-            keyboard.inline_keyboard[1][0].text, "Продолжить · Deftones — Rickets"
+            keyboard.inline_keyboard[1][0].text, "📝 Продолжить: Deftones — Rickets"
         )
         self.assertEqual(
             active_card_label({"item": {"artist": "A", "title": "B"}}, "fallback"),

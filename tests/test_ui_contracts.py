@@ -52,12 +52,12 @@ class PublicationGoldenTests(unittest.TestCase):
 
         self.assertEqual(
             text,
-            "<b>Sleep</b>\nDopesmoker\n\n#stonerhand #track",
+            "📝 <b>Твой пост · ещё не отправлен</b>\n\n<b>Sleep</b>\nDopesmoker\n\n#stonerhand #track",
         )
         self.assertEqual(draft["v"], CURRENT_DRAFT_VERSION)
         labels = [button.text for row in keyboard.inline_keyboard for button in row]
-        self.assertEqual(labels[:2], ["Текст", "Теги"])
-        self.assertIn("Ещё", labels)
+        self.assertEqual(labels[:2], ["✏️ Изменить", "➕ В подборку"])
+        self.assertIn("🔖 Сохранить на 90 дней", labels)
 
     def test_editor_card_snapshots_are_stable(self) -> None:
         context = SimpleNamespace(application=SimpleNamespace(bot_data={}))
@@ -353,7 +353,7 @@ class EditorFlowContractTests(unittest.IsolatedAsyncioTestCase):
             for row in query.edits[-1]["reply_markup"].inline_keyboard
             for button in row
         ]
-        self.assertIn("v2|editor|z0|draft123", callbacks)
+        self.assertIn("v2|editor|z0|draft123~1", callbacks)
 
     async def test_publish_opens_confirmation_in_the_same_message(self) -> None:
         draft = new_track_draft(_track(), chat_id=7, lang="ru", can_publish=True)

@@ -9,7 +9,7 @@ from telegram import InlineKeyboardMarkup
 
 from music_links_bot.bot_builder import active_card_label
 from music_links_bot.bot_history import load_history_items
-from music_links_bot.bot_runtime import MAX_RECENT_DRAFTS, encode_callback
+from music_links_bot.bot_runtime import encode_callback
 from music_links_bot.i18n import get_text
 from music_links_bot.publish_queue import QueueStorageError, load_jobs
 from music_links_bot.telegram_buttons import button as InlineKeyboardButton
@@ -39,21 +39,36 @@ def _navigation(rows: list, *, lang: str, action: str, page: int, pages: int) ->
 
 
 async def render_drafts_view(
-    context, *, user_id: int, lang: str, draft_ids: list[str], load_draft, page: int = 0
+    context,
+    *,
+    user_id: int,
+    lang: str,
+    draft_ids: list[str],
+    load_draft,
+    page: int = 0,
+    filter_by: str = "all",
+    search: str = "",
+    load_many=None,
 ) -> tuple[str, InlineKeyboardMarkup]:
-    ids = list(dict.fromkeys(draft_ids[:MAX_RECENT_DRAFTS]))
-    values = await asyncio.gather(*(load_draft(context, draft_id) for draft_id in ids))
+    from music_links_bot.bot_storage import valid_state_id
+
+    ids = list(
+        dict.fromkeys(value for value in draft_ids[:60] if valid_state_id(value))
+    )
+    values = (
+        await load_many(context, ids)
+        if load_many
+        else await asyncio.gather(*(load_draft(context, draft_id) for draft_id in ids))
+    )
     drafts = [
-        (draft_id, draft)
-        for draft_id, draft in zip(ids, values, strict=True)
+        (key, draft)
+        for key, draft in zip(ids, values, strict=True)
         if isinstance(draft, dict)
         and isinstance(draft.get("item"), dict)
         and not draft.get("deleted_at")
         and draft.get("chat_id") == user_id
     ]
-    if not drafts:
-        return _empty_view(lang, "drafts_empty")
-    queued: dict[str, dict] = {}
+    queued = {}
     queue_available = True
     if context.application.bot_data.get("admin_chat_id") == user_id:
         try:
@@ -65,39 +80,131 @@ async def render_drafts_view(
             }
         except QueueStorageError:
             queue_available = False
+
+    def status(key, draft):
+        job = queued.get(key)
+        if job:
+            return {
+                "processing": "draft_sending",
+                "delivering": "draft_sending",
+                "uncertain": "draft_uncertain",
+            }.get(job.get("status"), "draft_scheduled")
+        if draft.get("scheduled_at") and not queue_available:
+            return "draft_queue_unknown"
+        return "draft_published" if draft.get("published_at") else "draft_editable"
+
+    def matches(key, draft):
+        state = status(key, draft)
+        category = (
+            "draft"
+            if state == "draft_editable"
+            else "published"
+            if state == "draft_published"
+            else "scheduled"
+        )
+        return (
+            filter_by == "all"
+            or category == filter_by
+            or (filter_by == "saved" and draft.get("saved_at"))
+        ) and search.casefold() in (
+            str(draft["item"].get("artist", ""))
+            + " "
+            + str(draft["item"].get("title", ""))
+        ).casefold()
+
+    drafts = [(key, draft) for key, draft in drafts if matches(key, draft)]
+    drafts.sort(
+        key=lambda pair: (
+            bool(pair[1].get("saved_at")),
+            int(pair[1].get("saved_at") or pair[1].get("created_at") or 0),
+        ),
+        reverse=True,
+    )
     visible, page, pages = _page(drafts, page)
     lines = [
         get_text(lang, "drafts_title"),
         get_text(lang, "queue_page").format(page=page + 1, pages=pages),
     ]
+    if search:
+        lines.append("🔎 " + escape(search))
     rows = []
+    filters = [
+        InlineKeyboardButton(
+            ("✓ " if key == filter_by else "") + get_text(lang, "posts_" + key),
+            callback_data=encode_callback("menu", "postfilter", key),
+        )
+        for key in ("all", "draft", "scheduled", "published", "saved")
+    ]
+    rows.extend([filters[:2], filters[2:4], filters[4:]])
     zone = str(context.application.bot_data.get("timezone_name") or "Europe/Moscow")
     for index, (draft_id, draft) in enumerate(visible, start=page * PAGE_SIZE + 1):
         item = dict(draft["item"])
         item.setdefault("ts", draft.get("created_at"))
         _append_recent_line(lines, index, item, lang=lang, timezone_name=zone)
-        job = queued.get(draft_id)
-        if job:
-            status_key = {
-                "processing": "draft_sending",
-                "delivering": "draft_sending",
-                "uncertain": "draft_uncertain",
-            }.get(job.get("status"), "draft_scheduled")
-        elif draft.get("scheduled_at") and not queue_available:
-            status_key = "draft_queue_unknown"
-        elif draft.get("published_at"):
-            status_key = "draft_published"
-        else:
-            status_key = "draft_editable"
-        lines.append(f"<i>{escape(get_text(lang, status_key))}</i>")
+        lines.append(f"<i>{escape(get_text(lang, status(draft_id, draft)))}</i>")
+        if draft.get("expires_at"):
+            try:
+                date = datetime.fromtimestamp(
+                    draft["expires_at"], ZoneInfo(zone)
+                ).strftime("%d.%m.%Y")
+            except (ValueError, TypeError, OverflowError, ZoneInfoNotFoundError):
+                date = "—"
+            lines.append(get_text(lang, "posts_expires").format(date=date))
+        label = ("🔖 " if draft.get("saved_at") else "") + active_card_label(
+            draft, get_text(lang, "drafts_open")
+        )
         rows.append(
             [
                 InlineKeyboardButton(
-                    active_card_label(draft, get_text(lang, "drafts_open")),
-                    callback_data=encode_callback("editor", "b", draft_id),
+                    label, callback_data=encode_callback("editor", "b", draft_id)
                 )
             ]
         )
+    if not visible:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "home_create"),
+                    callback_data=encode_callback("menu", "create"),
+                    style="primary",
+                )
+            ]
+        )
+        lines.extend(
+            [
+                "",
+                get_text(
+                    lang,
+                    "posts_no_match"
+                    if filter_by != "all" or search
+                    else "drafts_empty",
+                ),
+            ]
+        )
+    lines.extend(["", "<i>" + get_text(lang, "posts_retention") + "</i>"])
+    rows.append(
+        [
+            InlineKeyboardButton(
+                get_text(lang, "posts_search"),
+                callback_data=encode_callback("menu", "postsearch"),
+            )
+        ]
+    )
+    if search:
+        rows[-1].append(
+            InlineKeyboardButton(
+                get_text(lang, "posts_search_clear"),
+                callback_data=encode_callback("menu", "postsearch_clear"),
+            )
+        )
+    rows.append(
+        [
+            InlineKeyboardButton(
+                get_text(lang, "posts_history"),
+                callback_data=encode_callback("menu", "recent"),
+            )
+        ]
+    )
     _navigation(rows, lang=lang, action="drafts", page=page, pages=pages)
     return "\n".join(lines), InlineKeyboardMarkup(rows)
 
@@ -177,5 +284,5 @@ def _empty_view(lang: str, key: str) -> tuple[str, InlineKeyboardMarkup]:
 
 def _home_button(lang: str) -> InlineKeyboardButton:
     return InlineKeyboardButton(
-        get_text(lang, "library_back"), callback_data=encode_callback("menu", "library")
+        get_text(lang, "home_back"), callback_data=encode_callback("menu", "start")
     )

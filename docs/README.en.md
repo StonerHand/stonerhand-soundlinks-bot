@@ -34,18 +34,33 @@ editable collection.
 Text above a link becomes the intro. Bold, italic and external links survive.
 The editor stays open while a separate preview shows the finished publication.
 
-### Edit directly below the post
+### Start with the post, then edit the details
 
 ```text
-        Text           Tags
-       Artwork        Buttons
-       Preview         More
-             Publish…
+      ✏️ Edit          ➕ Add to collection
+    👁 Preview          🔖 Save
+                 📣 Publish…
 ```
 
-Common edits are one tap away. More contains collections, templates and extra
-settings. Publish opens the channel, scheduling and send-to-self options;
-regular users see Send instead. Drafts and search history live in My library.
+Edit opens text, tags, artwork and buttons. Restore the original presentation
+or undo recent changes for five minutes. Publish offers channel delivery,
+scheduling or send-to-self; regular users see Send.
+
+**My posts** provides search, status filters and saved posts. Drafts expire
+7 days after the last edit; saved drafts last 90 days, up to 30 saved posts.
+A nonempty collection is visible on the home screen. Select an entry to move,
+replace or annotate it.
+
+### In 1.19
+
+- Links arriving during another edit get an explicit destination choice.
+- Partial lookup retries only failed sources, preserving successful results and order.
+- Concurrent edits cannot silently overwrite each other; stale controls refresh the card.
+- Uncertain deliveries require checking the destination before a retry. Replacing
+  a channel post removes the old one only after the new delivery is confirmed.
+- Tag explanations distinguish automatic suggestions from manual corrections.
+
+See the [1.19 verification report](reports/release-1.19.0.ru.md) for scope and limits.
 
 ## Inside the editor
 

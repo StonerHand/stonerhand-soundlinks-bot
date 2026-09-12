@@ -33,6 +33,7 @@ class LookupBundle:
     playlists: list[PlaylistMatch]
     artists: list[ArtistMatch]
     statuses: list[SourceStatus] = field(default_factory=list)
+    source_results: dict = field(default_factory=dict)
 
     @property
     def item_count(self) -> int:

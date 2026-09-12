@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from dataclasses import dataclass
 
 from music_links_bot.bot_crate import clear_crate, load_crate
@@ -38,7 +39,11 @@ async def delete_user_data(context, user_id: int) -> DeletionResult:
     crate = await load_crate(bot_data, user_id)
     draft_ids = {
         str(value)
-        for value in [session.active_draft_id, *session.recent_draft_ids]
+        for value in [
+            session.active_draft_id,
+            *session.recent_draft_ids,
+            *session.saved_draft_ids,
+        ]
         if value
     }
     draft_ids.update(
@@ -70,6 +75,24 @@ async def delete_user_data(context, user_id: int) -> DeletionResult:
         queue_available = False
         scheduled_posts = 0
 
+    from music_links_bot.durable_state import delete_value, read_json
+
+    kv = bot_data.get("kv_store")
+    receipt_index = (
+        await read_json(kv, f"receipt-index:v1:{user_id}")
+        if kv
+        else bot_data.get("receipt_indexes", {}).get(user_id)
+    )
+    for key in receipt_index if isinstance(receipt_index, (list, dict)) else []:
+        if isinstance(key, str) and re.fullmatch(
+            r"manual-delivery:v1:[A-Za-z0-9_-]{1,64}:[0-9a-f]{16}", key
+        ):
+            if kv:
+                await delete_value(kv, key)
+            bot_data.get("delivery_receipts", {}).pop(key, None)
+    if kv:
+        await delete_value(kv, f"receipt-index:v1:{user_id}")
+    bot_data.get("receipt_indexes", {}).pop(user_id, None)
     await runtime.forget_session(user_id)
     return DeletionResult(
         drafts=len(draft_ids),
@@ -84,6 +107,7 @@ async def _clear_transient_memory(context, user_id: int) -> None:
     for memory_key, redis_prefix in (
         ("search_selections", "selection:v1"),
         ("retry_sources", "retry:v1"),
+        ("input_choices", "input-choice:v1"),
     ):
         items = bot_data.setdefault(memory_key, {})
         owned = [

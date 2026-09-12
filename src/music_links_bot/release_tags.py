@@ -91,7 +91,7 @@ def _common_genres(tracks: list[TrackMatch]) -> list[str]:
     for track in tracks:
         saved = current_presentation.get().tags.get(release_preference_key(track))
         genres = (
-            [tag for tag in saved if tag not in STRUCTURAL_TAGS]
+            [tag for tag in genre_hashtags(track.genre) if tag in saved]
             if saved is not None
             else genre_hashtags(track.genre)
         )

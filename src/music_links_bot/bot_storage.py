@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import re
 import secrets
+import time
+from copy import deepcopy
 
 from music_links_bot.draft_model import normalize_track_draft
-from music_links_bot.durable_state import delete_value, read_json, write_json
+from music_links_bot.durable_state import delete_value, read_json
 from music_links_bot.kvstore import KVStore
+from music_links_bot.state_mutations import StateConflictError, mutate_json
 
-DRAFT_TTL_SECONDS = 48 * 3600
+DRAFT_TTL_SECONDS = 7 * 24 * 3600
+SAVED_DRAFT_TTL_SECONDS = 90 * 24 * 3600
 MAX_MEMORY_DRAFTS = 300
 SELECTION_TTL_SECONDS = 15 * 60
 MAX_MEMORY_SELECTIONS = 300
@@ -37,18 +41,36 @@ def valid_state_id(value: object) -> bool:
 
 
 async def store_draft(context, draft_id: str, draft: dict) -> None:
+    original = draft
     normalized = normalize_track_draft(draft)
     if normalized is not None:
         draft = normalized
     draft["editor_draft_id"] = draft_id
+    if "original_state" not in draft and not draft.get("revision"):
+        from music_links_bot.bot_editor_state import setting_snapshot
+
+        draft["original_state"] = setting_snapshot(draft)
     kv: KVStore | None = context.application.bot_data.get("kv_store")
+    ttl = SAVED_DRAFT_TTL_SECONDS if draft.get("saved_at") else DRAFT_TTL_SECONDS
+    draft["expires_at"] = int(time.time()) + ttl
+    revision = int(draft.get("revision") or 0)
+
+    def update(current):
+        current_revision = int((current or {}).get("revision") or 0)
+        if current_revision != revision or (current is None and revision):
+            raise StateConflictError("This draft has changed; reopen it")
+        return {**draft, "revision": revision + 1}
+
     if kv is not None:
-        await write_json(kv, f"draft:{draft_id}", draft, ttl_seconds=DRAFT_TTL_SECONDS)
+        draft = await mutate_json(kv, f"draft:{draft_id}", update, ttl_seconds=ttl)
+    else:
+        draft = update(context.application.bot_data.get("drafts", {}).get(draft_id))
+    original.update(draft)
     drafts: dict = context.application.bot_data.setdefault("drafts", {})
     remember_bounded(
         drafts,
         draft_id,
-        draft,
+        deepcopy(draft),
         max_size=MAX_MEMORY_DRAFTS,
     )
 
@@ -58,12 +80,15 @@ async def load_draft(context, draft_id: str) -> dict | None:
         return None
     drafts: dict = context.application.bot_data.setdefault("drafts", {})
     kv: KVStore | None = context.application.bot_data.get("kv_store")
-    draft = drafts.get(draft_id) if kv is None else None
+    draft = deepcopy(drafts.get(draft_id)) if kv is None else None
+    if draft and draft.get("expires_at") and draft["expires_at"] <= time.time():
+        drafts.pop(draft_id, None)
+        return None
     if isinstance(draft, dict):
         normalized = normalize_track_draft(draft)
         if normalized is not None:
             normalized["editor_draft_id"] = draft_id
-            drafts[draft_id] = normalized
+            drafts[draft_id] = deepcopy(normalized)
             return normalized
         return draft
 
@@ -76,7 +101,7 @@ async def load_draft(context, draft_id: str) -> dict | None:
         remember_bounded(
             drafts,
             draft_id,
-            normalized,
+            deepcopy(normalized),
             max_size=MAX_MEMORY_DRAFTS,
         )
         return normalized
@@ -145,12 +170,15 @@ async def store_retry_sources(
     *,
     user_id: int,
     urls: list[str],
+    completed: dict | None = None,
 ) -> str:
     retry_id = secrets.token_hex(5)
     payload = {
         "user_id": int(user_id),
         "urls": [str(url) for url in urls if url][:10],
     }
+    if completed:
+        payload["completed"] = completed
     retries: dict = context.application.bot_data.setdefault("retry_sources", {})
     remember_bounded(
         retries,
@@ -187,3 +215,20 @@ async def load_retry_sources(context, retry_id: str) -> dict | None:
         )
         return payload
     return None
+
+
+async def load_drafts(context, draft_ids: list[str]) -> list[dict | None]:
+    """One confirmed Redis request for the library, preserving missing slots."""
+    ids = [value for value in draft_ids if valid_state_id(value)][:60]
+    kv = context.application.bot_data.get("kv_store")
+    reader = getattr(kv, "mget_json_required", None)
+    if reader is None:
+        return [await load_draft(context, value) for value in ids]
+    values = await reader([f"draft:{value}" for value in ids])
+    result = []
+    for draft_id, value in zip(ids, values, strict=True):
+        draft = normalize_track_draft(value)
+        if draft is not None:
+            draft["editor_draft_id"] = draft_id
+        result.append(draft)
+    return result

@@ -529,7 +529,7 @@ class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 2)
         first_keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         second_keyboard = message.reply_kwargs[1]["reply_markup"].inline_keyboard
-        self.assertEqual(first_keyboard[0][0].text, "Создать пост")
+        self.assertEqual(first_keyboard[0][0].text, "➕ Новый пост")
         self.assertEqual(
             next(
                 button
@@ -1168,6 +1168,7 @@ class BotKeyboardTests(unittest.TestCase):
                 {"item": {"artist": "Kyuss", "title": "Green Machine"}},
             ],
             lang="ru",
+            selected_index=0,
         )
 
         self.assertIn("Sleep &lt;b&gt;", text)
@@ -1187,9 +1188,10 @@ class BotKeyboardTests(unittest.TestCase):
             confirm_clear=True,
         )
         self.assertIn("Очистить всю подборку", text)
-        self.assertEqual(
-            keyboard.inline_keyboard[0][0].callback_data,
-            "v2|crate|clear_confirm",
+        self.assertTrue(
+            keyboard.inline_keyboard[0][0].callback_data.startswith(
+                "v2|crate|clear_confirm|"
+            )
         )
         self.assertEqual(keyboard.inline_keyboard[0][0].style, "danger")
 
@@ -1206,9 +1208,9 @@ class BotKeyboardTests(unittest.TestCase):
     def test_empty_crate_can_restore_a_recent_clear(self) -> None:
         _, keyboard = _render_bot_crate([], lang="ru", can_undo=True)
 
-        self.assertEqual(keyboard.inline_keyboard[0][0].text, "Вернуть удалённый")
+        self.assertEqual(keyboard.inline_keyboard[1][0].text, "Вернуть удалённый")
         self.assertEqual(
-            keyboard.inline_keyboard[0][0].callback_data,
+            keyboard.inline_keyboard[1][0].callback_data,
             "v2|crate|undo",
         )
 
@@ -1222,15 +1224,15 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(rows[0][0].text, "Создать пост")
+        self.assertEqual(rows[0][0].text, "➕ Новый пост")
         self.assertEqual(rows[0][0].style, "primary")
-        self.assertEqual(rows[1][0].text, "Мои материалы")
+        self.assertEqual(rows[2][0].text, "📚 Мои посты")
         self.assertIsNone(rows[1][0].style)
-        self.assertEqual(rows[1][1].text, "Настройки")
-        self.assertEqual(rows[2][0].text, "Очередь публикаций")
-        self.assertEqual(rows[3][0].text, "Как это работает")
+        self.assertEqual(rows[2][1].text, "⚙️ Настройки")
+        self.assertEqual(rows[3][0].text, "Очередь публикаций")
+        self.assertEqual(rows[4][0].text, "Как это работает")
         self.assertIsNone(rows[3][0].style)
-        self.assertEqual(len(rows), 4)
+        self.assertEqual(len(rows), 5)
 
     def test_home_keeps_new_search_primary_when_a_card_can_be_restored(self) -> None:
         keyboard = _build_start_keyboard(
@@ -1240,7 +1242,7 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(rows[0][0].text, "Создать пост")
+        self.assertEqual(rows[0][0].text, "➕ Новый пост")
         self.assertEqual(rows[0][0].style, "primary")
         self.assertEqual(rows[1][0].text, "Продолжить пост")
         self.assertIsNone(rows[1][0].style)
@@ -2371,6 +2373,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_draft_write_waits_for_durable_storage(self) -> None:
         class BlockingKV:
+            async def get_json(self, key):
+                return None
+
             def __init__(self) -> None:
                 self.started = asyncio.Event()
                 self.release = asyncio.Event()
@@ -2509,7 +2514,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             for button in row
             if button.callback_data
         ]
-        self.assertTrue(any(data.startswith("v2|editor|ti|") for data in callback_data))
+        self.assertTrue(any(data.startswith("v2|editor|m|") for data in callback_data))
         self.assertEqual(len(context.application.bot_data["drafts"]), 1)
 
     async def test_multiple_spotify_links_use_one_collection_post(self) -> None:
@@ -2535,7 +2540,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("<blockquote>", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         labels = [button.text for row in keyboard for button in row]
-        self.assertEqual(labels, ["Открыть подборку", "Порядок", "Поделиться"])
+        self.assertEqual(labels, ["Открыть подборку", "Порядок", "↗️ Поделиться"])
         share_query = keyboard[-1][0].switch_inline_query
         self.assertEqual(len(parse_share_query(share_query or "") or []), 3)
 
@@ -2674,10 +2679,10 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("<b>Youth Code</b>\nTransitions", message.replies[0])
         self.assertIn("#stonerhand #track", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
-        self.assertEqual(keyboard[0][0].text, "Текст")
-        self.assertEqual(keyboard[0][1].text, "Теги")
-        self.assertEqual(keyboard[1][0].text, "Обложка")
-        self.assertEqual(keyboard[-1][0].text, "Отправить…")
+        self.assertEqual(keyboard[0][0].text, "✏️ Изменить")
+        self.assertEqual(keyboard[0][1].text, "➕ В подборку")
+        self.assertEqual(keyboard[1][0].text, "👁 Как выглядит")
+        self.assertEqual(keyboard[-1][0].text, "↗️ Отправить…")
         preview_options = message.reply_kwargs[0]["link_preview_options"]
         self.assertTrue(preview_options.prefer_large_media)
         self.assertFalse(bool(preview_options.prefer_small_media))
@@ -2738,8 +2743,8 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 1)
         self.assertIn("<b>Bondage Fairies</b>\nStar Signs", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
-        self.assertEqual(keyboard[0][0].text, "Текст")
-        self.assertTrue(keyboard[1][1].callback_data.startswith("v2|editor|ls|"))
+        self.assertEqual(keyboard[0][0].text, "✏️ Изменить")
+        self.assertTrue(keyboard[0][0].callback_data.startswith("v2|editor|m|"))
         preview_options = message.reply_kwargs[0]["link_preview_options"]
         self.assertEqual(
             preview_options.url,

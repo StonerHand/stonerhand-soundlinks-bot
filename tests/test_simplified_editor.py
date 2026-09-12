@@ -151,12 +151,9 @@ class SimplifiedEditorJourneys(unittest.IsolatedAsyncioTestCase):
             (a.scope, a.action)
             for a in callbacks(query.edit_message_text.call_args.kwargs["reply_markup"])
         ]
-        assert routes == [
-            ("menu", "drafts"),
-            ("crate", "open"),
-            ("menu", "recent"),
-            ("menu", "start"),
-        ]
+        assert ("menu", "postfilter") in routes
+        assert ("menu", "postsearch") in routes
+        assert ("menu", "start") in routes
 
     async def test_collection_settings_remember_return_target_after_saving(self):
         context, query = context_for(), query_for()

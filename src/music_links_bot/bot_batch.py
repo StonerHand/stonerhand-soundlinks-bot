@@ -8,6 +8,7 @@ from telegram.constants import ParseMode
 from music_links_bot.bot_runtime import encode_callback
 from music_links_bot.bot_storage import store_retry_sources
 from music_links_bot.i18n import get_text
+from music_links_bot.lookup_recovery import capture_sources
 from music_links_bot.telegram_buttons import ButtonTone, callback_button
 
 
@@ -26,9 +27,8 @@ async def send_partial_lookup_status(
     if not failed:
         return
 
-    # Retry the original batch, not only failed members. The UI result is one
-    # atomic collection; rebuilding all sources preserves order and avoids
-    # making the user manually merge recovered items with the earlier partial.
+    # Keep the original order, retaining successful sources in the retry record.
+    # The resolver queries only missing items and rebuilds one complete collection.
     retry_urls = [item.source_url for item in statuses] if failed else []
     if message.chat.type == "channel":
         summary = ", ".join(f"{item.provider}:{item.state}" for item in failed)
@@ -73,6 +73,7 @@ async def send_partial_lookup_status(
             context,
             user_id=user_id,
             urls=retry_urls,
+            completed=capture_sources(bundle),
         )
         rows = [
             [

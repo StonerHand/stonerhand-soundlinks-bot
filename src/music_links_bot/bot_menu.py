@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from html import escape
 from importlib.resources import files
 
@@ -20,7 +21,6 @@ from music_links_bot.bot_storage import load_draft
 from music_links_bot.bot_ui import (
     build_create_keyboard,
     build_home_text,
-    build_library_keyboard,
     build_onboarding_keyboard,
     build_privacy_keyboard,
     build_section_keyboard,
@@ -376,11 +376,18 @@ async def drafts_view(
 ) -> tuple[str, InlineKeyboardMarkup]:
     user_id = query.from_user.id if query.from_user else 0
     session = await runtime_for(context).get_session(user_id, lang=lang)
+    from music_links_bot.bot_storage import load_drafts
+
     return await render_drafts_view(
         context,
         user_id=user_id,
         lang=lang,
-        draft_ids=session.recent_draft_ids,
+        draft_ids=list(
+            dict.fromkeys([*session.saved_draft_ids, *session.recent_draft_ids])
+        ),
+        filter_by=session.draft_filter,
+        search=session.draft_query,
+        load_many=load_drafts,
         page=page,
         load_draft=load_draft,
     )
@@ -440,18 +447,36 @@ async def dispatch_menu_action(query, context, action: CallbackAction) -> None:
         page = 0
     if action.action == "start":
         text, keyboard = await home_view(query, context, lang=lang)
-    elif action.action == "library":
+    elif action.action in {"library", "postfilter", "postsearch", "postsearch_clear"}:
         user_id = query.from_user.id if query.from_user else 0
-        crate_count, _ = await home_state(context, user_id)
-        text, keyboard = (
-            get_text(lang, "library_title"),
-            build_library_keyboard(lang=lang, crate_count=crate_count),
-        )
+        session = await runtime_for(context).get_session(user_id, lang=lang)
+        if action.action == "postsearch" and query.message is not None:
+            from telegram import ForceReply
+
+            prompt = await query.message.reply_text(
+                get_text(lang, "posts_search_prompt"),
+                reply_markup=ForceReply(selective=True),
+            )
+            session.pending_input = {
+                "kind": "library_search",
+                "created_at": int(time.time()),
+                "prompt_message_id": prompt.message_id,
+            }
+        elif action.action == "postfilter":
+            if action.payload in {"all", "draft", "scheduled", "published", "saved"}:
+                session.draft_filter = action.payload
+        elif action.action == "postsearch_clear":
+            session.draft_query = ""
+        await runtime_for(context).save_session(session)
+        text, keyboard = await drafts_view(query, context, lang=lang)
     elif action.action == "drafts":
         text, keyboard = await drafts_view(query, context, lang=lang, page=page)
     elif action.action == "recent":
         text, keyboard = await recent_view(query, context, lang=lang, page=page)
     elif action.action == "create":
+        session = await runtime_for(context).get_session(query.from_user.id, lang=lang)
+        session.pending_input = {}
+        await runtime_for(context).save_session(session)
         text, keyboard = (
             get_text(lang, "create_prompt"),
             build_create_keyboard(lang=lang),

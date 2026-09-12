@@ -197,7 +197,7 @@ class PreferencesTests(unittest.IsolatedAsyncioTestCase):
             )
             self.assertIsInstance(results[0], ValueError)
             self.assertEqual(
-                values, {7: ("en", "Create post"), 8: ("ru", "Создать пост")}
+                values, {7: ("en", "➕ New post"), 8: ("ru", "➕ Новый пост")}
             )
             self.assertIsNone(preferred_language.get())
 
@@ -302,7 +302,15 @@ class DraftLibraryTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Страница 2 из 3", text)
         self.assertNotIn("Release 11", text)
         self.assertNotIn("Release 12", text)
-        self.assertIn("Release 5", keyboard.inline_keyboard[0][0].text)
+        self.assertIn(
+            "Release 5",
+            next(
+                b.text
+                for row in keyboard.inline_keyboard
+                for b in row
+                if (b.callback_data or "").startswith("v2|editor|")
+            ),
+        )
         self.assertEqual(
             keyboard.inline_keyboard[-2][0].callback_data, "v2|menu|drafts|0"
         )

@@ -128,8 +128,8 @@
     "ru": "Открыть"
   },
   "drafts_title": {
-    "ru": "<b>Черновики</b>\n<i>Нажми на релиз, чтобы продолжить. Хранятся до 48 часов.</i>",
-    "en": "<b>Drafts</b>\n<i>Choose a release to continue. Kept for up to 48 hours.</i>"
+    "ru": "📚 <b>Мои посты</b>",
+    "en": "📚 <b>My posts</b>"
   },
   "duplicate_repeat": {
     "en": "Publish again",
@@ -144,16 +144,16 @@
     "en": "<b>Where should this post go?</b>"
   },
   "ed_add_crate": {
-    "ru": "В подборку",
-    "en": "Add to collection"
+    "ru": "➕ В подборку",
+    "en": "➕ Add to collection"
   },
   "ed_admin_only": {
     "en": "Only the bot owner can publish to the channel",
     "ru": "Публиковать в канал может только владелец бота"
   },
   "ed_clean_preview": {
-    "en": "Preview",
-    "ru": "Превью"
+    "ru": "👁 Как выглядит",
+    "en": "👁 Preview"
   },
   "ed_constructor_hint": {
     "ru": "Изменения сохранены для этого поста.",
@@ -596,8 +596,8 @@
     "en": "← Main menu"
   },
   "home_body": {
-    "ru": "{greeting}\n\nПришли ссылку или <code>артист — название</code>.\nДля подборки — до 10 ссылок, по одной на строку.\nТекст над ссылкой — подводка к посту.",
-    "en": "{greeting}\n\nSend a link or <code>artist — title</code>.\nFor a collection, send up to 10 links, one per line.\nText above a link becomes the post intro."
+    "ru": "{greeting}\n\nПришли ссылку или <code>артист — название</code> — подготовлю пост. Несколько ссылок соберу в подборку. Текст над ссылками — твоя подводка.\n\n{mode}",
+    "en": "{greeting}\n\nSend a link or <code>artist — title</code> to prepare a post. Several links make a collection. Text above the links becomes your intro.\n\n{mode}"
   },
   "home_body_new": {
     "ru": "{greeting}\n\nПришли ссылку или <code>артист — название</code> — подготовлю пост с обложкой и кнопками.\n\nНесколько ссылок — подборка (до 10). Текст над ссылками — подводка. Всё можно изменить перед отправкой.",
@@ -608,20 +608,20 @@
     "en": "Continue post"
   },
   "home_continue_named": {
-    "ru": "Продолжить · {release}",
-    "en": "Continue · {release}"
+    "ru": "📝 Продолжить: {release}",
+    "en": "📝 Continue: {release}"
   },
   "home_crate": {
-    "ru": "Подборка · {count}",
-    "en": "Collection · {count}"
+    "ru": "🎶 Моя подборка · {count}/10",
+    "en": "🎶 My collection · {count}/10"
   },
   "home_drafts": {
     "ru": "Черновики",
     "en": "Drafts"
   },
   "home_create": {
-    "ru": "Создать пост",
-    "en": "Create post"
+    "ru": "➕ Новый пост",
+    "en": "➕ New post"
   },
   "home_mode_admin": {
     "en": "Editing, queueing and publishing are available right in the bot",
@@ -632,8 +632,8 @@
     "ru": "Карточку можно изменить и отправить прямо в этом чате"
   },
   "home_more": {
-    "ru": "Настройки",
-    "en": "Settings"
+    "ru": "⚙️ Настройки",
+    "en": "⚙️ Settings"
   },
   "home_queue": {
     "ru": "Очередь публикаций",
@@ -992,8 +992,8 @@
     "ru": "Отменить изменение"
   },
   "share_post": {
-    "en": "Share",
-    "ru": "Поделиться"
+    "ru": "↗️ Поделиться",
+    "en": "↗️ Share"
   },
   "start_using": {
     "en": "Done",
@@ -1336,8 +1336,8 @@
     "en": "Send a section heading before this release, up to 64 characters. Send - to remove it."
   },
   "home_library": {
-    "ru": "Мои материалы",
-    "en": "My library"
+    "ru": "📚 Мои посты",
+    "en": "📚 My posts"
   },
   "library_title": {
     "ru": "<b>Мои материалы</b>\n\nПродолжи черновик, собери подборку или вернись к недавнему поиску.",
@@ -1348,32 +1348,32 @@
     "en": "← My library"
   },
   "ed_quick_text": {
-    "ru": "Текст",
-    "en": "Text"
+    "ru": "✏️ Текст",
+    "en": "✏️ Text"
   },
   "ed_quick_tags": {
-    "ru": "Теги",
-    "en": "Tags"
+    "ru": "# Теги",
+    "en": "# Tags"
   },
   "ed_quick_cover": {
-    "ru": "Обложка",
-    "en": "Artwork"
+    "ru": "🖼 Обложка",
+    "en": "🖼 Artwork"
   },
   "ed_quick_buttons": {
-    "ru": "Кнопки",
-    "en": "Buttons"
+    "ru": "🔗 Кнопки",
+    "en": "🔗 Buttons"
   },
   "ed_quick_more": {
     "ru": "Ещё",
     "en": "More"
   },
   "ed_publish_menu": {
-    "ru": "Опубликовать…",
-    "en": "Publish…"
+    "ru": "📣 Опубликовать…",
+    "en": "📣 Publish…"
   },
   "ed_send_menu": {
-    "ru": "Отправить…",
-    "en": "Send…"
+    "ru": "↗️ Отправить…",
+    "en": "↗️ Send…"
   },
   "ed_style_short": {
     "ru": "Вид поста",
@@ -1418,5 +1418,217 @@
   "crate_back": {
     "ru": "← К подборке",
     "en": "← Back to collection"
+  },
+  "state_conflict": {
+    "ru": "Пост или подборка уже изменились. Открой актуальную карточку и повтори правку.",
+    "en": "This post or collection has changed. Open its current version and try again."
+  },
+  "ed_edit_post": {
+    "ru": "✏️ Изменить",
+    "en": "✏️ Edit"
+  },
+  "ed_save": {
+    "ru": "🔖 Сохранить на 90 дней",
+    "en": "🔖 Save for 90 days"
+  },
+  "ed_saved": {
+    "ru": "🔖 Сохранён · открепить",
+    "en": "🔖 Saved · unpin"
+  },
+  "ed_save_limit": {
+    "ru": "Уже сохранено 30 постов. Открепи один из них, чтобы сохранить новый.",
+    "en": "30 posts are already saved. Unpin one to save another."
+  },
+  "ed_saved_notice": {
+    "ru": "Сохранён на 90 дней и закреплён в «Моих постах».",
+    "en": "Saved for 90 days and pinned in My posts."
+  },
+  "ed_unsaved_notice": {
+    "ru": "Откреплён. Черновик доступен ещё 7 дней.",
+    "en": "Unpinned. This draft remains available for 7 days."
+  },
+  "ed_reset_original": {
+    "ru": "↩️ Исходный вид",
+    "en": "↩️ Original appearance"
+  },
+  "ed_done_editing": {
+    "ru": "✓ Готово",
+    "en": "✓ Done"
+  },
+  "workspace_ready": {
+    "ru": "📝 <b>Твой пост · ещё не отправлен</b>",
+    "en": "📝 <b>Your post · not sent yet</b>"
+  },
+  "workspace_editing": {
+    "ru": "✏️ <b>Редактирование поста</b>",
+    "en": "✏️ <b>Edit post</b>"
+  },
+  "ed_reset_question": {
+    "ru": "Вернуть текст, теги, обложку и кнопки к исходному виду? Сохранённые настройки других постов останутся прежними.",
+    "en": "Restore this post’s original text, tags, artwork and buttons? Other posts’ saved preferences stay unchanged."
+  },
+  "ed_reset_confirm": {
+    "ru": "↩️ Вернуть исходный вид",
+    "en": "↩️ Restore original"
+  },
+  "ed_original_missing": {
+    "ru": "Исходный вид этого старого черновика не сохранён. Доступна отмена последних правок.",
+    "en": "This older draft has no original snapshot. You can undo recent edits."
+  },
+  "ed_why_tags": {
+    "ru": "ℹ️ Откуда эти теги",
+    "en": "ℹ️ About these tags"
+  },
+  "posts_all": {
+    "ru": "Все",
+    "en": "All"
+  },
+  "posts_draft": {
+    "ru": "Черновики",
+    "en": "Drafts"
+  },
+  "posts_scheduled": {
+    "ru": "В очереди",
+    "en": "Scheduled"
+  },
+  "posts_published": {
+    "ru": "Опубликованные",
+    "en": "Published"
+  },
+  "posts_saved": {
+    "ru": "🔖 Сохранённые",
+    "en": "🔖 Saved"
+  },
+  "posts_search": {
+    "ru": "🔎 Поиск по постам",
+    "en": "🔎 Search posts"
+  },
+  "posts_search_prompt": {
+    "ru": "Пришли часть названия или имя исполнителя для поиска в твоих постах. /cancel — отменить.",
+    "en": "Send part of a title or artist name to search your posts. /cancel to cancel."
+  },
+  "posts_search_clear": {
+    "ru": "✕ Сбросить поиск",
+    "en": "✕ Clear search"
+  },
+  "posts_no_match": {
+    "ru": "По этому фильтру ничего нет. Выбери другой или сбрось поиск.",
+    "en": "No posts match. Choose another filter or clear your search."
+  },
+  "posts_expires": {
+    "ru": "Доступен до {date}",
+    "en": "Available until {date}"
+  },
+  "posts_retention": {
+    "ru": "Черновики: 7 дней после правки. 🔖 Сохранённые: 90 дней после сохранения или правки.",
+    "en": "Drafts: 7 days after an edit. 🔖 Saved: 90 days after saving or editing."
+  },
+  "pending_for_post": {
+    "ru": "Пост: <b>{release}</b>",
+    "en": "Post: <b>{release}</b>"
+  },
+  "pending_link_received": {
+    "ru": "Сейчас редактируется пост. Для новой ссылки нажми «Новый пост» или ответь на запрос ввода. Текущие правки сохранены.",
+    "en": "You are editing a post. Choose New post for this link, or reply to the input prompt. Your edits are saved."
+  },
+  "tag_explanation": {
+    "ru": "ℹ️ <b>Откуда эти теги</b>\n\n{selected}\nРежим: {mode}\nТип релиза: {kind}\nЖанр в данных релиза: {genre}\nТеги жанра: {genre_tags}\n\n#stonerhand — тег канала. Свои теги задаёшь ты. Если жанр неизвестен, бот его не угадывает. «Запомнить для релиза» применит твой выбор при следующем добавлении.",
+    "en": "ℹ️ <b>About these tags</b>\n\n{selected}\nMode: {mode}\nRelease type: {kind}\nGenre in release metadata: {genre}\nGenre tags: {genre_tags}\n\n#stonerhand identifies the channel. Custom tags are yours. Unknown genres are not guessed. Remember for release applies your selection next time."
+  },
+  "tags_manual": {
+    "ru": "твой выбор",
+    "en": "your selection"
+  },
+  "tags_auto": {
+    "ru": "автоматически",
+    "en": "automatic"
+  },
+  "tags_genre_missing": {
+    "ru": "нет подтверждённых данных",
+    "en": "no confirmed metadata"
+  },
+  "crate_links_prompt": {
+    "ru": "Пришли до 10 музыкальных ссылок, каждую с новой строки. Добавлю их в текущую подборку. /cancel — отменить.",
+    "en": "Send up to 10 music links, one per line, to add to your current collection. /cancel to cancel."
+  },
+  "crate_replace_prompt": {
+    "ru": "Пришли одну ссылку на трек или альбом для замены выбранной позиции. /cancel — отменить.",
+    "en": "Send one track or album link to replace the selected item. /cancel to cancel."
+  },
+  "crate_add_links": {
+    "ru": "➕ Добавить ссылки",
+    "en": "➕ Add links"
+  },
+  "crate_replace": {
+    "ru": "🔄 Заменить",
+    "en": "🔄 Replace"
+  },
+  "crate_added_count": {
+    "ru": "Добавлено: {added} из {total}. Дубли пропущены, в подборке не больше 10 позиций.",
+    "en": "Added {added} of {total}. Duplicates were skipped; collections hold up to 10 items."
+  },
+  "input_choose": {
+    "ru": "Вижу новую музыкальную ссылку. Сейчас открыт ввод правки — что сделать со ссылкой?",
+    "en": "You sent a music link while editing. What would you like to do with it?"
+  },
+  "input_new_post": {
+    "ru": "📝 Создать новый пост",
+    "en": "📝 Create new post"
+  },
+  "input_add_crate": {
+    "ru": "➕ Добавить в подборку",
+    "en": "➕ Add to collection"
+  },
+  "input_continue": {
+    "ru": "✏️ Продолжить правку",
+    "en": "✏️ Continue editing"
+  },
+  "input_continue_hint": {
+    "ru": "Продолжай правку, ответив на предыдущую подсказку. /cancel — отменить ввод.",
+    "en": "Continue editing by replying to the previous prompt. /cancel to cancel."
+  },
+  "delivery_uncertain": {
+    "ru": "Telegram мог принять пост. Перед повтором проверь чат.",
+    "en": "Telegram may have accepted the post. Check the chat before retrying."
+  },
+  "delivery_uncertain_detail": {
+    "ru": "⚠️ <b>Нужно проверить отправку</b>\n\nОтвет Telegram не получен. Пост мог уже появиться в чате или канале. Автоматический повтор остановлен.\n\nПроверь место отправки. Если поста нет, можно повторить отправку вручную.",
+    "en": "⚠️ <b>Check delivery</b>\n\nTelegram did not return a response. The post may already be in the destination chat or channel. Automatic retry is stopped.\n\nCheck the destination. If the post is absent, you can retry manually."
+  },
+  "delivery_already_sent": {
+    "ru": "✅ Этот пост уже отправлен. Повторное нажатие не создаёт копию.",
+    "en": "✅ This post was already sent. Repeated taps do not create copies."
+  },
+  "delivery_review_retry": {
+    "ru": "🔎 Проверить и повторить…",
+    "en": "🔎 Review and retry…"
+  },
+  "delivery_retry_question": {
+    "ru": "Проверь чат или канал: этого поста там точно нет? Повторная отправка может создать дубль.",
+    "en": "Check the destination: is this post definitely absent? Retrying can create a duplicate."
+  },
+  "delivery_retry_confirm": {
+    "ru": "Поста нет — отправить снова",
+    "en": "Post is absent — send again"
+  },
+  "workspace_published": {
+    "ru": "✅ <b>Пост опубликован</b>",
+    "en": "✅ <b>Post published</b>"
+  },
+  "workspace_sent": {
+    "ru": "✅ <b>Пост отправлен</b>",
+    "en": "✅ <b>Post sent</b>"
+  },
+  "posts_history": {
+    "ru": "🕘 История поиска",
+    "en": "🕘 Search history"
+  },
+  "old_post_not_removed": {
+    "ru": "Новый пост опубликован. Старый пост удалить не удалось — убери его вручную в канале.",
+    "en": "The new post is published. The old post could not be removed — delete it manually in the channel."
+  },
+  "editor_short_view": {
+    "ru": "В редакторе показан сокращённый вид. Текст сохранён; готовый пост открой через «Как выглядит».",
+    "en": "This editor view is shortened. Your text is saved; open Preview to see the finished post."
   }
 }

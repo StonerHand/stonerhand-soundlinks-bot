@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import json
+from copy import deepcopy
 from typing import Any
 
 from music_links_bot.bot_storage import remember_bounded
@@ -11,6 +14,7 @@ from music_links_bot.durable_state import (
     write_text,
 )
 from music_links_bot.kvstore import KVStore
+from music_links_bot.state_mutations import StateConflictError, mutate_json
 
 CRATE_TTL_SECONDS = 14 * 24 * 3600
 MAX_CRATE_ITEMS = 10
@@ -61,7 +65,7 @@ async def load_crate(bot_data: dict, user_id: int) -> list[dict[str, Any]]:
     memory = _memory_crates(bot_data)
     kv: KVStore | None = bot_data.get("kv_store")
     if kv is None and user_id in memory:
-        return list(memory[user_id])
+        return deepcopy(memory[user_id])
 
     payload = await read_json(kv, f"bot-crate:v2:{user_id}") if kv else None
     if isinstance(payload, dict):
@@ -81,9 +85,19 @@ async def load_crate(bot_data: dict, user_id: int) -> list[dict[str, Any]]:
         items[:MAX_CRATE_ITEMS],
         max_size=MAX_MEMORY_CRATES,
     )
-    result = list(memory[user_id])
+    result = deepcopy(memory[user_id])
     if migrated:
-        await save_crate(bot_data, user_id, result)
+        stored = await mutate_json(
+            kv,
+            f"bot-crate:v2:{user_id}",
+            lambda current: (
+                current
+                if current is not None
+                else {"v": CRATE_SCHEMA_VERSION, "items": result}
+            ),
+            ttl_seconds=CRATE_TTL_SECONDS,
+        )
+        result = deepcopy(stored.get("items", []))
     return result
 
 
@@ -134,72 +148,127 @@ def crate_contains_item(items: list[dict[str, Any]], item: dict[str, Any]) -> bo
     )
 
 
-async def add_many_to_crate(
-    bot_data: dict,
-    user_id: int,
-    *,
-    entries: list[tuple[str, dict[str, Any]]],
-) -> tuple[list[dict[str, Any]], int]:
-    """Add several releases with one crate load and at most one Redis write."""
-    items = await load_crate(bot_data, user_id)
-    fingerprints = {_fingerprint(existing.get("item") or {}) for existing in items}
-    added_count = 0
-    for draft_id, item in entries:
-        if len(items) >= MAX_CRATE_ITEMS:
-            break
-        fingerprint = _fingerprint(item)
-        if fingerprint in fingerprints:
-            continue
-        fingerprints.add(fingerprint)
-        items.append({"draft_id": draft_id, "item": item})
-        added_count += 1
-
-    if added_count:
-        await save_crate(bot_data, user_id, items)
-    return items, added_count
+def crate_item_key(entry: dict) -> str:
+    return hashlib.sha256(_fingerprint(entry.get("item") or {}).encode()).hexdigest()[
+        :16
+    ]
 
 
-async def move_crate_item(
-    bot_data: dict, user_id: int, index: int, direction: int
-) -> list[dict[str, Any]]:
-    items = await load_crate(bot_data, user_id)
-    target = index + direction
-    if 0 <= index < len(items) and 0 <= target < len(items):
-        items[index], items[target] = items[target], items[index]
-        await save_crate(bot_data, user_id, items)
-    return items
+def crate_revision(items: list[dict]) -> str:
+    return hashlib.sha256(
+        json.dumps(items, sort_keys=True, ensure_ascii=False).encode()
+    ).hexdigest()[:16]
 
 
-async def remove_crate_item(
-    bot_data: dict, user_id: int, index: int
-) -> list[dict[str, Any]]:
-    items = await load_crate(bot_data, user_id)
-    if 0 <= index < len(items):
-        items.pop(index)
-        await save_crate(bot_data, user_id, items)
-    return items
+def item_index(items, reference):
+    if isinstance(reference, int):
+        return reference
+    return next(
+        (i for i, entry in enumerate(items) if crate_item_key(entry) == reference), -1
+    )
 
 
-async def restore_crate_item(
-    bot_data: dict,
-    user_id: int,
-    *,
-    index: int,
-    entry: dict[str, Any],
-) -> tuple[list[dict[str, Any]], bool]:
-    """Restore one recently removed item without creating duplicates."""
-    items = await load_crate(bot_data, user_id)
-    item = entry.get("item") if isinstance(entry, dict) else None
-    if not isinstance(item, dict) or len(items) >= MAX_CRATE_ITEMS:
-        return items, False
-    fingerprint = _fingerprint(item)
-    if any(
-        _fingerprint(existing.get("item") or {}) == fingerprint for existing in items
-    ):
-        return items, False
-    items.insert(max(0, min(index, len(items))), entry)
-    await save_crate(bot_data, user_id, items)
-    return items, True
+async def edit_crate(bot_data, user_id, transform):
+    """Apply a pure list edit atomically, resolving a moved item by identity."""
+    initial = await load_crate(bot_data, user_id)
+    outcome = None
+
+    def update(payload):
+        nonlocal outcome
+        items = deepcopy(
+            payload.get("items", []) if isinstance(payload, dict) else initial
+        )
+        outcome = transform(items)
+        return {"v": CRATE_SCHEMA_VERSION, "items": items[:MAX_CRATE_ITEMS]}
+
+    kv = bot_data.get("kv_store")
+    if kv is None:
+        stored = update({"items": initial})
+    else:
+        stored = await mutate_json(
+            kv, f"bot-crate:v2:{user_id}", update, ttl_seconds=CRATE_TTL_SECONDS
+        )
+    items = stored["items"]
+    remember_bounded(
+        _memory_crates(bot_data), user_id, deepcopy(items), max_size=MAX_MEMORY_CRATES
+    )
+    return items, outcome
+
+
+async def add_many_to_crate(bot_data, user_id, *, entries):
+    def add(items):
+        fingerprints = {_fingerprint(entry.get("item") or {}) for entry in items}
+        added = 0
+        for draft_id, item in entries:
+            fingerprint = _fingerprint(item)
+            if len(items) < MAX_CRATE_ITEMS and fingerprint not in fingerprints:
+                items.append({"draft_id": draft_id, "item": deepcopy(item)})
+                fingerprints.add(fingerprint)
+                added += 1
+        return added
+
+    return await edit_crate(bot_data, user_id, add)
+
+
+async def move_crate_item(bot_data, user_id, index, direction):
+    def move(items):
+        source = item_index(items, index)
+        target = source + direction
+        if 0 <= source < len(items) and 0 <= target < len(items):
+            items[source], items[target] = items[target], items[source]
+
+    return (await edit_crate(bot_data, user_id, move))[0]
+
+
+async def pop_crate_item(bot_data, user_id, reference):
+    def remove(items):
+        index = item_index(items, reference)
+        return (index, items.pop(index)) if 0 <= index < len(items) else (-1, None)
+
+    return await edit_crate(bot_data, user_id, remove)
+
+
+async def remove_crate_item(bot_data, user_id, index):
+    return (await pop_crate_item(bot_data, user_id, index))[0]
+
+
+async def restore_crate_item(bot_data, user_id, *, index, entry):
+    def restore(items):
+        item = entry.get("item") if isinstance(entry, dict) else None
+        if (
+            not isinstance(item, dict)
+            or len(items) >= MAX_CRATE_ITEMS
+            or crate_contains_item(items, item)
+        ):
+            return False
+        items.insert(max(0, min(index, len(items))), deepcopy(entry))
+        return True
+
+    return await edit_crate(bot_data, user_id, restore)
+
+
+async def clear_crate_items(bot_data, user_id, expected):
+    def clear(items):
+        if not expected or crate_revision(items) != expected:
+            raise StateConflictError("Collection changed after confirmation was shown")
+        previous = list(items)
+        items.clear()
+        return previous
+
+    return await edit_crate(bot_data, user_id, clear)
+
+
+async def restore_crate_items(bot_data, user_id, entries):
+    def restore(items):
+        additions = [
+            e for e in entries if not crate_contains_item(items, e.get("item") or {})
+        ]
+        if len(items) + len(additions) > MAX_CRATE_ITEMS:
+            return False
+        items[:0] = deepcopy(additions)
+        return bool(additions)
+
+    return await edit_crate(bot_data, user_id, restore)
 
 
 def _fingerprint(item: dict[str, Any]) -> str:
@@ -207,5 +276,26 @@ def _fingerprint(item: dict[str, Any]) -> str:
     first_url = next(iter(links.values()), "")
     return "|".join(
         str(value).casefold().strip()
-        for value in (item.get("artist"), item.get("title"), first_url)
+        for value in (
+            item.get("artist"),
+            item.get("title"),
+            item.get("kind", "song"),
+            item.get("release_format"),
+            first_url,
+        )
     )
+
+
+async def replace_crate_item(bot_data, user_id, reference, item):
+    def replace(items):
+        index = item_index(items, reference)
+        if index < 0:
+            raise StateConflictError("The collection item was removed")
+        if any(
+            i != index and _fingerprint(entry.get("item") or {}) == _fingerprint(item)
+            for i, entry in enumerate(items)
+        ):
+            raise StateConflictError("The replacement already exists in the collection")
+        items[index] = {"draft_id": "", "item": deepcopy(item)}
+
+    return (await edit_crate(bot_data, user_id, replace))[0]
