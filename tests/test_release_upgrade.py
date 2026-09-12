@@ -157,7 +157,7 @@ def test_soundtrack_example_has_clean_title_and_confirmed_counts():
         release.release_year,
     ) == (title, "soundtrack", 19, "2010")
     text = format_track_message(release)
-    assert text.startswith(f"💿 <b>{title}</b>\nVarious Artists")
+    assert text.startswith(f"💿 · <b>{title}</b>\nVarious Artists")
     assert "Саундтрек · 2010 · 19 треков" in text
     assert "Compilation by" not in text and "#soundtrack" in text
     restored = normalize_track_draft(new_track_draft(release, chat_id=7, lang="ru"))

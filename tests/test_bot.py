@@ -1502,7 +1502,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(result.id), 32)
         self.assertIsInstance(result.input_message_content, InputTextMessageContent)
         self.assertIn(
-            "🎧 <b>Transitions</b>\nYouth Code",
+            "🎧 · <b>Transitions</b>\nYouth Code",
             result.input_message_content.message_text,
         )
         preview = result.input_message_content.link_preview_options
@@ -1530,7 +1530,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsNotNone(result)
         self.assertIn(
-            "🎧 <b>Transitions</b>\nYouth Code",
+            "🎧 · <b>Transitions</b>\nYouth Code",
             result.input_message_content.message_text,
         )
         keyboard = result.reply_markup.inline_keyboard
@@ -2357,7 +2357,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(message.replies[0], "<deleted>")
-        self.assertIn("🎧 <b>Transitions</b>\nYouth Code", message.replies[1])
+        self.assertIn("🎧 · <b>Transitions</b>\nYouth Code", message.replies[1])
 
     async def test_search_candidate_heading_escapes_user_html(self) -> None:
         class HtmlQueryMessageStub(PrivateMessageStub):
@@ -2676,7 +2676,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertIn("🎧 <b>Transitions</b>\nYouth Code", message.replies[0])
+        self.assertIn("🎧 · <b>Transitions</b>\nYouth Code", message.replies[0])
         self.assertIn("#stonerhand #track", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "✏️ Изменить")
@@ -2741,7 +2741,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertIn("🎧 <b>Star Signs</b>\nBondage Fairies", message.replies[0])
+        self.assertIn("🎧 · <b>Star Signs</b>\nBondage Fairies", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "✏️ Изменить")
         self.assertTrue(keyboard[0][0].callback_data.startswith("v2|editor|m|"))

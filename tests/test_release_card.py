@@ -29,7 +29,7 @@ def sample(**overrides):
 
 def test_agreed_track_caption_and_structural_tags():
     assert format_track_message(sample()) == (
-        "🎧 <b>Dig</b>\nFrom This Point On\n\n"
+        "🎧 · <b>Dig</b>\nFrom This Point On\n\n"
         "Трек · 2026\n💿 Из альбома «Unified»\n\n#stonerhand #track"
     )
 
@@ -37,7 +37,7 @@ def test_agreed_track_caption_and_structural_tags():
 @pytest.mark.parametrize("album", [None, "", " \n\t "])
 def test_unknown_album_is_omitted_without_placeholder(album):
     text = format_track_message(sample(album_title=album, release_year=None))
-    assert text == "🎧 <b>Dig</b>\nFrom This Point On\n\nТрек\n\n#stonerhand #track"
+    assert text == "🎧 · <b>Dig</b>\nFrom This Point On\n\nТрек\n\n#stonerhand #track"
 
 
 def test_album_metadata_is_escaped_and_does_not_change_type_tags():
@@ -50,7 +50,7 @@ def test_album_metadata_is_escaped_and_does_not_change_type_tags():
 def test_album_card_does_not_repeat_membership_and_keeps_verified_counts():
     text = format_track_message(sample(kind="album", track_count=12))
     assert text.startswith(
-        "💿 <b>Dig</b>\nFrom This Point On\n\nАльбом · 2026 · 12 треков"
+        "💿 · <b>Dig</b>\nFrom This Point On\n\nАльбом · 2026 · 12 треков"
     )
     assert "Из альбома" not in text
     assert text.endswith("#stonerhand #album")

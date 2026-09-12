@@ -58,7 +58,7 @@ def format_track_heading(track: TrackMatch) -> str:
 
 def format_release_heading(track: TrackMatch) -> str:
     artist, title = _display_text(track.artist), _display_text(track.title)
-    lines = [f"{release_emoji(track)} <b>{title}</b>"]
+    lines = [f"{release_emoji(track)} · <b>{title}</b>"]
     if artist:
         lines.append(artist)
     details = release_details(track)
