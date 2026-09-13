@@ -415,13 +415,25 @@ def apple_music_url_type(url: str) -> str | None:
 
     parts = [part.lower() for part in parsed.path.split("/") if part]
     for part in parts:
-        if part in {"album", "artist", "music-video", "playlist", "song"}:
+        if part in {
+            "album",
+            "artist",
+            "music-video",
+            "playlist",
+            "song",
+            "curator",
+            "station",
+        }:
             return part
     return None
 
 
 def is_apple_music_playlist_url(url: str) -> bool:
     return apple_music_url_type(url) == "playlist"
+
+
+def is_apple_music_radio_url(url: str) -> bool:
+    return apple_music_url_type(url) in {"curator", "station"}
 
 
 def is_playlist_url(url: str) -> bool:

@@ -11,6 +11,11 @@ from telegram.ext import ContextTypes
 
 from music_links_bot.artist import ArtistClient, ArtistLookupError
 from music_links_bot.i18n import get_text
+from music_links_bot.lookup_control import (
+    current_control,
+    live_sources,
+    observe_source,
+)
 from music_links_bot.lookup_delivery import (
     send_artist_result as _send_artist_result_impl,
     send_mixed_result as _send_mixed_result_impl,
@@ -111,6 +116,7 @@ async def _send_track_video_pair_result(*args, **kwargs) -> bool:
 async def resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBundle:
     source_urls = _unique_source_urls(source_urls)
     from music_links_bot.lookup_recovery import (
+        capture_sources,
         completed_sources,
         merge_recovered,
         restore_source,
@@ -133,7 +139,11 @@ async def resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBundl
             )
         finally:
             completed_sources.reset(token)
-        return merge_recovered(source_urls, retained, fresh)
+        result = merge_recovered(source_urls, retained, fresh)
+        control = current_control.get()
+        if control is not None:
+            control.completed.update(capture_sources(result))
+        return result
     cached = await get_cached_lookup(bot_data, source_urls)
     if cached is not None:
         restored = _bundle_from_cache(cached)
@@ -142,6 +152,9 @@ async def resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBundl
             if restored.is_complete_for(source_urls) or restored.is_negative_for(
                 source_urls
             ):
+                control = current_control.get()
+                if control is not None:
+                    control.completed.update(capture_sources(restored))
                 return restored
 
     key = lookup_cache_key(source_urls)
@@ -149,11 +162,25 @@ async def resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBundl
         "lookup_inflight", {}
     )
     pending = inflight.get(key)
-    if pending is not None:
-        return await asyncio.shield(pending)
+    snapshots = bot_data.setdefault("lookup_snapshots", {})
+    subscribers = bot_data.setdefault("lookup_subscribers", {})
+    if pending is None:
+        snapshot = {}
 
-    task = asyncio.create_task(_resolve_sources_uncached(bot_data, source_urls))
-    inflight[key] = task
+        async def resolve():
+            token = live_sources.set(snapshot)
+            try:
+                return await _resolve_sources_uncached(bot_data, source_urls)
+            finally:
+                live_sources.reset(token)
+
+        task = asyncio.create_task(resolve())
+        inflight[key] = task
+        snapshots[task] = snapshot
+    else:
+        task = pending
+        snapshot = snapshots.get(task, {})
+    subscribers[task] = subscribers.get(task, 0) + 1
 
     def finish(completed: asyncio.Task[LookupBundle]) -> None:
         if inflight.get(key) is completed:
@@ -163,8 +190,24 @@ async def resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBundl
 
     task.add_done_callback(finish)
     try:
-        return await asyncio.shield(task)
+        result = await asyncio.shield(task)
+        control = current_control.get()
+        if control is not None:
+            control.completed.update(capture_sources(result))
+        return result
     finally:
+        control = current_control.get()
+        if control is not None:
+            control.completed.update(snapshot)
+        subscribers[task] -= 1
+        if subscribers[task] == 0:
+            subscribers.pop(task, None)
+            snapshots.pop(task, None)
+            if not task.done():
+                if inflight.get(key) is task:
+                    inflight.pop(key, None)
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
         if task.done():
             finish(task)
 
@@ -180,8 +223,17 @@ async def _resolve_sources_uncached(
     playlist_urls = grouped["playlists"]
     youtube_urls = grouped["youtube"]
     nts_urls = grouped["nts"]
+    apple_radio_urls = grouped["apple_radio"]
     music_urls = grouped["songlink"]
     tasks: list[ProviderTask] = []
+    if apple_radio_urls:
+        tasks.append(
+            ProviderTask(
+                "apple_radio",
+                _lookup_nts_radios(bot_data["apple_radio_client"], apple_radio_urls),
+                [],
+            )
+        )
     if music_urls:
         tasks.append(
             ProviderTask(
@@ -251,7 +303,18 @@ async def _resolve_sources_uncached(
     )
     lookup_result = _outcome_value(outcomes, "songlink", ([], [], []))
     videos = _outcome_value(outcomes, "youtube", [])
-    radios = _outcome_value(outcomes, "nts", [])
+    radios = [
+        *_outcome_value(outcomes, "nts", []),
+        *_outcome_value(outcomes, "apple_radio", []),
+    ]
+    radio_order = {
+        cache_key_for_url(url): index for index, url in enumerate(source_urls)
+    }
+    radios.sort(
+        key=lambda radio: radio_order.get(
+            cache_key_for_url(radio.url), len(source_urls)
+        )
+    )
     playlists = _outcome_value(outcomes, "playlists", [])
     artists = _outcome_value(outcomes, "artists", [])
     tracks, unavailable_urls, track_statuses = lookup_result
@@ -259,6 +322,7 @@ async def _resolve_sources_uncached(
         *track_statuses,
         *_provider_statuses("youtube", youtube_urls, videos, outcomes),
         *_provider_statuses("nts", nts_urls, radios, outcomes),
+        *_provider_statuses("apple_radio", apple_radio_urls, radios, outcomes),
         *_provider_statuses("playlists", playlist_urls, playlists, outcomes),
         *_provider_statuses("artists", artist_urls, artists, outcomes),
     ]
@@ -419,7 +483,15 @@ async def _lookup_playlists(
     source_urls: list[str],
 ) -> list[PlaylistMatch]:
     results = await asyncio.gather(
-        *(client.lookup_playlist(source_url) for source_url in source_urls),
+        *(
+            observe_source(
+                client.lookup_playlist(url),
+                url,
+                field_name="playlists",
+                provider="playlists",
+            )
+            for url in source_urls
+        ),
         return_exceptions=True,
     )
 
@@ -451,7 +523,12 @@ async def _lookup_artists(
     source_urls: list[str],
 ) -> list[ArtistMatch]:
     results = await asyncio.gather(
-        *(client.lookup_artist(source_url) for source_url in source_urls),
+        *(
+            observe_source(
+                client.lookup_artist(url), url, field_name="artists", provider="artists"
+            )
+            for url in source_urls
+        ),
         return_exceptions=True,
     )
 
@@ -484,7 +561,12 @@ async def _lookup_youtube_videos(
     source_urls: list[str],
 ) -> list[VideoMatch]:
     results = await asyncio.gather(
-        *(client.lookup_video(source_url) for source_url in source_urls),
+        *(
+            observe_source(
+                client.lookup_video(url), url, field_name="videos", provider="youtube"
+            )
+            for url in source_urls
+        ),
         return_exceptions=True,
     )
 
@@ -517,7 +599,12 @@ async def _lookup_nts_radios(
     source_urls: list[str],
 ) -> list[RadioMatch]:
     results = await asyncio.gather(
-        *(client.lookup_radio(source_url) for source_url in source_urls),
+        *(
+            observe_source(
+                client.lookup_radio(url), url, field_name="radios", provider="nts"
+            )
+            for url in source_urls
+        ),
         return_exceptions=True,
     )
 
@@ -790,17 +877,26 @@ async def _lookup_tracks_detailed(
             await asyncio.sleep(delay)
 
     lookup_tasks = [
-        asyncio.create_task(lookup_one(index, source_url))
+        asyncio.create_task(
+            observe_source(
+                lookup_one(index, source_url),
+                source_url,
+                field_name="tracks",
+                provider=_track_provider(source_url),
+            )
+        )
         for index, source_url in enumerate(source_urls)
     ]
-    done, pending = await asyncio.wait(
-        lookup_tasks,
-        timeout=_BATCH_PROVIDER_WORK_SECONDS,
-    )
-    for task in pending:
-        task.cancel()
-    if pending:
-        await asyncio.gather(*pending, return_exceptions=True)
+    try:
+        done, pending = await asyncio.wait(
+            lookup_tasks,
+            timeout=_BATCH_PROVIDER_WORK_SECONDS,
+        )
+    finally:
+        for task in lookup_tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*lookup_tasks, return_exceptions=True)
     results: list[TrackMatch | Exception] = [
         task.result()
         if task in done and not task.cancelled()
@@ -819,10 +915,15 @@ async def _lookup_tracks_detailed(
     ]
     fallback_values = await asyncio.gather(
         *(
-            _build_lookup_fallback(
+            observe_source(
+                _build_lookup_fallback(
+                    source_urls[index],
+                    soundcloud_client=soundcloud_client,
+                    search_client=search_client,
+                ),
                 source_urls[index],
-                soundcloud_client=soundcloud_client,
-                search_client=search_client,
+                field_name="tracks",
+                provider=_track_provider(source_urls[index]),
             )
             for index in fallback_indexes
         ),

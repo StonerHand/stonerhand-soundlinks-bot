@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from typing import Any
 
 from telegram import Message
@@ -186,6 +187,14 @@ class PublicationService:
         require_valid_publication(publication_contract_from_view(view, track))
         text = view.text
         keyboard = view.keyboard
+        if keyboard is not None and not draft.get("collection_items"):
+            from music_links_bot.release_panel import add_release_panel
+
+            keyboard = await add_release_panel(
+                keyboard, self.context, track, lang=draft.get("lang") or "ru"
+            )
+            view = replace(view, keyboard=keyboard)
+            require_valid_publication(publication_contract_from_view(view, track))
 
         if view.source_audio_file_id:
             return await self._send_audio(

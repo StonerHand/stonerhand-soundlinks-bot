@@ -776,8 +776,8 @@
     "ru": "\n\n⚠️ Очередь публикаций временно недоступна. Остальные данные удалены; проверь очередь позже через владельца бота."
   },
   "privacy_title": {
-    "en": "🔐 <b>Data and privacy</b>\n\nThe bot stores only working state: drafts, your crate, history, design settings and scheduled publications. Retention is limited, while product metrics contain no post text or music links.\n\n<blockquote>After deletion, temporary search tokens may remain for up to 30 minutes and then expire automatically.</blockquote>",
-    "ru": "🔐 <b>Данные и приватность</b>\n\nБот хранит только состояние, нужное для работы: черновики, подборку, историю, настройки оформления и запланированные публикации. Срок хранения ограничен, а статистика продукта считается без текста постов и музыкальных ссылок.\n\n<blockquote>После удаления временные токены поиска могут существовать не более 30 минут, затем исчезают автоматически.</blockquote>"
+    "en": "🔐 <b>Data and privacy</b>\n\nThe bot keeps drafts, your crate, history, settings and scheduled publications for limited periods. Inline statistics contain sent card titles and aggregate counts, without users, search queries or destination chats. Statistics expire within 31 days.\n\n<blockquote>After deletion, temporary search tokens may remain for up to 30 minutes. Shared release metadata and links for the About panel are cached separately for up to 180 days; deleting personal data does not delete this shared cache or anonymous counts.</blockquote>",
+    "ru": "🔐 <b>Данные и приватность</b>\n\nБот хранит черновики, подборку, историю, настройки и запланированные публикации с ограниченным сроком хранения. Статистика inline содержит названия отправленных карточек и общие счётчики — без пользователей, поисковых запросов и чатов получателей. Срок хранения статистики — до 31 дня.\n\n<blockquote>После удаления временные токены поиска могут существовать до 30 минут. Общие сведения о релизах и ссылки для кнопки «О релизе» хранятся отдельно до 180 дней; удаление личных данных не удаляет этот общий кэш и обезличенные счётчики.</blockquote>"
   },
   "progress_batch": {
     "en": "✓ Links · {done}/{total}\n✓ Platforms\n🎨 Building the collection",
@@ -1630,5 +1630,53 @@
   "editor_short_view": {
     "ru": "В редакторе показан сокращённый вид. Текст сохранён; готовый пост открой через «Как выглядит».",
     "en": "This editor view is shortened. Your text is saved; open Preview to see the finished post."
+  },
+  "lookup_stopped": {
+    "ru": "Поиск остановлен. Можешь прислать новую ссылку или название.",
+    "en": "Search stopped. Send another link or title whenever you’re ready."
+  },
+  "lookup_stopped_partial": {
+    "ru": "Поиск остановлен. Успел найти: {found} из {total}.",
+    "en": "Search stopped. Found {found} of {total}."
+  },
+  "guest_rate_limit": {
+    "ru": "Слишком много запросов. Попробуй через минуту.",
+    "en": "Too many requests. Try again in a minute."
+  },
+  "guest_not_found": {
+    "ru": "Не удалось собрать релиз. Пришли другую ссылку или попробуй позже.",
+    "en": "Could not build the release card. Try another link or come back later."
+  },
+  "guest_too_many": {
+    "ru": "В одной подборке помещается до 10 ссылок. Раздели их на несколько подборок.",
+    "en": "A collection supports up to 10 links. Split these into several collections."
+  },
+  "guest_help": {
+    "ru": "Пришли музыкальную ссылку или «артист — трек» вместе с упоминанием бота. Можно ответить упоминанием на сообщение со ссылкой.",
+    "en": "Send a music link or artist — track along with the bot mention. You can also mention the bot in a reply to a link."
+  },
+  "guest_choose": {
+    "ru": "Нашёл несколько вариантов. Выбери нужный релиз:",
+    "en": "Found several matches. Choose your release:"
+  },
+  "copy_release_name": {
+    "ru": "📋 Скопировать название",
+    "en": "📋 Copy artist and title"
+  },
+  "copy_release_link": {
+    "ru": "🔗 Скопировать ссылку",
+    "en": "🔗 Copy release link"
+  },
+  "release_panel_open": {
+    "ru": "⋯ О релизе",
+    "en": "⋯ About this release"
+  },
+  "release_panel_close": {
+    "ru": "✕ Закрыть",
+    "en": "✕ Close"
+  },
+  "release_panel_expired": {
+    "ru": "Данные этой карточки больше не доступны. Пришли ссылку ещё раз — соберу свежую карточку.",
+    "en": "This card’s details are no longer available. Send its link again to create a fresh card."
   }
 }

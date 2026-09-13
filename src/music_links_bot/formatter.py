@@ -99,7 +99,11 @@ def format_video_message(video: VideoMatch, *, include_hashtags: bool = True) ->
 def format_radio_message(radio: RadioMatch, *, include_hashtags: bool = True) -> str:
     lines = [
         f"📻 · <b>{_display_text(radio.title)}</b>",
-        f"станция: {_display_text(radio.station)}",
+        (
+            f"Радиошоу · {_display_text(radio.station)}"
+            if radio.station == "Apple Music"
+            else f"станция: {_display_text(radio.station)}"
+        ),
     ]
     return _with_hashtags(
         lines, "#stonerhand #radio", include_hashtags=include_hashtags

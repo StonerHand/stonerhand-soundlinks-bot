@@ -3,14 +3,16 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from telegram import BotCommand, MenuButtonCommands
+from telegram import BotCommand, MenuButtonCommands, Update
 from telegram.error import TelegramError
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
+    ChosenInlineResultHandler,
     CommandHandler,
     InlineQueryHandler,
     MessageHandler,
+    TypeHandler,
     filters,
 )
 
@@ -28,13 +30,16 @@ from music_links_bot.bot_menu import (
     settings_command,
     start_command,
 )
+from music_links_bot.bot_native import native_update_handler
 from music_links_bot.bot_preferences import LocalizedApplication
 from music_links_bot.bot_runtime import BotRuntime
 from music_links_bot.config import Settings
+from music_links_bot.inline_feedback import chosen_inline_result_handler
 from music_links_bot.keyboards import _build_platform_order
 from music_links_bot.kvstore import KVStore
 from music_links_bot.lazy_client import LazyAsyncClient
 from music_links_bot.logging_config import quiet_transport_logs
+from music_links_bot.release_panel import release_panel_callback
 
 LOGGER = logging.getLogger(__name__)
 
@@ -93,6 +98,7 @@ def build_application(settings: Settings) -> Application:
     quiet_transport_logs()
 
     from music_links_bot import bot as handlers
+    from music_links_bot.apple_radio import AppleRadioClient
     from music_links_bot.artist import ArtistClient
     from music_links_bot.nts import NTSClient
     from music_links_bot.playlist import PlaylistClient
@@ -105,6 +111,7 @@ def build_application(settings: Settings) -> Application:
     application = (
         Application.builder()
         .application_class(LocalizedApplication)
+        .concurrent_updates(8)
         .token(settings.bot_token)
         .post_init(sync_application_commands)
         .post_shutdown(close_application_resources)
@@ -121,6 +128,7 @@ def build_application(settings: Settings) -> Application:
             ),
             "youtube_client": LazyAsyncClient(YouTubeClient),
             "nts_client": LazyAsyncClient(NTSClient),
+            "apple_radio_client": LazyAsyncClient(AppleRadioClient),
             "soundcloud_client": LazyAsyncClient(SoundCloudClient),
             "playlist_client": LazyAsyncClient(PlaylistClient),
             "artist_client": LazyAsyncClient(ArtistClient),
@@ -145,6 +153,10 @@ def build_application(settings: Settings) -> Application:
         }
     )
 
+    application.add_handler(TypeHandler(Update, native_update_handler), group=-1)
+    application.add_handler(
+        CallbackQueryHandler(release_panel_callback, pattern=r"^release:")
+    )
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("settings", settings_command))
@@ -167,6 +179,7 @@ def build_application(settings: Settings) -> Application:
         CallbackQueryHandler(handlers.editor_callback, pattern=r"^ed\|")
     )
     application.add_handler(InlineQueryHandler(inline_query_handler))
+    application.add_handler(ChosenInlineResultHandler(chosen_inline_result_handler))
     application.add_handler(
         MessageHandler(
             (filters.TEXT | filters.CAPTION | filters.PHOTO | filters.AUDIO)
@@ -225,6 +238,7 @@ async def close_application_resources(application: Application) -> None:
         "songlink_client",
         "youtube_client",
         "nts_client",
+        "apple_radio_client",
         "soundcloud_client",
         "playlist_client",
         "artist_client",

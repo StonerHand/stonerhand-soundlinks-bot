@@ -384,13 +384,21 @@ async def _dispatch_noop_action(query, context, action: CallbackAction) -> None:
 
 
 async def _dispatch_progress_action(query, context, action: CallbackAction) -> None:
-    del action
     if query.from_user is None:
         await query.answer()
         return
     lang = resolve_lang(query.from_user.language_code)
     runtime = _runtime(context)
-    cancelled = await runtime.cancel_request_durable(query.from_user.id)
+    if action.payload and action.payload.isdigit():
+        from music_links_bot.lookup_control import stop_lookup
+
+        cancelled = await stop_lookup(
+            context.application.bot_data,
+            chat_id=query.from_user.id,
+            draft_id=int(action.payload),
+        )
+    else:
+        cancelled = await runtime.cancel_request_durable(query.from_user.id)
     await query.answer(
         get_text(lang, "request_cancelled" if cancelled else "request_not_running")
     )
@@ -2329,6 +2337,9 @@ async def _send_track_matches(
                 ),
                 label=get_text(lang, "share_post"),
             )
+        from music_links_bot.release_panel import add_release_panel
+
+        keyboard = await add_release_panel(keyboard, context, track, lang=lang)
         await _send_track_result(
             context.bot,
             message,
@@ -2580,20 +2591,64 @@ async def _track_lookup_message_impl(
         return
     request = _build_lookup_request(update, context, message)
     accepted, request_token = await _admit_private_lookup(message, context, request)
-    if not accepted or not await _resolve_request_sources(message, context, request):
+    if not accepted:
         return
-    await _ensure_current_lookup(context, request, request_token)
-    if not await _ensure_channel_publish_access(message, context):
+    from music_links_bot.lookup_control import (
+        LookupStopped,
+        interruptible,
+        search_control,
+    )
+
+    async def resolve():
+        if not await _resolve_request_sources(message, context, request):
+            return None
+        await _ensure_current_lookup(context, request, request_token)
+        if not await _ensure_channel_publish_access(message, context):
+            return None
+        await _start_lookup_progress(message, context, request)
+        return await _bot_lookup.resolve_sources(
+            context.application.bot_data, request.source_urls
+        )
+
+    try:
+        if request.is_private:
+            async with search_control(context.application.bot_data, message):
+                bundle = await interruptible(resolve())
+        else:
+            bundle = await resolve()
+    except LookupStopped as stopped:
+        await _ensure_current_lookup(context, request, request_token)
+        await _cancel_progress(message.chat_id, request.lang)
+        from music_links_bot.lookup_recovery import merge_recovered
+
+        bundle = merge_recovered(
+            request.source_urls,
+            stopped.completed,
+            _bot_lookup.LookupBundle([], [], [], [], [], []),
+        )
+        await message.reply_text(
+            get_text(
+                request.lang,
+                "lookup_stopped_partial" if bundle.item_count else "lookup_stopped",
+            ).format(found=bundle.item_count, total=len(request.source_urls))
+        )
+        if bundle.item_count:
+            await _deliver_lookup_bundle(
+                message,
+                context,
+                bundle,
+                request=request,
+                user_prefix=""
+                if request.prefix_is_noise
+                else _build_user_prefix(message, bot_username=context.bot.username),
+            )
+        return
+    if bundle is None:
         return
     user_prefix = (
         ""
         if request.prefix_is_noise
         else _build_user_prefix(message, bot_username=context.bot.username)
-    )
-    await _start_lookup_progress(message, context, request)
-    bundle = await _bot_lookup.resolve_sources(
-        context.application.bot_data,
-        request.source_urls,
     )
     await _ensure_current_lookup(context, request, request_token)
     if request.is_private and bundle.item_count:

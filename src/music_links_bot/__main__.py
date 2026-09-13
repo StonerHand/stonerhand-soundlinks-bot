@@ -6,6 +6,7 @@ import logging
 from music_links_bot.bot_app import build_application
 from music_links_bot.config import Settings
 from music_links_bot.logging_config import quiet_transport_logs
+from music_links_bot.telegram_updates import ALLOWED_UPDATES
 
 
 def main() -> None:
@@ -20,9 +21,7 @@ def main() -> None:
     quiet_transport_logs()
 
     application = build_application(settings)
-    application.run_polling(
-        allowed_updates=["message", "channel_post", "callback_query", "inline_query"]
-    )
+    application.run_polling(allowed_updates=ALLOWED_UPDATES)
 
 
 if __name__ == "__main__":

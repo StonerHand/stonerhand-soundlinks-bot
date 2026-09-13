@@ -40,6 +40,10 @@ async def stats_text(context, *, include_private: bool) -> str:
     if not include_private:
         return text
 
+    from music_links_bot.inline_feedback import feedback_text
+
+    text += await feedback_text(context.application.bot_data)
+
     runtime = context.application.bot_data.get("runtime")
     if runtime is None:
         return text

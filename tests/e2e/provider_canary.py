@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import sys
 
+from music_links_bot.apple_radio import AppleRadioClient
 from music_links_bot.bot_lookup import _lookup_tracks
 from music_links_bot.musicbrainz import MusicBrainzClient
 from music_links_bot.nts import NTSClient
@@ -26,6 +27,7 @@ APPLE_PLAYLIST = (
     "anya-taylor-joy-my-lucky-playlist/pl.e245dcff90464785a675ec40e8c52abb"
 )
 NTS_PAGE = "https://www.nts.live/shows/guests"
+APPLE_RADIO = "https://music.apple.com/tr/curator/the-alligator-hour/993270307"
 
 
 async def verify() -> list[str]:
@@ -36,6 +38,7 @@ async def verify() -> list[str]:
     youtube = YouTubeClient(timeout=10)
     playlist = PlaylistClient(timeout=10)
     nts = NTSClient(timeout=10)
+    apple_radio = AppleRadioClient(timeout=10)
     musicbrainz = MusicBrainzClient(timeout=10)
     songlink = SonglinkClient(
         user_countries=("US", "GB", "DE"),
@@ -137,6 +140,13 @@ async def verify() -> list[str]:
             failures.append(f"apple playlist lookup failed: {type(exc).__name__}")
 
         try:
+            radio = await apple_radio.lookup_radio(APPLE_RADIO)
+            if radio.title != "The Alligator Hour" or radio.station != "Apple Music":
+                failures.append("Apple radio metadata is generic or incorrect")
+        except Exception as exc:  # noqa: BLE001
+            failures.append(f"Apple radio lookup failed: {type(exc).__name__}")
+
+        try:
             radio = await nts.lookup_radio(NTS_PAGE)
             if radio.title == "NTS Radio" or radio.station != "NTS Radio":
                 failures.append("NTS metadata fell back to a generic card")
@@ -149,6 +159,7 @@ async def verify() -> list[str]:
             youtube.aclose(),
             playlist.aclose(),
             nts.aclose(),
+            apple_radio.aclose(),
             songlink.aclose(),
             search.aclose(),
             musicbrainz.aclose(),

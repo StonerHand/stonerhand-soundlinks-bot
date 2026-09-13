@@ -69,6 +69,7 @@ class SearchClient:
             ttl_seconds=6 * 3600
         )
         self._inflight: dict[str, asyncio.Task[list[SearchCandidate]]] = {}
+        self._subscribers: dict[asyncio.Task, int] = {}
         self._musicbrainz_client = musicbrainz_client or MusicBrainzClient(
             timeout=min(timeout, 4.0)
         )
@@ -226,17 +227,28 @@ class SearchClient:
             raise SearchLookupError("No release matched the query.")
 
         pending = self._inflight.get(cache_key)
-        if pending is not None:
-            return await asyncio.shield(pending)
-
-        task = asyncio.create_task(self._search_and_cache(normalized_query, cache_key))
-        self._inflight[cache_key] = task
-        task.add_done_callback(
-            lambda completed, key=cache_key: self._finish_inflight(key, completed)
-        )
+        if pending is None:
+            task = asyncio.create_task(
+                self._search_and_cache(normalized_query, cache_key)
+            )
+            self._inflight[cache_key] = task
+            task.add_done_callback(
+                lambda completed, key=cache_key: self._finish_inflight(key, completed)
+            )
+        else:
+            task = pending
+        self._subscribers[task] = self._subscribers.get(task, 0) + 1
         try:
             return await asyncio.shield(task)
         finally:
+            self._subscribers[task] -= 1
+            if self._subscribers[task] == 0:
+                self._subscribers.pop(task, None)
+                if not task.done():
+                    if self._inflight.get(cache_key) is task:
+                        self._inflight.pop(cache_key, None)
+                    task.cancel()
+                    await asyncio.gather(task, return_exceptions=True)
             if task.done():
                 self._finish_inflight(cache_key, task)
 

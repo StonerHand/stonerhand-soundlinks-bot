@@ -159,6 +159,10 @@ async def home_view(query, context, *, lang: str) -> tuple[str, InlineKeyboardMa
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    from music_links_bot.release_panel import start_release_panel
+
+    if await start_release_panel(update, context):
+        return
     message = update.message
     if message is None:
         return

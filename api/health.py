@@ -208,7 +208,13 @@ def _check_telegram() -> dict:
     if isinstance(result, dict):
         username = str(result.get("username") or "")
 
-    return {"ok": True, "detail": f"@{username}"}
+    return {
+        "ok": True,
+        "detail": f"@{username}",
+        "guest_mode": bool(
+            isinstance(result, dict) and result.get("supports_guest_queries")
+        ),
+    }
 
 
 def _check_webhook() -> dict:
@@ -217,7 +223,14 @@ def _check_webhook() -> dict:
         return {"ok": False, "detail": "BOT_TOKEN missing or Telegram unreachable"}
 
     healthy, detail = evaluate_webhook_info(payload)
-    return {"ok": healthy, "detail": detail}
+    result = payload.get("result")
+    return {
+        "ok": healthy,
+        "detail": detail,
+        "allowed_updates": result.get("allowed_updates", [])
+        if isinstance(result, dict)
+        else [],
+    }
 
 
 def _storage_snapshot() -> tuple[dict, dict, dict]:

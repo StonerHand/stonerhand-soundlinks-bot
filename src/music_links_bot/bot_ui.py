@@ -567,6 +567,8 @@ def editor_text_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButt
 
 
 def editor_tools_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
+    from music_links_bot.release_panel import copy_rows
+
     lang = draft.get("lang") or "ru"
 
     def cb(key, action, **kwargs):
@@ -590,6 +592,8 @@ def editor_tools_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardBut
         rows.append([cb("ed_add_crate", "c")])
     rows.append([cb("ed_templates", "tp"), cb("ed_style_short", "zs")])
     rows.append([cb("ed_delivery_settings", "rs")])
+    if draft.get("item"):
+        rows.extend(copy_rows(TrackMatch(**draft["item"]), lang=lang))
     query = str(draft.get("search_query") or "").strip()
     if query:
         rows.append(

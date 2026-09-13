@@ -4,6 +4,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
 from music_links_bot.url_utils import (
+    is_apple_music_radio_url,
     is_nts_url,
     is_playlist_url,
     is_spotify_artist_url,
@@ -20,6 +21,7 @@ class ProviderAdapter:
 
 
 DEFAULT_PROVIDER_ADAPTERS = (
+    ProviderAdapter("apple_radio", is_apple_music_radio_url),
     ProviderAdapter("artists", is_spotify_artist_url),
     ProviderAdapter("playlists", is_playlist_url),
     ProviderAdapter("youtube", is_youtube_video_url),

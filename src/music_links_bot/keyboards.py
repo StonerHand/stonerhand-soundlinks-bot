@@ -275,8 +275,12 @@ def _build_nts_keyboard(
     *,
     include_channel_button: bool = False,
 ) -> InlineKeyboardMarkup:
+    from music_links_bot.url_utils import is_apple_music_radio_url
+
     return _single_url_keyboard(
-        "📻 Открыть на NTS",
+        "📻 Слушать в Apple Music"
+        if is_apple_music_radio_url(url)
+        else "📻 Открыть на NTS",
         url=url,
         style="primary",
         include_channel_button=include_channel_button,

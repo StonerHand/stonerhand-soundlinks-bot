@@ -158,6 +158,32 @@ class KVStore:
         result = await self._command(["EVAL", script, "1", key, str(ttl_seconds)])
         return result if isinstance(result, int) else None
 
+    async def record_ranked_event(self, key, event_key, label, *, ttl_seconds):
+        """Deduplicate delivery feedback and increment its aggregate atomically."""
+        script = (
+            "if not redis.call('set', KEYS[2], '1', 'EX', ARGV[2], 'NX') then return 0 end; "
+            "redis.call('zincrby', KEYS[1], 1, ARGV[1]); "
+            "redis.call('expire', KEYS[1], ARGV[2]); "
+            "redis.call('zremrangebyrank', KEYS[1], 0, -514); return 1"
+        )
+        return await self._command(
+            ["EVAL", script, "2", key, event_key, label, str(ttl_seconds)]
+        )
+
+    async def ranked_events(self, key, *, limit=5):
+        result = await self._command(
+            ["ZREVRANGE", key, "0", str(limit - 1), "WITHSCORES"]
+        )
+        if not isinstance(result, list):
+            return []
+        entries = []
+        for index in range(0, len(result) - 1, 2):
+            try:
+                entries.append((str(result[index]), int(float(result[index + 1]))))
+            except (TypeError, ValueError):  # noqa: PERF203 — tolerate malformed remote entries.
+                continue
+        return entries
+
     async def mget(self, keys: list[str]) -> list[str | None]:
         if not keys:
             return []

@@ -51,7 +51,21 @@ scheduling or send-to-self; regular users see Send.
 A nonempty collection is visible on the home screen. Select an entry to move,
 replace or annotate it.
 
-### In 1.19
+### New in 1.20
+
+- Guest mentions turn a link, including a replied-to link, into a card after
+  enabling Guest Mode in BotFather. Ambiguous searches offer a choice.
+- About opens every platform and native copy actions. Group panels are visible
+  only to the person who opened them; inline cards open the bot's private chat.
+- Stop cancels unneeded provider work while retaining completed results in order.
+  Another user's identical lookup continues independently.
+- Apple Music radio shows, including The Alligator Hour, have their own card type.
+- Admin inline statistics count chosen cards by week, after enabling
+  `/setinlinefeedback`. They count sends, not platform clicks or plays.
+
+See [Telegram setup and limits](SETUP.ru.md#возможности-telegram-120) (Russian).
+
+### The 1.19 foundation
 
 - In 1.19.1 the release title is bold, followed by the artist and a separate
   type/year block. Album membership appears only when metadata provides it.

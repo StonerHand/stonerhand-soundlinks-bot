@@ -9,6 +9,7 @@ from telegram.error import TelegramError
 
 from music_links_bot.bot_runtime import encode_callback
 from music_links_bot.i18n import get_text
+from music_links_bot.lookup_control import current_control
 from music_links_bot.rich_publications import send_rich_progress_draft
 from music_links_bot.telegram_buttons import (
     ButtonTone,
@@ -40,6 +41,13 @@ _PLACEHOLDER: contextvars.ContextVar[ProgressState | None] = contextvars.Context
 )
 
 
+def _stop_callback():
+    control = current_control.get()
+    return encode_callback(
+        "progress", "cancel", str(control.draft_id) if control else ""
+    )
+
+
 def _progress_keyboard(text: str, lang: str) -> InlineKeyboardMarkup:
     del text
     return InlineKeyboardMarkup(
@@ -53,7 +61,7 @@ def _progress_keyboard(text: str, lang: str) -> InlineKeyboardMarkup:
             [
                 callback_button(
                     get_text(lang, "request_cancel"),
-                    encode_callback("progress", "cancel"),
+                    _stop_callback(),
                 )
             ],
         ]
@@ -66,7 +74,7 @@ def _progress_fallback_keyboard(lang: str) -> InlineKeyboardMarkup:
             [
                 callback_button(
                     get_text(lang, "request_cancel"),
-                    encode_callback("progress", "cancel"),
+                    _stop_callback(),
                 )
             ]
         ]
@@ -143,6 +151,7 @@ async def start_progress(
                 chat_id=message.chat_id,
                 draft_id=draft_id,
                 text=text,
+                can_stop=current_control.get() is not None,
             )
         ):
             _PLACEHOLDER.set(
@@ -190,6 +199,7 @@ async def update_progress(lang: str, key: str) -> None:
                 chat_id=state.chat_id,
                 draft_id=state.draft_id,
                 text=text,
+                can_stop=current_control.get() is not None,
             )
         state.stage = next_stage
         state.last_text = text
@@ -213,6 +223,7 @@ async def update_progress_text(text: str, *, stage: int = 3, lang: str = "ru") -
                 chat_id=state.chat_id,
                 draft_id=state.draft_id,
                 text=text,
+                can_stop=current_control.get() is not None,
             )
         state.stage = stage
         state.last_text = text

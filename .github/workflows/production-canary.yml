@@ -42,6 +42,29 @@ jobs:
         env:
           CANARY_EXPECT_COMMIT: ${{ github.event.workflow_run.head_sha }}
         run: python tests/e2e/rollback_guard.py
+      - name: Refresh Telegram update subscriptions after a verified release
+        if: steps.canary.outcome == 'success' && github.event_name == 'workflow_run'
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from urllib.request import Request, urlopen
+
+          secret = os.environ.get("CRON_SECRET", "").strip()
+          if not secret:
+              raise SystemExit("CRON_SECRET is required to refresh Telegram updates")
+          request = Request(
+              "https://tg-bot-sh.vercel.app/api/set_webhook",
+              headers={"Authorization": "Bearer " + secret},
+          )
+          with urlopen(request, timeout=30) as response:
+              result = json.load(response)
+          if not result.get("ok"):
+              raise SystemExit("Telegram update registration was not confirmed")
+          print("Telegram webhook subscriptions refreshed; pending updates preserved")
+          PY
       - name: Instant rollback of the unhealthy release
         if: steps.rollback_guard.outcome == 'success'
         env:

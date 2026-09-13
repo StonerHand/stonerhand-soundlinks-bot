@@ -24,15 +24,8 @@ from music_links_bot.bot_app import (
 )
 from music_links_bot.config import Settings
 from music_links_bot.logging_config import quiet_transport_logs
+from music_links_bot.telegram_updates import ALLOWED_UPDATES
 from music_links_bot.webhook_secret import secrets_match
-
-ALLOWED_UPDATES = (
-    "message",
-    "channel_post",
-    "callback_query",
-    "inline_query",
-    "stopped_message_generation",
-)
 
 LOGGER = logging.getLogger(__name__)
 quiet_transport_logs()

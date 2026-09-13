@@ -26,6 +26,7 @@ from music_links_bot.formatter import (
     format_video_message,
 )
 from music_links_bot.i18n import get_text, resolve_lang
+from music_links_bot.inline_feedback import remember_results
 from music_links_bot.inline_storage import (
     load_cached_search,
     load_inline_history,
@@ -74,6 +75,7 @@ from music_links_bot.telegram_gateway import (
 from music_links_bot.url_utils import (
     cache_key_for_url,
     extract_supported_urls,
+    is_apple_music_radio_url,
     is_direct_platform_url,
     is_nts_url,
     is_playlist_url,
@@ -224,6 +226,7 @@ async def inline_query_handler(
         )
         return
 
+    await remember_results(context.application.bot_data, results)
     try:
         answer_kwargs = {
             "cache_time": 0,
@@ -268,6 +271,7 @@ async def inline_query_handler(
                 if isinstance(outcome, InlineQueryResultArticle)
             ]
             if classic_results:
+                await remember_results(context.application.bot_data, classic_results)
                 try:
                     await inline_query.answer(
                         classic_results,
@@ -393,6 +397,7 @@ async def _answer_inline_collection(
             get_text(lang, "inline_hint_collection_incomplete"),
         )
         return
+    await remember_results(context.application.bot_data, [result])
     try:
         await inline_query.answer(
             [result],
@@ -417,6 +422,7 @@ async def _answer_inline_collection(
                 user_id=user_id,
             )
             if classic_result is not None:
+                await remember_results(context.application.bot_data, [classic_result])
                 try:
                     await inline_query.answer(
                         [classic_result],
@@ -577,9 +583,13 @@ async def _build_inline_result(
             channel_safe=channel_safe,
         )
 
-    if is_nts_url(source_url):
+    if is_nts_url(source_url) or is_apple_music_radio_url(source_url):
         radios = await bot_lookup._lookup_nts_radios(
-            bot_data["nts_client"],
+            bot_data[
+                "apple_radio_client"
+                if is_apple_music_radio_url(source_url)
+                else "nts_client"
+            ],
             [source_url],
         )
         if not radios:
@@ -630,6 +640,9 @@ async def _build_inline_result(
         share_query=share_query,
         label=share_label,
     )
+    from music_links_bot.release_panel import add_release_panel
+
+    keyboard = await add_release_panel(keyboard, context, track, inline=True, lang=lang)
     return _inline_article(
         source_url,
         title=f"{track.artist} — {track.title}",

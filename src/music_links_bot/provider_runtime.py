@@ -172,8 +172,8 @@ def lookup_cache_key(
     # Version the aggregate key whenever completeness semantics change so an
     # old partial result cannot look like a complete collection after deploy.
     scoped = f"{namespace}\0{canonical}"
-    # v10 refreshes release formats, track counts and verified genre metadata.
-    return "lookup:v10:" + hashlib.sha256(scoped.encode()).hexdigest()
+    # v11 routes Apple radio separately from previously cached track lookups.
+    return "lookup:v11:" + hashlib.sha256(scoped.encode()).hexdigest()
 
 
 def _lookup_cache_namespace(bot_data: dict) -> str:
