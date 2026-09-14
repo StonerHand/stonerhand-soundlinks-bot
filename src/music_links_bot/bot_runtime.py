@@ -160,7 +160,7 @@ class UserSession:
     default_hashtags: str = ""
     collection_layout: str = "column"
     collection_grouping: str = "none"
-    default_artwork: str = "native"
+    default_artwork: str = "clean"
     release_tags: dict[str, list[str]] = field(default_factory=dict)
     collection_annotations: dict[str, dict[str, str]] = field(default_factory=dict)
     onboarding_seen: bool = False
@@ -212,7 +212,7 @@ class UserSession:
                 default_artwork=_choice(
                     payload.get("default_artwork"), {"native", "clean"}
                 )
-                or "native",
+                or "clean",
                 release_tags=normalize_release_tags(payload.get("release_tags")),
                 collection_annotations=normalize_annotations(
                     payload.get("collection_annotations")

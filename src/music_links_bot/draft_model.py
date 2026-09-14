@@ -78,6 +78,13 @@ def _normalize_track_item(value: dict) -> DraftTrackItem:
 
     if count := positive_track_count(value.get("track_count")):
         item["track_count"] = count
+    from music_links_bot.release_metadata import duration_ms, metadata_url
+
+    for key, kind in (("album_url", "album"), ("artist_url", "artist")):
+        if url := metadata_url(value.get(key), kind):
+            item[key] = url
+    if duration := duration_ms(value.get("duration_ms")):
+        item["duration_ms"] = duration
     return item
 
 
@@ -92,6 +99,9 @@ class DraftTrackItem(TypedDict, total=False):
     thumbnail_url: str | None
     album_title: str | None
     track_count: int | None
+    album_url: str | None
+    artist_url: str | None
+    duration_ms: int | None
     genre: str | None
 
 
@@ -178,6 +188,8 @@ def new_track_draft(
     can_publish: bool = False,
     search_query: str = "",
 ) -> TrackDraft:
+    from music_links_bot.release_preferences import use_clean_artwork
+
     return {
         "v": CURRENT_DRAFT_VERSION,
         "type": "track",
@@ -186,7 +198,7 @@ def new_track_draft(
         "hashtags": True,
         "quote": bool(prefix),
         "large_preview": True,
-        "as_photo": False,
+        "as_photo": use_clean_artwork(track),
         "chat_id": int(chat_id),
         "lang": "en" if lang == "en" else "ru",
         "search_query": search_query.strip()[:120],

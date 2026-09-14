@@ -20,7 +20,7 @@ MAX_RELEASE_PREFERENCES = 60
 class PresentationPreferences:
     layout: str = "column"
     grouping: str = "none"
-    artwork: str = "native"
+    artwork: str = "clean"
     tags: Mapping[str, list[str]] = field(default_factory=lambda: MappingProxyType({}))
     annotations: Mapping[str, dict[str, str]] = field(
         default_factory=lambda: MappingProxyType({})
@@ -74,11 +74,19 @@ def preferences_from_session(session) -> PresentationPreferences:
     return PresentationPreferences(
         layout=getattr(session, "collection_layout", "column"),
         grouping=getattr(session, "collection_grouping", "none"),
-        artwork=getattr(session, "default_artwork", "native"),
+        artwork=getattr(session, "default_artwork", "clean"),
         tags=normalize_release_tags(getattr(session, "release_tags", {})),
         annotations=normalize_annotations(
             getattr(session, "collection_annotations", {})
         ),
+    )
+
+
+def use_clean_artwork(track: TrackMatch) -> bool:
+    return bool(
+        track.kind in {"song", "album"}
+        and track.thumbnail_url
+        and current_presentation.get().artwork == "clean"
     )
 
 

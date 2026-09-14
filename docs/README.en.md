@@ -53,6 +53,9 @@ replace or annotate it.
 
 ### New in 1.20
 
+- In 1.20.1, new music cards default to clean artwork, with verified album/artist
+  links and duration when available. Saved preview choices and existing drafts
+  remain unchanged. Video, radio and playlist captions share consistent formatting.
 - Guest mentions turn a link, including a replied-to link, into a card after
   enabling Guest Mode in BotFather. Ambiguous searches offer a choice.
 - About opens every platform and native copy actions. Group panels are visible

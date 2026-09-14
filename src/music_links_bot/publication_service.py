@@ -221,14 +221,35 @@ class PublicationService:
             return sent
 
         if view.as_photo and view.cover:
-            return await self._send_photo(
-                draft,
-                track,
-                target=target,
-                cover=view.cover,
-                text=text,
-                keyboard=keyboard,
-            )
+            try:
+                return await self._send_photo(
+                    draft,
+                    track,
+                    target=target,
+                    cover=view.cover,
+                    text=text,
+                    keyboard=keyboard,
+                )
+            except BadRequest as exc:
+                # Only a definitive artwork rejection permits a fallback send.
+                # A transport failure may already have delivered the photo.
+                media_error = any(
+                    token in str(exc).casefold()
+                    for token in (
+                        "failed to get http url content",
+                        "wrong type of the web page content",
+                        "wrong file identifier",
+                        "photo_invalid",
+                        "image_process_failed",
+                        "webpage_curl_failed",
+                        "webpage_media_empty",
+                    )
+                )
+                if draft.get("custom_cover_file_id") or not media_error:
+                    raise
+                LOGGER.info(
+                    "Provider artwork rejected; using the native release preview"
+                )
 
         return await self._send_classic_message(
             target=target,

@@ -2338,6 +2338,7 @@ async def _send_track_matches(
                 label=get_text(lang, "share_post"),
             )
         from music_links_bot.release_panel import add_release_panel
+        from music_links_bot.release_preferences import use_clean_artwork
 
         keyboard = await add_release_panel(keyboard, context, track, lang=lang)
         await _send_track_result(
@@ -2348,8 +2349,9 @@ async def _send_track_matches(
                 track,
                 include_hashtags=include_hashtags,
             ),
-            preview_url=_select_preview_url(track.links, context)
-            or track.thumbnail_url,
+            preview_url=track.thumbnail_url
+            if use_clean_artwork(track)
+            else _select_preview_url(track.links, context) or track.thumbnail_url,
             reply_markup=keyboard,
             source_urls=tuple(track.links.values()),
             content_kind=track.kind,

@@ -343,8 +343,8 @@ class FormatterTests(unittest.TestCase):
         )
         self.assertEqual(
             format_video_message(video),
-            "<b>SANSAE Live Session Vol.3 - Melon</b>\n"
-            "<i>Источник: SANSAE</i>\n\n"
+            "📺 · <b>SANSAE Live Session Vol.3 - Melon</b>\n\n"
+            "Видео · YouTube\nИсточник: SANSAE\n\n"
             "#stonerhand #video",
         )
 
@@ -356,8 +356,8 @@ class FormatterTests(unittest.TestCase):
         )
         self.assertEqual(
             format_radio_message(radio),
-            "📻 · <b>Dark Energy w/ Guest</b>\n"
-            "станция: NTS Radio\n\n"
+            "📻 · <b>Dark Energy w/ Guest</b>\n\n"
+            "Радио · NTS Radio\n\n"
             "#stonerhand #radio",
         )
 
@@ -369,7 +369,7 @@ class FormatterTests(unittest.TestCase):
         )
         self.assertEqual(
             format_playlist_message(playlist),
-            "🎛 · <b>Women of Punk</b>\nплатформа: Spotify\n\n#stonerhand #playlist",
+            "🎛 · <b>Women of Punk</b>\n\nПлейлист · Spotify\n\n#stonerhand #playlist",
         )
 
     def test_format_artist_message_uses_artist_style(self) -> None:
@@ -380,7 +380,7 @@ class FormatterTests(unittest.TestCase):
         )
         self.assertEqual(
             format_artist_message(artist),
-            "🧬 · <b>1.Kla$</b>\nпрофиль: Spotify\n\n#stonerhand #artist",
+            "🧬 · <b>1.Kla$</b>\n\nИсполнитель · Spotify\n\n#stonerhand #artist",
         )
 
     def test_format_playlist_collection_message_lists_playlists(self) -> None:

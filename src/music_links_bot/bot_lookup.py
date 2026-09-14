@@ -86,7 +86,7 @@ _BATCH_RETRY_DELAY_SECONDS = 0.2
 _BATCH_ITEM_TIMEOUT_SECONDS = 8.5
 _BATCH_PROVIDER_WORK_SECONDS = 18.0
 _LOOKUP_REQUEST_BUDGET_SECONDS = 20.0
-_GENRE_ENRICHMENT_TIMEOUT_SECONDS = 0.75
+_RELEASE_ENRICHMENT_TIMEOUT_SECONDS = 1.5
 
 
 def configure_track_result_sender(sender: Callable[..., Awaitable[Any]]) -> None:
@@ -1044,11 +1044,14 @@ async def _lookup_tracks_detailed(
             # wait_for cancels a slow request so it cannot outlive the update
             # and mutate data after the result has already been cached/sent.
             await asyncio.wait_for(
-                _fill_genres(search_client, tracks),
-                timeout=_GENRE_ENRICHMENT_TIMEOUT_SECONDS,
+                asyncio.gather(
+                    _fill_genres(search_client, tracks),
+                    _fill_release_metadata(client, search_client, tracks),
+                ),
+                timeout=_RELEASE_ENRICHMENT_TIMEOUT_SECONDS,
             )
         except asyncio.TimeoutError:
-            LOGGER.debug("Genre enrichment timed out and was cancelled")
+            LOGGER.debug("Release metadata enrichment timed out and was cancelled")
 
     return tracks, unavailable_urls, statuses
 
@@ -1089,6 +1092,61 @@ async def _fill_genres(search_client: SearchClient, tracks: list[TrackMatch]) ->
     for track, genre in zip(pending, genres, strict=True):
         if isinstance(genre, str):
             track.genre = genre
+
+
+async def _fill_release_metadata(client, search_client, tracks):
+    from music_links_bot.release_metadata import duration_ms, metadata_url
+    from music_links_bot.search import SearchCandidate
+
+    async def fill(track):
+        if track.kind not in {"song", "album"}:
+            return
+        if (
+            track.duration_ms
+            and track.artist_url
+            and (track.kind == "album" or track.album_url and track.album_title)
+        ):
+            return
+        provider = search_client if track.links.get("appleMusic") else client
+        lookup = getattr(provider, "lookup_release_metadata", None)
+        source = track.links.get("appleMusic") or track.links.get("spotify")
+        if not source or not callable(lookup):
+            return
+        try:
+            details = await lookup(source)
+        except Exception:  # noqa: BLE001 — enrichment must not lose a resolved release.
+            return
+        if not isinstance(details, (TrackMatch, SearchCandidate)):
+            return
+        kind = "album" if details.kind == "album" else "song"
+        if kind != track.kind:
+            return
+        album = (
+            details.album
+            if isinstance(details, SearchCandidate)
+            else details.album_title
+        )
+        # Keep an existing title/link pair intact if stores describe different editions.
+        if (
+            not track.album_title
+            or album
+            and track.album_title.casefold() == album.casefold()
+        ):
+            track.album_title = track.album_title or album
+            track.album_url = track.album_url or metadata_url(
+                details.album_url, "album"
+            )
+        if " ".join(track.artist.casefold().split()) == " ".join(
+            details.artist.casefold().split()
+        ):
+            track.artist_url = track.artist_url or metadata_url(
+                details.artist_url, "artist"
+            )
+        track.duration_ms = track.duration_ms or duration_ms(details.duration_ms)
+        if track.kind == "album":
+            track.track_count = track.track_count or details.track_count
+
+    await asyncio.gather(*(fill(track) for track in tracks))
 
 
 async def _build_lookup_fallback(

@@ -93,6 +93,9 @@ class SonglinkClient:
             if task.done():
                 self._finish_inflight(cache_key, task)
 
+    async def lookup_release_metadata(self, source_url: str) -> TrackMatch:
+        return await self._spotify_client.lookup_release(source_url)
+
     def _finish_inflight(self, cache_key: str, task: asyncio.Task[TrackMatch]) -> None:
         """Forget completed single-flight tasks even if their waiter timed out."""
         if self._inflight.get(cache_key) is task:
@@ -331,6 +334,9 @@ class SonglinkClient:
             track_count=positive_track_count(
                 entity.get("trackCount") or entity.get("totalTracks")
             ),
+            album_url=entity.get("albumUrl"),
+            artist_url=entity.get("artistUrl"),
+            duration_ms=entity.get("durationMs"),
         )
 
     def _merge_matches(self, matches: list[TrackMatch]) -> TrackMatch:
@@ -341,6 +347,9 @@ class SonglinkClient:
             merged_links.update(match.links)
 
         return TrackMatch(
+            album_url=primary.album_url,
+            artist_url=primary.artist_url,
+            duration_ms=primary.duration_ms,
             album_title=next(
                 (match.album_title for match in matches if match.album_title), None
             ),

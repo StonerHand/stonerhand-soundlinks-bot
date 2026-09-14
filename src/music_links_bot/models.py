@@ -22,6 +22,9 @@ class TrackMatch:
     genre: str | None = None
     album_title: str | None = None
     track_count: int | None = None
+    album_url: str | None = None
+    artist_url: str | None = None
+    duration_ms: int | None = None
 
     def __post_init__(self) -> None:
         # Spotify's public metadata sometimes returns an SEO page title such
@@ -33,6 +36,11 @@ class TrackMatch:
                 or self.release_format
             )
         self.track_count = positive_track_count(self.track_count)
+        from music_links_bot.release_metadata import duration_ms, metadata_url
+
+        self.album_url = metadata_url(self.album_url, "album")
+        self.artist_url = metadata_url(self.artist_url, "artist")
+        self.duration_ms = duration_ms(self.duration_ms)
         self.title = clean_spotify_metadata_title(
             self.title,
             artist=self.artist,

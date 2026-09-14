@@ -2657,7 +2657,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(message.replies), 1)
         self.assertIn("<b>Dark Energy w/ Guest</b>", message.replies[0])
-        self.assertIn("станция: NTS Radio", message.replies[0])
+        self.assertIn("Радио · NTS Radio", message.replies[0])
         self.assertIn("#stonerhand #radio", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         preview_options = message.reply_kwargs[0]["link_preview_options"]
@@ -2800,7 +2800,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(message.replies), 1)
         self.assertIn("<b>1.Kla$</b>", message.replies[0])
-        self.assertIn("профиль: Spotify", message.replies[0])
+        self.assertIn("Исполнитель · Spotify", message.replies[0])
         self.assertIn("#stonerhand #artist", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "🧬 Открыть артиста")
@@ -3078,7 +3078,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
         search = SlowGenreSearchStub()
         with patch(
-            "music_links_bot.bot_lookup._GENRE_ENRICHMENT_TIMEOUT_SECONDS",
+            "music_links_bot.bot_lookup._RELEASE_ENRICHMENT_TIMEOUT_SECONDS",
             0.001,
         ):
             tracks, _ = await _lookup_tracks(

@@ -55,13 +55,15 @@ def apply_preferences(draft: dict, session: UserSession) -> None:
         draft.pop("custom_tags", None)
     if (
         session.default_artwork == "clean"
-        and draft.get("item", {}).get("kind") != "video"
+        and draft.get("item", {}).get("kind") in {"song", "album"}
+        and draft.get("publication_mode") != "longread"
     ):
         draft["as_photo"] = bool(draft.get("item", {}).get("thumbnail_url"))
     elif (
         session.default_artwork == "native"
         and draft.get("publication_mode") != "longread"
     ):
+        draft["as_photo"] = False
         draft["delivery_mode"] = "classic"
     track = TrackMatch(**draft["item"])
     saved = session.release_tags.get(release_preference_key(track))

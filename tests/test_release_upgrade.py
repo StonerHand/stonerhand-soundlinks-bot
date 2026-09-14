@@ -157,7 +157,7 @@ def test_soundtrack_example_has_clean_title_and_confirmed_counts():
         release.release_year,
     ) == (title, "soundtrack", 19, "2010")
     text = format_track_message(release)
-    assert text.startswith(f"💿 · <b>{title}</b>\nVarious Artists")
+    assert text.startswith(f"💿 · <b>{title}</b>\n\nСаундтрек")
     assert "Саундтрек · 2010 · 19 треков" in text
     assert "Compilation by" not in text and "#soundtrack" in text
     restored = normalize_track_draft(new_track_draft(release, chat_id=7, lang="ru"))
@@ -284,7 +284,7 @@ def test_video_source_is_separate_from_artist_and_cover_choice():
         url="https://www.youtube.com/watch?v=abc",
     )
     text = format_video_message(video)
-    assert text.startswith("<b>Deadушки — Коллекционер (Maxidrom 2001)</b>")
+    assert text.startswith("📺 · <b>Deadушки — Коллекционер (Maxidrom 2001)</b>")
     assert "Источник: Aleksandr Doronin" in text
     item = track(
         kind="video",

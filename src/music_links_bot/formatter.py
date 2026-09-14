@@ -12,6 +12,7 @@ from music_links_bot.models import (
     TrackMatch,
     VideoMatch,
 )
+from music_links_bot.release_metadata import duration_label, metadata_url
 from music_links_bot.release_preferences import (
     current_presentation,
     release_preference_key,
@@ -59,8 +60,12 @@ def format_track_heading(track: TrackMatch) -> str:
 def format_release_heading(track: TrackMatch) -> str:
     artist, title = _display_text(track.artist), _display_text(track.title)
     lines = [f"{release_emoji(track)} · <b>{title}</b>"]
-    if artist:
-        lines.append(artist)
+    various_artists = track.artist.strip().casefold() in {
+        "various artists",
+        "разные исполнители",
+    }
+    if artist and not (track.kind == "album" and various_artists):
+        lines.append(_metadata_link(artist, track.artist_url, "artist"))
     details = release_details(track)
     if details:
         lines.extend(["", escape(details)])
@@ -69,8 +74,15 @@ def format_release_heading(track: TrackMatch) -> str:
         album = _display_text(track.album_title)
         if album:
             label = "From the album" if resolve_lang(None) == "en" else "Из альбома"
-            lines.append(f"💿 {label} «{album}»")
+            lines.append(
+                f"💿 {label} «{_metadata_link(album, track.album_url, 'album')}»"
+            )
     return "\n".join(lines)
+
+
+def _metadata_link(label: str, url: str | None, kind: str) -> str:
+    safe = metadata_url(url, kind)
+    return f'<a href="{escape(safe, quote=True)}">{label}</a>' if safe else label
 
 
 def format_track_message(
@@ -88,9 +100,14 @@ def format_track_message(
 
 def format_video_message(video: VideoMatch, *, include_hashtags: bool = True) -> str:
     lines = [
-        f"<b>{_display_text(video.title)}</b>",
-        f"<i>{'Source' if resolve_lang(None) == 'en' else 'Источник'}: {_display_text(video.author)}</i>",
+        f"📺 · <b>{_display_text(video.title)}</b>",
+        "",
+        "Video · YouTube" if resolve_lang(None) == "en" else "Видео · YouTube",
     ]
+    if video.author.strip():
+        lines.append(
+            f"{'Source' if resolve_lang(None) == 'en' else 'Источник'}: {_display_text(video.author)}"
+        )
     return _with_hashtags(
         lines, "#stonerhand #video", include_hashtags=include_hashtags
     )
@@ -99,10 +116,11 @@ def format_video_message(video: VideoMatch, *, include_hashtags: bool = True) ->
 def format_radio_message(radio: RadioMatch, *, include_hashtags: bool = True) -> str:
     lines = [
         f"📻 · <b>{_display_text(radio.title)}</b>",
+        "",
         (
-            f"Радиошоу · {_display_text(radio.station)}"
+            f"{'Radio show' if resolve_lang(None) == 'en' else 'Радиошоу'} · {_display_text(radio.station)}"
             if radio.station == "Apple Music"
-            else f"станция: {_display_text(radio.station)}"
+            else f"{'Radio' if resolve_lang(None) == 'en' else 'Радио'} · {_display_text(radio.station)}"
         ),
     ]
     return _with_hashtags(
@@ -117,7 +135,8 @@ def format_playlist_message(
 ) -> str:
     lines = [
         f"🎛 · <b>{_display_text(playlist.title)}</b>",
-        f"платформа: {_display_text(playlist.platform)}",
+        "",
+        f"{'Playlist' if resolve_lang(None) == 'en' else 'Плейлист'} · {_display_text(playlist.platform)}",
     ]
     return _with_hashtags(
         lines, "#stonerhand #playlist", include_hashtags=include_hashtags
@@ -131,7 +150,8 @@ def format_artist_message(
 ) -> str:
     lines = [
         f"🧬 · <b>{_display_text(artist.title)}</b>",
-        f"профиль: {_display_text(artist.platform)}",
+        "",
+        f"{'Artist' if resolve_lang(None) == 'en' else 'Исполнитель'} · {_display_text(artist.platform)}",
     ]
     return _with_hashtags(
         lines, "#stonerhand #artist", include_hashtags=include_hashtags
@@ -555,4 +575,6 @@ def release_details(track: TrackMatch) -> str:
         and 0 < track.track_count <= 9999
     ):
         details.append(count_label(track.track_count, "track"))
+    if duration := duration_label(track.duration_ms):
+        details.append(duration)
     return " · ".join(details)

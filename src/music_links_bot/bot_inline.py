@@ -48,7 +48,6 @@ from music_links_bot.publication_contract import (
     RenderedPublication,
     require_valid_publication,
 )
-from music_links_bot.release_preferences import current_presentation
 from music_links_bot.rich_publications import (
     RICH_MESSAGE_CAPABILITY,
     rich_api_unavailable,
@@ -641,6 +640,7 @@ async def _build_inline_result(
         label=share_label,
     )
     from music_links_bot.release_panel import add_release_panel
+    from music_links_bot.release_preferences import use_clean_artwork
 
     keyboard = await add_release_panel(keyboard, context, track, inline=True, lang=lang)
     return _inline_article(
@@ -659,9 +659,7 @@ async def _build_inline_result(
         keyboard=keyboard,
         preview_url=(
             track.thumbnail_url
-            if current_presentation.get().artwork == "clean"
-            and track.thumbnail_url
-            and track.kind != "video"
+            if use_clean_artwork(track)
             else _select_preview_url(track.links, context) or track.thumbnail_url
         ),
         thumbnail_url=track.thumbnail_url,

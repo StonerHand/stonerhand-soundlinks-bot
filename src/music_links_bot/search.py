@@ -10,9 +10,11 @@ import httpx
 
 from music_links_bot.cache import TTLCache
 from music_links_bot.constants import HTTP_USER_AGENT
+from music_links_bot.metadata_cleaning import positive_track_count
 from music_links_bot.models import TrackMatch
 from music_links_bot.musicbrainz import MusicBrainzClient, MusicBrainzLookupError
 from music_links_bot.release_hubs import canonical_release_hub_url
+from music_links_bot.release_metadata import apple_album_url, duration_ms, metadata_url
 from music_links_bot.url_utils import cache_key_for_url, normalize_host
 
 LOGGER = logging.getLogger(__name__)
@@ -37,6 +39,10 @@ class SearchCandidate:
     album: str | None = None
     year: str | None = None
     kind: str | None = None
+    album_url: str | None = None
+    artist_url: str | None = None
+    duration_ms: int | None = None
+    track_count: int | None = None
 
 
 class SearchClient:
@@ -69,6 +75,7 @@ class SearchClient:
             ttl_seconds=6 * 3600
         )
         self._inflight: dict[str, asyncio.Task[list[SearchCandidate]]] = {}
+        self._details_cache: TTLCache[SearchCandidate] = TTLCache(ttl_seconds=6 * 3600)
         self._subscribers: dict[asyncio.Task, int] = {}
         self._musicbrainz_client = musicbrainz_client or MusicBrainzClient(
             timeout=min(timeout, 4.0)
@@ -104,6 +111,8 @@ class SearchClient:
             candidate = await self._lookup_apple_candidate(source_url)
         if candidate is None:
             return None
+        if candidate.kind == "album" and candidate.duration_ms is None:
+            candidate = await self.lookup_release_metadata(source_url) or candidate
 
         kind = "album" if candidate.kind == "album" else "song"
         links = {"appleMusic": candidate.url}
@@ -140,7 +149,27 @@ class SearchClient:
             kind=kind,
             album_title=candidate.album if kind == "song" else None,
             thumbnail_url=_large_artwork_url(candidate.artwork_url),
+            album_url=candidate.album_url,
+            artist_url=candidate.artist_url,
+            duration_ms=candidate.duration_ms,
+            track_count=candidate.track_count if kind == "album" else None,
         )
+
+    async def lookup_release_metadata(self, source_url: str) -> SearchCandidate | None:
+        key = cache_key_for_url(source_url)
+        cached = self._details_cache.get(key)
+        if cached is not None:
+            return cached
+        try:
+            candidate = await asyncio.wait_for(
+                self._lookup_apple_candidate(source_url, include_tracks=True),
+                timeout=1.25,
+            )
+        except asyncio.TimeoutError:
+            return None
+        if candidate is not None:
+            self._details_cache.set(key, candidate)
+        return candidate
 
     async def lookup_genre(self, artist: str, title: str) -> str | None:
         """Return a genre only for an exact artist/release match.
@@ -297,22 +326,38 @@ class SearchClient:
         for candidate in candidates:
             self._candidate_cache.set(cache_key_for_url(candidate.url), candidate)
 
-    async def _lookup_apple_candidate(self, source_url: str) -> SearchCandidate | None:
+    async def _lookup_apple_candidate(
+        self, source_url: str, *, include_tracks: bool = False
+    ) -> SearchCandidate | None:
         item_id = _apple_item_id(source_url)
         if item_id is None:
             return None
+        params = {"id": item_id, "country": self._country}
+        if include_tracks:
+            params.update(entity="song", limit="200")
         try:
             response = await self._client.get(
                 "/lookup",
-                params={"id": item_id, "country": self._country},
+                params=params,
             )
             response.raise_for_status()
-            candidates = _extract_release_candidates(response.json())
+            payload = response.json()
+            # ID lookups must not accidentally accept a related track/artist.
+            candidates = [
+                c
+                for c in _extract_release_candidates(payload)
+                if _apple_item_id(c.url) == item_id
+            ]
         except (httpx.HTTPError, ValueError):
             LOGGER.debug("Apple Music metadata fallback failed", exc_info=True)
             return None
+        candidate = candidates[0] if candidates else None
+        if candidate is not None and candidate.kind == "album" and include_tracks:
+            candidate.duration_ms = _complete_album_duration(
+                payload, item_id, candidate.track_count
+            )
         self._remember_candidates(candidates)
-        return candidates[0] if candidates else None
+        return candidate
 
 
 def normalize_search_query(query: str) -> str | None:
@@ -465,9 +510,34 @@ def _extract_release_candidates(payload: object) -> list[SearchCandidate]:
                     if result.get("wrapperType") == "collection"
                     else str(result.get("kind") or "track")
                 ),
+                album_url=apple_album_url(
+                    result.get("collectionViewUrl"), result.get("collectionId")
+                ),
+                artist_url=metadata_url(result.get("artistViewUrl"), "artist"),
+                duration_ms=duration_ms(result.get("trackTimeMillis")),
+                track_count=positive_track_count(result.get("trackCount")),
             )
         )
         if len(candidates) >= MAX_CANDIDATES:
             break
 
     return candidates
+
+
+def _complete_album_duration(
+    payload: object, item_id: str, expected: int | None
+) -> int | None:
+    if not isinstance(payload, dict) or not expected:
+        return None
+    tracks = [
+        r
+        for r in payload.get("results", [])
+        if isinstance(r, dict)
+        and r.get("wrapperType") == "track"
+        and str(r.get("collectionId")) == item_id
+    ]
+    durations = [duration_ms(r.get("trackTimeMillis")) for r in tracks]
+    identities = {str(r["trackId"]) for r in tracks if r.get("trackId")}
+    if len(tracks) == expected and len(identities) == expected and all(durations):
+        return duration_ms(sum(durations))
+    return None

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from collections.abc import Mapping
@@ -16,6 +17,11 @@ from music_links_bot.metadata_cleaning import (
 )
 from music_links_bot.models import TrackMatch
 from music_links_bot.release_hubs import canonical_release_hub_url
+from music_links_bot.release_metadata import (
+    duration_ms,
+    metadata_url,
+    spotify_entity_url,
+)
 from music_links_bot.url_utils import cache_key_for_url, spotify_url_type
 
 SPOTIFY_EMBED_BASE_URL = "https://open.spotify.com/embed"
@@ -119,6 +125,7 @@ class SpotifyClient:
                 else SpotifyLookupError("Spotify public metadata is unavailable.")
             )
         else:
+            await self._complete_metadata(match)
             self._cache.set(cache_key, match)
             return match
 
@@ -157,6 +164,34 @@ class SpotifyClient:
             )
         self._cache.set(cache_key, match)
         return match
+
+    async def _complete_metadata(self, match: TrackMatch) -> None:
+        async def complete():
+            if match.kind == "song" and match.album_url and not match.album_title:
+                album = self._cache.get(cache_key_for_url(match.album_url))
+                if album is None:
+                    response = await self._client.get(match.album_url)
+                    response.raise_for_status()
+                    album = parse_spotify_page(match.album_url, response.text)
+                match.album_title = album.title
+            elif (
+                match.kind == "album"
+                and match.duration_ms is None
+                and match.track_count
+            ):
+                url = match.links["spotify"]
+                response = await self._client.get(_spotify_embed_url(url, "album"))
+                response.raise_for_status()
+                details = parse_spotify_embed(
+                    url, response.text, expected_count=match.track_count
+                )
+                match.duration_ms = details.duration_ms
+                match.artist_url = match.artist_url or details.artist_url
+
+        try:
+            await asyncio.wait_for(complete(), timeout=1.25)
+        except (asyncio.TimeoutError, httpx.HTTPError, SpotifyLookupError):
+            pass
 
 
 def parse_spotify_page(source_url: str, html: str) -> TrackMatch:
@@ -229,10 +264,20 @@ def parse_spotify_page(source_url: str, html: str) -> TrackMatch:
         or ("album" if normalized_kind == "album" else None),
         track_count=positive_track_count(count_match.group(1)) if count_match else None,
         thumbnail_url=thumbnail_url,
+        album_title=parser.first("music:album_description") or None,
+        album_url=metadata_url(parser.first("music:album"), "album"),
+        artist_url=metadata_url(parser.first("music:musician"), "artist")
+        if len(set(artists)) == 1
+        else None,
+        duration_ms=duration_ms(parser.first("music:duration") + "000")
+        if parser.first("music:duration").isdigit()
+        else None,
     )
 
 
-def parse_spotify_embed(source_url: str, html: str) -> TrackMatch:
+def parse_spotify_embed(
+    source_url: str, html: str, *, expected_count: int | None = None
+) -> TrackMatch:
     parser = _NextDataParser()
     parser.feed(html)
     if not parser.parts:
@@ -261,6 +306,33 @@ def parse_spotify_embed(source_url: str, html: str) -> TrackMatch:
     if not release_year.isdigit():
         release_year = None
 
+    count = (
+        positive_track_count(entity.get("trackCount") or entity.get("totalTracks"))
+        or expected_count
+    )
+    duration = duration_ms(entity.get("duration"))
+    if normalized_kind == "album" and duration is None and count:
+        tracks = entity.get("trackList")
+        if (
+            isinstance(tracks, list)
+            and len(tracks) == count
+            and all(isinstance(t, Mapping) for t in tracks)
+        ):
+            durations = [duration_ms(t.get("duration")) for t in tracks]
+            identities = {t.get("uri") for t in tracks if isinstance(t.get("uri"), str)}
+            if len(identities) == count and all(durations):
+                duration = sum(durations)
+    artist_items = entity.get("artists")
+    artist_link = None
+    if (
+        isinstance(artist_items, list)
+        and len(artist_items) == 1
+        and isinstance(artist_items[0], Mapping)
+    ):
+        artist_link = spotify_entity_url(artist_items[0].get("uri"), "artist")
+    elif not artist_items:
+        artist_link = spotify_entity_url(entity.get("relatedEntityUri"), "artist")
+
     return TrackMatch(
         title=title,
         artist=artist,
@@ -275,9 +347,10 @@ def parse_spotify_embed(source_url: str, html: str) -> TrackMatch:
         if normalized_kind == "album"
         else None,
         album_title=str(entity.get("albumName") or "") or None,
-        track_count=positive_track_count(
-            entity.get("trackCount") or entity.get("totalTracks")
-        ),
+        track_count=count,
+        duration_ms=duration,
+        artist_url=artist_link,
+        album_url=spotify_entity_url(entity.get("albumUri"), "album"),
         thumbnail_url=_spotify_thumbnail(entity),
     )
 
@@ -366,10 +439,10 @@ def _spotify_artist(entity: Mapping[str, object]) -> str:
 
 
 def _spotify_thumbnail(entity: Mapping[str, object]) -> str | None:
-    for key in ("coverArt", "images"):
+    for key in ("coverArt", "images", "visualIdentity"):
         images = entity.get(key)
         if isinstance(images, Mapping):
-            images = images.get("sources") or images.get("items")
+            images = images.get("sources") or images.get("items") or images.get("image")
         if not isinstance(images, list):
             continue
         for image in images:
