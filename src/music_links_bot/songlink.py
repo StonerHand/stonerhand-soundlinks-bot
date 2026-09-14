@@ -9,9 +9,19 @@ import httpx
 
 from music_links_bot.cache import TTLCache
 from music_links_bot.constants import HTTP_HEADERS, PLATFORM_ALIASES
+from music_links_bot.deezer import (
+    DeezerClient,
+    DeezerLookupError,
+    is_deezer_release_url,
+)
 from music_links_bot.kvstore import KVStore
 from music_links_bot.metadata_cleaning import infer_release_format, positive_track_count
 from music_links_bot.models import TrackMatch
+from music_links_bot.public_release import (
+    PublicReleaseClient,
+    PublicReleaseError,
+    release_identity,
+)
 from music_links_bot.release_hubs import canonical_release_hub_url
 from music_links_bot.spotify import SpotifyClient, SpotifyLookupError
 from music_links_bot.url_utils import cache_key_for_url, is_platform_destination_url
@@ -46,6 +56,8 @@ class SonglinkClient:
         self._kv = kv
         self._spotify_client = spotify_client or SpotifyClient(timeout=timeout)
         self._owns_spotify_client = spotify_client is None
+        self._deezer_client = DeezerClient(timeout=timeout)
+        self._public_release_client = PublicReleaseClient(timeout=timeout)
         self._client = httpx.AsyncClient(
             base_url="https://api.song.link/v1-alpha.1",
             headers=HTTP_HEADERS,
@@ -66,6 +78,8 @@ class SonglinkClient:
             await asyncio.gather(*pending, return_exceptions=True)
         self._inflight.clear()
         await self._client.aclose()
+        await self._deezer_client.aclose()
+        await self._public_release_client.aclose()
         if self._owns_spotify_client:
             await self._spotify_client.aclose()
 
@@ -96,6 +110,13 @@ class SonglinkClient:
     async def lookup_release_metadata(self, source_url: str) -> TrackMatch:
         return await self._spotify_client.lookup_release(source_url)
 
+    async def _lookup_provider_release(self, source_url: str) -> TrackMatch:
+        if is_deezer_release_url(source_url):
+            return await self._deezer_client.lookup_release(source_url)
+        if release_identity(source_url):
+            return await self._public_release_client.lookup_release(source_url)
+        return await self._spotify_client.lookup_release(source_url)
+
     def _finish_inflight(self, cache_key: str, task: asyncio.Task[TrackMatch]) -> None:
         """Forget completed single-flight tasks even if their waiter timed out."""
         if self._inflight.get(cache_key) is task:
@@ -118,8 +139,8 @@ class SonglinkClient:
         # directly to the verified Spotify/provider-specific fallback chain.
         if not self._api_key:
             try:
-                match = await self._spotify_client.lookup_release(source_url)
-            except SpotifyLookupError as exc:
+                match = await self._lookup_provider_release(source_url)
+            except (SpotifyLookupError, DeezerLookupError, PublicReleaseError) as exc:
                 raise SonglinkLookupError(
                     "Song.link legacy API is not configured for this URL."
                 ) from exc
@@ -187,8 +208,8 @@ class SonglinkClient:
                 None,
             )
             try:
-                match = await self._spotify_client.lookup_release(source_url)
-            except SpotifyLookupError as exc:
+                match = await self._lookup_provider_release(source_url)
+            except (SpotifyLookupError, DeezerLookupError, PublicReleaseError) as exc:
                 raise (
                     service_error
                     or lookup_error

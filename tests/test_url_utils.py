@@ -361,8 +361,10 @@ class UrlUtilsTests(unittest.TestCase):
         self.assertTrue(is_youtube_video_url("https://youtube.com/shorts/abc"))
         self.assertTrue(is_youtube_video_url("https://m.youtube.com/live/abc"))
 
-    def test_is_youtube_video_url_ignores_music_and_non_video_links(self) -> None:
-        self.assertFalse(is_youtube_video_url("https://music.youtube.com/watch?v=abc"))
+    def test_youtube_music_uses_youtube_metadata_but_non_video_links_are_ignored(
+        self,
+    ) -> None:
+        self.assertTrue(is_youtube_video_url("https://music.youtube.com/watch?v=abc"))
         self.assertFalse(is_youtube_video_url("https://www.youtube.com/@channel"))
         self.assertFalse(is_youtube_video_url("https://example.com/watch?v=abc"))
 

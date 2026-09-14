@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from html.parser import HTMLParser
 from urllib.parse import urlparse
 
 from telegram import InlineKeyboardMarkup
@@ -10,10 +11,12 @@ from music_links_bot.constants import PLATFORM_LABELS
 from music_links_bot.i18n import STRINGS
 from music_links_bot.publication_budget import visible_length
 from music_links_bot.release_hubs import is_universal_release_url
+from music_links_bot.release_metadata import metadata_url
 from music_links_bot.url_utils import (
     extract_supported_urls,
     is_direct_platform_url,
     is_platform_destination_url,
+    is_supported_music_url,
 )
 
 MAX_INLINE_BUTTONS = 100
@@ -112,7 +115,7 @@ def validate_rendered_publication(
             )
         )
 
-    leaked_urls = extract_supported_urls(text)
+    leaked_urls = _source_urls_in_html(text)
     if leaked_urls:
         issues.append(
             ContractIssue(
@@ -158,6 +161,33 @@ def validate_rendered_publication(
 
     issues.extend(_keyboard_issues(publication.keyboard))
     return ContractResult(tuple(issues))
+
+
+class _PublicationTextParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.visible: list[str] = []
+        self.source_links: list[str] = []
+
+    def handle_data(self, data: str) -> None:
+        self.visible.append(data)
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag == "a":
+            href = dict(attrs).get("href") or ""
+            # Album/artist navigation is intentional card metadata. Raw source
+            # links in user notes still belong in the keyboard, not the caption.
+            if is_supported_music_url(href) and not (
+                metadata_url(href, "album") or metadata_url(href, "artist")
+            ):
+                self.source_links.append(href)
+
+
+def _source_urls_in_html(text: str) -> list[str]:
+    parser = _PublicationTextParser()
+    parser.feed(text)
+    parser.close()
+    return extract_supported_urls("".join(parser.visible)) + parser.source_links
 
 
 def require_valid_publication(

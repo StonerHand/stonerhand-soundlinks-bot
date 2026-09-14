@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from urllib.parse import urlparse, urlunparse
 
 import httpx
 
@@ -34,9 +35,15 @@ class YouTubeClient:
             return cached_video
 
         try:
+            parsed = urlparse(source_url)
+            metadata_url = (
+                urlunparse(parsed._replace(netloc="www.youtube.com"))
+                if parsed.hostname == "music.youtube.com"
+                else source_url
+            )
             response = await self._client.get(
                 "/oembed",
-                params={"url": source_url, "format": "json"},
+                params={"url": metadata_url, "format": "json"},
             )
             response.raise_for_status()
         except httpx.HTTPError as exc:

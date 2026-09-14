@@ -13,6 +13,7 @@ SUPPORTED_INPUT_HOSTS = {
     "youtu.be",
     "music.youtube.com",
     "deezer.com",
+    "deezer.page.link",
     "www.deezer.com",
     "tidal.com",
     "listen.tidal.com",
@@ -42,6 +43,7 @@ PLATFORM_LABELS = {
     "youtubeMusic": "YouTube Music",
     "soundcloud": "SoundCloud",
     "deezer": "Deezer",
+    "bandcamp": "Bandcamp",
     "tidal": "Tidal",
     "yandexMusic": "Yandex Music",
 }
@@ -64,6 +66,7 @@ PLATFORM_ALIASES = {
     "youtubeMusic": ("youtubeMusic", "youtube"),
     "soundcloud": ("soundcloud",),
     "deezer": ("deezer",),
+    "bandcamp": ("bandcamp",),
     "tidal": ("tidal",),
     "yandexMusic": ("yandexMusic", "yandex"),
 }

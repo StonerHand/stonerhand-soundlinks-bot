@@ -45,6 +45,7 @@ PLATFORM_BUTTON_ICONS = {
     "youtubeMusic": "🔴",
     "soundcloud": "🟠",
     "deezer": "🟣",
+    "bandcamp": "🔵",
     "tidal": "⚫",
     "yandexMusic": "🟡",
 }
@@ -57,6 +58,7 @@ DEFAULT_PLATFORM_ORDER = (
     "deezer",
     "tidal",
     "yandexMusic",
+    "bandcamp",
 )
 PRIMARY_PLATFORM_ALIASES = {
     "spotify": "spotify",
@@ -71,6 +73,7 @@ PRIMARY_PLATFORM_ALIASES = {
     "soundcloud": "soundcloud",
     "sc": "soundcloud",
     "deezer": "deezer",
+    "bandcamp": "bandcamp",
     "tidal": "tidal",
     "yandex": "yandexMusic",
     "yandexmusic": "yandexMusic",

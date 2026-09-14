@@ -33,6 +33,7 @@ PLATFORM_DESTINATION_HOSTS = {
         {"soundcloud.com", "m.soundcloud.com", "on.soundcloud.com"}
     ),
     "deezer": frozenset({"deezer.com"}),
+    "bandcamp": frozenset({"bandcamp.com"}),
     "tidal": frozenset({"tidal.com", "listen.tidal.com"}),
     "yandexMusic": frozenset({"music.yandex.ru", "music.yandex.com"}),
 }
@@ -182,7 +183,11 @@ def is_platform_destination_url(platform_key: object, value: object) -> bool:
         and not parsed.username
         and not parsed.password
         and port in {None, 443}
-        and normalize_host(parsed.hostname) in allowed_hosts
+        and (
+            normalize_host(parsed.hostname) in allowed_hosts
+            or canonical_platform_key(platform_key) == "bandcamp"
+            and normalize_host(parsed.hostname).endswith(".bandcamp.com")
+        )
     )
 
 
@@ -339,13 +344,10 @@ def is_youtube_video_url(url: str) -> bool:
     if parsed is None:
         return False
     normalized_host = normalize_host(parsed.hostname)
-    if normalized_host == YOUTUBE_MUSIC_HOST:
-        return False
-
     if normalized_host == "youtu.be":
         return bool([part for part in parsed.path.split("/") if part])
 
-    if normalized_host not in {"youtube.com", "m.youtube.com"}:
+    if normalized_host not in {"youtube.com", "m.youtube.com", YOUTUBE_MUSIC_HOST}:
         return False
 
     parts = [part.lower() for part in parsed.path.split("/") if part]

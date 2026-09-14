@@ -53,6 +53,10 @@ replace or annotate it.
 
 ### New in 1.20
 
+- 1.20.2 fixes card delivery and inline results containing linked metadata, and
+  adds direct provider fallback for Deezer, Tidal, Bandcamp and YouTube Music.
+  Yandex Music availability depends on the server region; explicit regional
+  refusals are reported separately by the provider checks.
 - In 1.20.1, new music cards default to clean artwork, with verified album/artist
   links and duration when available. Saved preview choices and existing drafts
   remain unchanged. Video, radio and playlist captions share consistent formatting.
