@@ -172,6 +172,19 @@ def prepare_publication_draft(value: object) -> PreparedPublicationDraft | None:
     normalized = normalize_track_draft(candidate)
     if normalized is None:
         return None
+    # Older cover drafts used a provider link preview. Use the same photo
+    # delivery for saved drafts and scheduled posts as for new cover cards.
+    if (
+        candidate.get("preset") == "cover"
+        and normalized.get("publication_mode") != "longread"
+        and not normalized.get("collection_items")
+        and normalized["item"].get("kind", "song") in {"song", "album"}
+        and (
+            normalized.get("custom_cover_file_id")
+            or normalized["item"].get("thumbnail_url")
+        )
+    ):
+        normalized["as_photo"] = True
     try:
         track = TrackMatch(**normalized["item"])
     except (KeyError, TypeError, ValueError):

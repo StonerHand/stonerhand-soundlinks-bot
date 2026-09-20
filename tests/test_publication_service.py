@@ -4,11 +4,53 @@ from unittest.mock import AsyncMock, Mock, patch
 
 from telegram.error import BadRequest
 
+from music_links_bot.draft_model import prepare_publication_draft
 from music_links_bot.models import TrackMatch
 from music_links_bot.publication_service import PublicationService
 
 
 class PublicationServiceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_saved_cover_publication_uses_branded_photo_without_details(self):
+        bot = SimpleNamespace(send_photo=AsyncMock(return_value=SimpleNamespace()))
+        context = SimpleNamespace(application=SimpleNamespace(bot_data={}), bot=bot)
+        brand = AsyncMock(return_value=b"branded-cover")
+        service = PublicationService(
+            context,
+            channel_username="stonerhand",
+            branding_hooks=(lambda: True, brand, lambda value: value, lambda: None),
+        )
+        draft = {
+            "item": {
+                "artist": "Castle Rat",
+                "title": "SIREN",
+                "kind": "song",
+                "links": {"spotify": "https://open.spotify.com/track/abc"},
+                "thumbnail_url": "https://img.example/cover.jpg",
+            },
+            "preset": "cover",
+            "as_photo": False,
+        }
+        for target, channel_style in ((7, False), ("@stonerhand", True)):
+            with self.subTest(target=target):
+                result = await service._send(
+                    prepare_publication_draft(draft).data,
+                    TrackMatch(**draft["item"]),
+                    target=target,
+                    channel_style=channel_style,
+                )
+                self.assertIsNotNone(result)
+                payload = bot.send_photo.await_args.kwargs
+                self.assertEqual(payload["photo"], b"branded-cover")
+                self.assertIn("SIREN", payload["caption"])
+                self.assertTrue(
+                    all(
+                        button.url and not button.callback_data
+                        for row in payload["reply_markup"].inline_keyboard
+                        for button in row
+                    )
+                )
+        self.assertEqual(brand.await_args.kwargs["label"], "@stonerhand")
+
     async def test_clean_preview_uses_delivery_pipeline_without_side_effects(
         self,
     ) -> None:

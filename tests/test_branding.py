@@ -25,8 +25,10 @@ def _png_bytes(color=(80, 60, 90), size=(300, 300)) -> bytes:
 class BrandingTests(unittest.TestCase):
     def test_toggle_and_label_from_env(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
-            self.assertFalse(photo_branding_enabled())
+            self.assertTrue(photo_branding_enabled())
             self.assertEqual(brand_label("@stonerhand"), "@stonerhand")
+        with patch.dict(os.environ, {"BRAND_PHOTO_FRAME": "0"}):
+            self.assertFalse(photo_branding_enabled())
         with patch.dict(
             os.environ, {"BRAND_PHOTO_FRAME": "1", "BRAND_LABEL": "My Channel"}
         ):

@@ -72,4 +72,11 @@ def apply_preset(draft: dict, value: object) -> str:
     preset = normalize_preset(value, draft)
     draft["preset"] = preset
     draft.update(PRESET_PROFILES[preset])
+    if preset == "cover":
+        item = draft.get("item") or {}
+        draft["as_photo"] = bool(
+            item.get("kind", "song") in {"song", "album"}
+            and (draft.get("custom_cover_file_id") or item.get("thumbnail_url"))
+            and not draft.get("collection_items")
+        )
     return preset

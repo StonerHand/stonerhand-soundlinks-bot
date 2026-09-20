@@ -639,10 +639,8 @@ async def _build_inline_result(
         share_query=share_query,
         label=share_label,
     )
-    from music_links_bot.release_panel import add_release_panel
     from music_links_bot.release_preferences import use_clean_artwork
 
-    keyboard = await add_release_panel(keyboard, context, track, inline=True, lang=lang)
     return _inline_article(
         source_url,
         title=f"{track.artist} — {track.title}",

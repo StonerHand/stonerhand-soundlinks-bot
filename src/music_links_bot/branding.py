@@ -30,7 +30,7 @@ BRANDING_FETCH_SECONDS = 8.0
 
 
 def photo_branding_enabled() -> bool:
-    return os.getenv("BRAND_PHOTO_FRAME", "").strip().casefold() in _TRUE
+    return os.getenv("BRAND_PHOTO_FRAME", "1").strip().casefold() in _TRUE
 
 
 def brand_label(default: str) -> str:

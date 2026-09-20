@@ -33,6 +33,18 @@ class ReleasePresentationTests(unittest.TestCase):
         self.assertFalse(draft["as_photo"])
         self.assertEqual(draft["publication_mode"], "longread")
 
+    def test_cover_preset_sends_music_artwork_as_photo(self) -> None:
+        for kind, expected in (("song", True), ("album", True), ("video", False)):
+            with self.subTest(kind=kind):
+                draft = {
+                    "item": {
+                        "kind": kind,
+                        "thumbnail_url": "https://img.example/cover.jpg",
+                    }
+                }
+                apply_preset(draft, "cover")
+                self.assertEqual(draft["as_photo"], expected)
+
     def test_compact_release_title_preserves_trailing_remaster_metadata(self) -> None:
         self.assertEqual(
             compact_release_title("There's No Other Way - 2012 Remaster"),
