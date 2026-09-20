@@ -1,11 +1,16 @@
 import json
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 from urllib.parse import urlencode
 
 import httpx
 import pytest
-from test_bot import ContextStub, PrivateMessageStub, UpdateStub
+from test_bot import (
+    ContextStub,
+    PrivateMessageStub,
+    ReplaceableChannelMessageStub,
+    UpdateStub,
+)
 from test_card_details import run_async
 from test_release_card import sample
 
@@ -27,6 +32,54 @@ from music_links_bot.publication_contract import (
 from music_links_bot.publication_service import PublicationService
 from music_links_bot.songlink import SonglinkClient
 from music_links_bot.youtube import YouTubeClient
+
+
+@run_async
+@pytest.mark.parametrize("delivery_fails", [False, True])
+async def test_direct_channel_link_uses_branded_photo_and_preserves_source_on_failure(
+    delivery_fails,
+):
+    source = "https://open.spotify.com/track/102"
+    track = sample(title="Samhain", artist="Froglord", links={"spotify": source})
+    context = ContextStub(
+        songlink_client=SimpleNamespace(lookup_track=AsyncMock(return_value=track))
+    )
+    message = ReplaceableChannelMessageStub()
+    message.text = "тест\n" + source
+
+    async def send_photo(**kwargs):
+        assert not message.deleted
+        if delivery_fails:
+            raise TimeoutError("Delivery outcome unknown")
+        return SimpleNamespace(message_id=123)
+
+    context.bot.send_photo = AsyncMock(side_effect=send_photo)
+    context.bot.get_chat_member = AsyncMock(
+        return_value=SimpleNamespace(
+            status="administrator", can_post_messages=True, can_delete_messages=True
+        )
+    )
+    with (
+        patch("music_links_bot.branding.photo_branding_enabled", return_value=True),
+        patch(
+            "music_links_bot.branding.build_branded_cover",
+            new=AsyncMock(return_value=b"BRANDED"),
+        ) as brand,
+    ):
+        await track_lookup_message(UpdateStub(message), context)
+
+    context.bot.send_photo.assert_awaited_once()
+    payload = context.bot.send_photo.await_args.kwargs
+    assert payload["photo"] == b"BRANDED"
+    assert "Samhain" in payload["caption"] and "тест" in payload["caption"]
+    assert brand.await_args.kwargs["label"] == "@stonerhand"
+    assert all(
+        button.url and not button.callback_data
+        for row in payload["reply_markup"].inline_keyboard
+        for button in row
+    )
+    assert message.deleted is not delivery_fails
+    assert not context.bot.sent_messages
 
 
 @pytest.mark.parametrize("platform", ["spotify", "appleMusic"])

@@ -2320,6 +2320,18 @@ async def _send_track_matches(
             user_id=user_id,
             search_query=search_query,
         )
+    elif message.chat.type == "channel":
+        # A link posted directly in a channel must use the same publication
+        # pipeline as an editor card (photo, branding, caption and buttons).
+        draft = new_track_draft(
+            track, chat_id=message.chat_id, lang=lang, prefix=user_prefix
+        )
+        draft["hashtags"] = include_hashtags
+        sent = await PublicationService(
+            context, channel_username=CHANNEL_USERNAME
+        ).preview(draft, target=message.chat_id)
+        if sent is not None and sent is not False:
+            await _try_delete_message(message)
     else:
         keyboard = _build_link_keyboard(
             track.links,
