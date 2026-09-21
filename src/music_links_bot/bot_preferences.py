@@ -29,20 +29,35 @@ class LocalizedApplication(Application):
     __slots__ = ()
 
     async def process_update(self, update: object) -> None:
+        from music_links_bot.user_state import user_state_scope
+
         with state_scope(), language_context(None), presentation_context():
             runtime = self.bot_data.get("runtime")
             user = update.effective_user if isinstance(update, Update) else None
-            if user is not None and isinstance(runtime, BotRuntime):
-                try:
-                    session = await runtime.get_session(
-                        user.id, lang=resolve_lang(user.language_code)
-                    )
-                except KVUnavailableError as exc:
-                    await self.process_error(update, error=exc)
-                    return
-                preferred_language.set(session.preferred_lang or None)
-                current_presentation.set(preferences_from_session(session))
-            await super().process_update(update)
+            try:
+                async with user_state_scope(
+                    self.bot_data.get("kv_store"), user.id if user else 0
+                ):
+                    if user is not None and isinstance(runtime, BotRuntime):
+                        session = await runtime.get_session(
+                            user.id, lang=resolve_lang(user.language_code)
+                        )
+                        preferred_language.set(session.preferred_lang or None)
+                        current_presentation.set(preferences_from_session(session))
+                    await super().process_update(update)
+            except KVUnavailableError as exc:
+                await self.process_error(update, error=exc)
+
+    async def process_error(self, update, error, job=None, coroutine=None):
+        from music_links_bot.state_mutations import StateConflictError
+        from music_links_bot.update_execution import current_execution
+
+        execution = current_execution.get()
+        if execution is not None and not isinstance(error, StateConflictError):
+            execution.error = error
+        return await super().process_error(
+            update, error=error, job=job, coroutine=coroutine
+        )
 
 
 def apply_preferences(draft: dict, session: UserSession) -> None:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import secrets
 import sys
 import threading
 import time
@@ -23,12 +24,14 @@ from music_links_bot.bot_app import (
     close_application_resources,
 )
 from music_links_bot.config import Settings
+from music_links_bot.kvstore import KVUnavailableError
 from music_links_bot.logging_config import quiet_transport_logs
 from music_links_bot.loop_runner import (
     run_on_loop,
     start_background_loop,
     stop_background_loop,
 )
+from music_links_bot.update_execution import UpdateExecution, current_execution
 from music_links_bot.webhook_secret import secrets_match
 
 LOGGER = logging.getLogger(__name__)
@@ -57,9 +60,15 @@ _FAILURE_LOCK = threading.Lock()
 # Telegram re-sends an update if it doesn't get a prompt 200, so identical
 # update_ids are ignored to avoid double replies / double publishes.
 UPDATE_DEDUP_TTL_SECONDS = 600
+DELIVERED_UPDATE_TTL_SECONDS = 7 * 86400
 _SEEN_UPDATE_IDS: OrderedDict[int, float] = OrderedDict()
 _SEEN_UPDATE_MAX = 1024
 _SEEN_UPDATE_LOCK = threading.Lock()
+_UPDATE_STATES: dict[int, str] = {}
+
+
+class UpdateBusyError(RuntimeError):
+    """A duplicate is still being processed; it must not be acknowledged."""
 
 
 class handler(BaseHTTPRequestHandler):
@@ -144,53 +153,126 @@ def _process_claimed_update(
     loop, application, update_payload: dict[str, object]
 ) -> None:
     update_id = update_payload.get("update_id")
+    owner = "processing:" + secrets.token_hex(12)
     if isinstance(update_id, int) and not run_on_loop(
-        loop, _claim_update(application, update_id), timeout=5
+        loop, _claim_update(application, update_id, owner=owner), timeout=5
     ):
-        LOGGER.info("Skipping duplicate Telegram update %s", update_id)
+        state = run_on_loop(loop, _update_state(application, update_id), timeout=5)
+        if state not in {"done", "uncertain", "1"} and not str(state).startswith(
+            "delivering:"
+        ):
+            raise UpdateBusyError("Update is still processing")
+        LOGGER.info("Skipping completed Telegram update %s", update_id)
         return
 
     started = time.monotonic()
+    execution = UpdateExecution()
+    claim_state = owner
+    delivery_lock = asyncio.Lock()
+
+    async def protect_delivery():
+        nonlocal claim_state
+        async with delivery_lock:
+            if claim_state.startswith("delivering:") or not isinstance(update_id, int):
+                return
+            delivering = "delivering:" + owner
+            await _finish_update(application, update_id, claim_state, delivering)
+            claim_state = delivering
+
+    execution.before_send = protect_delivery
     try:
         update = Update.de_json(update_payload, application.bot)
         run_on_loop(
             loop,
-            application.process_update(update),
+            _dispatch_update(application, update, execution),
             timeout=PROCESS_TIMEOUT_SECONDS,
         )
+        if execution.error is not None:
+            raise execution.error
     except Exception as exc:
         if isinstance(update_id, int):
-            try:
-                run_on_loop(loop, _release_update(application, update_id), timeout=5)
-            except Exception:
-                LOGGER.debug("Could not release update claim", exc_info=True)
+            if execution.deliveries:
+                # A reply/post may have reached Telegram. Quarantine the update
+                # instead of replaying its handler and creating another message.
+                run_on_loop(
+                    loop,
+                    _finish_update(application, update_id, claim_state, "uncertain"),
+                    timeout=5,
+                )
+                _note_failure_locked(exc)
+                LOGGER.exception(
+                    "Update %s failed after delivery started; automatic replay stopped",
+                    update_id,
+                )
+                return
+            run_on_loop(
+                loop,
+                _release_update(application, update_id, owner=claim_state),
+                timeout=5,
+            )
         _note_failure_locked(exc)
         raise
-
+    if isinstance(update_id, int):
+        run_on_loop(
+            loop, _finish_update(application, update_id, claim_state, "done"), timeout=5
+        )
     _note_success_locked()
     LOGGER.info(
         "update=%s processed in %.0fms", update_id, (time.monotonic() - started) * 1000
     )
 
 
-async def _claim_update(application, update_id: int) -> bool:
-    """Reserve an update_id so a Telegram retry of the same update is skipped.
-    Returns False when it was already claimed."""
+async def _dispatch_update(application, update, execution):
+    token = current_execution.set(execution)
+    try:
+        processor = getattr(application, "update_processor", None)
+        if processor is None:
+            await application.process_update(update)
+        else:
+            await processor.process_update(update, application.process_update(update))
+    finally:
+        current_execution.reset(token)
+
+
+async def _claim_update(application, update_id: int, *, owner="1") -> bool:
     kv = application.bot_data.get("kv_store")
     if kv is not None:
-        key = f"seen_update:{update_id}"
-        if await kv.set(key, "1", ttl_seconds=UPDATE_DEDUP_TTL_SECONDS, nx=True):
+        setter = getattr(kv, "set_required", None) or kv.set
+        if await setter(
+            f"seen_update:{update_id}",
+            owner,
+            ttl_seconds=UPDATE_DEDUP_TTL_SECONDS,
+            nx=True,
+        ):
             return True
-        # KVStore deliberately swallows transport errors. Distinguish a real
-        # duplicate from an unavailable Redis instance so an outage cannot
-        # make the webhook acknowledge and silently discard every update.
-        if await kv.get(key) is not None:
+        if await kv.get(f"seen_update:{update_id}") is not None:
             return False
-        LOGGER.warning(
-            "Redis update deduplication unavailable; using warm-instance fallback"
-        )
+        raise KVUnavailableError("Cannot claim update without shared deduplication")
+    claimed = _claim_update_in_memory(update_id)
+    if claimed:
+        _UPDATE_STATES[update_id] = owner
+    return claimed
 
-    return _claim_update_in_memory(update_id)
+
+async def _update_state(application, update_id):
+    kv = application.bot_data.get("kv_store")
+    if kv is not None:
+        return await kv.get(f"seen_update:{update_id}")
+    return _UPDATE_STATES.get(update_id)
+
+
+async def _finish_update(application, update_id, owner, state):
+    kv = application.bot_data.get("kv_store")
+    if kv is not None:
+        if not await kv.compare_set_required(
+            f"seen_update:{update_id}",
+            owner,
+            state,
+            ttl_seconds=DELIVERED_UPDATE_TTL_SECONDS,
+        ):
+            raise KVUnavailableError("Update claim changed before completion")
+    elif _UPDATE_STATES.get(update_id) == owner:
+        _UPDATE_STATES[update_id] = state
 
 
 def _claim_update_in_memory(update_id: int, *, now: float | None = None) -> bool:
@@ -201,22 +283,28 @@ def _claim_update_in_memory(update_id: int, *, now: float | None = None) -> bool
             _oldest_id, oldest_at = next(iter(_SEEN_UPDATE_IDS.items()))
             if oldest_at > cutoff:
                 break
-            _SEEN_UPDATE_IDS.popitem(last=False)
+            expired, _ = _SEEN_UPDATE_IDS.popitem(last=False)
+            _UPDATE_STATES.pop(expired, None)
 
         if update_id in _SEEN_UPDATE_IDS:
             return False
         _SEEN_UPDATE_IDS[update_id] = claimed_at
         while len(_SEEN_UPDATE_IDS) > _SEEN_UPDATE_MAX:
-            _SEEN_UPDATE_IDS.popitem(last=False)
+            expired, _ = _SEEN_UPDATE_IDS.popitem(last=False)
+            _UPDATE_STATES.pop(expired, None)
         return True
 
 
-async def _release_update(application, update_id: int) -> None:
+async def _release_update(application, update_id: int, *, owner=None) -> None:
     kv = application.bot_data.get("kv_store")
     if kv is not None:
-        await kv.delete(f"seen_update:{update_id}")
+        if owner is not None:
+            await kv.delete_if_value(f"seen_update:{update_id}", owner)
+        else:
+            await kv.delete(f"seen_update:{update_id}")
     with _SEEN_UPDATE_LOCK:
         _SEEN_UPDATE_IDS.pop(update_id, None)
+        _UPDATE_STATES.pop(update_id, None)
 
 
 def _note_success_locked() -> None:
@@ -257,7 +345,7 @@ def _alert_crash_safely(exc: Exception) -> None:
 
         send_admin_alert(
             f"Webhook update crashed: {type(exc).__name__}. "
-            "Telegram will retry the update; check the Vercel logs.",
+            "Check the logs: safe failures retry; ambiguous deliveries require review.",
             dedup_key="webhook-crash",
         )
     except Exception:

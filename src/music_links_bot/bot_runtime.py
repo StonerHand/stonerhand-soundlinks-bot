@@ -892,6 +892,7 @@ class BotRuntime:
             if cache_requests
             else 0.0
         )
+        snapshot["metrics_scope"] = "instance"
         snapshot["updated_at"] = int(time())
         snapshot["providers"] = {
             item["provider"]: {

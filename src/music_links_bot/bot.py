@@ -2306,7 +2306,7 @@ async def _send_track_matches(
             source_urls=collection_sources,
             content_kind="collection",
         )
-        _record_matches_safely(tracks, message, context=context)
+        await _record_matches_safely(tracks, message, context=context)
         return
 
     track = tracks[0]
@@ -2368,7 +2368,7 @@ async def _send_track_matches(
             source_urls=tuple(track.links.values()),
             content_kind=track.kind,
         )
-    _record_matches_safely([track], message, context=context)
+    await _record_matches_safely([track], message, context=context)
 
 
 async def _consume_pending_input(
@@ -2756,7 +2756,7 @@ async def _deliver_lookup_bundle(
             allow_share=not partial,
             **common,
         )
-        _record_videos_safely(bundle.videos, message, context=context)
+        await _record_videos_safely(bundle.videos, message, context=context)
     elif kind == "radios":
         await _send_nts_result(
             context.bot,
@@ -2766,7 +2766,7 @@ async def _deliver_lookup_bundle(
             allow_share=not partial,
             **common,
         )
-        _record_radios_safely(bundle.radios, message, context=context)
+        await _record_radios_safely(bundle.radios, message, context=context)
     elif kind == "playlists":
         import_id = None
         if (
@@ -2788,7 +2788,7 @@ async def _deliver_lookup_bundle(
             import_id=import_id,
             **common,
         )
-        _record_playlists_safely(bundle.playlists, message, context=context)
+        await _record_playlists_safely(bundle.playlists, message, context=context)
     elif kind == "artists":
         await _send_artist_result(
             context.bot,
@@ -2798,7 +2798,7 @@ async def _deliver_lookup_bundle(
             allow_share=not partial,
             **common,
         )
-        _record_artists_safely(bundle.artists, message, context=context)
+        await _record_artists_safely(bundle.artists, message, context=context)
     elif kind == "mixed":
         await _send_mixed_result(
             context.bot,
@@ -2813,7 +2813,7 @@ async def _deliver_lookup_bundle(
             allow_share=not partial,
             **common,
         )
-        _record_mixed_safely(
+        await _record_mixed_safely(
             bundle.tracks,
             bundle.videos,
             bundle.radios,
