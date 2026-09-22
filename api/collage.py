@@ -23,6 +23,11 @@ from music_links_bot.collection_collage import (
     decode_collage_payload,
 )
 from music_links_bot.constants import HTTP_USER_AGENT
+from music_links_bot.cover_style import (
+    brand_label,
+    photo_branding_enabled,
+    signature_cache_key,
+)
 
 FETCH_TIMEOUT_SECONDS = 6
 _HTTP_CLIENT = httpx.Client(
@@ -52,7 +57,7 @@ class handler(BaseHTTPRequestHandler):
             self.send_error(HTTPStatus.FORBIDDEN)
             return
 
-        etag = f'"collage-{signature}"'
+        etag = f'"collage-{signature}-{signature_cache_key()}"'
         if self.headers.get("if-none-match") == etag:
             self.send_response(HTTPStatus.NOT_MODIFIED)
             self.send_header("etag", etag)
@@ -62,7 +67,9 @@ class handler(BaseHTTPRequestHandler):
 
         with ThreadPoolExecutor(max_workers=min(2, len(urls))) as executor:
             images = [image for image in executor.map(_fetch_artwork, urls) if image]
-        collage = compose_collection_collage(images)
+        collage = compose_collection_collage(
+            images, label=brand_label() if photo_branding_enabled() else None
+        )
         if collage is None:
             self.send_response(HTTPStatus.FOUND)
             self.send_header("location", urls[0])

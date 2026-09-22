@@ -11,6 +11,7 @@ import zlib
 from contextlib import ExitStack
 from urllib.parse import urlencode, urlparse
 
+from music_links_bot.cover_style import apply_cover_signature, signature_cache_key
 from music_links_bot.models import TrackMatch
 from music_links_bot.telegram_gateway import feature_enabled
 from music_links_bot.webhook_secret import secrets_match
@@ -64,7 +65,7 @@ def collection_collage_preview_url(
 
     payload = _encode_payload(artwork_urls)
     signature = _signature(payload, secret)
-    query = urlencode({"p": payload, "s": signature})
+    query = urlencode({"p": payload, "s": signature, "v": signature_cache_key()})
     preview_url = f"{public_origin}/api/collage?{query}"
     return preview_url if len(preview_url) <= MAX_PREVIEW_URL_LENGTH else None
 
@@ -124,6 +125,7 @@ def compose_collection_collage(
     *,
     size: int = 1_200,
     gap: int = 10,
+    label: str | None = None,
 ) -> bytes | None:
     """Compose downloaded artwork into a deterministic square JPEG."""
     try:
@@ -176,6 +178,11 @@ def compose_collection_collage(
                 ):
                     tile.paste(fitted, mask=mask)
                     canvas.paste(tile, (left, top))
+
+            if label is not None:
+                canvas = resources.enter_context(
+                    apply_cover_signature(canvas, label=label)
+                )
 
             output = io.BytesIO()
             canvas.save(output, "JPEG", quality=88, optimize=True)

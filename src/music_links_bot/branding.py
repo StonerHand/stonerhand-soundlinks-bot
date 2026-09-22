@@ -20,10 +20,14 @@ import httpx
 
 from music_links_bot.collection_collage import _safe_source_url
 from music_links_bot.constants import HTTP_USER_AGENT
+from music_links_bot.cover_style import (
+    apply_cover_signature,
+    brand_label as brand_label,
+    photo_branding_enabled as photo_branding_enabled,
+)
 
 LOGGER = logging.getLogger(__name__)
 
-_TRUE = {"1", "true", "yes", "on"}
 MAX_BRANDING_BYTES = 3 * 1024 * 1024
 MAX_BRANDING_PIXELS = 12_000_000
 MAX_COVER_SIZE = 1200
@@ -31,25 +35,8 @@ BRANDING_FETCH_SECONDS = 8.0
 _COMPOSE_LIMITS: WeakKeyDictionary = WeakKeyDictionary()
 
 
-def photo_branding_enabled() -> bool:
-    return os.getenv("BRAND_PHOTO_FRAME", "1").strip().casefold() in _TRUE
-
-
-def brand_label(default: str) -> str:
-    return os.getenv("BRAND_LABEL", "").strip() or default
-
-
 def brand_logo_url() -> str | None:
     return os.getenv("BRAND_LOGO_URL", "").strip() or None
-
-
-def _font(size: int):
-    from PIL import ImageFont
-
-    try:
-        return ImageFont.load_default(size=size)
-    except TypeError:  # Pillow < 10.1 — no scalable default
-        return ImageFont.load_default()
 
 
 def _square(img, target: int):
@@ -73,7 +60,7 @@ def compose_cover(
 ) -> bytes | None:
     """Pure-image compositing (no network) so it is easy to test."""
     try:
-        from PIL import Image, ImageDraw
+        from PIL import Image
     except ImportError:
         return None
 
@@ -88,30 +75,7 @@ def compose_cover(
             rgb = resources.enter_context(source.convert("RGB"))
             base = resources.enter_context(_square(rgb, size))
             width, height = base.size
-            overlay = resources.enter_context(
-                Image.new("RGBA", (width, height), (0, 0, 0, 0))
-            )
-            draw = ImageDraw.Draw(overlay)
-            bar_height = int(height * 0.18)
-            for row in range(bar_height):
-                alpha = int(190 * (row / bar_height))
-                draw.line(
-                    [
-                        (0, height - bar_height + row),
-                        (width, height - bar_height + row),
-                    ],
-                    fill=(0, 0, 0, alpha),
-                )
-            if label:
-                draw.text(
-                    (int(width * 0.05), height - int(bar_height * 0.60)),
-                    label[:160],
-                    font=_font(max(1, int(height * 0.05))),
-                    fill=(255, 255, 255, 235),
-                )
-            rgba = resources.enter_context(base.convert("RGBA"))
-            composite = resources.enter_context(Image.alpha_composite(rgba, overlay))
-            composed = resources.enter_context(composite.convert("RGB"))
+            composed = resources.enter_context(apply_cover_signature(base, label=label))
             if logo_bytes and len(logo_bytes) <= MAX_BRANDING_BYTES:
                 try:
                     with Image.open(io.BytesIO(logo_bytes)) as logo_source:
