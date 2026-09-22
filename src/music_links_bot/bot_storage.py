@@ -9,6 +9,7 @@ from music_links_bot.draft_model import normalize_track_draft
 from music_links_bot.durable_state import delete_value, read_json
 from music_links_bot.kvstore import KVStore
 from music_links_bot.state_mutations import StateConflictError, mutate_json
+from music_links_bot.user_state import register_owned_key
 
 DRAFT_TTL_SECONDS = 7 * 24 * 3600
 SAVED_DRAFT_TTL_SECONDS = 90 * 24 * 3600
@@ -62,6 +63,9 @@ async def store_draft(context, draft_id: str, draft: dict) -> None:
         return {**draft, "revision": revision + 1}
 
     if kv is not None:
+        await register_owned_key(
+            kv, draft.get("chat_id"), f"draft:{draft_id}", ttl_seconds=ttl
+        )
         draft = await mutate_json(kv, f"draft:{draft_id}", update, ttl_seconds=ttl)
     else:
         draft = update(context.application.bot_data.get("drafts", {}).get(draft_id))
@@ -126,7 +130,12 @@ async def store_search_selection(
     urls: list[str],
 ) -> str:
     selection_id = secrets.token_hex(5)
-    payload = {"user_id": user_id, "query": query, "urls": urls}
+    payload = {
+        "user_id": user_id,
+        "query": query,
+        "urls": urls,
+        "expires_at": int(time.time()) + SELECTION_TTL_SECONDS,
+    }
     selections: dict = context.application.bot_data.setdefault("search_selections", {})
     remember_bounded(
         selections,
@@ -136,6 +145,12 @@ async def store_search_selection(
     )
     kv: KVStore | None = context.application.bot_data.get("kv_store")
     if kv is not None:
+        await register_owned_key(
+            kv,
+            user_id,
+            f"selection:v1:{selection_id}",
+            ttl_seconds=SELECTION_TTL_SECONDS,
+        )
         await kv.set_json(
             f"selection:v1:{selection_id}",
             payload,
@@ -148,13 +163,15 @@ async def load_search_selection(context, selection_id: str) -> dict | None:
     if not valid_state_id(selection_id):
         return None
     selections: dict = context.application.bot_data.setdefault("search_selections", {})
-    payload = selections.get(selection_id)
-    if isinstance(payload, dict):
-        return payload
-
     kv: KVStore | None = context.application.bot_data.get("kv_store")
+    payload = selections.get(selection_id) if kv is None else None
+    if _transient_valid(payload):
+        return payload
+    selections.pop(selection_id, None)
     payload = await kv.get_json(f"selection:v1:{selection_id}") if kv else None
-    if isinstance(payload, dict):
+    if isinstance(payload, dict) and (
+        "expires_at" not in payload or _transient_valid(payload)
+    ):
         remember_bounded(
             selections,
             selection_id,
@@ -175,6 +192,7 @@ async def store_retry_sources(
     retry_id = secrets.token_hex(5)
     payload = {
         "user_id": int(user_id),
+        "expires_at": int(time.time()) + RETRY_TTL_SECONDS,
         "urls": [str(url) for url in urls if url][:10],
     }
     if completed:
@@ -188,6 +206,9 @@ async def store_retry_sources(
     )
     kv: KVStore | None = context.application.bot_data.get("kv_store")
     if kv is not None:
+        await register_owned_key(
+            kv, user_id, f"retry:v1:{retry_id}", ttl_seconds=RETRY_TTL_SECONDS
+        )
         await kv.set_json(
             f"retry:v1:{retry_id}",
             payload,
@@ -200,13 +221,15 @@ async def load_retry_sources(context, retry_id: str) -> dict | None:
     if not valid_state_id(retry_id):
         return None
     retries: dict = context.application.bot_data.setdefault("retry_sources", {})
-    payload = retries.get(retry_id)
-    if isinstance(payload, dict):
-        return payload
-
     kv: KVStore | None = context.application.bot_data.get("kv_store")
+    payload = retries.get(retry_id) if kv is None else None
+    if _transient_valid(payload):
+        return payload
+    retries.pop(retry_id, None)
     payload = await kv.get_json(f"retry:v1:{retry_id}") if kv else None
-    if isinstance(payload, dict):
+    if isinstance(payload, dict) and (
+        "expires_at" not in payload or _transient_valid(payload)
+    ):
         remember_bounded(
             retries,
             retry_id,
@@ -232,3 +255,11 @@ async def load_drafts(context, draft_ids: list[str]) -> list[dict | None]:
             draft["editor_draft_id"] = draft_id
         result.append(draft)
     return result
+
+
+def _transient_valid(payload):
+    return (
+        isinstance(payload, dict)
+        and isinstance(payload.get("expires_at"), (int, float))
+        and payload["expires_at"] > time.time()
+    )

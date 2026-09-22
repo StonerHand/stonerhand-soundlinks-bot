@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from telegram.error import TelegramError
+from telegram.error import BadRequest, Forbidden
 
 from music_links_bot.telegram_gateway import TelegramApiGateway, feature_enabled
 
@@ -33,9 +33,8 @@ async def send_ephemeral_message(
     timeout: float = 8.0,
 ) -> bool:
     """Reply in a group so only `receiver_user_id` sees it — Telegram's
-    "invisible messages". Called over raw HTTP so it works regardless of the
-    installed python-telegram-bot version; never raises and returns False when
-    the feature is unavailable, so callers can fall back to a public reply.
+    "invisible messages". Only definitive API rejections permit a public
+    fallback; ambiguous transport failures propagate without a duplicate send.
     """
     if not bot_token or not receiver_user_id:
         return False
@@ -54,6 +53,6 @@ async def send_ephemeral_message(
             link_preview_options=link_preview_options,
             reply_to_message_id=reply_to_message_id,
         )
-    except TelegramError:
+    except (BadRequest, Forbidden):
         LOGGER.debug("Ephemeral send failed", exc_info=True)
         return False

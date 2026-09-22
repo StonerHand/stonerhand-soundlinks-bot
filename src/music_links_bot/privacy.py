@@ -35,6 +35,12 @@ async def delete_user_data(context, user_id: int) -> DeletionResult:
         runtime = BotRuntime(bot_data.get("kv_store"))
         bot_data["runtime"] = runtime
 
+    from music_links_bot.durable_state import delete_value
+    from music_links_bot.user_state import invalidate_previous_requests, owned_keys
+
+    kv = bot_data.get("kv_store")
+    await invalidate_previous_requests(kv, user_id)
+    indexed_keys = await owned_keys(kv, user_id)
     session = await runtime.get_session(user_id)
     crate = await load_crate(bot_data, user_id)
     draft_ids = {
@@ -55,8 +61,23 @@ async def delete_user_data(context, user_id: int) -> DeletionResult:
         if isinstance(draft, dict) and int(draft.get("chat_id") or 0) == user_id:
             draft_ids.add(str(draft_id))
 
+    draft_ids.update(
+        key.removeprefix("draft:") for key in indexed_keys if key.startswith("draft:")
+    )
+    batch_delete = getattr(kv, "delete_many_required", None)
+    if batch_delete is not None:
+        await batch_delete(sorted(indexed_keys))
+    else:
+        for key in indexed_keys:
+            await delete_value(kv, key)
+    if kv is not None:
+        await delete_value(kv, f"user-keys:v1:{user_id}")
+
     for draft_id in draft_ids:
-        await delete_draft(context, draft_id)
+        if f"draft:{draft_id}" in indexed_keys:
+            bot_data.setdefault("drafts", {}).pop(draft_id, None)
+        else:
+            await delete_draft(context, draft_id)
 
     await asyncio.gather(
         clear_crate(bot_data, user_id),
@@ -102,6 +123,8 @@ async def delete_user_data(context, user_id: int) -> DeletionResult:
 
 
 async def _clear_transient_memory(context, user_id: int) -> None:
+    from music_links_bot.durable_state import delete_value
+
     bot_data = context.application.bot_data
     kv = bot_data.get("kv_store")
     for memory_key, redis_prefix in (
@@ -118,7 +141,7 @@ async def _clear_transient_memory(context, user_id: int) -> None:
         for state_id in owned:
             items.pop(state_id, None)
             if kv is not None:
-                await kv.delete(f"{redis_prefix}:{state_id}")
+                await delete_value(kv, f"{redis_prefix}:{state_id}")
 
 
 async def _remove_stats_identity(context, user_id: int) -> None:
@@ -127,14 +150,16 @@ async def _remove_stats_identity(context, user_id: int) -> None:
     kv = context.application.bot_data.get("kv_store")
     if kv is None:
         return
-    payload = await kv.get_json(STATS_KV_KEY)
-    if not isinstance(payload, dict):
-        return
-    changed = dict(payload)
-    for key in ("users", "chats"):
-        values = changed.get(key)
-        if isinstance(values, dict):
-            values = dict(values)
-            values.pop(str(user_id), None)
-            changed[key] = values
-    await kv.set_json(STATS_KV_KEY, changed)
+    from music_links_bot.state_mutations import mutate_json
+
+    def remove(payload):
+        changed = dict(payload) if isinstance(payload, dict) else {}
+        for key in ("users", "chats"):
+            values = changed.get(key)
+            if isinstance(values, dict):
+                values = dict(values)
+                values.pop(str(user_id), None)
+                changed[key] = values
+        return changed
+
+    await mutate_json(kv, STATS_KV_KEY, remove, ttl_seconds=10 * 365 * 86400)

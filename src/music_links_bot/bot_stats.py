@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import secrets
 from collections.abc import Callable
 from datetime import datetime, timezone
 
@@ -20,7 +21,7 @@ from music_links_bot.models import (
     VideoMatch,
 )
 from music_links_bot.stats import (
-    merge_stats,
+    STATS_PATH,
     record_artists,
     record_matches,
     record_mixed,
@@ -104,97 +105,107 @@ def build_user_prefix(message: Message, *, bot_username: str | None = None) -> s
     return prepend_user_html(body_html, author_label=author_label)
 
 
-def record_tracks(
+async def record_tracks(
     tracks: list[TrackMatch],
     message: Message,
     *,
     context: ContextTypes.DEFAULT_TYPE | None = None,
 ) -> None:
     if tracks:
-        _record(
+        await _record(
             "track",
             lambda: record_matches(
                 tracks,
+                path=_stats_path(context),
                 user=_user_entry(message),
                 chat=_chat_entry(message),
             ),
             context,
+            event_id=_event_id(message),
         )
 
 
-def record_video_items(
+async def record_video_items(
     videos: list[VideoMatch],
     message: Message,
     *,
     context: ContextTypes.DEFAULT_TYPE | None = None,
 ) -> None:
     if videos:
-        _record(
+        await _record(
             "video",
             lambda: record_videos(
                 videos,
+                path=_stats_path(context),
                 user=_user_entry(message),
                 chat=_chat_entry(message),
             ),
             context,
+            event_id=_event_id(message),
         )
 
 
-def record_radio_items(
+async def record_radio_items(
     radios: list[RadioMatch],
     message: Message,
     *,
     context: ContextTypes.DEFAULT_TYPE | None = None,
 ) -> None:
     if radios:
-        _record(
+        await _record(
             "radio",
             lambda: record_radios(
                 radios,
+                path=_stats_path(context),
                 user=_user_entry(message),
                 chat=_chat_entry(message),
             ),
             context,
+            event_id=_event_id(message),
         )
 
 
-def record_playlist_items(
+async def record_playlist_items(
     playlists: list[PlaylistMatch],
     message: Message,
     *,
     context: ContextTypes.DEFAULT_TYPE | None = None,
 ) -> None:
     if playlists:
-        _record(
+        await _record(
             "playlist",
             lambda: record_playlists(
                 playlists,
+                path=_stats_path(context),
                 user=_user_entry(message),
                 chat=_chat_entry(message),
             ),
             context,
+            event_id=_event_id(message),
         )
 
 
-def record_artist_items(
+async def record_artist_items(
     artists: list[ArtistMatch],
     message: Message,
     *,
     context: ContextTypes.DEFAULT_TYPE | None = None,
 ) -> None:
     if artists:
-        _record(
+        await _record(
             "artist",
             lambda: record_artists(
                 artists,
+                path=_stats_path(context),
                 user=_user_entry(message),
                 chat=_chat_entry(message),
             ),
             context,
+            event_id=_event_id(message),
         )
 
 
-def record_mixed_items(
+async def record_mixed_items(
     tracks: list[TrackMatch],
     videos: list[VideoMatch],
     radios: list[RadioMatch],
@@ -205,7 +216,7 @@ def record_mixed_items(
     context: ContextTypes.DEFAULT_TYPE | None = None,
 ) -> None:
     if any((tracks, videos, radios, playlists, artists)):
-        _record(
+        await _record(
             "mixed",
             lambda: record_mixed(
                 tracks,
@@ -213,20 +224,24 @@ def record_mixed_items(
                 playlists,
                 artists=artists,
                 radios=radios,
+                path=_stats_path(context),
                 user=_user_entry(message),
                 chat=_chat_entry(message),
             ),
             context,
+            event_id=_event_id(message),
         )
 
 
-def _record(
+async def _record(
     label: str,
     callback: Callable[[], object],
     context: ContextTypes.DEFAULT_TYPE | None,
+    *,
+    event_id: str,
 ) -> None:
     try:
-        stats_data = callback()
+        stats_data = await asyncio.to_thread(callback)
     except Exception:
         LOGGER.exception("Could not update %s stats", label)
         return
@@ -237,17 +252,13 @@ def _record(
     if kv is None or not isinstance(stats_data, dict):
         return
     try:
-        asyncio.get_running_loop().create_task(_persist(kv, stats_data))
-    except RuntimeError:
-        LOGGER.debug("No running loop to persist stats to KV")
-
-
-async def _persist(kv: KVStore, stats_data: dict) -> None:
-    try:
-        existing = await kv.get_json(STATS_KV_KEY)
-        await kv.set_json(STATS_KV_KEY, merge_stats(stats_data, existing))
+        await _persist(kv, stats_data, event_id=f"{label}:{event_id}")
     except Exception:
-        LOGGER.debug("Could not persist stats to KV", exc_info=True)
+        LOGGER.warning("Could not persist activity event", exc_info=True)
+
+
+async def _persist(kv: KVStore, stats_data: dict, *, event_id: str) -> None:
+    await kv.record_activity_event(STATS_KV_KEY, event_id, stats_data)
 
 
 def _user_entry(message: Message) -> dict[str, object] | None:
@@ -275,3 +286,15 @@ def _chat_entry(message: Message) -> dict[str, object]:
 
 def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+
+def _event_id(message):
+    message_id = getattr(message, "message_id", None)
+    return f"{message.chat_id}:{message_id}" if message_id else secrets.token_hex(12)
+
+
+def _stats_path(context):
+    # None builds one pure event delta; only standalone polling needs a file.
+    if context is not None and context.application.bot_data.get("kv_store") is not None:
+        return None
+    return STATS_PATH

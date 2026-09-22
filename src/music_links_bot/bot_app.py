@@ -105,6 +105,7 @@ def build_application(settings: Settings) -> Application:
     from music_links_bot.search import SearchClient
     from music_links_bot.songlink import SonglinkClient
     from music_links_bot.soundcloud import SoundCloudClient
+    from music_links_bot.update_execution import DeliveryAwareBot
     from music_links_bot.youtube import YouTubeClient
 
     kv_store = KVStore.from_env()
@@ -112,7 +113,7 @@ def build_application(settings: Settings) -> Application:
         Application.builder()
         .application_class(LocalizedApplication)
         .concurrent_updates(8)
-        .token(settings.bot_token)
+        .bot(DeliveryAwareBot(settings.bot_token))
         .post_init(sync_application_commands)
         .post_shutdown(close_application_resources)
         .build()

@@ -68,7 +68,7 @@ def load_stats(path: Path = STATS_PATH) -> StatsData:
 
 def record_matches(
     matches: list[TrackMatch],
-    path: Path = STATS_PATH,
+    path: Path | None = STATS_PATH,
     *,
     user: dict[str, object] | None = None,
     chat: dict[str, object] | None = None,
@@ -87,7 +87,7 @@ def record_matches(
 
 def record_videos(
     videos: list[VideoMatch],
-    path: Path = STATS_PATH,
+    path: Path | None = STATS_PATH,
     *,
     user: dict[str, object] | None = None,
     chat: dict[str, object] | None = None,
@@ -106,7 +106,7 @@ def record_videos(
 
 def record_radios(
     radios: list[RadioMatch],
-    path: Path = STATS_PATH,
+    path: Path | None = STATS_PATH,
     *,
     user: dict[str, object] | None = None,
     chat: dict[str, object] | None = None,
@@ -125,7 +125,7 @@ def record_radios(
 
 def record_playlists(
     playlists: list[PlaylistMatch],
-    path: Path = STATS_PATH,
+    path: Path | None = STATS_PATH,
     *,
     user: dict[str, object] | None = None,
     chat: dict[str, object] | None = None,
@@ -144,7 +144,7 @@ def record_playlists(
 
 def record_artists(
     artists: list[ArtistMatch],
-    path: Path = STATS_PATH,
+    path: Path | None = STATS_PATH,
     *,
     user: dict[str, object] | None = None,
     chat: dict[str, object] | None = None,
@@ -165,7 +165,7 @@ def record_mixed(
     matches: list[TrackMatch],
     videos: list[VideoMatch],
     playlists: list[PlaylistMatch] | None = None,
-    path: Path = STATS_PATH,
+    path: Path | None = STATS_PATH,
     *,
     artists: list[ArtistMatch] | None = None,
     radios: list[RadioMatch] | None = None,
@@ -185,7 +185,7 @@ def record_mixed(
 
 
 def _record_activity(
-    path: Path,
+    path: Path | None,
     *,
     matches: list[TrackMatch],
     video_count: int,
@@ -196,7 +196,7 @@ def _record_activity(
     chat: dict[str, object] | None,
 ) -> StatsData:
     with STATS_LOCK:
-        stats = load_stats(path)
+        stats = load_stats(path) if path is not None else _empty_stats()
         stats["posts"] += 1
         stats["videos"] += video_count
         stats["radios"] += radio_count
@@ -218,7 +218,8 @@ def _record_activity(
         if chat:
             _record_counter(stats["chats"], chat)
 
-        _write_stats(path, stats)
+        if path is not None:
+            _write_stats(path, stats)
         return stats
 
 

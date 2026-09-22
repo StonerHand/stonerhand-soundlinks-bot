@@ -45,7 +45,7 @@ class UpdateDedupTests(unittest.TestCase):
         self.assertTrue(claimed)
         self.assertTrue(reclaimed)
 
-    def test_redis_outage_falls_back_instead_of_dropping_update(self) -> None:
+    def test_redis_outage_is_retryable_without_unsafe_local_claim(self) -> None:
         class UnavailableKV:
             async def set(self, *_args, **_kwargs):
                 return False
@@ -55,11 +55,11 @@ class UpdateDedupTests(unittest.TestCase):
 
         app = SimpleNamespace(bot_data={"kv_store": UnavailableKV()})
 
-        first = asyncio.run(tg._claim_update(app, 90003))
-        second = asyncio.run(tg._claim_update(app, 90003))
+        from music_links_bot.kvstore import KVUnavailableError
 
-        self.assertTrue(first)
-        self.assertFalse(second)
+        with self.assertRaises(KVUnavailableError):
+            asyncio.run(tg._claim_update(app, 90003))
+        self.assertNotIn(90003, tg._SEEN_UPDATE_IDS)
 
     def test_in_memory_claim_expires_after_dedup_ttl(self) -> None:
         self.assertTrue(tg._claim_update_in_memory(90004, now=1000))

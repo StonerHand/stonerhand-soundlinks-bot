@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 from api.telegram import _ensure_application
 from music_links_bot.loop_runner import run_on_loop
-from music_links_bot.publish_queue import process_due_jobs
+from music_links_bot.publish_queue import QueueStorageError, process_due_jobs
 from music_links_bot.webhook_secret import queue_worker_secret, secrets_match
 
 LOGGER = logging.getLogger(__name__)
@@ -45,6 +45,12 @@ class handler(BaseHTTPRequestHandler):
                 process_due_jobs(context),
                 timeout=QUEUE_TICK_TIMEOUT_SECONDS,
             )
+        except QueueStorageError:
+            self._send_json(
+                {"ok": False, "error": "storage unavailable", "retryable": True},
+                HTTPStatus.SERVICE_UNAVAILABLE,
+            )
+            return
         except asyncio.TimeoutError:
             self._send_json(
                 {"ok": False, "error": "timeout", "retryable": True},

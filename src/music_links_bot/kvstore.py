@@ -170,6 +170,31 @@ class KVStore:
             ["EVAL", script, "2", key, event_key, label, str(ttl_seconds)]
         )
 
+    async def record_activity_event(self, key, event_id, delta):
+        """Count an event once across instances without merging local snapshots."""
+        import hashlib
+
+        event_key = "stats-event:v1:" + hashlib.sha256(event_id.encode()).hexdigest()
+        script = (
+            "if redis.call('exists', KEYS[2]) == 1 then return 0 end; "
+            "local raw = redis.call('get', KEYS[1]); "
+            "local stats = raw and cjson.decode(raw) or {}; "
+            "local delta = cjson.decode(ARGV[1]); "
+            "for key, value in pairs(delta) do "
+            "if type(value) == 'number' then stats[key] = (tonumber(stats[key]) or 0) + value "
+            "elseif key == 'users' or key == 'chats' then "
+            "if type(stats[key]) ~= 'table' then stats[key] = {} end; "
+            "for id, entry in pairs(value) do "
+            "local old = stats[key][id] or {}; "
+            "entry.count = (tonumber(old.count) or 0) + (tonumber(entry.count) or 0); "
+            "stats[key][id] = entry end end end; "
+            "redis.call('set', KEYS[1], cjson.encode(stats)); "
+            "redis.call('set', KEYS[2], '1', 'EX', ARGV[2]); return 1"
+        )
+        return await self._command_or_raise(
+            ["EVAL", script, "2", key, event_key, json.dumps(delta), str(7 * 86400)]
+        )
+
     async def ranked_events(self, key, *, limit=5):
         result = await self._command(
             ["ZREVRANGE", key, "0", str(limit - 1), "WITHSCORES"]
@@ -275,7 +300,9 @@ class KVStore:
 
     async def _command(self, command: list[str]) -> Any | None:
         try:
-            response = await self._client.post("/", json=command)
+            from music_links_bot.user_state import guard_command
+
+            response = await self._client.post("/", json=guard_command(self, command))
             response.raise_for_status()
             payload = response.json()
         except (httpx.HTTPError, ValueError):
@@ -283,13 +310,17 @@ class KVStore:
             return None
 
         if isinstance(payload, dict):
+            if "USER_STATE_CHANGED" in str(payload.get("error", "")):
+                raise KVUnavailableError("User data was deleted during this request")
             return payload.get("result")
 
         return None
 
     async def _command_or_raise(self, command: list[str]) -> Any | None:
         try:
-            response = await self._client.post("/", json=command)
+            from music_links_bot.user_state import guard_command
+
+            response = await self._client.post("/", json=guard_command(self, command))
             response.raise_for_status()
             payload = response.json()
         except (httpx.HTTPError, ValueError) as exc:
@@ -299,3 +330,28 @@ class KVStore:
         if not isinstance(payload, dict) or "result" not in payload:
             raise KVUnavailableError("Redis returned an invalid response")
         return payload["result"]
+
+    async def scan_keys_required(self, pattern: str):
+        cursor = "0"
+        while True:
+            result = await self._command_or_raise(
+                ["SCAN", cursor, "MATCH", pattern, "COUNT", "100"]
+            )
+            if (
+                not isinstance(result, list)
+                or len(result) != 2
+                or not isinstance(result[1], list)
+            ):
+                raise KVUnavailableError("Redis returned an invalid key scan")
+            cursor = str(result[0])
+            keys = [key for key in result[1] if isinstance(key, str)]
+            if keys:
+                yield keys
+            if cursor == "0":
+                break
+
+    async def delete_many_required(self, keys):
+        for offset in range(0, len(keys), 100):
+            result = await self._command_or_raise(["DEL", *keys[offset : offset + 100]])
+            if not isinstance(result, int) or result < 0:
+                raise KVUnavailableError("Redis did not confirm batch deletion")

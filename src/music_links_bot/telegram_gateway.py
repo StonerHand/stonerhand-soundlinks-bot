@@ -9,7 +9,13 @@ from time import monotonic
 from typing import Any
 
 import httpx
-from telegram.error import BadRequest, Forbidden, RetryAfter, TelegramError
+from telegram.error import (
+    BadRequest,
+    Forbidden,
+    NetworkError,
+    RetryAfter,
+    TelegramError,
+)
 from telegram.warnings import PTBDeprecationWarning
 
 from music_links_bot.constants import HTTP_USER_AGENT
@@ -132,20 +138,35 @@ class TelegramApiGateway:
         if not self.token:
             raise BadRequest("Telegram bot token is unavailable")
 
+        from music_links_bot.update_execution import (
+            begin_send,
+            protect_send,
+            reject_send,
+        )
+
+        execution = begin_send(method)
+        await protect_send(execution)
         async with httpx.AsyncClient(
             timeout=httpx.Timeout(self.timeout, connect=3.0),
             headers={"User-Agent": HTTP_USER_AGENT},
         ) as client:
-            response = await client.post(
-                f"{TELEGRAM_API_BASE}/bot{self.token}/{method}",
-                json=data,
-            )
+            try:
+                response = await client.post(
+                    f"{TELEGRAM_API_BASE}/bot{self.token}/{method}",
+                    json=data,
+                )
+            except httpx.HTTPError as exc:
+                raise NetworkError(
+                    "Telegram transport failed; delivery is unknown"
+                ) from exc
         try:
             payload = response.json()
         except ValueError as exc:
             raise TelegramError("Telegram returned invalid JSON") from exc
         if not isinstance(payload, dict) or not payload.get("ok"):
-            raise _telegram_api_error(response.status_code, payload)
+            error = _telegram_api_error(response.status_code, payload)
+            reject_send(execution, error)
+            raise error
         return payload.get("result")
 
     async def send_rich_message(

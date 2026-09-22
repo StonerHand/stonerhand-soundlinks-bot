@@ -74,6 +74,11 @@ async def guard_input(update, context, *, text):
     payload = {"user_id": user.id, "text": text[:4096], "created_at": int(time.time())}
     kv = context.application.bot_data.get("kv_store")
     if kv:
+        from music_links_bot.user_state import register_owned_key
+
+        await register_owned_key(
+            kv, user.id, f"input-choice:v1:{choice_id}", ttl_seconds=900
+        )
         await write_json(kv, f"input-choice:v1:{choice_id}", payload, ttl_seconds=900)
     else:
         from music_links_bot.bot_storage import remember_bounded

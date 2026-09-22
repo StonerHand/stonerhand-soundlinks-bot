@@ -276,7 +276,9 @@ def _storage_snapshot() -> tuple[dict, dict, dict]:
 
     queue = _summarize_queue_jobs(jobs if isinstance(jobs, list) else [])
     queue["last_tick_at"] = (
-        _safe_int(tick.get("started_at")) if isinstance(tick, dict) else 0
+        _safe_int(tick.get("completed_at") or tick.get("started_at"))
+        if isinstance(tick, dict)
+        else 0
     )
     queue["worker_stale"] = bool(
         queue["overdue"] and queue["last_tick_at"] < time.time() - 900

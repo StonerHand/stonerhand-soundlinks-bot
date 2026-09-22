@@ -14,6 +14,7 @@ import io
 import logging
 import os
 from contextlib import ExitStack
+from weakref import WeakKeyDictionary
 
 import httpx
 
@@ -27,6 +28,7 @@ MAX_BRANDING_BYTES = 3 * 1024 * 1024
 MAX_BRANDING_PIXELS = 12_000_000
 MAX_COVER_SIZE = 1200
 BRANDING_FETCH_SECONDS = 8.0
+_COMPOSE_LIMITS: WeakKeyDictionary = WeakKeyDictionary()
 
 
 def photo_branding_enabled() -> bool:
@@ -189,4 +191,9 @@ async def build_branded_cover(
         LOGGER.debug("Branding fetch failed")
         return None
 
-    return compose_cover(artwork_bytes, label=label, logo_bytes=logo_bytes)
+    loop = asyncio.get_running_loop()
+    semaphore = _COMPOSE_LIMITS.setdefault(loop, asyncio.Semaphore(2))
+    async with semaphore:
+        return await asyncio.to_thread(
+            compose_cover, artwork_bytes, label=label, logo_bytes=logo_bytes
+        )

@@ -36,6 +36,7 @@ Changelog = "https://github.com/StonerHand/stonerhand-soundlinks-bot/blob/main/C
 dev = [
   "bandit==1.9.4",
   "coverage==7.16.0",
+  "fakeredis[lua]==2.38.0",
   "mypy==2.3.1",
   "pip-audit==2.10.1",
   "pytest==9.1.1",

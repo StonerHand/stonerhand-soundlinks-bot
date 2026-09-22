@@ -21,6 +21,13 @@ def main() -> None:
     quiet_transport_logs()
 
     application = build_application(settings)
+    from music_links_bot.polling_worker import (
+        start_polling_services,
+        stop_polling_services,
+    )
+
+    application.post_init = start_polling_services
+    application.post_stop = stop_polling_services
     application.run_polling(allowed_updates=ALLOWED_UPDATES)
 
 

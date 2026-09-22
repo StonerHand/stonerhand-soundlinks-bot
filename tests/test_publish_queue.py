@@ -140,7 +140,8 @@ class PublishQueueTests(unittest.TestCase):
                 "_finish_job",
                 side_effect=publish_queue.QueueStorageError("offline after delivery"),
             ):
-                await publish_queue.process_due_jobs(context, now=200)
+                with self.assertRaises(publish_queue.QueueStorageError):
+                    await publish_queue.process_due_jobs(context, now=200)
             await publish_queue.process_due_jobs(context, now=400)
             await publish_queue.process_due_jobs(context, now=600)
             return await publish_queue.load_jobs(context)

@@ -5,7 +5,7 @@ from html import escape
 
 from telegram import Bot, InlineKeyboardMarkup, InputMediaPhoto, Message
 from telegram.constants import ParseMode
-from telegram.error import TelegramError
+from telegram.error import BadRequest, TelegramError
 
 from music_links_bot.bot_builder import PHOTO_CAPTION_LIMIT, fit_telegram_html
 from music_links_bot.models import TrackMatch, VideoMatch
@@ -72,12 +72,8 @@ async def send_track_video_album(
         rich_html = build_rich_track_video_html(
             track,
             video,
-            body_html=(
-                f"<b>{escape(track.artist)} — {escape(track.title)}</b><br>"
-                f'Клип: <a href="{escape(video_url, quote=True)}">'
-                f"{escape(video_title)}</a>"
-            ),
-            hashtags="#stonerhand #track #video",
+            body_html=caption.replace("\n", "<br>"),
+            hashtags=None,
             reply_markup=reply_markup,
         )
         try:
@@ -88,6 +84,8 @@ async def send_track_video_album(
             )
             return [sent] if isinstance(sent, Message) else []
         except TelegramError as exc:
+            if not isinstance(exc, BadRequest):
+                raise
             if rich_api_unavailable(exc):
                 LOGGER.info("Rich track/video card unavailable; using album")
             else:
@@ -112,7 +110,7 @@ async def send_track_video_album(
                 ),
             ],
         )
-    except TelegramError:
+    except BadRequest:
         LOGGER.info(
             "Could not send track/video album; using card fallback", exc_info=True
         )

@@ -14,6 +14,7 @@ LOGGER = logging.getLogger(__name__)
 
 QUEUE_KV_KEY = "queue:v1"
 QUEUE_TICK_KV_KEY = "queue:last-tick:v1"
+QUEUE_TICK_STARTED_KV_KEY = "queue:tick-start:v1"
 QUEUE_LOCK_KEY = "queue:lock"
 QUEUE_LOCK_TTL_SECONDS = 30
 QUEUE_MEMORY_KEY = "publish_queue"
@@ -453,13 +454,13 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
     kv = context.application.bot_data.get("kv_store")
     if kv is not None:
         await kv.set_json(
-            QUEUE_TICK_KV_KEY, {"started_at": started_at}, ttl_seconds=86400
+            QUEUE_TICK_STARTED_KV_KEY, {"started_at": started_at}, ttl_seconds=86400
         )
     owner = secrets.token_hex(12)
     published = 0
     try:
         recovered = await _recover_uncertain_jobs(context, now=started_at)
-    except (QueueBusyError, QueueStorageError):
+    except QueueBusyError:
         recovered = []
     for job in recovered:
         await _alert_uncertain_job(context, job.get("draft"))
@@ -471,7 +472,7 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
                 owner=owner,
                 limit=1,
             )
-        except (QueueBusyError, QueueStorageError):
+        except QueueBusyError:
             break
         if not claimed:
             break
@@ -508,7 +509,7 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
                 now=current_time(),
                 confirmed_not_sent=service is not None and service.confirmed_not_sent,
             )
-        except (QueueBusyError, QueueStorageError):
+        except QueueBusyError:
             LOGGER.warning(
                 "Could not finalize queue job %s; lease will recover it", job.get("id")
             )
@@ -542,6 +543,12 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
         elif outcome == "uncertain":
             await _alert_uncertain_job(context, failed_draft)
 
+    if kv is not None:
+        await kv.set_json(
+            QUEUE_TICK_KV_KEY,
+            {"started_at": started_at, "completed_at": current_time()},
+            ttl_seconds=86400,
+        )
     return published
 
 

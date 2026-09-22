@@ -11,7 +11,7 @@ from music_links_bot.bot_runtime import METRICS_KV_KEY
 from music_links_bot.chat_access import check_publish_access
 from music_links_bot.constants import STATS_KV_KEY
 from music_links_bot.publish_queue import QueueStorageError, load_jobs
-from music_links_bot.stats import format_stats_message, load_stats, merge_stats
+from music_links_bot.stats import format_stats_message, load_stats
 
 
 async def id_command(update, context) -> None:
@@ -31,10 +31,14 @@ async def stats_command(update, context) -> None:
 
 
 async def stats_text(context, *, include_private: bool) -> str:
-    stats_data = load_stats()
     kv = context.application.bot_data.get("kv_store")
-    if kv is not None:
-        stats_data = merge_stats(stats_data, await kv.get_json(STATS_KV_KEY))
+    stats_data = (
+        await kv.get_json(STATS_KV_KEY)
+        if kv is not None
+        else await asyncio.to_thread(load_stats)
+    )
+    if not isinstance(stats_data, dict):
+        stats_data = {}
 
     text = format_stats_message(stats_data, include_private=include_private)
     if not include_private:
@@ -49,7 +53,7 @@ async def stats_text(context, *, include_private: bool) -> str:
         return text
     metrics = runtime.metrics_snapshot()
     text += (
-        "\n\nRuntime\n"
+        "\n\nRuntime (текущий экземпляр)\n"
         f"Запросы: {metrics['requests']} · "
         f"среднее: {metrics['request_ms_avg']} ms · "
         f"кэш: {metrics['cache_hits']}/{metrics['cache_misses']}\n"
