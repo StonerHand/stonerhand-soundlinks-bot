@@ -26,6 +26,14 @@ from music_links_bot.cover_style import (
     photo_branding_enabled as photo_branding_enabled,
 )
 
+__all__ = [
+    "brand_label",
+    "brand_logo_url",
+    "build_branded_cover",
+    "compose_cover",
+    "photo_branding_enabled",
+]
+
 LOGGER = logging.getLogger(__name__)
 
 MAX_BRANDING_BYTES = 3 * 1024 * 1024
