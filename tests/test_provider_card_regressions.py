@@ -276,7 +276,10 @@ async def test_deezer_rejects_a_different_release_returned_by_the_api():
         ),
     ],
 )
-def test_public_release_uses_exact_schema_metadata(source, kind, artist, title):
+@pytest.mark.parametrize("artist_shape", ["object", "list", "multiple", "invalid"])
+def test_public_release_uses_exact_schema_metadata(
+    source, kind, artist, title, artist_shape
+):
     schema = {
         "@type": kind,
         "@id": source,
@@ -284,7 +287,19 @@ def test_public_release_uses_exact_schema_metadata(source, kind, artist, title):
         "byArtist": {"name": artist},
         "duration": "PT3M15S",
     }
+    if artist_shape == "list":
+        schema["byArtist"] = [{"name": artist}]
+    elif artist_shape == "multiple":
+        schema["byArtist"] = [{"name": artist}, {"name": "Guest"}, {"name": artist}]
+    elif artist_shape == "invalid":
+        schema["byArtist"] = [None, {"name": 42}, {"name": " "}]
     page = f'<meta property="og:url" content="{source}"><script type="application/ld+json">{json.dumps(schema)}</script>'
+    if artist_shape == "invalid":
+        with pytest.raises(PublicReleaseError, match="Incomplete release"):
+            parse_public_release(source, page)
+        return
+    if artist_shape == "multiple":
+        artist += ", Guest"
     track = parse_public_release(source, page)
     assert (track.title, track.artist, track.duration_ms) == (title, artist, 195000)
     assert list(track.links.values()) == [source]

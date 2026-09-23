@@ -163,7 +163,16 @@ def parse_public_release(source_url: str, html: str) -> TrackMatch:
     )
     title = schema.get("name") or parser.meta.get("og:title", "")
     by_artist = schema.get("byArtist") or {}
-    artist = by_artist.get("name", "") if isinstance(by_artist, dict) else ""
+    artists = by_artist if isinstance(by_artist, list) else [by_artist]
+    artist = ", ".join(
+        dict.fromkeys(
+            entry["name"].strip()
+            for entry in artists
+            if isinstance(entry, dict)
+            and isinstance(entry.get("name"), str)
+            and entry["name"].strip()
+        )
+    )
     if platform == "yandexMusic":
         description = parser.meta.get("og:description", "").split(" • ")
         expected_labels = {"Альбом", "Album"} if kind == "album" else {"Трек", "Track"}
