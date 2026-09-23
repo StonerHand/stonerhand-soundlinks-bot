@@ -138,9 +138,9 @@ class Release121AsyncTests(IsolatedAsyncioTestCase):
 
     async def test_photo_file_cache_expires_in_memory(self):
         from music_links_bot.telegram_media_cache import (
+            MEDIA_CACHE_TTL_SECONDS,
             get_cached_file_id,
             remember_photo_file_id,
-            MEDIA_CACHE_TTL_SECONDS,
         )
 
         context = SimpleNamespace(application=SimpleNamespace(bot_data={}))
