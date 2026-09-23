@@ -45,7 +45,7 @@ async def store_draft(context, draft_id: str, draft: dict) -> None:
     original = draft
     normalized = normalize_track_draft(draft)
     if normalized is not None:
-        draft = normalized
+        draft = dict(normalized)
     draft["editor_draft_id"] = draft_id
     if "original_state" not in draft and not draft.get("revision"):
         from music_links_bot.bot_editor_state import setting_snapshot
@@ -93,7 +93,7 @@ async def load_draft(context, draft_id: str) -> dict | None:
         if normalized is not None:
             normalized["editor_draft_id"] = draft_id
             drafts[draft_id] = deepcopy(normalized)
-            return normalized
+            return dict(normalized)
         return draft
 
     if kv is None:
@@ -108,7 +108,7 @@ async def load_draft(context, draft_id: str) -> dict | None:
             deepcopy(normalized),
             max_size=MAX_MEMORY_DRAFTS,
         )
-        return normalized
+        return dict(normalized)
     drafts.pop(draft_id, None)
     return None
 
@@ -253,7 +253,7 @@ async def load_drafts(context, draft_ids: list[str]) -> list[dict | None]:
         draft = normalize_track_draft(value)
         if draft is not None:
             draft["editor_draft_id"] = draft_id
-        result.append(draft)
+        result.append(dict(draft) if draft is not None else None)
     return result
 
 

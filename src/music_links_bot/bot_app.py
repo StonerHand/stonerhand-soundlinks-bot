@@ -235,6 +235,11 @@ async def sync_application_commands(application: Application) -> None:
 
 
 async def close_application_resources(application: Application) -> None:
+    from music_links_bot.branding import close_cover_resources
+    from music_links_bot.shared_http import close_shared_clients
+
+    await close_cover_resources()
+    await close_shared_clients()
     client_keys = (
         "songlink_client",
         "youtube_client",

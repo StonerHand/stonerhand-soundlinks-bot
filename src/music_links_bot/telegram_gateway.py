@@ -18,8 +18,6 @@ from telegram.error import (
 )
 from telegram.warnings import PTBDeprecationWarning
 
-from music_links_bot.constants import HTTP_USER_AGENT
-
 LOGGER = logging.getLogger(__name__)
 TELEGRAM_API_BASE = "https://api.telegram.org"
 CAPABILITY_COOLDOWN_SECONDS = 5 * 60
@@ -146,19 +144,17 @@ class TelegramApiGateway:
 
         execution = begin_send(method)
         await protect_send(execution)
-        async with httpx.AsyncClient(
-            timeout=httpx.Timeout(self.timeout, connect=3.0),
-            headers={"User-Agent": HTTP_USER_AGENT},
-        ) as client:
-            try:
-                response = await client.post(
-                    f"{TELEGRAM_API_BASE}/bot{self.token}/{method}",
-                    json=data,
-                )
-            except httpx.HTTPError as exc:
-                raise NetworkError(
-                    "Telegram transport failed; delivery is unknown"
-                ) from exc
+        from music_links_bot.shared_http import shared_client
+
+        client = shared_client("telegram", timeout=self.timeout)
+        try:
+            response = await client.post(
+                f"{TELEGRAM_API_BASE}/bot{self.token}/{method}", json=data
+            )
+        except httpx.HTTPError as exc:
+            raise NetworkError(
+                "Telegram transport failed; delivery is unknown"
+            ) from exc
         try:
             payload = response.json()
         except ValueError as exc:

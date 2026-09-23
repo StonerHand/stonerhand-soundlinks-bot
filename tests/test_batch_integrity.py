@@ -635,7 +635,7 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
         collage_url = "https://bot.example/api/collage?p=fixture&s=signature"
         with (
             patch(
-                "music_links_bot.bot.collection_collage_preview_url",
+                "music_links_bot.collection_plan.collection_collage_preview_url",
                 return_value=collage_url,
             ),
             patch("music_links_bot.bot._send_track_result", new=AsyncMock()) as send,

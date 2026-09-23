@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import time
 from typing import Any
 
 from music_links_bot.bot_storage import remember_bounded
@@ -20,16 +21,24 @@ async def get_cached_file_id(context: Any, url: str | None) -> str | None:
     if not url:
         return None
     bot_data = context.application.bot_data
-    memory: dict[str, str] = bot_data.setdefault("telegram_media_cache", {})
+    memory: dict[str, tuple[str, float]] = bot_data.setdefault(
+        "telegram_media_cache", {}
+    )
     key = _key(url)
     cached = memory.get(key)
-    if cached:
-        return cached
+    if cached and cached[1] > time.monotonic():
+        return cached[0]
+    memory.pop(key, None)
     kv: KVStore | None = bot_data.get("kv_store")
-    cached = await kv.get(key) if kv is not None else None
-    if cached:
-        remember_bounded(memory, key, cached, max_size=MAX_MEMORY_MEDIA)
-    return cached
+    remote = await kv.get(key) if kv is not None else None
+    if remote:
+        remember_bounded(
+            memory,
+            key,
+            (remote, time.monotonic() + MEDIA_CACHE_TTL_SECONDS),
+            max_size=MAX_MEMORY_MEDIA,
+        )
+    return remote
 
 
 async def remember_photo_file_id(
@@ -45,9 +54,16 @@ async def remember_photo_file_id(
     if not file_id:
         return
     bot_data = context.application.bot_data
-    memory: dict[str, str] = bot_data.setdefault("telegram_media_cache", {})
+    memory: dict[str, tuple[str, float]] = bot_data.setdefault(
+        "telegram_media_cache", {}
+    )
     key = _key(url)
-    remember_bounded(memory, key, file_id, max_size=MAX_MEMORY_MEDIA)
+    remember_bounded(
+        memory,
+        key,
+        (file_id, time.monotonic() + MEDIA_CACHE_TTL_SECONDS),
+        max_size=MAX_MEMORY_MEDIA,
+    )
     kv: KVStore | None = bot_data.get("kv_store")
     if kv is not None:
         await kv.set(key, file_id, ttl_seconds=MEDIA_CACHE_TTL_SECONDS)

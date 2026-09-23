@@ -95,6 +95,30 @@ async def render_queue(
         lines.append(
             f"\n\n<b>{index}. {escape(label[:120])}</b>\n<code>{escape(when)}</code>"
         )
+        overdue_seconds = max(
+            0,
+            int(time.time())
+            - int(job.get("scheduled_for") or job.get("publish_at") or 0),
+        )
+        if overdue_seconds >= 60:
+            lines.append(
+                "\n"
+                + get_text(lang, "queue_lateness").format(minutes=overdue_seconds // 60)
+            )
+        if job.get("attempts"):
+            lines.append(
+                "\n" + get_text(lang, "queue_attempts").format(count=job["attempts"])
+            )
+        failure = job.get("last_failure")
+        if failure in {
+            "invalid_draft",
+            "access_denied",
+            "rejected",
+            "rate_limited",
+            "delivery_unknown",
+            "provider_unavailable",
+        }:
+            lines.append("\n" + get_text(lang, f"queue_failure_{failure}"))
         if job.get("status") in {JOB_PROCESSING, JOB_DELIVERING}:
             lines.append("\n" + get_text(lang, "queue_sending"))
             continue

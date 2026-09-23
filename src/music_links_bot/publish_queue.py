@@ -195,6 +195,7 @@ async def add_job(context, draft: dict, publish_at: int) -> dict:
         "id": secrets.token_hex(6),
         "status": JOB_PENDING,
         "publish_at": int(publish_at),
+        "scheduled_for": int(publish_at),
         "created_at": int(time.time()),
         "attempts": 0,
         "draft": prepared.data,
@@ -274,7 +275,11 @@ async def reschedule_job(
                 updated.append(job)
                 continue
             changed = dict(job)
-            changed.update(status=JOB_PENDING, publish_at=int(publish_at))
+            changed.update(
+                status=JOB_PENDING,
+                publish_at=int(publish_at),
+                scheduled_for=int(publish_at),
+            )
             changed.pop("lease_owner", None)
             changed.pop("lease_until", None)
             changed.pop("delivery_started_at", None)
@@ -383,6 +388,7 @@ async def _finish_job(
     delivered: bool,
     now: int,
     confirmed_not_sent: bool = False,
+    failure_code: str = "",
 ) -> tuple[str, dict | None]:
     """Commit the result only if this worker still owns the job lease."""
 
@@ -400,7 +406,11 @@ async def _finish_job(
 
             if job.get("status") == JOB_DELIVERING and not confirmed_not_sent:
                 uncertain = dict(job)
-                uncertain.update(status=JOB_UNCERTAIN, uncertain_at=now)
+                uncertain.update(
+                    status=JOB_UNCERTAIN,
+                    uncertain_at=now,
+                    last_failure=failure_code or "delivery_unknown",
+                )
                 uncertain.pop("lease_owner", None)
                 uncertain.pop("lease_until", None)
                 updated.append(uncertain)
@@ -422,6 +432,7 @@ async def _finish_job(
             retry.update(
                 status=JOB_PENDING,
                 attempts=attempts,
+                last_failure=failure_code or "provider_unavailable",
                 publish_at=now
                 + RETRY_BACKOFF_SECONDS[min(attempts, len(RETRY_BACKOFF_SECONDS)) - 1],
             )
@@ -477,6 +488,21 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
         if not claimed:
             break
         job = claimed[0]
+        from music_links_bot.operation_metrics import record_duration
+
+        record_duration(
+            context.application.bot_data,
+            "queue_delay",
+            max(
+                0,
+                current_time()
+                - int(
+                    job.get("scheduled_for") or job.get("publish_at") or current_time()
+                ),
+            )
+            * 1000,
+        )
+        delivery_started = time.monotonic()
         draft = job.get("draft")
         prepared = prepare_publication_draft(draft)
         valid = prepared is not None
@@ -500,6 +526,11 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
             except Exception:
                 LOGGER.exception("Scheduled publish crashed for job %s", job.get("id"))
 
+        record_duration(
+            context.application.bot_data,
+            "queue_delivery",
+            (time.monotonic() - delivery_started) * 1000,
+        )
         try:
             outcome, failed_draft = await _finish_job(
                 context,
@@ -508,6 +539,7 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
                 delivered=bool(delivered),
                 now=current_time(),
                 confirmed_not_sent=service is not None and service.confirmed_not_sent,
+                failure_code=getattr(service, "failure_code", "invalid_draft"),
             )
         except QueueBusyError:
             LOGGER.warning(

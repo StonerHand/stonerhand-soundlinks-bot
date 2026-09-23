@@ -59,6 +59,10 @@ async def send_partial_lookup_status(
                 if item.reason == "rate_limited"
                 else "partial_timeout"
                 if item.reason == "timeout"
+                else "partial_region_unavailable"
+                if item.reason == "region_unavailable"
+                else "partial_metadata_incomplete"
+                if item.reason == "metadata_incomplete"
                 else "partial_unavailable",
             )
         else:

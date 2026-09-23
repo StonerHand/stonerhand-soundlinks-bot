@@ -10,6 +10,7 @@ falls back to the plain artwork, so publishing never breaks because of it.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import io
 import logging
 import os
@@ -18,13 +19,14 @@ from weakref import WeakKeyDictionary
 
 import httpx
 
+from music_links_bot.cache import TTLCache
 from music_links_bot.collection_collage import _safe_source_url
-from music_links_bot.constants import HTTP_USER_AGENT
 from music_links_bot.cover_style import (
     apply_cover_signature,
     brand_label as brand_label,
     photo_branding_enabled as photo_branding_enabled,
 )
+from music_links_bot.shared_http import shared_client
 
 __all__ = [
     "brand_label",
@@ -41,6 +43,17 @@ MAX_BRANDING_PIXELS = 12_000_000
 MAX_COVER_SIZE = 1200
 BRANDING_FETCH_SECONDS = 8.0
 _COMPOSE_LIMITS: WeakKeyDictionary = WeakKeyDictionary()
+_COVER_CACHES: WeakKeyDictionary = WeakKeyDictionary()
+_COVER_TASKS: WeakKeyDictionary = WeakKeyDictionary()
+
+
+def branded_cover_key(
+    artwork_url: str, *, label: str, logo_url: str | None = None
+) -> str:
+    import json
+
+    payload = json.dumps(["cover-v2", artwork_url, label, logo_url], ensure_ascii=False)
+    return "branded:" + hashlib.sha256(payload.encode()).hexdigest()
 
 
 def brand_logo_url() -> str | None:
@@ -138,7 +151,7 @@ async def _fetch_bytes(client: httpx.AsyncClient, url: str | None) -> bytes | No
         return None
 
 
-async def build_branded_cover(
+async def _build_branded_cover(
     artwork_url: str | None, *, label: str, logo_url: str | None = None
 ) -> bytes | None:
     """Download the artwork (and logo) and return branded JPEG bytes, or None to
@@ -147,18 +160,15 @@ async def build_branded_cover(
         return None
 
     try:
-        async with httpx.AsyncClient(
-            timeout=httpx.Timeout(8.0, connect=3.0),
-            headers={"User-Agent": HTTP_USER_AGENT},
-        ) as client:
-            artwork_bytes, logo_bytes = await asyncio.wait_for(
-                asyncio.gather(
-                    _fetch_bytes(client, artwork_url), _fetch_bytes(client, logo_url)
-                ),
-                timeout=BRANDING_FETCH_SECONDS,
-            )
-            if artwork_bytes is None:
-                return None
+        client = shared_client("branding")
+        artwork_bytes, logo_bytes = await asyncio.wait_for(
+            asyncio.gather(
+                _fetch_bytes(client, artwork_url), _fetch_bytes(client, logo_url)
+            ),
+            timeout=BRANDING_FETCH_SECONDS,
+        )
+        if artwork_bytes is None:
+            return None
     except (asyncio.TimeoutError, httpx.HTTPError, ValueError):
         LOGGER.debug("Branding fetch failed")
         return None
@@ -169,3 +179,51 @@ async def build_branded_cover(
         return await asyncio.to_thread(
             compose_cover, artwork_bytes, label=label, logo_bytes=logo_bytes
         )
+
+
+async def build_branded_cover(
+    artwork_url: str | None, *, label: str, logo_url: str | None = None
+) -> bytes | None:
+    """Bounded cache and single-flight for repeated artwork transformations."""
+    if not artwork_url or not _safe_source_url(artwork_url):
+        return None
+    loop = asyncio.get_running_loop()
+    cache = _COVER_CACHES.setdefault(loop, TTLCache(ttl_seconds=3600, max_size=16))
+    key = branded_cover_key(artwork_url, label=label, logo_url=logo_url)
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    tasks = _COVER_TASKS.setdefault(loop, {})
+    task = tasks.get(key)
+    if task is None:
+
+        async def build():
+            result = await _build_branded_cover(
+                artwork_url, label=label, logo_url=logo_url
+            )
+            if result is not None and len(result) <= MAX_BRANDING_BYTES:
+                cache.set(key, result)
+            return result
+
+        task = asyncio.create_task(build())
+        tasks[key] = task
+
+        def finish(completed):
+            if tasks.get(key) is completed:
+                tasks.pop(key, None)
+            if not completed.cancelled():
+                completed.exception()
+
+        task.add_done_callback(finish)
+    return await asyncio.shield(task)
+
+
+async def close_cover_resources() -> None:
+    """Finish detached single-flight tasks before closing their HTTP pool."""
+    loop = asyncio.get_running_loop()
+    tasks = list(_COVER_TASKS.pop(loop, {}).values())
+    for task in tasks:
+        task.cancel()
+    await asyncio.gather(*tasks, return_exceptions=True)
+    _COVER_CACHES.pop(loop, None)
+    _COMPOSE_LIMITS.pop(loop, None)

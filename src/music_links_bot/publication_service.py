@@ -40,6 +40,7 @@ class PublicationService:
         self.channel_username = channel_username.lstrip("@")
         self.branding_hooks = branding_hooks
         self.confirmed_not_sent = True
+        self.failure_code = ""
 
     async def publish(
         self,
@@ -103,6 +104,7 @@ class PublicationService:
         draft = prepared.data
         track = prepared.track
         if not validate_publication(draft, track).ready:
+            self.failure_code = "invalid_draft"
             self._record_publication(False)
             await self._persist_metrics()
             return None
@@ -110,6 +112,7 @@ class PublicationService:
         if channel_style:
             access = await check_publish_access(self.context, target)
             if not access.allowed:
+                self.failure_code = "access_denied"
                 if notify_failure:
                     await self._report_failure(
                         track,
@@ -129,6 +132,15 @@ class PublicationService:
                 channel_style=channel_style,
             )
         except Exception as exc:
+            self.failure_code = (
+                "rate_limited"
+                if isinstance(exc, RetryAfter)
+                else "access_denied"
+                if isinstance(exc, Forbidden)
+                else "rejected"
+                if isinstance(exc, BadRequest)
+                else "delivery_unknown"
+            )
             # These are explicit Bot API rejections. A network failure can
             # occur after Telegram accepted the post and must stay ambiguous.
             self.confirmed_not_sent = isinstance(
@@ -380,19 +392,27 @@ class PublicationService:
                 brand_logo_url,
             ) = self.branding_hooks
 
-        if cacheable and track.thumbnail_url and photo_branding_enabled():
-            cacheable = False
-            branded = await build_branded_cover(
-                track.thumbnail_url,
-                label=brand_label(f"@{self.channel_username}"),
-                logo_url=brand_logo_url(),
-            )
-            if branded is not None:
-                photo = branded
-        if cacheable and track.thumbnail_url:
-            from music_links_bot.telegram_media_cache import get_cached_file_id
+        from music_links_bot.branding import branded_cover_key
+        from music_links_bot.telegram_media_cache import get_cached_file_id
 
-            photo = await get_cached_file_id(self.context, track.thumbnail_url) or photo
+        cache_url = track.thumbnail_url if cacheable else None
+        if cache_url and photo_branding_enabled():
+            label, logo_url = brand_label(f"@{self.channel_username}"), brand_logo_url()
+            cache_url = branded_cover_key(cache_url, label=label, logo_url=logo_url)
+            cached = await get_cached_file_id(self.context, cache_url)
+            if cached:
+                photo = cached
+            else:
+                branded = await build_branded_cover(
+                    track.thumbnail_url, label=label, logo_url=logo_url
+                )
+                if branded is not None:
+                    photo = branded
+                else:
+                    # Never store a plain fallback under a branded cache key.
+                    cache_url = None
+        elif cache_url:
+            photo = await get_cached_file_id(self.context, cache_url) or photo
         sent = await self.context.bot.send_photo(
             chat_id=target,
             photo=photo,
@@ -400,10 +420,10 @@ class PublicationService:
             parse_mode=ParseMode.HTML,
             reply_markup=keyboard,
         )
-        if cacheable and track.thumbnail_url:
+        if cache_url:
             from music_links_bot.telegram_media_cache import remember_photo_file_id
 
-            await remember_photo_file_id(self.context, track.thumbnail_url, sent)
+            await remember_photo_file_id(self.context, cache_url, sent)
         return sent
 
     async def _send_classic_message(

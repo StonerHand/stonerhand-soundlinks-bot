@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import asdict, dataclass
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 
 from music_links_bot.constants import PLATFORM_LABELS
 from music_links_bot.metadata_cleaning import clean_spotify_metadata_title
@@ -22,7 +22,7 @@ MAX_TRACK_LINKS = 16
 
 def _safe_int(value: object, *, default: int = 0) -> int:
     try:
-        return int(value)  # type: ignore[arg-type]
+        return int(cast(Any, value))
     except (TypeError, ValueError, OverflowError):
         return default
 
@@ -50,7 +50,7 @@ def _normalize_track_item(value: dict) -> DraftTrackItem:
             if len(links) >= MAX_TRACK_LINKS:
                 break
 
-    item: DraftTrackItem = {
+    item: dict[str, Any] = {
         "title": clean_spotify_metadata_title(value.get("title"))[
             :MAX_TRACK_FIELD_LENGTH
         ],
@@ -85,7 +85,7 @@ def _normalize_track_item(value: dict) -> DraftTrackItem:
             item[key] = url
     if duration := duration_ms(value.get("duration_ms")):
         item["duration_ms"] = duration
-    return item
+    return cast(DraftTrackItem, item)
 
 
 class DraftTrackItem(TypedDict, total=False):
@@ -113,6 +113,12 @@ class DraftUndoState(TypedDict, total=False):
 class TrackDraft(TypedDict, total=False):
     """Durable editor state shared by callbacks, queue and publications."""
 
+    revision: int
+    expires_at: int
+    saved_at: int
+    sent_at: int
+    original_state: dict[str, Any]
+    collection_items: list[DraftTrackItem]
     v: int
     type: str
     item: DraftTrackItem
@@ -239,7 +245,7 @@ def normalize_track_draft(value: object) -> TrackDraft | None:
     ):
         return None
 
-    draft: TrackDraft = dict(value)
+    draft: dict[str, Any] = dict(value)
     draft["v"] = CURRENT_DRAFT_VERSION
     draft["type"] = "track"
     draft["item"] = _normalize_track_item(item)
@@ -306,4 +312,4 @@ def normalize_track_draft(value: object) -> TrackDraft | None:
         ]
     else:
         draft.pop("undo_stack", None)
-    return draft
+    return cast(TrackDraft, draft)
