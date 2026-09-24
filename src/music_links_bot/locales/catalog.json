@@ -48,8 +48,8 @@
     "ru": "+ Найти первый трек"
   },
   "crate_hint": {
-    "en": "<blockquote>Select a track number to reorder or remove it.</blockquote>",
-    "ru": "<blockquote>Выбери номер трека, чтобы изменить порядок или удалить его.</blockquote>"
+    "ru": "Выбери номер релиза ниже: ↑ / ↓ меняют порядок, «Удалить» убирает только выбранный релиз.",
+    "en": "Select a release number below: ↑ / ↓ change its order; Remove deletes only the selected release."
   },
   "crate_name_prompt": {
     "en": "Send the collection name in one message.",
@@ -1678,5 +1678,65 @@
   "release_panel_expired": {
     "ru": "Данные этой карточки больше не доступны. Пришли ссылку ещё раз — соберу свежую карточку.",
     "en": "This card’s details are no longer available. Send its link again to create a fresh card."
+  },
+  "partial_region_unavailable": {
+    "ru": "Сервис недоступен в регионе сервера. Попробуй ссылку другой площадки.",
+    "en": "Service unavailable in the server region. Try another platform."
+  },
+  "partial_metadata_incomplete": {
+    "ru": "Сервис вернул неполные данные. Повтори запрос позже или замени ссылку.",
+    "en": "The service returned incomplete metadata. Retry later or replace the link."
+  },
+  "queue_lateness": {
+    "ru": "Задержка от выбранного времени: {minutes} мин.",
+    "en": "Delay from the scheduled time: {minutes} min."
+  },
+  "queue_attempts": {
+    "ru": "Неудачных попыток: {count}.",
+    "en": "Failed attempts: {count}."
+  },
+  "queue_failure_invalid_draft": {
+    "ru": "Не хватает данных поста — проверь черновик.",
+    "en": "Post data is incomplete — check the draft."
+  },
+  "queue_failure_access_denied": {
+    "ru": "Нет доступа к публикации — проверь права бота.",
+    "en": "Cannot publish — check bot permissions."
+  },
+  "queue_failure_rejected": {
+    "ru": "Telegram отклонил пост — проверь текст и медиа.",
+    "en": "Telegram rejected the post — check text and media."
+  },
+  "queue_failure_rate_limited": {
+    "ru": "Telegram ограничил частоту отправок.",
+    "en": "Telegram is limiting sending frequency."
+  },
+  "queue_failure_delivery_unknown": {
+    "ru": "Доставка не подтверждена. Перед повтором проверь канал.",
+    "en": "Delivery is unconfirmed. Check the channel before retrying."
+  },
+  "queue_failure_provider_unavailable": {
+    "ru": "Временный сбой отправки.",
+    "en": "Temporary delivery failure."
+  },
+  "collection_check_ok": {
+    "ru": "✓ Подборка проверена: данные и обложки на месте.",
+    "en": "✓ Collection checked: metadata and artwork are present."
+  },
+  "collection_check_title": {
+    "ru": "Перед отправкой проверь:",
+    "en": "Check before sending:"
+  },
+  "collection_check_metadata": {
+    "ru": "• №{index}: неполные данные или нет ссылки — замени этот релиз.",
+    "en": "• #{index}: incomplete metadata or missing link — replace this release."
+  },
+  "collection_check_cover": {
+    "ru": "• №{index}: нет обложки; подборка может отображаться без коллажа.",
+    "en": "• #{index}: no artwork; the collection may appear without a collage."
+  },
+  "collection_check_duplicate": {
+    "ru": "• №{index}: повтор внутри подборки. При необходимости удали его.",
+    "en": "• #{index}: duplicate within this collection. Remove it if unwanted."
   }
 }

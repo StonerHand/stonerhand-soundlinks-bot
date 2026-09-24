@@ -25,6 +25,20 @@
 buttons, add your own words, then preview and share. Several links become one
 editable collection.
 
+## Release 1.21.0
+
+Branded covers reuse cached image bytes and Telegram file IDs. Collection
+previews, inline results and chat posts share a rendering plan. Collection
+checks identify missing metadata/artwork and duplicates within the collection;
+select an item number to move or remove it without rebuilding the collection.
+Reset appearance now lives under More. Queue entries show lateness, failed
+attempts and failure reasons; unconfirmed deliveries still require checking
+the channel before an explicit retry. Provider errors distinguish region,
+timeout and incomplete metadata failures.
+
+The owner's `/stats` includes p50/p95 lookup and queue timings for the last 200
+samples in the current instance. No previous-publication warning was added.
+
 ## From discovery to a finished post
 
 | 01 · Find | 02 · Edit | 03 · Publish |

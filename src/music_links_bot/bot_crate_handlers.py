@@ -20,9 +20,7 @@ from music_links_bot.bot_menu import runtime_for, safe_edit, update_lang
 from music_links_bot.bot_runtime import CallbackAction, encode_callback
 from music_links_bot.bot_storage import remember_bounded
 from music_links_bot.bot_ui import render_crate
-from music_links_bot.formatter import format_collection_message
 from music_links_bot.i18n import get_text, resolve_lang
-from music_links_bot.keyboards import _build_collection_keyboard
 from music_links_bot.models import TrackMatch
 from music_links_bot.release_preferences import release_preference_key
 from music_links_bot.sharing import add_share_button, build_crate_share_query
@@ -268,6 +266,13 @@ async def _start_rename(query, context, *, user_id: int, lang: str) -> None:
 
 async def _show_preview(query, context, *, user_id: int, lang: str, title: str) -> None:
     items = await load_crate(context.application.bot_data, user_id)
+    from music_links_bot.collection_plan import build_collection_plan, collection_issues
+
+    if any(issue.blocking for issue in collection_issues(items)):
+        await query.answer()
+        text, keyboard = render_crate(items, lang=lang, title=title)
+        await safe_edit(query, text, keyboard)
+        return
     tracks = [
         TrackMatch(**{"links": {}, **entry["item"]})
         for entry in items
@@ -278,10 +283,13 @@ async def _show_preview(query, context, *, user_id: int, lang: str, title: str) 
         text, keyboard = render_crate([], lang=lang, title=title)
         await safe_edit(query, text, keyboard)
         return
-    preview_keyboard = _build_collection_keyboard(
+    plan = build_collection_plan(
         tracks,
+        context=context,
+        title=title or get_text(lang, "crate_preview_title"),
         include_channel_button=False,
     )
+    preview_keyboard = plan.keyboard
     preview_keyboard = add_share_button(
         preview_keyboard,
         share_query=build_crate_share_query(items),
@@ -301,11 +309,7 @@ async def _show_preview(query, context, *, user_id: int, lang: str, title: str) 
     await query.answer()
     await safe_edit(
         query,
-        format_collection_message(
-            tracks,
-            title=title or get_text(lang, "crate_preview_title"),
-            include_hashtags=True,
-        ),
+        plan.text,
         keyboard,
     )
 

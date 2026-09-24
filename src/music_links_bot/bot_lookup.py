@@ -114,6 +114,18 @@ async def _send_track_video_pair_result(*args, **kwargs) -> bool:
 
 
 async def resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBundle:
+    from time import monotonic
+
+    from music_links_bot.operation_metrics import record_duration
+
+    started = monotonic()
+    try:
+        return await _resolve_sources(bot_data, source_urls)
+    finally:
+        record_duration(bot_data, "lookup", (monotonic() - started) * 1000)
+
+
+async def _resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBundle:
     source_urls = _unique_source_urls(source_urls)
     from music_links_bot.lookup_recovery import (
         capture_sources,
@@ -977,7 +989,15 @@ async def _lookup_tracks_detailed(
                 )
 
             if isinstance(result, SonglinkLookupError):
-                retryable = spotify_url_type(source_url) in {"track", "album"}
+                reason = _failure_reason(result)
+                known_failure = (
+                    reason != "provider_unavailable" or result.__cause__ is not None
+                )
+                retryable = (
+                    reason not in {"region_unavailable", "release_not_found"}
+                    if known_failure
+                    else spotify_url_type(source_url) in {"track", "album"}
+                )
                 LOGGER.info(
                     "Song.link could not resolve source=%s retryable=%s",
                     _source_log_id(source_url),
@@ -987,9 +1007,11 @@ async def _lookup_tracks_detailed(
                     SourceStatus(
                         source_url=source_url,
                         provider=_track_provider(source_url),
-                        state="not_found",
+                        state="unavailable"
+                        if known_failure and reason != "release_not_found"
+                        else "not_found",
                         retryable=retryable,
-                        reason="release_not_found",
+                        reason=reason if known_failure else "release_not_found",
                     )
                 )
                 continue
@@ -1067,13 +1089,9 @@ def _source_log_id(source_url: str) -> str:
 
 
 def _failure_reason(error: BaseException) -> str:
-    name = type(error).__name__.casefold()
-    detail = str(error).casefold()
-    if "rate" in name or "429" in detail:
-        return "rate_limited"
-    if isinstance(error, (TimeoutError, asyncio.TimeoutError)) or "timeout" in name:
-        return "timeout"
-    return "provider_unavailable"
+    from music_links_bot.provider_errors import provider_failure_reason
+
+    return provider_failure_reason(error)
 
 
 async def _fill_genres(search_client: SearchClient, tracks: list[TrackMatch]) -> None:

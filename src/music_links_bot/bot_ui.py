@@ -489,7 +489,7 @@ def editor_rows(
             media.append(cb("ed_quick_cover", "ap"))
         media.append(cb("ed_quick_buttons", "ls"))
         rows.append(media)
-    rows.append([cb("ed_reset_original", "reset"), cb("ed_quick_more", "tools")])
+    rows.append([cb("ed_quick_more", "tools")])
     rows.append([cb("ed_done_editing", "b", tone=ButtonTone.PRIMARY)])
     return append_setting_undo(rows, draft_id, draft)
 
@@ -604,6 +604,7 @@ def editor_tools_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardBut
         )
     if draft.get("quote"):
         rows.append([cb("ed_intro_remove", "t0")])
+    rows.append([cb("ed_reset_original", "reset")])
     rows.append([cb("ed_delete", "d", tone=ButtonTone.DANGER)])
     rows.append(
         [
@@ -1056,7 +1057,16 @@ def render_crate(
                 f"<b>{index}.</b> {escape(str(item.get('artist') or '—'))} — "
                 f"{escape(str(item.get('title') or '—'))}"
             )
-        lines.extend(["", get_text(lang, "crate_hint")])
+        from music_links_bot.collection_plan import (
+            collection_check_text,
+            collection_issues,
+        )
+
+        lines.extend(
+            ["", collection_check_text(items, lang), "", get_text(lang, "crate_hint")]
+        )
+        if any(issue.blocking for issue in collection_issues(items)):
+            share_query = None
         text = "\n".join(lines)
 
     rows: list[list[InlineKeyboardButton]] = [

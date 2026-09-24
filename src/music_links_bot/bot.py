@@ -56,13 +56,11 @@ from music_links_bot.bot_editor_state import (
 )
 from music_links_bot.bot_history import record_history as _record_recent_item
 from music_links_bot.bot_lookup import (
-    _format_no_url_message,
     _send_artist_result,
     _send_mixed_result,
     _send_nts_result,
     _send_playlist_result,
     _send_youtube_result,
-    _strip_bot_mention,
 )
 from music_links_bot.bot_menu import (
     MENU_HELP,
@@ -147,7 +145,6 @@ from music_links_bot.channel_templates import (
     apply_template,
 )
 from music_links_bot.chat_access import check_publish_access
-from music_links_bot.collection_collage import collection_collage_preview_url
 from music_links_bot.constants import MAX_LINKS_PER_MESSAGE
 from music_links_bot.draft_model import new_track_draft
 from music_links_bot.editor_view import (
@@ -159,7 +156,6 @@ from music_links_bot.ephemeral import (
     send_ephemeral_message,
 )
 from music_links_bot.formatter import (
-    format_collection_message,
     format_track_message,
 )
 from music_links_bot.i18n import get_text, resolve_lang
@@ -182,7 +178,6 @@ from music_links_bot.lookup_transport import (
 from music_links_bot.models import (
     TrackMatch,
 )
-from music_links_bot.publication_budget import compose_with_intro
 from music_links_bot.publication_preflight import validate_publication
 from music_links_bot.publication_presets import (
     apply_named_preset,
@@ -200,11 +195,6 @@ from music_links_bot.publish_queue import (
     QueueStorageError,
     add_job,
 )
-from music_links_bot.search import (
-    SearchClient,
-    SearchLookupError,
-    normalize_search_query,
-)
 from music_links_bot.sharing import (
     add_share_button,
     build_share_query,
@@ -216,7 +206,6 @@ from music_links_bot.telegram_buttons import (
     ButtonTone,
     button as InlineKeyboardButton,
     callback_button,
-    current_chat_button,
     disabled_button,
 )
 from music_links_bot.telegram_messages import (
@@ -1765,28 +1754,22 @@ async def _reply_with_error(
     *,
     lang: str = "ru",
 ) -> None:
-    reply_markup = _build_error_keyboard(
-        context.bot.username,
-        lang=lang,
-        recovery="platforms",
-    )
-    if await _try_ephemeral_error(
-        message,
-        context,
-        text,
-        reply_markup,
-    ):
-        return
-    placeholder = _take_placeholder(message.chat_id)
-    if placeholder is not None:
-        try:
-            await placeholder.edit_text(text, reply_markup=reply_markup)
-            return
-        except TelegramError:
-            LOGGER.debug("Could not edit loading placeholder", exc_info=True)
-            await _try_delete_message(placeholder)
+    from music_links_bot import bot_error_handlers
 
-    await message.reply_text(text, reply_markup=reply_markup)
+    return await bot_error_handlers._reply_with_error(
+        message=message,
+        context=context,
+        text=text,
+        lang=lang,
+        hooks=bot_error_handlers.WorkflowHooks(
+            build_error_keyboard=_build_error_keyboard,
+            try_ephemeral_error=_try_ephemeral_error,
+            take_placeholder=_take_placeholder,
+            try_delete_message=_try_delete_message,
+            ephemeral_group_replies_enabled=ephemeral_group_replies_enabled,
+            send_ephemeral_message=send_ephemeral_message,
+        ),
+    )
 
 
 async def _reply_with_flow_error(
@@ -1798,76 +1781,24 @@ async def _reply_with_flow_error(
     search_query: str | None = None,
     source_url: str | None = None,
 ) -> None:
-    detail_key = {
-        BotErrorCode.INVALID_INPUT: "no_url_hint",
-        BotErrorCode.SEARCH_NOT_FOUND: "error_search",
-        BotErrorCode.RELEASE_NOT_FOUND: "error_search",
-        BotErrorCode.PROVIDER_UNAVAILABLE: "error_provider",
-        BotErrorCode.RATE_LIMITED: "error_rate_limit",
-    }.get(error.code, "no_url_hint")
-    detail = get_text(lang, detail_key)
-    if error.code == BotErrorCode.RATE_LIMITED:
-        detail = detail.format(seconds=escape(error.detail or "60"))
-    if error.code == BotErrorCode.PROVIDER_UNAVAILABLE and error.provider:
-        provider_labels = {
-            "songlink": "Song.link",
-            "youtube": "YouTube",
-            "nts": "NTS Radio",
-            "apple": "Apple Music",
-            "spotify": "Spotify",
-        }
-        provider = provider_labels.get(error.provider.casefold(), error.provider)
-        detail = get_text(lang, "error_provider_named").format(
-            provider=escape(provider)
-        )
-    title_key = {
-        BotErrorCode.INVALID_INPUT: "error_title_invalid_input",
-        BotErrorCode.SEARCH_NOT_FOUND: "error_title_not_found",
-        BotErrorCode.RELEASE_NOT_FOUND: "error_title_not_found",
-        BotErrorCode.PROVIDER_UNAVAILABLE: "error_title_provider",
-        BotErrorCode.RATE_LIMITED: "error_title_rate_limit",
-    }.get(error.code, "error_title")
-    text = f"⚠️ <b>{get_text(lang, title_key)}</b>\n{detail}"
-    if search_query and error.code in {
-        BotErrorCode.SEARCH_NOT_FOUND,
-        BotErrorCode.RELEASE_NOT_FOUND,
-    }:
-        text += f"\n\n<blockquote>{escape(search_query[:120])}</blockquote>"
-    recovery = {
-        BotErrorCode.INVALID_INPUT: "platforms",
-        BotErrorCode.SEARCH_NOT_FOUND: "change",
-        BotErrorCode.RELEASE_NOT_FOUND: "change",
-        BotErrorCode.PROVIDER_UNAVAILABLE: "retry",
-        BotErrorCode.RATE_LIMITED: "retry",
-        BotErrorCode.LIMIT_EXCEEDED: "crate",
-    }.get(error.code, "retry" if error.retryable else "search")
-    keyboard = _build_error_keyboard(
-        context.bot.username,
+    from music_links_bot import bot_error_handlers
+
+    return await bot_error_handlers._reply_with_flow_error(
+        message=message,
+        context=context,
+        error=error,
         lang=lang,
-        retryable=error.retryable,
         search_query=search_query,
         source_url=source_url,
-        recovery=recovery,
+        hooks=bot_error_handlers.WorkflowHooks(
+            build_error_keyboard=_build_error_keyboard,
+            try_ephemeral_error=_try_ephemeral_error,
+            take_placeholder=_take_placeholder,
+            try_delete_message=_try_delete_message,
+            ephemeral_group_replies_enabled=ephemeral_group_replies_enabled,
+            send_ephemeral_message=send_ephemeral_message,
+        ),
     )
-    if await _try_ephemeral_error(
-        message,
-        context,
-        text,
-        keyboard,
-        parse_mode=ParseMode.HTML,
-    ):
-        return
-    placeholder = _take_placeholder(message.chat_id)
-    if placeholder is not None:
-        try:
-            await placeholder.edit_text(
-                text, parse_mode=ParseMode.HTML, reply_markup=keyboard
-            )
-            return
-        except TelegramError:
-            LOGGER.debug("Could not edit flow-error placeholder", exc_info=True)
-            await _try_delete_message(placeholder)
-    await message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
 
 async def _try_ephemeral_error(
@@ -1878,29 +1809,23 @@ async def _try_ephemeral_error(
     *,
     parse_mode: object | None = None,
 ) -> bool:
-    """Keep recovery private in groups and preserve the public fallback."""
-    user = getattr(message, "from_user", None)
-    if (
-        getattr(message.chat, "type", None) not in {"group", "supergroup"}
-        or user is None
-        or not ephemeral_group_replies_enabled()
-    ):
-        return False
-    delivered = await send_ephemeral_message(
-        getattr(context.bot, "token", None),
-        message.chat_id,
-        user.id,
-        text,
+    from music_links_bot import bot_error_handlers
+
+    return await bot_error_handlers._try_ephemeral_error(
+        message=message,
+        context=context,
+        text=text,
+        keyboard=keyboard,
         parse_mode=parse_mode,
-        reply_markup=keyboard,
-        reply_to_message_id=getattr(message, "message_id", None),
+        hooks=bot_error_handlers.WorkflowHooks(
+            build_error_keyboard=_build_error_keyboard,
+            try_ephemeral_error=_try_ephemeral_error,
+            take_placeholder=_take_placeholder,
+            try_delete_message=_try_delete_message,
+            ephemeral_group_replies_enabled=ephemeral_group_replies_enabled,
+            send_ephemeral_message=send_ephemeral_message,
+        ),
     )
-    if not delivered:
-        return False
-    placeholder = _take_placeholder(message.chat_id)
-    if placeholder is not None:
-        await _try_delete_message(placeholder)
-    return True
 
 
 async def _send_typing_action(bot: Bot, message: Message) -> None:
@@ -1921,119 +1846,23 @@ async def _resolve_search_sources(
     user_id: int,
     lang: str,
 ) -> tuple[list[str], bool, str] | None:
-    """Resolve a private text query or finish the flow with a picker/error."""
-    search_query = normalize_search_query(
-        _strip_bot_mention(message_text or "", context.bot.username)
-    )
-    if search_query is None:
-        await _reply_with_error(
-            message,
-            context,
-            _format_no_url_message(message_text, message.chat_id, lang=lang),
-            lang=lang,
-        )
-        return None
+    from music_links_bot import bot_search_handlers
 
-    await _send_loading_placeholder(message, lang)
-    search_client: SearchClient = context.application.bot_data["search_client"]
-    try:
-        if hasattr(search_client, "search_release_candidates"):
-            candidates = await search_client.search_release_candidates(search_query)
-        else:
-            source_url = await search_client.search_release_url(search_query)
-            candidates = [
-                type(
-                    "SearchChoice",
-                    (),
-                    {"url": source_url, "artist": "", "title": search_query},
-                )()
-            ]
-        if len(candidates) > 1:
-            selection_id = await _store_search_selection(
-                context,
-                user_id=user_id,
-                query=search_query,
-                urls=[candidate.url for candidate in candidates[:3]],
-            )
-            placeholder = _take_placeholder(message.chat_id)
-            lines = [
-                get_text(lang, "search_choose").replace(
-                    "{query}", escape(search_query)
-                ),
-                "",
-            ]
-            for index, candidate in enumerate(candidates[:3], start=1):
-                artist = escape(str(getattr(candidate, "artist", "") or "—"))
-                title = escape(str(getattr(candidate, "title", "") or "—"))
-                meta = [
-                    escape(str(value))
-                    for value in (
-                        getattr(candidate, "album", None),
-                        getattr(candidate, "year", None),
-                    )
-                    if value
-                ]
-                suffix = f" <i>· {' · '.join(meta)}</i>" if meta else ""
-                lines.append(f"<b>{index}.</b> {artist} — {title}{suffix}")
-            text = "\n".join(lines)
-            keyboard = InlineKeyboardMarkup(
-                [
-                    [
-                        callback_button(
-                            (
-                                f"{index + 1} · "
-                                f"{getattr(candidate, 'artist', '')} — {candidate.title}"
-                            )[:64],
-                            encode_callback(
-                                "select", "pick", f"{selection_id}:{index}"
-                            ),
-                            tone=ButtonTone.PRIMARY if index == 0 else None,
-                        )
-                    ]
-                    for index, candidate in enumerate(candidates[:3])
-                ]
-                + [
-                    [
-                        current_chat_button(
-                            get_text(lang, "search_change"),
-                            search_query,
-                        )
-                    ],
-                    [
-                        callback_button(
-                            get_text(lang, "home_back"),
-                            encode_callback("menu", "start"),
-                        )
-                    ],
-                ]
-            )
-            if placeholder is not None:
-                try:
-                    await placeholder.edit_text(
-                        text,
-                        parse_mode=ParseMode.HTML,
-                        reply_markup=keyboard,
-                    )
-                    return None
-                except TelegramError:
-                    LOGGER.debug("Could not edit search progress", exc_info=True)
-                    await _try_delete_message(placeholder)
-            await message.reply_text(
-                text,
-                parse_mode=ParseMode.HTML,
-                reply_markup=keyboard,
-            )
-            return None
-        return [candidates[0].url], True, search_query
-    except (SearchLookupError, IndexError):
-        await _reply_with_flow_error(
-            message,
-            context,
-            BotFlowError(BotErrorCode.SEARCH_NOT_FOUND, retryable=True),
-            lang=lang,
-            search_query=search_query,
-        )
-        return None
+    return await bot_search_handlers._resolve_search_sources(
+        message=message,
+        context=context,
+        message_text=message_text,
+        user_id=user_id,
+        lang=lang,
+        hooks=bot_search_handlers.WorkflowHooks(
+            reply_with_error=_reply_with_error,
+            send_loading_placeholder=_send_loading_placeholder,
+            store_search_selection=_store_search_selection,
+            take_placeholder=_take_placeholder,
+            try_delete_message=_try_delete_message,
+            reply_with_flow_error=_reply_with_flow_error,
+        ),
+    )
 
 
 async def track_lookup_message(
@@ -2277,23 +2106,21 @@ async def _send_track_matches(
                 )
             if message.chat.type == "channel":
                 collection_keyboard = make_channel_safe_keyboard(collection_keyboard)
-        collection_body = format_collection_message(
+        from music_links_bot.collection_plan import build_collection_plan
+
+        plan = build_collection_plan(
             tracks,
-            include_hashtags=include_hashtags,
+            context=context,
             title=title,
+            include_hashtags=include_hashtags,
+            include_channel_button=include_channel_button,
+            intro_html=user_prefix,
+            complete=len(tracks) == total,
         )
-        collection_text, _intro = compose_with_intro(
-            {"quote": bool(user_prefix)},
-            prefix_html=user_prefix,
-            body_html=collection_body,
-        )
-        collection_preview = (
-            (collection_collage_preview_url(tracks) if len(tracks) == total else None)
-            or _select_preview_url(tracks[0].links, context)
-            or tracks[0].thumbnail_url
-        )
-        collection_sources = tuple(
-            url for track in tracks for url in track.links.values()
+        collection_text, collection_preview, collection_sources = (
+            plan.text,
+            plan.preview_url,
+            plan.source_urls,
         )
         await _send_track_result(
             context.bot,

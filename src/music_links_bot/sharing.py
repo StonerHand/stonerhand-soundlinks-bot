@@ -10,7 +10,6 @@ from telegram import InlineKeyboardMarkup
 from music_links_bot.collection_collage import collection_collage_preview_url
 from music_links_bot.formatter import (
     format_artist_collection_message,
-    format_collection_message,
     format_mixed_collection_message,
     format_playlist_collection_message,
     format_radio_collection_message,
@@ -19,7 +18,6 @@ from music_links_bot.formatter import (
 from music_links_bot.keyboards import (
     DEFAULT_PLATFORM_ORDER,
     _build_artist_collection_keyboard,
-    _build_collection_keyboard,
     _build_mixed_collection_keyboard,
     _build_nts_collection_keyboard,
     _build_playlist_collection_keyboard,
@@ -231,12 +229,15 @@ def render_inline_share_card(
             found=len(bundle.tracks),
             total=total_count,
         )
-        text = format_collection_message(
+        from music_links_bot.collection_plan import build_collection_plan
+
+        plan = build_collection_plan(
             bundle.tracks,
-            include_hashtags=True,
+            context=context,
             title=title,
+            complete=found_count == total_count,
         )
-        keyboard = _build_collection_keyboard(bundle.tracks)
+        text, keyboard, preview_url = plan.text, plan.keyboard, plan.preview_url
     elif bundle.content_type_count == 1 and bundle.videos:
         title = collection_result_title(
             lang,

@@ -48,6 +48,10 @@ async def stats_text(context, *, include_private: bool) -> str:
 
     text += await feedback_text(context.application.bot_data)
 
+    from music_links_bot.operation_metrics import latency_summary
+
+    for name, metric in latency_summary(context.application.bot_data).items():
+        text += f"\n{name}: p50 {metric['p50_ms']} ms · p95 {metric['p95_ms']} ms · n={metric['samples']} (текущий экземпляр)"
     runtime = context.application.bot_data.get("runtime")
     if runtime is None:
         return text
