@@ -106,6 +106,20 @@ def _artwork_preview_url(
     return preview_url if len(preview_url) <= MAX_PREVIEW_URL_LENGTH else None
 
 
+def is_generated_artwork_url(url: str | None) -> bool:
+    """Identify our signed image URLs, not arbitrary provider pages."""
+    if not url:
+        return False
+    parsed = urlparse(url)
+    origin = _public_origin(None)
+    if not origin or parsed.netloc != urlparse(origin).netloc:
+        return False
+    from urllib.parse import parse_qs
+
+    query = parse_qs(parsed.query)
+    return parsed.path == "/api/collage" and bool(query.get("p") and query.get("s"))
+
+
 def decode_collage_payload(
     payload: str,
     signature: str,

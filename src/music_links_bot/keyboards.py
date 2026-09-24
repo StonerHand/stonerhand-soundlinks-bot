@@ -102,6 +102,10 @@ def _build_link_preview_options(
     if not preview_url:
         return LinkPreviewOptions(is_disabled=True)
 
+    from music_links_bot.collection_collage import is_generated_artwork_url
+
+    # Raw generated images have no small-card title or description.
+    prefer_large_media = prefer_large_media or is_generated_artwork_url(preview_url)
     media_preferences = (
         {"prefer_large_media": True}
         if prefer_large_media
