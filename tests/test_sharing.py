@@ -1,10 +1,12 @@
 import os
 import unittest
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlparse
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from music_links_bot.bot_lookup import LookupBundle
+from music_links_bot.collection_collage import decode_collage_payload
 from music_links_bot.models import TrackMatch
 from music_links_bot.sharing import (
     MAX_SHARE_QUERY_LENGTH,
@@ -186,7 +188,13 @@ class SharingTests(unittest.TestCase):
                 share_label="Поделиться",
                 requested_count=3,
             )
-        self.assertEqual(card.preview_url, "https://open.spotify.com/track/0")
+        query = parse_qs(urlparse(card.preview_url).query)
+        self.assertEqual(
+            decode_collage_payload(
+                query["p"][0], query["s"][0], signing_secret="secret", allow_single=True
+            ),
+            ["https://i.scdn.co/0.jpg"],
+        )
 
     def test_complete_inline_collection_uses_all_distinct_artworks(self) -> None:
         tracks = [

@@ -628,6 +628,9 @@ async def _build_inline_result(
         return None
 
     track = tracks[0]
+    from music_links_bot.collection_collage import branded_artwork_preview_url
+
+    branded_preview = branded_artwork_preview_url(track.thumbnail_url)
     keyboard = add_share_button(
         _build_link_keyboard(
             track.links,
@@ -655,7 +658,8 @@ async def _build_inline_result(
         ),
         text=format_track_message(track, include_hashtags=True),
         keyboard=keyboard,
-        preview_url=(
+        preview_url=branded_preview
+        or (
             track.thumbnail_url
             if use_clean_artwork(track)
             else _select_preview_url(track.links, context) or track.thumbnail_url
