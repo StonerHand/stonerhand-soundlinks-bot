@@ -8,7 +8,10 @@ from typing import Any
 
 from telegram import InlineKeyboardMarkup
 
-from music_links_bot.collection_collage import collection_collage_preview_url
+from music_links_bot.collection_collage import (
+    branded_artwork_preview_url,
+    collection_collage_preview_url,
+)
 from music_links_bot.formatter import format_collection_message
 from music_links_bot.i18n import get_text
 from music_links_bot.keyboards import _build_collection_keyboard, _select_preview_url
@@ -100,6 +103,7 @@ def build_collection_plan(
     )
     preview = collection_collage_preview_url(tracks) if complete else None
     if tracks:
+        preview = preview or branded_artwork_preview_url(tracks[0].thumbnail_url)
         preview = (
             preview
             or _select_preview_url(tracks[0].links, context)

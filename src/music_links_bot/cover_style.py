@@ -18,7 +18,7 @@ def brand_label(default: str = "@stonerhand") -> str:
 
 
 def signature_cache_key() -> str:
-    value = f"signature-v1:{photo_branding_enabled()}:{brand_label()}"
+    value = f"signature-v2:{photo_branding_enabled()}:{brand_label()}"
     return hashlib.sha256(value.encode()).hexdigest()[:12]
 
 

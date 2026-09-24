@@ -7,7 +7,10 @@ from urllib.parse import parse_qs, urlparse
 
 from telegram import InlineKeyboardMarkup
 
-from music_links_bot.collection_collage import collection_collage_preview_url
+from music_links_bot.collection_collage import (
+    branded_artwork_preview_url,
+    collection_collage_preview_url,
+)
 from music_links_bot.formatter import (
     format_artist_collection_message,
     format_mixed_collection_message,
@@ -405,7 +408,11 @@ def _bundle_preview_url(
         if collage_url:
             return collage_url
         track = bundle.tracks[0]
-        return _select_preview_url(track.links, context) or track.thumbnail_url
+        return (
+            branded_artwork_preview_url(track.thumbnail_url)
+            or _select_preview_url(track.links, context)
+            or track.thumbnail_url
+        )
     if bundle.playlists:
         return bundle.playlists[0].url
     if bundle.artists:

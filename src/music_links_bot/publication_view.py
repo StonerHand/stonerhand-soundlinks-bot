@@ -90,6 +90,8 @@ def build_publication_view(
     include_channel_button: bool,
     max_visible_platforms: int | None = None,
 ) -> PublicationPlan:
+    from music_links_bot.collection_collage import branded_artwork_preview_url
+
     hashtags = resolve_draft_hashtags(draft, track)
     prefix = str(draft.get("prefix") or "")
     body = format_track_message(
@@ -123,7 +125,9 @@ def build_publication_view(
         keyboard=keyboard,
         intro=intro,
         hashtags=hashtags,
-        preview_url=_select_preview_url(track.links, context) or track.thumbnail_url,
+        preview_url=branded_artwork_preview_url(track.thumbnail_url)
+        or _select_preview_url(track.links, context)
+        or track.thumbnail_url,
         cover=cover,
         source_audio_file_id=source_audio_file_id,
         as_photo=bool(draft.get("as_photo")),

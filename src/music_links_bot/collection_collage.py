@@ -11,7 +11,11 @@ import zlib
 from contextlib import ExitStack
 from urllib.parse import urlencode, urlparse
 
-from music_links_bot.cover_style import apply_cover_signature, signature_cache_key
+from music_links_bot.cover_style import (
+    apply_cover_signature,
+    photo_branding_enabled,
+    signature_cache_key,
+)
 from music_links_bot.models import TrackMatch
 from music_links_bot.telegram_gateway import feature_enabled
 from music_links_bot.webhook_secret import secrets_match
@@ -36,6 +40,10 @@ _ARTWORK_HOST_SUFFIXES = (
     "sndcdn.com",
     "spotifycdn.com",
     "ytimg.com",
+    "resources.tidal.com",
+    "bcbits.com",
+    "music.yandex.net",
+    "avatars.yandex.net",
 )
 
 
@@ -48,7 +56,7 @@ def collection_collage_preview_url(
     """Build a signed public image URL for a 2–6-cover classic preview."""
     if not feature_enabled("COLLECTION_COLLAGE_ENABLED", default=True):
         return None
-    if not MIN_COLLAGE_ITEMS <= len(tracks) <= MAX_COLLAGE_ITEMS:
+    if len(tracks) < MIN_COLLAGE_ITEMS:
         return None
 
     artwork_urls: list[str] = []
@@ -56,8 +64,36 @@ def collection_collage_preview_url(
         thumbnail = str(track.thumbnail_url or "").strip()
         if thumbnail and _safe_source_url(thumbnail) and thumbnail not in artwork_urls:
             artwork_urls.append(thumbnail)
+            if len(artwork_urls) == MAX_COLLAGE_ITEMS:
+                break
     if len(artwork_urls) < MIN_COLLAGE_ITEMS:
         return None
+    return _artwork_preview_url(
+        artwork_urls, base_url=base_url, signing_secret=signing_secret
+    )
+
+
+def branded_artwork_preview_url(
+    artwork_url: str | None,
+    *,
+    base_url: str | None = None,
+    signing_secret: str | None = None,
+) -> str | None:
+    """Signed single-cover image for Telegram link previews and inline posts."""
+    if (
+        not photo_branding_enabled()
+        or not artwork_url
+        or not _safe_source_url(artwork_url)
+    ):
+        return None
+    return _artwork_preview_url(
+        [artwork_url], base_url=base_url, signing_secret=signing_secret
+    )
+
+
+def _artwork_preview_url(
+    artwork_urls: list[str], *, base_url: str | None, signing_secret: str | None
+) -> str | None:
     public_origin = _public_origin(base_url)
     secret = str(signing_secret or os.getenv("BOT_TOKEN") or "").strip()
     if not public_origin or not secret:
@@ -75,6 +111,7 @@ def decode_collage_payload(
     signature: str,
     *,
     signing_secret: str,
+    allow_single: bool = False,
 ) -> list[str] | None:
     """Verify a collage request and return only safe HTTPS artwork URLs."""
     if (
@@ -113,9 +150,10 @@ def decode_collage_payload(
     if not isinstance(value, list):
         return None
     urls = [str(url).strip() for url in value]
-    if not MIN_COLLAGE_ITEMS <= len(urls) <= MAX_COLLAGE_ITEMS:
+    minimum = 1 if allow_single else MIN_COLLAGE_ITEMS
+    if not minimum <= len(urls) <= MAX_COLLAGE_ITEMS:
         return None
-    if len(set(urls)) < MIN_COLLAGE_ITEMS:
+    if len(set(urls)) < minimum:
         return None
     return urls if all(_safe_source_url(url) for url in urls) else None
 

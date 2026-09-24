@@ -17,6 +17,7 @@ SRC_PATH = PROJECT_ROOT / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
+from music_links_bot.branding import compose_cover
 from music_links_bot.collection_collage import (
     MAX_ARTWORK_BYTES,
     compose_collection_collage,
@@ -52,6 +53,7 @@ class handler(BaseHTTPRequestHandler):
             query.get("p", [""])[0],
             signature,
             signing_secret=os.getenv("BOT_TOKEN", "").strip(),
+            allow_single=True,
         )
         if urls is None:
             self.send_error(HTTPStatus.FORBIDDEN)
@@ -67,9 +69,14 @@ class handler(BaseHTTPRequestHandler):
 
         with ThreadPoolExecutor(max_workers=min(2, len(urls))) as executor:
             images = [image for image in executor.map(_fetch_artwork, urls) if image]
-        collage = compose_collection_collage(
-            images, label=brand_label() if photo_branding_enabled() else None
-        )
+        if len(images) == 1 and photo_branding_enabled():
+            collage = compose_cover(images[0], label=brand_label(), size=1200)
+        elif len(images) >= 2:
+            collage = compose_collection_collage(
+                images, label=brand_label() if photo_branding_enabled() else None
+            )
+        else:
+            collage = None
         if collage is None:
             self.send_response(HTTPStatus.FOUND)
             self.send_header("location", urls[0])
