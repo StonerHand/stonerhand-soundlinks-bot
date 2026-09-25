@@ -759,6 +759,11 @@ async def _build_inline_collection_result(
         text=card.text,
         keyboard=card.keyboard,
         preview_url=card.preview_url,
+        thumbnail_url=next(
+            (track.thumbnail_url for track in bundle.tracks if track.thumbnail_url),
+            None,
+        ),
+        force_classic=force_classic,
         channel_safe=channel_safe,
         found_count=card.publication.found_count,
         requested_count=card.publication.requested_count,
@@ -875,9 +880,15 @@ def _inline_article(
     from music_links_bot.collection_collage import is_generated_artwork_url
     from music_links_bot.publication_budget import visible_length
 
+    generated_preview = is_generated_artwork_url(preview_url)
+    branded_inline_photo = feature_enabled(
+        "INLINE_BRANDED_PHOTO_ENABLED", default=False
+    )
     if (
         not use_rich
-        and is_generated_artwork_url(preview_url)
+        and not force_classic
+        and branded_inline_photo
+        and generated_preview
         and visible_length(text) <= PHOTO_CAPTION_LIMIT
     ):
         return InlineQueryResultPhoto(
@@ -894,6 +905,10 @@ def _inline_article(
             parse_mode=ParseMode.HTML,
             reply_markup=keyboard,
         )
+    # Inline photo URLs must be fetched by Telegram before a result can be sent.
+    # A provider thumbnail keeps inline usable when the image endpoint is unreachable.
+    if generated_preview:
+        preview_url = thumbnail_url
     rich_message: dict[str, object] = {"html": rich_html or ""}
     if rich_media:
         rich_message["media"] = rich_media
