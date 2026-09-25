@@ -72,7 +72,10 @@ def test_single_inline_uses_branded_preview_and_preserves_buttons():
             ),
         ):
             result = await _build_inline_result(track().links["spotify"], context)
-        url = result.input_message_content.link_preview_options.url
+        url = result.photo_url
+        assert result.type == "photo"
+        assert result.caption
+        assert result.input_message_content is None
         assert decoded(url) == [track().thumbnail_url]
         assert result.reply_markup.inline_keyboard
 

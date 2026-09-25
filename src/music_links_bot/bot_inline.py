@@ -7,6 +7,7 @@ import logging
 from telegram import (
     InlineKeyboardMarkup,
     InlineQueryResultArticle,
+    InlineQueryResultPhoto,
     InlineQueryResultsButton,
     InputTextMessageContent,
     Update,
@@ -207,9 +208,9 @@ async def inline_query_handler(
         ),
         return_exceptions=True,
     )
-    results: list[InlineQueryResultArticle] = []
+    results: list[InlineQueryResultArticle | InlineQueryResultPhoto] = []
     for source_url, outcome in zip(page_urls, outcomes, strict=True):
-        if isinstance(outcome, InlineQueryResultArticle):
+        if isinstance(outcome, (InlineQueryResultArticle, InlineQueryResultPhoto)):
             results.append(outcome)
         elif isinstance(outcome, Exception):
             LOGGER.error(
@@ -267,7 +268,9 @@ async def inline_query_handler(
             classic_results = [
                 outcome
                 for outcome in classic_outcomes
-                if isinstance(outcome, InlineQueryResultArticle)
+                if isinstance(
+                    outcome, (InlineQueryResultArticle, InlineQueryResultPhoto)
+                )
             ]
             if classic_results:
                 await remember_results(context.application.bot_data, classic_results)
@@ -493,7 +496,7 @@ async def _build_inline_result(
     channel_safe: bool = False,
     history: bool = False,
     force_classic: bool = False,
-) -> InlineQueryResultArticle | None:
+) -> InlineQueryResultArticle | InlineQueryResultPhoto | None:
     bot_data = context.application.bot_data
     share_query = build_share_query([source_url])
     share_label = get_text(lang, "share_post")
@@ -685,7 +688,7 @@ async def _build_inline_collection_result(
     channel_safe: bool = False,
     force_classic: bool = False,
     user_id: int = 0,
-) -> InlineQueryResultArticle | None:
+) -> InlineQueryResultArticle | InlineQueryResultPhoto | None:
     if len(source_urls) == 1:
         return await _build_inline_result(
             source_urls[0],
@@ -840,7 +843,7 @@ def _inline_article(
     found_count: int = 1,
     requested_count: int = 1,
     source_urls: tuple[str, ...] = (),
-) -> InlineQueryResultArticle:
+) -> InlineQueryResultArticle | InlineQueryResultPhoto:
     if channel_safe:
         keyboard = make_channel_safe_keyboard(keyboard)
     effective_source_urls = source_urls
@@ -868,6 +871,29 @@ def _inline_article(
         and not channel_safe
         and not force_classic
     )
+    from music_links_bot.bot_builder import PHOTO_CAPTION_LIMIT
+    from music_links_bot.collection_collage import is_generated_artwork_url
+    from music_links_bot.publication_budget import visible_length
+
+    if (
+        not use_rich
+        and is_generated_artwork_url(preview_url)
+        and visible_length(text) <= PHOTO_CAPTION_LIMIT
+    ):
+        return InlineQueryResultPhoto(
+            id=hashlib.sha256(
+                (
+                    source_url + text + keyboard.to_json() + str(preview_url) + "photo"
+                ).encode()
+            ).hexdigest()[:32],
+            photo_url=preview_url,
+            thumbnail_url=thumbnail_url or preview_url,
+            title=title,
+            description=description,
+            caption=text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=keyboard,
+        )
     rich_message: dict[str, object] = {"html": rich_html or ""}
     if rich_media:
         rich_message["media"] = rich_media
@@ -897,6 +923,8 @@ def _inline_article(
     )
 
 
-def _result_uses_rich(result: InlineQueryResultArticle) -> bool:
+def _result_uses_rich(
+    result: InlineQueryResultArticle | InlineQueryResultPhoto,
+) -> bool:
     content = getattr(result, "input_message_content", None)
     return isinstance(content, dict) and isinstance(content.get("rich_message"), dict)
