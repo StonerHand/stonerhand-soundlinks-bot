@@ -35,13 +35,13 @@ Changelog = "https://github.com/StonerHand/stonerhand-soundlinks-bot/blob/main/C
 [project.optional-dependencies]
 dev = [
   "bandit==1.9.4",
-  "coverage==7.16.0",
+  "coverage==7.16.1",
   "fakeredis[lua]==2.38.0",
   "mypy==2.3.1",
   "pip-audit==2.10.1",
   "pytest==9.1.1",
   "pyflakes==3.4.0",
-  "ruff==0.16.6",
+  "ruff==0.16.8",
   "tomli==2.4.1; python_version < '3.11'",
 ]
 
