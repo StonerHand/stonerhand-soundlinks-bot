@@ -1766,10 +1766,13 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsNotNone(result)
         assert result is not None
-        self.assertEqual(result.type, "photo")
-        self.assertTrue(result.photo_url.startswith("https://bot.example/api/collage?"))
-        self.assertIsNone(result.input_message_content)
-        self.assertTrue(result.caption)
+        self.assertEqual(result.type, "article")
+        self.assertTrue(
+            result.input_message_content.link_preview_options.url.startswith(
+                "https://i.scdn.co/"
+            )
+        )
+        self.assertTrue(result.input_message_content.message_text)
 
     async def test_inline_collection_restores_matching_editorial_intro(self) -> None:
         urls = [

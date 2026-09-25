@@ -21,6 +21,7 @@ ENV = {
     "BOT_TOKEN": "test-signing-secret",
     "WEBHOOK_BASE_URL": "https://bot.example",
     "BRAND_PHOTO_FRAME": "1",
+    "INLINE_BRANDED_PHOTO_ENABLED": "1",
     "BRAND_LABEL": "@stonerhand",
 }
 
@@ -72,11 +73,12 @@ def test_single_inline_uses_branded_preview_and_preserves_buttons():
             ),
         ):
             result = await _build_inline_result(track().links["spotify"], context)
-        url = result.photo_url
-        assert result.type == "photo"
-        assert result.caption
-        assert result.input_message_content is None
-        assert decoded(url) == [track().thumbnail_url]
+        assert result.type == "article"
+        assert result.input_message_content.message_text
+        assert (
+            result.input_message_content.link_preview_options.url
+            == track().thumbnail_url
+        )
         assert result.reply_markup.inline_keyboard
 
     asyncio.run(run())

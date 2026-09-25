@@ -17,6 +17,7 @@ ENV = {
     "WEBHOOK_BASE_URL": "https://bot.example",
     "BOT_TOKEN": "test",
     "BRAND_PHOTO_FRAME": "1",
+    "INLINE_BRANDED_PHOTO_ENABLED": "1",
 }
 TRACK = TrackMatch(
     artist="Artist",
@@ -94,3 +95,19 @@ async def _check_delivery(error):
         )
     else:
         bot.send_message.assert_not_awaited()
+
+
+def test_default_inline_does_not_depend_on_generated_image_server():
+    with patch.dict(os.environ, {**ENV, "INLINE_BRANDED_PHOTO_ENABLED": "0"}):
+        result = _inline_article(
+            TRACK.links["spotify"],
+            title="Song",
+            description="Artist",
+            text="Full post",
+            keyboard=InlineKeyboardMarkup([]),
+            preview_url=branded_artwork_preview_url(TRACK.thumbnail_url),
+            thumbnail_url=TRACK.thumbnail_url,
+        )
+    assert result.type == "article"
+    assert result.input_message_content.message_text == "Full post"
+    assert result.input_message_content.link_preview_options.url == TRACK.thumbnail_url
