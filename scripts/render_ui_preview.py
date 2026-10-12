@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 from telegram import InlineKeyboardMarkup
 
 from music_links_bot.bot_preferences import preferences_view
-from music_links_bot.bot_recent import render_drafts_view, render_recent_view
+from music_links_bot.bot_recent import render_drafts_view
 from music_links_bot.bot_runtime import UserSession
 from music_links_bot.bot_ui import (
     build_create_keyboard,
@@ -22,14 +22,11 @@ from music_links_bot.bot_ui import (
     build_publish_confirmation,
     build_start_keyboard,
     editor_appearance_rows,
-    editor_delivery_rows,
     editor_hashtag_rows,
     editor_intro_rows,
     editor_overflow_rows,
     editor_platform_rows,
     editor_schedule_rows,
-    editor_style_rows,
-    editor_tag_options_rows,
     editor_text_rows,
     editor_tools_rows,
     render_crate,
@@ -158,11 +155,8 @@ async def main():
     for name, key, builder in (
         ("appearance", "ed_appearance_title", editor_appearance_rows),
         ("text", "ed_text_title", editor_text_rows),
-        ("style", "ed_style_title", editor_style_rows),
-        ("format", "ed_delivery_title", editor_delivery_rows),
         ("intro", "ed_intro_title", editor_intro_rows),
         ("tags", "ed_hashtags_title", editor_hashtag_rows),
-        ("tag_options", "ed_tag_options_title", editor_tag_options_rows),
         ("tools", "ed_tools_title", editor_tools_rows),
     ):
         screens[name] = screen(
@@ -187,26 +181,7 @@ async def main():
         screens["pref_" + section] = screen(
             *preferences_view(UserSession(user_id=7), lang="ru", section=section)
         )
-    screens["published"] = {
-        "text": "<b>Пост опубликован</b>\n\nSleep — Dopesmoker\n\nКанал: <b>@stonerhand</b>\n08.09 · 14:00",
-        "art": False,
-        "rows": [
-            [{"label": "Открыть пост", "action": "external", "style": "success"}],
-            [
-                {
-                    "label": get_text("ru", "ed_create_more"),
-                    "action": "v2|menu|create",
-                    "style": "neutral",
-                }
-            ],
-        ],
-    }
     screens["preview"] = screen(*render_track_draft(draft, context))
-    screens["sent"] = {
-        **screens["published"],
-        "text": "<b>" + get_text("ru", "ed_sent") + "</b>\n\nSleep — Dopesmoker",
-        "rows": screens["published"]["rows"][1:],
-    }
     demo_drafts = {}
     for index in range(8):
         item = new_track_draft(track, chat_id=7, lang="ru")
@@ -233,9 +208,6 @@ async def main():
         return demo_drafts.get(draft_id)
 
     for page in (0, 1):
-        screens[f"recent{page}"] = screen(
-            *await render_recent_view(context, user_id=7, lang="ru", page=page)
-        )
         screens[f"drafts{page}"] = screen(
             *await render_drafts_view(
                 context,

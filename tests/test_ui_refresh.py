@@ -22,7 +22,7 @@ from music_links_bot.bot_preferences import (
     dispatch_preferences,
     preferences_view,
 )
-from music_links_bot.bot_recent import render_drafts_view, render_recent_view
+from music_links_bot.bot_recent import render_drafts_view
 from music_links_bot.bot_runtime import (
     BotRuntime,
     CallbackAction,
@@ -353,25 +353,6 @@ class DraftLibraryTests(unittest.IsolatedAsyncioTestCase):
             if (b.callback_data or "").startswith("v2|editor|")
         )
         self.assertTrue(post.startswith("📝 "), post)
-
-    async def test_recent_releases_are_paged(self):
-        context = context_for(
-            bot_history={
-                7: [
-                    {
-                        "title": f"Release {n}",
-                        "artist": "Artist",
-                        "source_url": f"https://open.spotify.com/track/{n}",
-                    }
-                    for n in range(10)
-                ]
-            }
-        )
-        text, keyboard = await render_recent_view(context, user_id=7, lang="ru", page=1)
-        self.assertIn("Release 9", text)
-        self.assertEqual(
-            keyboard.inline_keyboard[-2][0].callback_data, "v2|menu|recent|0"
-        )
 
     async def test_queue_success_updates_linked_draft(self):
         context = context_for()

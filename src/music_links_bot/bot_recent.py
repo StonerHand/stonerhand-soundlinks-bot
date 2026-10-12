@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from datetime import datetime
 from html import escape
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from telegram import InlineKeyboardMarkup
 
@@ -246,79 +244,6 @@ async def render_search_view(
         ]
     )
     return "\n".join(lines), InlineKeyboardMarkup(rows)
-
-
-async def render_recent_view(
-    context, *, user_id: int, lang: str, page: int = 0
-) -> tuple[str, InlineKeyboardMarkup]:
-    history = await load_history_items(context, user_id)
-    if not history:
-        return _empty_view(lang, "recent_empty")
-    visible, page, pages = _page(history, page)
-    lines = [
-        get_text(lang, "recent_title"),
-        get_text(lang, "queue_page").format(page=page + 1, pages=pages),
-    ]
-    rows = []
-    zone = str(context.application.bot_data.get("timezone_name") or "Europe/Moscow")
-    for index, item in enumerate(visible, start=page * PAGE_SIZE + 1):
-        _append_recent_line(lines, index, item, lang=lang, timezone_name=zone)
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    active_card_label({"item": item}, get_text(lang, "recent_repeat")),
-                    switch_inline_query_current_chat=str(item.get("source_url") or "")[
-                        :256
-                    ],
-                )
-            ]
-        )
-    _navigation(rows, lang=lang, action="recent", page=page, pages=pages)
-    return "\n".join(lines), InlineKeyboardMarkup(rows)
-
-
-def _append_recent_line(
-    lines: list[str],
-    index: int,
-    item: dict,
-    *,
-    lang: str,
-    timezone_name: str = "Europe/Moscow",
-) -> None:
-    when = ""
-    timestamp = item.get("ts")
-    if isinstance(timestamp, (int, float)) and 0 < timestamp < 253402300800:
-        try:
-            zone = ZoneInfo(timezone_name)
-            moment = datetime.fromtimestamp(timestamp, zone)
-            today = datetime.now(zone).date()
-            when = moment.strftime(
-                ("today" if lang == "en" else "сегодня") + " · %H:%M"
-                if moment.date() == today
-                else "%d.%m · %H:%M"
-            )
-        except (ValueError, OverflowError, OSError, ZoneInfoNotFoundError):
-            pass
-    label = " — ".join(str(item.get(key) or "—")[:180] for key in ("artist", "title"))
-    lines.append(
-        f"\n<b>{index}. {escape(label)}</b>"
-        + (f"\n<i>{escape(when)}</i>" if when else "")
-    )
-
-
-def _empty_view(lang: str, key: str) -> tuple[str, InlineKeyboardMarkup]:
-    return get_text(lang, key), InlineKeyboardMarkup(
-        [
-            [
-                InlineKeyboardButton(
-                    get_text(lang, "home_create"),
-                    callback_data=encode_callback("menu", "create"),
-                    style="primary",
-                )
-            ],
-            [_home_button(lang)],
-        ]
-    )
 
 
 def _home_button(lang: str) -> InlineKeyboardButton:

@@ -23,17 +23,14 @@ from music_links_bot.bot_runtime import (
     decode_callback,
 )
 from music_links_bot.bot_storage import load_draft, store_draft
-from music_links_bot.bot_ui import editor_appearance_rows, editor_tag_options_rows
+from music_links_bot.bot_ui import editor_appearance_rows
 from music_links_bot.channel_templates import (
     load_channel_template,
     save_channel_template,
 )
 from music_links_bot.i18n import STRINGS, language_context
-from music_links_bot.models import TrackMatch
 from music_links_bot.release_preferences import (
-    preferences_from_session,
     presentation_context,
-    release_preference_key,
 )
 from tests.test_ui_refresh import MemoryKV, context_for, draft_for, query_for
 
@@ -208,30 +205,6 @@ class SimplifiedEditorJourneys(unittest.IsolatedAsyncioTestCase):
         await _handle_editor_action(query, context, "ht", "post")
         assert query.answer.call_args.kwargs["show_alert"]
         query.edit_message_text.assert_not_awaited()
-
-
-def test_tag_options_only_offer_relevant_saved_actions():
-    draft = draft_for()
-    draft["custom_tags"] = ["#doom"]
-    session = UserSession(user_id=7)
-    key = release_preference_key(TrackMatch(**draft["item"]))
-    session.release_tags[key] = ["#doom"]
-    with presentation_context(preferences_from_session(session)):
-        actions = [
-            decode_callback(b.callback_data).action
-            for row in editor_tag_options_rows("post", draft)
-            for b in row
-        ]
-        assert "hp" not in actions
-        assert "hr" in actions
-    with presentation_context():
-        actions = [
-            decode_callback(b.callback_data).action
-            for row in editor_tag_options_rows("post", draft)
-            for b in row
-        ]
-        assert "hp" in actions
-        assert "hr" not in actions
 
 
 def test_settings_sections_return_to_their_parent():

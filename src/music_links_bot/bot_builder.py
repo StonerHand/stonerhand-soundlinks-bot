@@ -28,15 +28,12 @@ class BuilderScreen(str, Enum):
     APPEARANCE = "appearance"
     TEXT = "text"
     TOOLS = "tools"
-    STYLE = "style"
     PLATFORMS = "platforms"
     INTRO = "intro"
     HASHTAGS = "hashtags"
-    TAG_OPTIONS = "tag_options"
     PREVIEW = "preview"
     ACTIONS = "actions"
     SCHEDULE = "schedule"
-    DELIVERY = "delivery"
     TEMPLATES = "templates"
 
 

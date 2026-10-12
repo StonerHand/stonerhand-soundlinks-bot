@@ -328,15 +328,15 @@ def _build_ui_contract() -> dict[str, object]:
                 recovery="change",
                 search_query="Sleep — Dopesmoker",
             ),
-            expected_primary="Изменить запрос",
+            expected_primary="✏️ Изменить запрос",
         ),
         "error_retry": _summarize_ui_keyboard(
             build_error_keyboard(None, lang="ru", recovery="retry"),
-            expected_primary="Повторить",
+            expected_primary="🔄 Повторить",
         ),
         "error_platforms": _summarize_ui_keyboard(
             build_error_keyboard(None, lang="ru", recovery="platforms"),
-            expected_primary="Что поддерживается",
+            expected_primary="❓ Что поддерживается",
         ),
         "error_crate": _summarize_ui_keyboard(
             build_error_keyboard(None, lang="ru", recovery="crate"),
