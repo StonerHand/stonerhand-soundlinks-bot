@@ -836,15 +836,16 @@ async def _schedule_editor_draft(
     draft["scheduled_at"] = publish_at
     if draft_id:
         await _store_draft(context, draft_id, draft)
-    from music_links_bot.human_time import human_datetime
+    from music_links_bot.human_time import human_datetime, local_time_html
 
     date = human_datetime(publish_at, timezone_name=timezone_name, lang=lang)
     await query.answer(
         get_text(lang, "schedule_done").format(date=date), show_alert=True
     )
     text, _ = _render_track_draft(draft, context, draft_id=None)
+    local = local_time_html(publish_at, timezone_name=timezone_name, lang=lang)
     text = (
-        f"<b>{escape(get_text(lang, 'schedule_done').format(date=date))}</b>\n\n{text}"
+        f"<b>{escape(get_text(lang, 'schedule_done')).format(date=local)}</b>\n\n{text}"
     )
     await _edit_editor_message(
         query,
@@ -1063,7 +1064,7 @@ async def _show_editor_publish_success(
         getattr(published, "link", None) if not isinstance(published, bool) else None
     )
     from music_links_bot.bot_ui import build_publish_success_keyboard
-    from music_links_bot.human_time import human_datetime
+    from music_links_bot.human_time import local_time_html
 
     keyboard = build_publish_success_keyboard(
         request.draft_id,
@@ -1076,7 +1077,7 @@ async def _show_editor_publish_success(
         request.context.application.bot_data.get("publish_chat_id")
         or f"@{CHANNEL_USERNAME}"
     )
-    moment = human_datetime(
+    moment = local_time_html(
         time.time(),
         timezone_name=request.context.application.bot_data.get("timezone_name"),
         lang=request.lang,
@@ -1085,7 +1086,7 @@ async def _show_editor_publish_success(
         _editor_success_text(request, "ed_published")
         + "\n\n"
         + get_text(request.lang, "published_details").format(
-            target=escape(target), date=escape(moment)
+            target=escape(target), date=moment
         )
     )
     await _edit_editor_message(

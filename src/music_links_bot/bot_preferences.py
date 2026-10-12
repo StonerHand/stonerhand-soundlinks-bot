@@ -20,7 +20,7 @@ from music_links_bot.release_preferences import (
     release_preference_key,
 )
 from music_links_bot.release_presentation import apply_preset
-from music_links_bot.telegram_buttons import button
+from music_links_bot.telegram_buttons import button, disabled_button
 
 
 class LocalizedApplication(Application):
@@ -171,8 +171,10 @@ def preferences_view(
             current = "cover"
         rows = [
             [
-                cb(
-                    ("✓ " if current == value else "") + get_text(lang, label),
+                disabled_button("✓ " + get_text(lang, label))
+                if current == value
+                else cb(
+                    get_text(lang, label),
                     section,
                     ("crate:" if origin == "crate" else "") + (value or "inherit"),
                 )

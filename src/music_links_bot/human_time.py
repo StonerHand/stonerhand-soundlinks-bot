@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 import time
 from datetime import datetime, timedelta, tzinfo
+from html import escape
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 _WEEKDAYS = {
@@ -44,6 +45,21 @@ def zone(name: str | None) -> tzinfo:
         return ZoneInfo(name or "Europe/Moscow")
     except (ZoneInfoNotFoundError, ValueError):
         return ZoneInfo("Europe/Moscow")
+
+
+def local_time_html(
+    timestamp: float,
+    *,
+    timezone_name: str | None = None,
+    lang: str = "ru",
+) -> str:
+    """The moment in each reader's own time zone (Bot API 9.5 date_time).
+
+    Telegram formats it as "weekday, date, time" for the viewer; older clients
+    fall back to the human label in the bot's time zone.
+    """
+    label = human_datetime(timestamp, timezone_name=timezone_name, lang=lang)
+    return f'<tg-time unix="{int(timestamp)}" format="wdt">{escape(label)}</tg-time>'
 
 
 def human_datetime(

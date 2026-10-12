@@ -3,7 +3,12 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from telegram import BotCommand, MenuButtonCommands, Update
+from telegram import (
+    BotCommand,
+    BotCommandScopeAllGroupChats,
+    MenuButtonCommands,
+    Update,
+)
 from telegram.error import TelegramError
 from telegram.ext import (
     Application,
@@ -58,6 +63,18 @@ PUBLIC_BOT_COMMANDS_EN = (
     BotCommand("channel", "📣 Check the bot in a channel"),
     BotCommand("help", "❓ How it works"),
     BotCommand("privacy", "🔐 My data"),
+)
+# In groups only the commands that answer privately: Telegram marks them with
+# is_ephemeral (Bot API 10.2), so the sender knows nobody else sees the reply.
+GROUP_BOT_COMMANDS = (
+    BotCommand("help", "❓ Как это работает", api_kwargs={"is_ephemeral": True}),
+    BotCommand("channel", "📣 Проверить права бота", api_kwargs={"is_ephemeral": True}),
+)
+GROUP_BOT_COMMANDS_EN = (
+    BotCommand("help", "❓ How it works", api_kwargs={"is_ephemeral": True}),
+    BotCommand(
+        "channel", "📣 Check the bot's rights", api_kwargs={"is_ephemeral": True}
+    ),
 )
 BOT_DESCRIPTIONS = {
     "": (
@@ -211,6 +228,20 @@ async def sync_application_commands(application: Application) -> None:
     await attempt(
         "commands:en",
         application.bot.set_my_commands(PUBLIC_BOT_COMMANDS_EN, language_code="en"),
+    )
+    await attempt(
+        "commands:groups",
+        application.bot.set_my_commands(
+            GROUP_BOT_COMMANDS, scope=BotCommandScopeAllGroupChats()
+        ),
+    )
+    await attempt(
+        "commands:groups:en",
+        application.bot.set_my_commands(
+            GROUP_BOT_COMMANDS_EN,
+            scope=BotCommandScopeAllGroupChats(),
+            language_code="en",
+        ),
     )
     await attempt(
         "menu_button",

@@ -19,6 +19,8 @@ if str(SRC_PATH) not in sys.path:
 from music_links_bot.bot_app import (
     BOT_DESCRIPTIONS,
     BOT_SHORT_DESCRIPTIONS,
+    GROUP_BOT_COMMANDS,
+    GROUP_BOT_COMMANDS_EN,
     PUBLIC_BOT_COMMANDS,
     PUBLIC_BOT_COMMANDS_EN,
 )
@@ -128,30 +130,33 @@ def _telegram_set_commands_url(
     commands=PUBLIC_BOT_COMMANDS,
     *,
     language_code: str = "",
+    scope: dict[str, str] | None = None,
 ) -> str:
-    commands_payload = [
-        {"command": command.command, "description": command.description}
-        for command in commands
-    ]
+    commands_payload = [command.to_dict() for command in commands]
     params = {"commands": json.dumps(commands_payload, ensure_ascii=False)}
     if language_code:
         params["language_code"] = language_code
+    if scope:
+        params["scope"] = json.dumps(scope)
     query = urlencode(params)
     return f"https://api.telegram.org/bot{bot_token}/setMyCommands?{query}"
 
 
 def _sync_commands(bot_token: str) -> dict[str, object]:
     scopes: dict[str, dict[str, object]] = {}
-    for language_code, commands in (
-        ("", PUBLIC_BOT_COMMANDS),
-        ("en", PUBLIC_BOT_COMMANDS_EN),
+    groups = {"type": "all_group_chats"}
+    for label, language_code, commands, scope in (
+        ("default", "", PUBLIC_BOT_COMMANDS, None),
+        ("en", "en", PUBLIC_BOT_COMMANDS_EN, None),
+        ("groups", "", GROUP_BOT_COMMANDS, groups),
+        ("groups:en", "en", GROUP_BOT_COMMANDS_EN, groups),
     ):
-        label = language_code or "default"
         scopes[label] = _telegram_json_call(
             _telegram_set_commands_url(
                 bot_token,
                 commands,
                 language_code=language_code,
+                scope=scope,
             ),
             label=f"commands:{label}",
         )

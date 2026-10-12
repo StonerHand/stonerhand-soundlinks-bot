@@ -8,7 +8,7 @@ from telegram.constants import ParseMode
 from telegram.error import BadRequest
 
 from music_links_bot.bot_runtime import CallbackAction, encode_callback
-from music_links_bot.human_time import human_datetime
+from music_links_bot.human_time import local_time_html
 from music_links_bot.i18n import get_text, resolve_lang
 from music_links_bot.publish_queue import (
     JOB_DELIVERING,
@@ -87,16 +87,14 @@ async def render_queue(
             if part
         ) or get_text(lang, "queue_unknown")
         try:
-            when = human_datetime(
+            when = local_time_html(
                 int(job.get("publish_at") or 0),
                 timezone_name=timezone_name,
                 lang=lang,
             )
         except (TypeError, ValueError, OverflowError):
             when = "—"
-        lines.append(
-            f"\n\n<b>{index}. {escape(label[:120])}</b>\n<code>{escape(when)}</code>"
-        )
+        lines.append(f"\n\n<b>{index}. {escape(label[:120])}</b>\n🕒 {when}")
         overdue_seconds = max(
             0,
             int(time.time())

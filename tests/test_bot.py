@@ -583,7 +583,7 @@ class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
         application = type("ApplicationStub", (), {})()
         application.bot = type("BotStub", (), {})()
         application.bot.set_my_commands = AsyncMock(
-            side_effect=[TelegramError("temporary failure"), None]
+            side_effect=[TelegramError("temporary failure"), None, None, None]
         )
         application.bot.set_chat_menu_button = AsyncMock()
         application.bot.set_my_description = AsyncMock()
@@ -591,7 +591,8 @@ class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
 
         await sync_application_commands(application)
 
-        self.assertEqual(application.bot.set_my_commands.await_count, 2)
+        # Default, English, and the private group scopes in both languages.
+        self.assertEqual(application.bot.set_my_commands.await_count, 4)
         application.bot.set_chat_menu_button.assert_awaited_once()
         self.assertEqual(
             application.bot.set_my_description.await_count,
