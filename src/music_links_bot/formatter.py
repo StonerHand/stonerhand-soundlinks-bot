@@ -392,25 +392,6 @@ def format_collection_message(
             include_hashtags=include_hashtags,
         )
 
-    lines: list[str] = []
-    composition = escape(collection_composition(tracks)) if len(tracks) > 1 else ""
-    if title or not intro:
-        # "Тяжёлый вечер · 5 треков": what it is and how big, on one line.
-        # Generated titles ("Подборка · 2 релиза") already carry a count.
-        heading = f"<b>{_display_text(title) if title else 'Подборка'}</b>"
-        counted = bool(title) and any(char.isdigit() for char in title)
-        lines.extend(
-            [
-                f"{heading} · {composition}"
-                if composition and not counted
-                else heading,
-                "",
-            ]
-        )
-        composition = ""
-    if intro:
-        lines.extend([_display_text(intro), ""])
-
     presentation = current_presentation.get()
     annotations = [
         presentation.annotations.get(release_preference_key(track), {})
@@ -432,15 +413,46 @@ def format_collection_message(
             )
             for track, item in zip(tracks, annotations, strict=True)
         ]
-    if composition:
-        lines.extend([f"<i>{composition}</i>", ""])
-    active_section = ""
+    lines: list[str] = []
+    title_named_artist = False
+    composition = escape(collection_composition(tracks)) if len(tracks) > 1 else ""
     shared_artist = (
         shared_collection_artist(tracks)
         if not any(section.strip() for section in (item_sections or []))
         else None
     )
-    if shared_artist:
+    if title or not intro:
+        # Like a single release: the name in bold, then what it is and how big.
+        #   🎶 The Growlers
+        #   Подборка · 8 треков
+        # Generated titles ("Подборка · 2 релиза") already carry a count.
+        label = "Collection" if resolve_lang(None) == "en" else "Подборка"
+        counted = bool(title) and any(char.isdigit() for char in title)
+        generated = counted and str(title).startswith(("Подборка", "Collection"))
+        if shared_artist and (not title or generated):
+            lines.append(f"🎶 <b>{_display_text(shared_artist)}</b>")
+            details = _display_text(title) if title else f"{label} · {composition}"
+        else:
+            name = _display_text(title) if title else ""
+            # "⚠️ Подборка · 3 из 4" already starts with its own icon.
+            icon = "" if title and not title.lstrip()[:1].isalnum() else "🎶 "
+            lines.append(f"{icon}<b>{name or label}</b>")
+            details = (
+                "" if counted else (f"{label} · {composition}" if name else composition)
+            )
+        if composition and details:
+            lines.append(details)
+        lines.append("")
+        composition = ""
+        title_named_artist = bool(shared_artist) and (not title or generated)
+    if intro:
+        lines.extend([_display_text(intro), ""])
+
+    if composition:
+        lines.extend([f"<i>{composition}</i>", ""])
+    active_section = ""
+    if shared_artist and not title_named_artist:
+        # The heading names something else: keep the artist above the list.
         lines.append(f"<b>{_display_text(shared_artist)}</b>")
     for index, track in enumerate(tracks, start=1):
         section = (
@@ -459,10 +471,10 @@ def format_collection_message(
         )
         number = _list_number(index)
         if shared_artist:
-            lines.append(f"{number} {title_text}")
+            lines.append(f"{number} · {title_text}")
         else:
             artist = _display_text(track.artist, MAX_COLLECTION_TEXT_LENGTH)
-            lines.append(f"{number} <b>{artist}</b> — {title_text}")
+            lines.append(f"{number} · <b>{artist}</b> — {title_text}")
         note = (
             item_notes[index - 1].strip()
             if item_notes and index <= len(item_notes)

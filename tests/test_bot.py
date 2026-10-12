@@ -2502,7 +2502,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertIn("<b>Подборка · 3 релиза</b>", message.replies[0])
+        self.assertIn("🎶 <b>Artist</b>\nПодборка · 3 релиза", message.replies[0])
         self.assertNotIn("найдено", message.replies[0])
         self.assertNotIn("open.spotify.com", message.replies[0])
         self.assertNotIn("<blockquote>", message.replies[0])

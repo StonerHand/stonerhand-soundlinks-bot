@@ -200,7 +200,7 @@ def test_ten_item_layouts_preserve_order_and_destinations(layout, rows):
     assert [button.url for button in buttons] == [item.page_url for item in tracks]
     for index, button in enumerate(buttons, start=1):
         assert button.text == f"{index} · Song {index}"
-        assert f"<code>{index:02}</code> Song {index}" in text
+        assert f"<code>{index:02}</code> · Song {index}" in text
 
 
 def test_long_labels_get_full_width_and_single_primary_action_is_deduplicated():
@@ -254,7 +254,7 @@ def test_maximal_notes_keep_all_ten_entries_within_telegram_limit():
     assert re.findall(r"^<code>0*(\d+)</code> ", text, flags=re.M) == [
         str(index) for index in range(1, 11)
     ]
-    assert "#collection" in text and "<code>10</code> <b>Band 10" in text
+    assert "#collection" in text and "<code>10</code> · <b>Band 10" in text
 
 
 def test_groups_notes_and_rich_use_same_order_without_html_injection():
@@ -277,9 +277,9 @@ def test_groups_notes_and_rich_use_same_order_without_html_injection():
     assert text.count("<b>First</b>") == 2
     assert "&lt;b&gt;My note&lt;/b&gt;" in text and "&lt;b&gt;My note&lt;/b&gt;" in rich
     assert (
-        text.index("<code>01</code> <b>A")
-        < text.index("<code>02</code> <b>B")
-        < text.index("<code>03</code> <b>A")
+        text.index("<code>01</code> · <b>A")
+        < text.index("<code>02</code> · <b>B")
+        < text.index("<code>03</code> · <b>A")
     )
 
 
@@ -526,7 +526,7 @@ class ReleaseSettingsTests(unittest.IsolatedAsyncioTestCase):
         assert not saved.pending_input
         with presentation_context(preferences_from_session(saved)):
             text = format_collection_message([second, first])
-        assert "<code>02</code> Song 1\n   <i>↳ Моя заметка &lt;live&gt;</i>" in text
+        assert "<code>02</code> · Song 1\n   <i>↳ Моя заметка &lt;live&gt;</i>" in text
 
     async def test_concurrent_updates_isolate_presentation_and_restore_context_on_error(
         self,

@@ -204,9 +204,9 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_collection_message(tracks),
             (
-                "<b>Подборка</b> · 1 трек · 1 альбом\n\n"
-                "<code>01</code> <b>Artist</b> — Song\n"
-                "<code>02</code> <b>Band</b> — Album\n\n"
+                "🎶 <b>Подборка</b>\n1 трек · 1 альбом\n\n"
+                "<code>01</code> · <b>Artist</b> — Song\n"
+                "<code>02</code> · <b>Band</b> — Album\n\n"
                 "#stonerhand #collection #track #album"
             ),
         )
@@ -224,8 +224,8 @@ class FormatterTests(unittest.TestCase):
         message = format_collection_message(tracks)
 
         self.assertIn("<b>Kokomo</b>\n", message)
-        self.assertIn("<code>01</code> A Torinói Ló", message)
-        self.assertIn("<code>02</code> The Lonesome Foghorn Blows", message)
+        self.assertIn("<code>01</code> · A Torinói Ló", message)
+        self.assertIn("<code>02</code> · The Lonesome Foghorn Blows", message)
         self.assertEqual(message.count("<b>Kokomo</b>"), 1)
 
     def test_collection_keeps_release_count_and_preserves_remaster_suffixes(
@@ -242,10 +242,11 @@ class FormatterTests(unittest.TestCase):
 
         message = format_collection_message(tracks, title="Подборка · 2 релиза")
 
-        # A generated title already carries the count: it is not repeated.
-        self.assertIn("<b>Подборка · 2 релиза</b>\n\n", message)
+        # One artist goes into the heading; the generated title (which already
+        # carries the count) becomes the details line.
+        self.assertIn("🎶 <b>Blur</b>\nПодборка · 2 релиза\n\n", message)
         self.assertIn(
-            "<b>Blur</b>\n<code>01</code> There&#x27;s No Other Way - 2012 Remaster\n<code>02</code> Fool (Remastered 2012)",
+            "<code>01</code> · There&#x27;s No Other Way - 2012 Remaster\n<code>02</code> · Fool (Remastered 2012)",
             message,
         )
         self.assertIn("Remaster", message)
