@@ -75,9 +75,8 @@ def test_single_inline_uses_branded_preview_and_preserves_buttons():
             result = await _build_inline_result(track().links["spotify"], context)
         assert result.type == "article"
         assert result.input_message_content.message_text
-        assert (
+        assert "/api/collage?" in (
             result.input_message_content.link_preview_options.url
-            == track().thumbnail_url
         )
         assert result.reply_markup.inline_keyboard
 

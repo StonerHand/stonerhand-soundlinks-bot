@@ -97,8 +97,15 @@ async def _check_delivery(error):
         bot.send_message.assert_not_awaited()
 
 
-def test_default_inline_does_not_depend_on_generated_image_server():
-    with patch.dict(os.environ, {**ENV, "INLINE_BRANDED_PHOTO_ENABLED": "0"}):
+def test_inline_signed_preview_can_be_switched_off():
+    with patch.dict(
+        os.environ,
+        {
+            **ENV,
+            "INLINE_BRANDED_PHOTO_ENABLED": "0",
+            "INLINE_SIGNED_PREVIEW_ENABLED": "0",
+        },
+    ):
         result = _inline_article(
             TRACK.links["spotify"],
             title="Song",
@@ -111,3 +118,21 @@ def test_default_inline_does_not_depend_on_generated_image_server():
     assert result.type == "article"
     assert result.input_message_content.message_text == "Full post"
     assert result.input_message_content.link_preview_options.url == TRACK.thumbnail_url
+
+
+def test_default_inline_post_previews_the_signed_cover():
+    with patch.dict(os.environ, {**ENV, "INLINE_BRANDED_PHOTO_ENABLED": "0"}):
+        preview = branded_artwork_preview_url(TRACK.thumbnail_url)
+        result = _inline_article(
+            TRACK.links["spotify"],
+            title="Song",
+            description="Artist",
+            text="Full post",
+            keyboard=InlineKeyboardMarkup([]),
+            preview_url=preview,
+            thumbnail_url=TRACK.thumbnail_url,
+        )
+    # A text post, so sending never waits for the image server.
+    assert result.type == "article"
+    assert result.input_message_content.link_preview_options.url == preview
+    assert result.thumbnail_url == TRACK.thumbnail_url

@@ -228,6 +228,7 @@ class PublicationService:
 
         generated_cover = is_generated_artwork_url(view.preview_url)
         photo_fits = visible_length(text) <= PHOTO_CAPTION_LIMIT
+        photo_rejected = False
         if (view.as_photo or (generated_cover and photo_fits)) and view.cover:
             try:
                 return await self._send_photo(
@@ -255,17 +256,19 @@ class PublicationService:
                 )
                 if draft.get("custom_cover_file_id") or not media_error:
                     raise
+                photo_rejected = True
                 LOGGER.info(
                     "Provider artwork rejected; using the native release preview"
                 )
 
-        # Long captions and definitively rejected photos use a native preview.
-        # Never fall back to the generated image as an empty web-page card.
+        # A caption too long for a photo keeps the signed cover as a large
+        # preview above the text. Only a definitively rejected image falls back
+        # to the native preview: never retry it as an empty web-page card.
         from music_links_bot.keyboards import _select_preview_url
 
         fallback_preview = (
             _select_preview_url(track.links, self.context) or track.thumbnail_url
-            if generated_cover
+            if generated_cover and photo_rejected
             else view.preview_url
         )
         return await self._send_classic_message(

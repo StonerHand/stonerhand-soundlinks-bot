@@ -145,6 +145,7 @@ from music_links_bot.channel_templates import (
     apply_template,
 )
 from music_links_bot.chat_access import check_publish_access
+from music_links_bot.collection_collage import branded_artwork_preview_url
 from music_links_bot.constants import MAX_LINKS_PER_MESSAGE
 from music_links_bot.draft_model import new_track_draft
 from music_links_bot.editor_view import (
@@ -189,6 +190,7 @@ from music_links_bot.publication_state import (
     find_posted_record as _find_posted_record,
     mark_posted as _schedule_mark_posted,
 )
+from music_links_bot.publication_view import editor_preview_url
 from music_links_bot.publish_queue import (
     QueueBusyError,
     QueueFullError,
@@ -432,7 +434,7 @@ async def _send_track_draft(
     await _reply_with_track(
         message,
         text,
-        preview_url=_select_preview_url(track.links, context) or track.thumbnail_url,
+        preview_url=editor_preview_url(draft, track, context),
         reply_markup=keyboard,
         prefer_large_preview=bool(draft.get("large_preview")),
         source_urls=tuple(track.links.values()),
@@ -1640,7 +1642,7 @@ async def _edit_editor_message(
             text=text,
             parse_mode=ParseMode.HTML,
             link_preview_options=_build_link_preview_options(
-                _select_preview_url(track.links, context) or track.thumbnail_url,
+                editor_preview_url(draft, track, context),
                 prefer_large_media=bool(draft.get("large_preview")),
             ),
             reply_markup=keyboard,
@@ -2188,9 +2190,12 @@ async def _send_track_matches(
                 track,
                 include_hashtags=include_hashtags,
             ),
-            preview_url=track.thumbnail_url
-            if use_clean_artwork(track)
-            else _select_preview_url(track.links, context) or track.thumbnail_url,
+            preview_url=branded_artwork_preview_url(track.thumbnail_url)
+            or (
+                track.thumbnail_url
+                if use_clean_artwork(track)
+                else _select_preview_url(track.links, context) or track.thumbnail_url
+            ),
             reply_markup=keyboard,
             source_urls=tuple(track.links.values()),
             content_kind=track.kind,

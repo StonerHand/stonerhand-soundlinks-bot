@@ -905,9 +905,13 @@ def _inline_article(
             parse_mode=ParseMode.HTML,
             reply_markup=keyboard,
         )
-    # Inline photo URLs must be fetched by Telegram before a result can be sent.
-    # A provider thumbnail keeps inline usable when the image endpoint is unreachable.
-    if generated_preview:
+    # Only an inline *photo* must be fetched before the result can be sent (see
+    # above). A text post's link preview is fetched afterwards: if the signed
+    # cover is ever unreachable the post still sends, just without an image.
+    # INLINE_SIGNED_PREVIEW_ENABLED=0 restores the plain provider artwork.
+    if generated_preview and not feature_enabled(
+        "INLINE_SIGNED_PREVIEW_ENABLED", default=True
+    ):
         preview_url = thumbnail_url
     rich_message: dict[str, object] = {"html": rich_html or ""}
     if rich_media:
