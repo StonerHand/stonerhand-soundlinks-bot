@@ -59,22 +59,22 @@ def format_track_heading(track: TrackMatch) -> str:
 
 
 def format_release_heading(track: TrackMatch) -> str:
-    """ "Artist — Title" on one bold line, then one line of release details."""
+    """ "Artist — Title" in bold, a blank line, then the release details."""
     artist, title = _display_text(track.artist), _display_text(track.title)
     various_artists = track.artist.strip().casefold() in {
         "various artists",
         "разные исполнители",
     }
     if artist and not (track.kind == "album" and various_artists):
-        lines = [
+        heading = (
             f"<b>{_metadata_link(artist, track.artist_url, 'artist')} — {title}</b>"
-        ]
+        )
     else:
-        lines = [f"<b>{title}</b>"]
+        heading = f"<b>{title}</b>"
+    lines = []
     details = release_details(track)
-    lines.append(f"{release_emoji(track)} {escape(details)}" if details else "")
-    if not lines[-1]:
-        lines.pop()
+    if details:
+        lines.append(f"{release_emoji(track)} {escape(details)}")
     # Album membership is provider metadata, never inferred from the song title.
     if track.kind == "song" and track.album_title:
         album = _display_text(track.album_title)
@@ -83,7 +83,8 @@ def format_release_heading(track: TrackMatch) -> str:
             lines.append(
                 f"💿 {label} «{_metadata_link(album, track.album_url, 'album')}»"
             )
-    return "\n".join(lines)
+    # A blank line keeps the title apart from the details under it.
+    return "\n\n".join(filter(None, (heading, "\n".join(lines))))
 
 
 def _metadata_link(label: str, url: str | None, kind: str) -> str:
@@ -118,6 +119,7 @@ def format_video_message(video: VideoMatch, *, include_hashtags: bool = True) ->
         details.append(_display_text(video.author))
     lines = [
         f"<b>{_display_text(video.title)}</b>",
+        "",
         f"{video_kind_emoji(video)} " + " · ".join(details),
     ]
     return _with_hashtags(
@@ -128,6 +130,7 @@ def format_video_message(video: VideoMatch, *, include_hashtags: bool = True) ->
 def format_radio_message(radio: RadioMatch, *, include_hashtags: bool = True) -> str:
     lines = [
         f"<b>{_display_text(radio.title)}</b>",
+        "",
         "📻 "
         + (
             f"{'Radio show' if resolve_lang(None) == 'en' else 'Радиошоу'} · {_display_text(radio.station)}"
@@ -147,6 +150,7 @@ def format_playlist_message(
 ) -> str:
     lines = [
         f"<b>{_display_text(playlist.title)}</b>",
+        "",
         f"🎛 {'Playlist' if resolve_lang(None) == 'en' else 'Плейлист'} · {_display_text(playlist.platform)}",
     ]
     return _with_hashtags(
@@ -161,6 +165,7 @@ def format_artist_message(
 ) -> str:
     lines = [
         f"<b>{_display_text(artist.title)}</b>",
+        "",
         f"🧬 {'Artist' if resolve_lang(None) == 'en' else 'Исполнитель'} · {_display_text(artist.platform)}",
     ]
     return _with_hashtags(
