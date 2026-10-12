@@ -123,7 +123,10 @@ def test_signed_endpoint_draws_signature_on_single_and_collection(count):
     with Image.open(io.BytesIO(request.wfile.getvalue())) as image:
         assert image.size == (1200, 1200)
         footer = image.crop((40, 1050, 500, 1190))
-        assert sum(1 for r, g, b in footer.getdata() if min(r, g, b) > 180) > 300
+        assert (
+            sum(1 for r, g, b in footer.get_flattened_data() if min(r, g, b) > 180)
+            > 300
+        )
 
 
 def test_signature_cannot_turn_endpoint_into_arbitrary_image_proxy():

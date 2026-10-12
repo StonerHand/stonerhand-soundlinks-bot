@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import threading
-from collections.abc import Awaitable
-from typing import TypeVar
+from collections.abc import Coroutine
+from typing import Any, TypeVar
 
 T = TypeVar("T")
 
@@ -36,7 +36,7 @@ def start_background_loop(
 
 def run_on_loop(
     loop: asyncio.AbstractEventLoop,
-    awaitable: Awaitable[T],
+    awaitable: Coroutine[Any, Any, T],
     *,
     timeout: float,
 ) -> T:

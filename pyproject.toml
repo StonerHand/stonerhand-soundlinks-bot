@@ -103,6 +103,23 @@ files = [
   "src/music_links_bot/collection_collage.py",
   "src/music_links_bot/publication_contract.py",
   "src/music_links_bot/publication_state.py",
+  "src/music_links_bot/kvstore.py",
+  "src/music_links_bot/state_mutations.py",
+  "src/music_links_bot/durable_state.py",
+  "src/music_links_bot/user_state.py",
+  "src/music_links_bot/bot_history.py",
+  "src/music_links_bot/bot_crate.py",
+  "src/music_links_bot/channel_templates.py",
+  "src/music_links_bot/bot_preferences.py",
+  "src/music_links_bot/bot_stats.py",
+  "src/music_links_bot/shared_http.py",
+  "src/music_links_bot/lazy_client.py",
+  "src/music_links_bot/loop_runner.py",
+  "src/music_links_bot/provider_runtime.py",
+  "src/music_links_bot/lookup_control.py",
+  "src/music_links_bot/webhook_secret.py",
+  "src/music_links_bot/config.py",
+  "src/music_links_bot/update_execution.py",
 ]
 follow_imports = "skip"
 check_untyped_defs = true

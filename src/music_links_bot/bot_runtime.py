@@ -420,11 +420,10 @@ class BotRuntime:
             if prefetched is not None or callable(raw_reader):
                 # Keep the exact stored text so the next save can go straight
                 # to compare-and-set instead of re-reading the session.
-                raw_current, raw_legacy = (
-                    prefetched
-                    if prefetched is not None
-                    else await raw_reader([current_key, legacy_key])
-                )
+                if prefetched is None:
+                    fetched = await raw_reader([current_key, legacy_key])
+                    prefetched = (fetched[0], fetched[1])
+                raw_current, raw_legacy = prefetched
                 try:
                     payload = (
                         json.loads(raw_current) if raw_current is not None else None

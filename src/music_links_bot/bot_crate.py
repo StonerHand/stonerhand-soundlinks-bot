@@ -278,8 +278,8 @@ async def restore_crate_items(bot_data, user_id, entries):
 
 
 def _fingerprint(item: dict[str, Any]) -> str:
-    links = item.get("links") if isinstance(item.get("links"), dict) else {}
-    first_url = next(iter(links.values()), "")
+    links = item.get("links")
+    first_url = next(iter(links.values()), "") if isinstance(links, dict) else ""
     return "|".join(
         str(value).casefold().strip()
         for value in (
