@@ -252,11 +252,54 @@ async def _send_first_visit_demo(message: Message, *, lang: str) -> bool:
         return False
 
 
+async def _reply_only_to_sender(message: Message, context, text: str) -> bool:
+    """In a group, answer a command so only its sender sees it (Bot API 10.2).
+
+    The answer carries a link to the private chat instead of menu buttons:
+    menu callbacks edit their message, which an ephemeral message does not
+    allow. Returns False to fall back to a regular reply.
+    """
+    from music_links_bot.ephemeral import (
+        ephemeral_group_replies_enabled,
+        send_ephemeral_message,
+    )
+
+    if (
+        message.chat.type not in {"group", "supergroup"}
+        or message.from_user is None
+        or not ephemeral_group_replies_enabled()
+    ):
+        return False
+    lang = resolve_lang(message.from_user.language_code)
+    keyboard = InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(
+                    get_text(lang, "group_open_bot"),
+                    url=f"https://t.me/{context.bot.username}",
+                )
+            ]
+        ]
+    )
+    return await send_ephemeral_message(
+        context.bot.token,
+        message.chat_id,
+        message.from_user.id,
+        text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=keyboard,
+    )
+
+
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if update.message is not None:
-        await reply_with_menu(
-            update.message, context, MENU_HELP, lang=update_lang(update)
-        )
+    if update.message is None:
+        return
+    lang = update_lang(update)
+    if await _reply_only_to_sender(
+        update.message, context, menu_text(MENU_HELP, lang=lang)
+    ):
+        return
+    await reply_with_menu(update.message, context, MENU_HELP, lang=lang)
 
 
 async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -454,6 +497,8 @@ async def channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 else "channel_check_fix",
             )
         )
+    if await _reply_only_to_sender(message, context, "\n".join(lines)):
+        return
     await message.reply_text(
         "\n".join(lines),
         parse_mode=ParseMode.HTML,

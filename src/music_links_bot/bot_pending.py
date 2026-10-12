@@ -368,11 +368,11 @@ async def _schedule_custom_time(
         await message.reply_text(get_text(lang, "ed_queue_unavailable"))
         return DraftInputResult()
     draft["scheduled_at"] = publish_at
-    from music_links_bot.human_time import human_datetime
+    from music_links_bot.human_time import local_time_html
 
     return DraftInputResult(
         "schedule_done",
-        human_datetime(publish_at, timezone_name=timezone_name, lang=lang),
+        local_time_html(publish_at, timezone_name=timezone_name, lang=lang),
     )
 
 
@@ -443,12 +443,13 @@ async def _restore_draft_screen(
         settings=True,
         show_status=True,
     )
+    # The schedule label is already HTML: the moment in the reader's time zone.
     saved_label = (
-        get_text(lang, saved_key).format(date=schedule_label)
+        escape(get_text(lang, saved_key)).format(date=schedule_label)
         if saved_key == "schedule_done"
-        else get_text(lang, saved_key)
+        else escape(get_text(lang, saved_key))
     )
-    text = f"<b>{escape(saved_label)}</b>\n\n{text}"
+    text = f"<b>{saved_label}</b>\n\n{text}"
     track = TrackMatch(**draft["item"])
     preview_url = select_preview_url(track.links, context) or track.thumbnail_url
     restored = await edit_pending_screen(

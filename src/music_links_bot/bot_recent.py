@@ -12,7 +12,10 @@ from music_links_bot.bot_runtime import encode_callback
 from music_links_bot.human_time import human_date, human_datetime
 from music_links_bot.i18n import get_text
 from music_links_bot.publish_queue import QueueStorageError, load_jobs
-from music_links_bot.telegram_buttons import button as InlineKeyboardButton
+from music_links_bot.telegram_buttons import (
+    button as InlineKeyboardButton,
+    disabled_button,
+)
 
 PAGE_SIZE = 6
 EXPIRY_WARNING_SECONDS = 2 * 86400
@@ -143,8 +146,10 @@ async def render_drafts_view(
     )
     rows = [
         [
-            InlineKeyboardButton(
-                ("✓ " if key == filter_by else "") + get_text(lang, "posts_" + key),
+            disabled_button("✓ " + get_text(lang, "posts_" + key))
+            if key == filter_by
+            else InlineKeyboardButton(
+                get_text(lang, "posts_" + key),
                 callback_data=encode_callback("menu", "postfilter", key),
             )
             for key in ("all", "draft", "scheduled", "published", "saved")

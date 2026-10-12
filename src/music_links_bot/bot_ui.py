@@ -26,6 +26,7 @@ from music_links_bot.telegram_buttons import (
     button as InlineKeyboardButton,
     callback_button,
     current_chat_button,
+    disabled_button,
 )
 
 
@@ -563,9 +564,10 @@ def editor_appearance_rows(
     lang = draft.get("lang") or "ru"
 
     def cb(key, action, *, selected=False):
+        if selected:
+            return disabled_button("✓ " + get_text(lang, key))
         return callback_button(
-            ("✓ " if selected else "") + get_text(lang, key),
-            encode_callback("editor", action, draft_id),
+            get_text(lang, key), encode_callback("editor", action, draft_id)
         )
 
     preset = normalize_preset(draft.get("preset"), draft)

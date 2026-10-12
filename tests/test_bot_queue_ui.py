@@ -40,7 +40,7 @@ class BotQueueUiTests(unittest.IsolatedAsyncioTestCase):
         text, keyboard = await render_queue(context, lang="ru")
 
         self.assertIn("Sleep — Dragonaut", text)
-        self.assertIn("<code>", text)
+        self.assertIn('<tg-time unix="1800000000" format="wdt">', text)
         self.assertEqual(
             keyboard.inline_keyboard[0][0].callback_data,
             "v2|queue|cancel|0:job123",

@@ -89,10 +89,10 @@ def _workspace_header(draft: dict, context: Any, *, lang: str, settings: bool) -
             continue
         header = get_text(lang, key)
         if isinstance(moment, (int, float)):
-            from music_links_bot.human_time import human_datetime
+            from music_links_bot.human_time import local_time_html
 
             bot_data = getattr(getattr(context, "application", None), "bot_data", {})
-            header += " · " + human_datetime(
+            header += " · " + local_time_html(
                 moment,
                 timezone_name=(bot_data or {}).get("timezone_name"),
                 lang=lang,
