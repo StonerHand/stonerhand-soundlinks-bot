@@ -10,6 +10,8 @@ import httpx
 from music_links_bot.constants import HTTP_USER_AGENT
 
 LOGGER = logging.getLogger(__name__)
+# /stats shows a top 10; a bounded map keeps every activity event O(1).
+MAX_STATS_IDENTITIES = 200
 
 
 class KVUnavailableError(RuntimeError):
@@ -223,11 +225,38 @@ class KVStore:
             "local old = stats[key][id] or {}; "
             "entry.count = (tonumber(old.count) or 0) + (tonumber(entry.count) or 0); "
             "stats[key][id] = entry end end end; "
+            # Keep only the most active users/chats (plus the ones in this
+            # event) so the blob, and this script's cost, stop growing.
+            "local cap = tonumber(ARGV[3]); "
+            "for _, name in ipairs({'users', 'chats'}) do "
+            "local map = stats[name]; "
+            "if type(map) == 'table' then "
+            "local list = {}; "
+            "for id, entry in pairs(map) do "
+            "list[#list + 1] = {id, type(entry) == 'table' "
+            "and tonumber(entry.count) or 0} end; "
+            "if #list > cap then "
+            "table.sort(list, function(a, b) return a[2] > b[2] end); "
+            "local touched = type(delta[name]) == 'table' and delta[name] or {}; "
+            "local kept = {}; "
+            "for i, item in ipairs(list) do "
+            "if i <= cap or touched[item[1]] ~= nil then "
+            "kept[item[1]] = map[item[1]] end end; "
+            "stats[name] = kept end end end; "
             "redis.call('set', KEYS[1], cjson.encode(stats)); "
             "redis.call('set', KEYS[2], '1', 'EX', ARGV[2]); return 1"
         )
         return await self._command_or_raise(
-            ["EVAL", script, "2", key, event_key, json.dumps(delta), str(7 * 86400)]
+            [
+                "EVAL",
+                script,
+                "2",
+                key,
+                event_key,
+                json.dumps(delta),
+                str(7 * 86400),
+                str(MAX_STATS_IDENTITIES),
+            ]
         )
 
     async def ranked_events(self, key, *, limit=5):
