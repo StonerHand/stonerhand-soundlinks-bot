@@ -7,6 +7,7 @@ import io
 import ipaddress
 import json
 import os
+import re
 import zlib
 from contextlib import ExitStack
 from urllib.parse import urlencode, urlparse
@@ -111,11 +112,54 @@ def video_collage_preview_url(
     )
 
 
+_FLAGS_MODE = re.compile(r"b[01]{2,6}")
+
+
+def media_collage_preview_url(
+    tracks: list[TrackMatch],
+    videos: list,
+    *,
+    base_url: str | None = None,
+    signing_secret: str | None = None,
+) -> str | None:
+    """Signed collage for a mixed post: release covers first, then clip frames.
+
+    Each tile's ▶ flag travels signed as a bit string ("b0011"), so any mix of
+    songs and videos keeps the right badges.
+    """
+    if not feature_enabled("COLLECTION_COLLAGE_ENABLED", default=True):
+        return None
+    urls: list[str] = []
+    flags: list[bool] = []
+    for item, is_video in [*((t, False) for t in tracks), *((v, True) for v in videos)]:
+        image = str(getattr(item, "thumbnail_url", "") or "").strip()
+        if image and _safe_source_url(image) and image not in urls:
+            urls.append(image)
+            flags.append(is_video)
+        if len(urls) == MAX_COLLAGE_ITEMS:
+            break
+    if len(urls) < MIN_COLLAGE_ITEMS or not any(flags):
+        return None
+    return _artwork_preview_url(
+        urls,
+        base_url=base_url,
+        signing_secret=signing_secret,
+        mode="b" + "".join("1" if flag else "0" for flag in flags),
+    )
+
+
+def valid_collage_mode(mode: str | None) -> bool:
+    return mode is None or mode in COLLAGE_MODES or bool(_FLAGS_MODE.fullmatch(mode))
+
+
 def collage_play_flags(mode: str | None, count: int) -> list[bool]:
     if mode == VIDEO_MODE:
         return [True] * count
     if mode == MIX_MODE:
         return [False] + [True] * max(0, count - 1)
+    if mode and _FLAGS_MODE.fullmatch(mode):
+        bits = [bit == "1" for bit in mode[1:]][:count]
+        return bits + [False] * (count - len(bits))
     return [False] * count
 
 
@@ -200,7 +244,7 @@ def decode_collage_payload(
         or len(payload) > MAX_PAYLOAD_LENGTH
     ):
         return None
-    if mode is not None and mode not in COLLAGE_MODES:
+    if not valid_collage_mode(mode):
         return None
     if not secrets_match(
         signature, _signature(payload, signing_secret, label=label, mode=mode)

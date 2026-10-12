@@ -52,7 +52,7 @@ class handler(BaseHTTPRequestHandler):
 
         signature = query.get("s", [""])[0]
         label_override = query.get("l", [""])[0][:MAX_BRAND_LABEL_LENGTH] or None
-        mode = query.get("m", [""])[0][:2] or None
+        mode = query.get("m", [""])[0][:8] or None
         urls = decode_collage_payload(
             query.get("p", [""])[0],
             signature,

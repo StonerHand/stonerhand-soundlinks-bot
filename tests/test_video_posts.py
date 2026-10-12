@@ -233,3 +233,66 @@ def test_collage_endpoint_draws_play_badges_for_the_signed_mode():
         # Cover (left) without a badge, video frame (right) with a white ▶.
         assert min(rgb.getpixel((width * 3 // 4, height // 2))) > 200
         assert rgb.getpixel((width // 4, height // 2))[0] > 150
+
+
+def test_several_songs_and_clips_share_one_collage_with_badges_only_on_frames():
+    from music_links_bot.collection_collage import (
+        collage_play_flags,
+        decode_collage_payload,
+        media_collage_preview_url,
+    )
+    from music_links_bot.lookup_delivery import send_mixed_result
+
+    second = TrackMatch(
+        artist="The Growlers",
+        title="City Club",
+        thumbnail_url="https://i.scdn.co/image/cover2",
+        links={"spotify": "https://open.spotify.com/track/def"},
+    )
+    videos = [clip("Monotonia (Official Video)", "a"), clip("Love Test", "b")]
+    with patch.dict(os.environ, ENV):
+        url = media_collage_preview_url([TRACK, second], videos)
+        query = parse_qs(urlparse(url).query)
+        assert query["m"] == ["b0011"]
+        assert collage_play_flags("b0011", 4) == [False, False, True, True]
+        assert decode_collage_payload(
+            query["p"][0], query["s"][0], signing_secret="1:x", mode="b0011"
+        )
+        # A forged bit string does not pass the signature.
+        assert (
+            decode_collage_payload(
+                query["p"][0], query["s"][0], signing_secret="1:x", mode="b1111"
+            )
+            is None
+        )
+
+        send_track_result = AsyncMock()
+        asyncio.run(
+            send_mixed_result(
+                SimpleNamespace(),
+                SimpleNamespace(),
+                [TRACK, second],
+                videos,
+                [],
+                [],
+                [],
+                send_track_result=send_track_result,
+                send_track_video_pair_result=AsyncMock(),
+                user_prefix="",
+                include_channel_button=False,
+                include_hashtags=True,
+                context=SimpleNamespace(application=SimpleNamespace(bot_data={})),
+                lang="ru",
+            )
+        )
+    kwargs = send_track_result.await_args.kwargs
+    assert "m=b0011" in kwargs["preview_url"]
+    labels = [b.text for row in kwargs["reply_markup"].inline_keyboard for b in row]
+    assert any(label.startswith("🎬 3 · ") for label in labels)
+
+
+def test_collage_with_only_songs_never_uses_the_media_mode():
+    from music_links_bot.collection_collage import media_collage_preview_url
+
+    with patch.dict(os.environ, ENV):
+        assert media_collage_preview_url([TRACK, TRACK], []) is None

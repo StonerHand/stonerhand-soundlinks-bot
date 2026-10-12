@@ -1105,7 +1105,7 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[0][0].url, "https://www.nts.live/shows/example")
         self.assertIsNone(rows[0][0].style)
         # Short labels share a row in the default two-column layout.
-        self.assertEqual(rows[0][1].text, "2 · Live Session")
+        self.assertEqual(rows[0][1].text, "🎤 2 · Live Session")
         self.assertIsNone(rows[0][1].style)
 
     def test_mixed_collection_repairs_an_untrusted_release_page(self) -> None:
@@ -2901,7 +2901,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("#stonerhand #collection #playlist #video", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "1 · Women of Punk")
-        self.assertEqual(keyboard[1][0].text, "2 · SANSAE Live Session Vol.3 - Melon")
+        self.assertEqual(
+            keyboard[1][0].text, "🎤 2 · SANSAE Live Session Vol.3 - Melon"
+        )
         record_mixed.assert_called_once()
 
     async def test_mixed_nts_and_youtube_links_keep_both_items(self) -> None:
@@ -2923,7 +2925,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("#stonerhand #collection #radio #video", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "1 · Dark Energy w/ Guest")
-        self.assertEqual(keyboard[1][0].text, "2 · SANSAE Live Session Vol.3 - Melon")
+        self.assertEqual(
+            keyboard[1][0].text, "🎤 2 · SANSAE Live Session Vol.3 - Melon"
+        )
         record_mixed.assert_called_once()
 
     async def test_youtube_lookup_uses_fallback_when_metadata_fails(self) -> None:
