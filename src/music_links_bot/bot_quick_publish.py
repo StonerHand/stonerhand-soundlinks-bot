@@ -50,8 +50,11 @@ async def try_quick_publish(message, context, *, draft_id, draft, track, user_id
     link = getattr(published, "link", None) or _message_url(
         target, getattr(published, "message_id", None)
     )
-    await message.reply_text(
-        get_text(lang, "quick_published").format(
+    from music_links_bot.message_effects import send_with_effect
+
+    await send_with_effect(
+        message.reply_text,
+        text=get_text(lang, "quick_published").format(
             artist=_escape(track.artist), title=_escape(track.title)
         ),
         parse_mode=ParseMode.HTML,

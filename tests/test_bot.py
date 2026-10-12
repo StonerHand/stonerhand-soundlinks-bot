@@ -509,8 +509,11 @@ class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
                 super().__init__()
                 self.animations: list[tuple[bytes, str]] = []
 
-            async def reply_photo(self, *, photo, caption: str) -> None:
-                self.animations.append((photo.read(), caption))
+            async def reply_photo(self, *, photo, caption: str, **kwargs) -> None:
+                self.animations.append((photo, caption))
+                self.effects = getattr(self, "effects", []) + [
+                    kwargs.get("message_effect_id")
+                ]
 
         message = AnimatedPrivateMessage()
         update = StartUpdateStub(message)
@@ -526,6 +529,8 @@ class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.animations), 1)
         self.assertTrue(message.animations[0][0].startswith(b"\x89PNG"))
         self.assertIn("Твоя музыка", message.animations[0][1])
+        # The first hello arrives with Telegram's 🎉 effect.
+        self.assertEqual(message.effects, ["5046509860389126442"])
         self.assertEqual(len(message.replies), 2)
         first_keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         second_keyboard = message.reply_kwargs[1]["reply_markup"].inline_keyboard
@@ -737,8 +742,8 @@ class BotKeyboardTests(unittest.TestCase):
 
     def test_profile_descriptions_are_current_and_fit_telegram_limits(self) -> None:
         self.assertIn("Несколько ссылок", BOT_DESCRIPTIONS[""])
-        self.assertIn("точный релиз", BOT_DESCRIPTIONS[""])
-        self.assertIn("подборка", BOT_SHORT_DESCRIPTIONS[""])
+        self.assertIn("кнопками всех площадок", BOT_DESCRIPTIONS[""])
+        self.assertIn("Подборки", BOT_SHORT_DESCRIPTIONS[""])
         self.assertTrue(all(len(value) <= 512 for value in BOT_DESCRIPTIONS.values()))
         self.assertTrue(
             all(len(value) <= 120 for value in BOT_SHORT_DESCRIPTIONS.values())
@@ -767,11 +772,12 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(
             [(command.command, command.description) for command in PUBLIC_BOT_COMMANDS],
             [
-                ("start", "меню и быстрый старт"),
-                ("help", "как пользоваться"),
-                ("settings", "язык и оформление"),
-                ("crate", "моя подборка"),
-                ("privacy", "данные и приватность"),
+                ("start", "🎧 Новый пост и меню"),
+                ("crate", "🎶 Моя подборка"),
+                ("settings", "⚙️ Язык, вид и подпись"),
+                ("channel", "📣 Проверить бота в канале"),
+                ("help", "❓ Как это работает"),
+                ("privacy", "🔐 Мои данные"),
             ],
         )
 
@@ -874,11 +880,12 @@ class BotKeyboardTests(unittest.TestCase):
 
         rows = keyboard.inline_keyboard
         self.assertEqual(rows[0][0].text, "🎧 Слушать трек")
-        self.assertEqual(rows[1][0].text, "🟢 Spotify")
-        self.assertEqual(rows[1][1].text, "⚪ Apple Music")
-        self.assertEqual(rows[2][0].text, "🟠 SoundCloud")
-        self.assertEqual(rows[2][1].text, "🟣 Deezer")
-        self.assertEqual(rows[3][0].text, "⚫ Tidal")
+        # The three most used services share one row with short names.
+        self.assertEqual(
+            [button.text for button in rows[1]],
+            ["🟢 Spotify", "🍎 Apple", "🟠 SoundCloud"],
+        )
+        self.assertEqual([button.text for button in rows[2]], ["🟣 Deezer", "⚫ Tidal"])
         self.assertEqual(rows[0][0].style, "primary")
         self.assertTrue(all(button.style is None for row in rows[1:] for button in row))
 
@@ -921,7 +928,7 @@ class BotKeyboardTests(unittest.TestCase):
 
         rows = keyboard.inline_keyboard
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0][0].text, "⚪ Apple Music")
+        self.assertEqual(rows[0][0].text, "🍎 Apple Music")
         self.assertEqual(rows[0][0].style, "primary")
 
     def test_minimal_ui_mode_strips_platform_button_emoji(self) -> None:
@@ -1097,8 +1104,9 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[0][0].text, "1 · Dark Energy")
         self.assertEqual(rows[0][0].url, "https://www.nts.live/shows/example")
         self.assertIsNone(rows[0][0].style)
-        self.assertEqual(rows[1][0].text, "2 · Live Session")
-        self.assertIsNone(rows[1][0].style)
+        # Short labels share a row in the default two-column layout.
+        self.assertEqual(rows[0][1].text, "2 · Live Session")
+        self.assertIsNone(rows[0][1].style)
 
     def test_mixed_collection_repairs_an_untrusted_release_page(self) -> None:
         keyboard = _build_mixed_collection_keyboard(
@@ -1238,8 +1246,7 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(
             [[button.text for button in row] for row in rows],
             [
-                ["🎶 Подборка · 3"],
-                ["🕒 В очереди · 2"],
+                ["🎶 Подборка · 3", "🕒 В очереди · 2"],
                 ["📚 Мои посты", "⚙️ Настройки"],
             ],
         )
@@ -1535,7 +1542,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(result.id), 32)
         self.assertIsInstance(result.input_message_content, InputTextMessageContent)
         self.assertIn(
-            "🎧 · <b>Transitions</b>\nYouth Code",
+            "<b>Youth Code — Transitions</b>",
             result.input_message_content.message_text,
         )
         preview = result.input_message_content.link_preview_options
@@ -1563,7 +1570,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsNotNone(result)
         self.assertIn(
-            "🎧 · <b>Transitions</b>\nYouth Code",
+            "<b>Youth Code — Transitions</b>",
             result.input_message_content.message_text,
         )
         keyboard = result.reply_markup.inline_keyboard
@@ -1712,8 +1719,8 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsNotNone(result)
         self.assertEqual(result.title, "Подборка · 2 релиза")
-        self.assertIn("1.", result.input_message_content.message_text)
-        self.assertIn("2.", result.input_message_content.message_text)
+        self.assertIn("<code>01</code>", result.input_message_content.message_text)
+        self.assertIn("<code>02</code>", result.input_message_content.message_text)
         self.assertEqual(
             result.reply_markup.inline_keyboard[-1][0].switch_inline_query, query
         )
@@ -2393,7 +2400,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(message.replies[0], "<deleted>")
-        self.assertIn("🎧 · <b>Transitions</b>\nYouth Code", message.replies[1])
+        self.assertIn("<b>Youth Code — Transitions</b>", message.replies[1])
 
     async def test_search_candidate_heading_escapes_user_html(self) -> None:
         class HtmlQueryMessageStub(PrivateMessageStub):
@@ -2670,7 +2677,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(message.replies), 1)
         self.assertIn("<b>SANSAE Live Session Vol.3 - Melon</b>", message.replies[0])
-        self.assertIn("Источник: SANSAE", message.replies[0])
+        self.assertIn("YouTube · SANSAE", message.replies[0])
         self.assertIn("#stonerhand #video", message.replies[0])
         # Private chats show an editable loading placeholder instead of a
         # typing action, so no chat action is expected here.
@@ -2712,7 +2719,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertIn("🎧 · <b>Transitions</b>\nYouth Code", message.replies[0])
+        self.assertIn("<b>Youth Code — Transitions</b>", message.replies[0])
         self.assertIn("#stonerhand #track", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "✏️ Изменить")
@@ -2777,7 +2784,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertIn("🎧 · <b>Star Signs</b>\nBondage Fairies", message.replies[0])
+        self.assertIn("<b>Bondage Fairies — Star Signs</b>", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "✏️ Изменить")
         self.assertTrue(keyboard[0][0].callback_data.startswith("v2|editor|m|"))
@@ -3053,7 +3060,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             [button.text for row in keyboard.inline_keyboard for button in row],
-            ["🎧 Слушать трек", "🟢 Spotify"],
+            ["🎧 Слушать трек", "🟢 Spotify", "🍎 Apple Music"],
         )
         self.assertEqual(
             tracks[0].thumbnail_url,
@@ -3205,7 +3212,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             {"appleMusic": "https://music.apple.com/album/paranoid"},
         )
         keyboard = _build_link_keyboard(tracks[0].links)
-        self.assertEqual(keyboard.inline_keyboard[0][0].text, "⚪ Apple Music")
+        self.assertEqual(keyboard.inline_keyboard[0][0].text, "🍎 Apple Music")
 
     async def test_lookup_tracks_uses_soundcloud_metadata_fallback(self) -> None:
         tracks, unavailable_urls = await _lookup_tracks(

@@ -262,7 +262,8 @@ def build_release_smoke_report() -> dict[str, object]:
                 content_kind="collection",
             ),
             extra_checks={
-                "all_items_present": len(re.findall(r"^\d+\. ", text, re.M)) == 10,
+                "all_items_present": len(re.findall(r"^<code>\d+</code> ", text, re.M))
+                == 10,
                 "mandatory_type": "#collection" in text,
                 "all_buttons_present": sum(len(row) for row in keyboard.inline_keyboard)
                 == 10,

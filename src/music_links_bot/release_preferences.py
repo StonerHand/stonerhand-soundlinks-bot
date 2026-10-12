@@ -18,7 +18,7 @@ MAX_RELEASE_PREFERENCES = 60
 
 @dataclass(frozen=True, slots=True)
 class PresentationPreferences:
-    layout: str = "column"
+    layout: str = "auto"
     grouping: str = "none"
     artwork: str = "clean"
     tags: Mapping[str, list[str]] = field(default_factory=lambda: MappingProxyType({}))

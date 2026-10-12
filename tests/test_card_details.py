@@ -412,7 +412,8 @@ def test_soundtrack_and_other_cards_have_consistent_ru_en_metadata():
         )
     )
     assert "Various Artists" not in text
-    assert "Саундтрек · 2026 · 19 треков · 6:40" in text
+    # Albums show their length in minutes.
+    assert "Саундтрек · 2026 · 19 треков · 7 мин" in text
     with language_context("en"):
         video = format_video_message(
             VideoMatch("Recording", "Uploader", "https://youtube.com/watch?v=abc")
@@ -420,5 +421,5 @@ def test_soundtrack_and_other_cards_have_consistent_ru_en_metadata():
         playlist = format_playlist_message(
             PlaylistMatch("Mix", "Apple Music", APPLE_ALBUM)
         )
-    assert "📺 · <b>Recording</b>\n\nVideo · YouTube\nSource: Uploader" in video
-    assert "🎛 · <b>Mix</b>\n\nPlaylist · Apple Music" in playlist
+    assert "<b>Recording</b>\n📺 Video · YouTube · Uploader" in video
+    assert "<b>Mix</b>\n🎛 Playlist · Apple Music" in playlist

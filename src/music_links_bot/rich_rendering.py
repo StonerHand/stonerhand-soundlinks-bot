@@ -510,6 +510,8 @@ def build_rich_collection_html(
     # Reuse the same complete, numbered text as the classic preview and delivery.
     body = format_collection_message(tracks, title=title, include_hashtags=False)
     body = body.split("\n\n", 1)[-1]
+    # Rich layouts number lists themselves; keep "1." instead of <code>01</code>.
+    body = re.sub(r"<code>0*(\d+)</code> ", r"\1. ", body)
     if body:
         pieces.append("<p>" + body.replace("\n", "<br/>") + "</p>")
     buttons = rich_button_rows_html(reply_markup)

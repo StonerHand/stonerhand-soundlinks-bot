@@ -44,48 +44,48 @@ from music_links_bot.release_panel import release_panel_callback
 LOGGER = logging.getLogger(__name__)
 
 PUBLIC_BOT_COMMANDS = (
-    BotCommand("start", "меню и быстрый старт"),
-    BotCommand("help", "как пользоваться"),
-    BotCommand("settings", "язык и оформление"),
-    BotCommand("crate", "моя подборка"),
-    BotCommand("privacy", "данные и приватность"),
+    BotCommand("start", "🎧 Новый пост и меню"),
+    BotCommand("crate", "🎶 Моя подборка"),
+    BotCommand("settings", "⚙️ Язык, вид и подпись"),
+    BotCommand("channel", "📣 Проверить бота в канале"),
+    BotCommand("help", "❓ Как это работает"),
+    BotCommand("privacy", "🔐 Мои данные"),
 )
 PUBLIC_BOT_COMMANDS_EN = (
-    BotCommand("start", "menu and quick start"),
-    BotCommand("help", "how to use the bot"),
-    BotCommand("settings", "language and appearance"),
-    BotCommand("crate", "my music crate"),
-    BotCommand("privacy", "data and privacy"),
+    BotCommand("start", "🎧 New post and menu"),
+    BotCommand("crate", "🎶 My collection"),
+    BotCommand("settings", "⚙️ Language, look and signature"),
+    BotCommand("channel", "📣 Check the bot in a channel"),
+    BotCommand("help", "❓ How it works"),
+    BotCommand("privacy", "🔐 My data"),
 )
 BOT_DESCRIPTIONS = {
     "": (
-        "Музыкальный редактор для Telegram.\n\n"
-        "• Ссылка или «артист — трек» → обложка, точный релиз и кнопки площадок\n"
-        "• Несколько ссылок → одна подборка без дублей\n"
-        "• Свой текст над ссылкой → подводка к посту\n"
-        "• Стиль, хэштеги, площадки и обложка — в конструкторе\n"
-        "• Отправка себе, в чат, очередь или канал\n"
-        "• Inline: @StonerHandBot + запрос прямо в переписке\n"
-        "• История, шаблоны и управление данными — прямо в боте\n\n"
-        "Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
-        "Yandex Music, NTS Radio."
+        "🎧 Музыка → красивый пост за секунды.\n\n"
+        "Пришли ссылку или «артист — трек» — бот соберёт пост с обложкой "
+        "и кнопками всех площадок.\n\n"
+        "🎶 Несколько ссылок — подборка с коллажем\n"
+        "🎬 Песня + клипы — одним постом\n"
+        "✏️ Свой текст, теги и вид — в один тап\n"
+        "📣 В любой чат или канал, сразу или по времени\n\n"
+        "Spotify · Apple Music · YouTube · SoundCloud · Deezer · Tidal · "
+        "Яндекс Музыка · Bandcamp · NTS"
     ),
     "en": (
-        "A music post editor for Telegram.\n\n"
-        "• A link or artist — track → artwork, the exact release and platform buttons\n"
-        "• Several links → one duplicate-free collection\n"
-        "• Your text above a link → the post intro\n"
-        "• Style, hashtags, platforms and artwork stay editable\n"
-        "• Send to yourself, another chat, the queue or a channel\n"
-        "• Inline: @StonerHandBot + query anywhere\n"
-        "• History, templates and data controls live inside the bot\n\n"
-        "Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, "
-        "Yandex Music and NTS Radio."
+        "🎧 Music → a beautiful post in seconds.\n\n"
+        "Send a link or “artist — track” and get a post with the cover "
+        "and buttons for every platform.\n\n"
+        "🎶 Several links — a collection with a collage\n"
+        "🎬 A song + clips — one post\n"
+        "✏️ Your text, tags and look — one tap away\n"
+        "📣 To any chat or channel, now or later\n\n"
+        "Spotify · Apple Music · YouTube · SoundCloud · Deezer · Tidal · "
+        "Yandex Music · Bandcamp · NTS"
     ),
 }
 BOT_SHORT_DESCRIPTIONS = {
-    "": "Ссылка или «артист — трек» → готовый пост. Несколько ссылок → подборка.",
-    "en": "A link or artist — track → a finished post. Several links → a collection.",
+    "": "🎧 Ссылка → красивый пост с обложкой и кнопками всех площадок. Подборки и клипы.",
+    "en": "🎧 A link → a beautiful post with the cover and every platform. Collections and clips.",
 }
 
 

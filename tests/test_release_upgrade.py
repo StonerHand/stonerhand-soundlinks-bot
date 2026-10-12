@@ -157,7 +157,7 @@ def test_soundtrack_example_has_clean_title_and_confirmed_counts():
         release.release_year,
     ) == (title, "soundtrack", 19, "2010")
     text = format_track_message(release)
-    assert text.startswith(f"💿 · <b>{title}</b>\n\nСаундтрек")
+    assert text.startswith(f"<b>{title}</b>\n💿 Саундтрек")
     assert "Саундтрек · 2010 · 19 треков" in text
     assert "Compilation by" not in text and "#soundtrack" in text
     restored = normalize_track_draft(new_track_draft(release, chat_id=7, lang="ru"))
@@ -198,7 +198,7 @@ def test_ten_item_layouts_preserve_order_and_destinations(layout, rows):
     assert [button.url for button in buttons] == [item.page_url for item in tracks]
     for index, button in enumerate(buttons, start=1):
         assert button.text == f"{index} · Song {index}"
-        assert f"{index}. Song {index}" in text
+        assert f"<code>{index:02}</code> Song {index}" in text
 
 
 def test_long_labels_get_full_width_and_single_primary_action_is_deduplicated():
@@ -214,7 +214,7 @@ def test_long_labels_get_full_width_and_single_primary_action_is_deduplicated():
     apple = "https://music.apple.com/us/album/release/123?i=456"
     keyboard = _build_link_keyboard({"appleMusic": apple}, release_page_url=apple)
     buttons = [button for row in keyboard.inline_keyboard for button in row]
-    assert len(buttons) == 1 and buttons[0].text == "⚪ Apple Music"
+    assert len(buttons) == 1 and buttons[0].text == "🍎 Apple Music"
     keyboard = _build_link_keyboard(
         {"spotify": "https://open.spotify.com/track/1", "appleMusic": apple},
         release_page_url="https://song.link/s/1",
@@ -224,7 +224,7 @@ def test_long_labels_get_full_width_and_single_primary_action_is_deduplicated():
     assert [button.text for button in buttons] == [
         "🎧 Слушать трек",
         "🟢 Spotify",
-        "⚪ Apple Music",
+        "🍎 Apple Music",
     ]
     assert sum(button.style == "primary" for button in buttons) == 1
     assert len({button.url for button in buttons}) == 3
@@ -249,10 +249,10 @@ def test_maximal_notes_keep_all_ten_entries_within_telegram_limit():
     with presentation_context(PresentationPreferences(annotations=annotations)):
         text = format_collection_message(tracks, title="Большая подборка")
     assert visible_length(text) <= 4096
-    assert re.findall(r"^(\d+)\. ", text, flags=re.M) == [
+    assert re.findall(r"^<code>0*(\d+)</code> ", text, flags=re.M) == [
         str(index) for index in range(1, 11)
     ]
-    assert "#collection" in text and "10. <b>Band 10" in text
+    assert "#collection" in text and "<code>10</code> <b>Band 10" in text
 
 
 def test_groups_notes_and_rich_use_same_order_without_html_injection():
@@ -274,7 +274,11 @@ def test_groups_notes_and_rich_use_same_order_without_html_injection():
         )
     assert text.count("<b>First</b>") == 2
     assert "&lt;b&gt;My note&lt;/b&gt;" in text and "&lt;b&gt;My note&lt;/b&gt;" in rich
-    assert text.index("1. <b>A") < text.index("2. <b>B") < text.index("3. <b>A")
+    assert (
+        text.index("<code>01</code> <b>A")
+        < text.index("<code>02</code> <b>B")
+        < text.index("<code>03</code> <b>A")
+    )
 
 
 def test_video_source_is_separate_from_artist_and_cover_choice():
@@ -284,8 +288,8 @@ def test_video_source_is_separate_from_artist_and_cover_choice():
         url="https://www.youtube.com/watch?v=abc",
     )
     text = format_video_message(video)
-    assert text.startswith("📺 · <b>Deadушки — Коллекционер (Maxidrom 2001)</b>")
-    assert "Источник: Aleksandr Doronin" in text
+    assert text.startswith("<b>Deadушки — Коллекционер (Maxidrom 2001)</b>\n📺 Видео")
+    assert "YouTube · Aleksandr Doronin" in text
     item = track(
         kind="video",
         title=video.title,
@@ -520,7 +524,7 @@ class ReleaseSettingsTests(unittest.IsolatedAsyncioTestCase):
         assert not saved.pending_input
         with presentation_context(preferences_from_session(saved)):
             text = format_collection_message([second, first])
-        assert "2. Song 1\n   <i>↳ Моя заметка &lt;live&gt;</i>" in text
+        assert "<code>02</code> Song 1\n   <i>↳ Моя заметка &lt;live&gt;</i>" in text
 
     async def test_concurrent_updates_isolate_presentation_and_restore_context_on_error(
         self,
@@ -564,5 +568,5 @@ class ReleaseSettingsTests(unittest.IsolatedAsyncioTestCase):
                 return_exceptions=True,
             )
             assert isinstance(results[0], ValueError)
-            assert values == {7: "compact", 8: "column"}
-            assert current_presentation.get().layout == "column"
+            assert values == {7: "compact", 8: "auto"}
+            assert current_presentation.get().layout == "auto"

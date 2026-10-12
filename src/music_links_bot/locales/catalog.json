@@ -1938,5 +1938,9 @@
   "pref_help": {
     "ru": "❓ Помощь",
     "en": "❓ Help"
+  },
+  "home_owner_summary": {
+    "ru": "<i>📊 За неделю: {published} · 🕒 {queued} в очереди · 📝 {drafts}</i>",
+    "en": "<i>📊 This week: {published} · 🕒 {queued} scheduled · 📝 {drafts}</i>"
   }
 }
