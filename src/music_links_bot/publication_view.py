@@ -139,3 +139,17 @@ def build_publication_view(
             else "classic"
         ),
     )
+
+
+def editor_preview_url(draft: dict, track: TrackMatch, context=None) -> str | None:
+    """Show the editor card with the cover the post will actually be published with.
+
+    A custom cover is a Telegram file, which a link preview cannot display, so
+    the card keeps the platform preview for it.
+    """
+    from music_links_bot.collection_collage import branded_artwork_preview_url
+
+    native = _select_preview_url(track.links, context) or track.thumbnail_url
+    if draft.get("custom_cover_file_id") or draft.get("source_audio_file_id"):
+        return native
+    return branded_artwork_preview_url(track.thumbnail_url) or native

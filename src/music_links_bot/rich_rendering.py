@@ -550,9 +550,12 @@ def build_rich_html(
     if data["lead"]:
         pieces.append(f"<p><i>{_lines(data['lead'])}</i></p>")
     if track.thumbnail_url:
+        from music_links_bot.collection_collage import signed_cover_url
+
+        cover = signed_cover_url(track.thumbnail_url) or track.thumbnail_url
         pieces.append(
             "<figure>"
-            f'<img src="{html.escape(track.thumbnail_url, quote=True)}"/>'
+            f'<img src="{html.escape(cover, quote=True)}"/>'
             f"<figcaption>{html.escape(track.artist)} — "
             f"{html.escape(track.title)}</figcaption>"
             "</figure>"

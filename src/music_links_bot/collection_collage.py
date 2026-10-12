@@ -91,6 +91,11 @@ def branded_artwork_preview_url(
     )
 
 
+def signed_cover_url(artwork_url: str | None) -> str | None:
+    """The artwork with the cover signature when branding can serve it, else as is."""
+    return branded_artwork_preview_url(artwork_url) or artwork_url
+
+
 def _artwork_preview_url(
     artwork_urls: list[str], *, base_url: str | None, signing_secret: str | None
 ) -> str | None:

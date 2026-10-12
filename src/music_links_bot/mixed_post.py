@@ -8,6 +8,7 @@ from telegram.constants import ParseMode
 from telegram.error import BadRequest, TelegramError
 
 from music_links_bot.bot_builder import PHOTO_CAPTION_LIMIT, fit_telegram_html
+from music_links_bot.collection_collage import signed_cover_url
 from music_links_bot.models import TrackMatch, VideoMatch
 from music_links_bot.rich_publications import (
     build_rich_track_video_html,
@@ -96,7 +97,7 @@ async def send_track_video_album(
             chat_id=chat_id,
             media=[
                 InputMediaPhoto(
-                    media=track.thumbnail_url,
+                    media=signed_cover_url(track.thumbnail_url) or track.thumbnail_url,
                     caption=fit_telegram_html(caption, PHOTO_CAPTION_LIMIT),
                     parse_mode=ParseMode.HTML,
                 ),

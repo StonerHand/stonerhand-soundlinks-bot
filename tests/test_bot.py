@@ -1767,10 +1767,9 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(result)
         assert result is not None
         self.assertEqual(result.type, "article")
-        self.assertTrue(
-            result.input_message_content.link_preview_options.url.startswith(
-                "https://i.scdn.co/"
-            )
+        self.assertIn(
+            "/api/collage?",
+            result.input_message_content.link_preview_options.url,
         )
         self.assertTrue(result.input_message_content.message_text)
 

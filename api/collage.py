@@ -88,6 +88,9 @@ class handler(BaseHTTPRequestHandler):
         self.send_header("content-type", "image/jpeg")
         self.send_header("content-length", str(len(collage)))
         self.send_header("cache-control", "public, max-age=2592000, immutable")
+        # Signed URLs never change content: let Vercel's CDN answer repeat
+        # fetches (Telegram previews, inline reuse) without a cold function.
+        self.send_header("vercel-cdn-cache-control", "max-age=2592000")
         self.send_header("etag", etag)
         self.send_header("x-content-type-options", "nosniff")
         self.end_headers()

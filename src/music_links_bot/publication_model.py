@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from html import escape
 
+from music_links_bot.collection_collage import signed_cover_url
 from music_links_bot.formatter import release_details
 from music_links_bot.i18n import resolve_lang
 from music_links_bot.models import TrackMatch, VideoMatch
@@ -35,10 +36,9 @@ class MusicPublication:
         lead_html: str = "",
         hashtags: str = "",
     ) -> MusicPublication:
+        cover = signed_cover_url(track.thumbnail_url)
         media = (
-            [PublicationMedia("photo", track.thumbnail_url, cls.track_title(track))]
-            if track.thumbnail_url
-            else []
+            [PublicationMedia("photo", cover, cls.track_title(track))] if cover else []
         )
         return cls(
             title=cls.track_title(track),
@@ -59,10 +59,9 @@ class MusicPublication:
         hashtags: str = "",
     ) -> MusicPublication:
         media: list[PublicationMedia] = []
-        if track.thumbnail_url:
-            media.append(
-                PublicationMedia("photo", track.thumbnail_url, cls.track_title(track))
-            )
+        cover = signed_cover_url(track.thumbnail_url)
+        if cover:
+            media.append(PublicationMedia("photo", cover, cls.track_title(track)))
         if video.thumbnail_url:
             media.append(PublicationMedia("photo", video.thumbnail_url, video.title))
         return cls(
