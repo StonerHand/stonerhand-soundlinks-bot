@@ -74,6 +74,51 @@ def collection_collage_preview_url(
     )
 
 
+VIDEO_MODE = "v"  # every tile is a video frame
+MIX_MODE = "m"  # the first tile is the release cover, the rest are frames
+COLLAGE_MODES = {VIDEO_MODE, MIX_MODE}
+
+
+def video_collage_preview_url(
+    videos: list,
+    *,
+    track: TrackMatch | None = None,
+    base_url: str | None = None,
+    signing_secret: str | None = None,
+) -> str | None:
+    """Signed collage of clip frames (with the release cover first, if any)."""
+    if not feature_enabled("COLLECTION_COLLAGE_ENABLED", default=True):
+        return None
+    urls: list[str] = []
+    cover = str(getattr(track, "thumbnail_url", "") or "").strip()
+    if track is not None:
+        if not cover or not _safe_source_url(cover):
+            return None
+        urls.append(cover)
+    for video in videos:
+        frame = str(getattr(video, "thumbnail_url", "") or "").strip()
+        if frame and _safe_source_url(frame) and frame not in urls:
+            urls.append(frame)
+        if len(urls) == MAX_COLLAGE_ITEMS:
+            break
+    if len(urls) < MIN_COLLAGE_ITEMS:
+        return None
+    return _artwork_preview_url(
+        urls,
+        base_url=base_url,
+        signing_secret=signing_secret,
+        mode=MIX_MODE if track is not None else VIDEO_MODE,
+    )
+
+
+def collage_play_flags(mode: str | None, count: int) -> list[bool]:
+    if mode == VIDEO_MODE:
+        return [True] * count
+    if mode == MIX_MODE:
+        return [False] + [True] * max(0, count - 1)
+    return [False] * count
+
+
 def branded_artwork_preview_url(
     artwork_url: str | None,
     *,
@@ -98,7 +143,11 @@ def signed_cover_url(artwork_url: str | None) -> str | None:
 
 
 def _artwork_preview_url(
-    artwork_urls: list[str], *, base_url: str | None, signing_secret: str | None
+    artwork_urls: list[str],
+    *,
+    base_url: str | None,
+    signing_secret: str | None,
+    mode: str | None = None,
 ) -> str | None:
     public_origin = _public_origin(base_url)
     secret = str(signing_secret or os.getenv("BOT_TOKEN") or "").strip()
@@ -107,11 +156,13 @@ def _artwork_preview_url(
 
     payload = _encode_payload(artwork_urls)
     label = brand_label_override()
-    signature = _signature(payload, secret, label=label)
+    signature = _signature(payload, secret, label=label, mode=mode)
     params = {"p": payload, "s": signature, "v": signature_cache_key()}
     if label:
         # The image function has no Redis: the owner's label travels signed.
         params["l"] = label
+    if mode:
+        params["m"] = mode
     query = urlencode(params)
     preview_url = f"{public_origin}/api/collage?{query}"
     return preview_url if len(preview_url) <= MAX_PREVIEW_URL_LENGTH else None
@@ -138,6 +189,7 @@ def decode_collage_payload(
     signing_secret: str,
     allow_single: bool = False,
     label: str | None = None,
+    mode: str | None = None,
 ) -> list[str] | None:
     """Verify a collage request and return only safe HTTPS artwork URLs."""
     if (
@@ -148,7 +200,11 @@ def decode_collage_payload(
         or len(payload) > MAX_PAYLOAD_LENGTH
     ):
         return None
-    if not secrets_match(signature, _signature(payload, signing_secret, label=label)):
+    if mode is not None and mode not in COLLAGE_MODES:
+        return None
+    if not secrets_match(
+        signature, _signature(payload, signing_secret, label=label, mode=mode)
+    ):
         return None
 
     try:
@@ -190,8 +246,13 @@ def compose_collection_collage(
     size: int = 1_200,
     gap: int = 10,
     label: str | None = None,
+    play: list[bool] | None = None,
 ) -> bytes | None:
-    """Compose downloaded artwork into a deterministic square JPEG."""
+    """Compose downloaded artwork into a deterministic square JPEG.
+
+    ``play`` marks video frames: they lose YouTube's letterbox bars and get a
+    ▶ badge, so a post with clips reads as "watchable" at a glance.
+    """
     try:
         from PIL import Image, ImageOps
     except ImportError:
@@ -203,9 +264,12 @@ def compose_collection_collage(
     if sum(len(raw) for raw in sources) > MAX_TOTAL_ARTWORK_BYTES:
         return None
 
+    flags = list(play or [])[: len(sources)]
+    flags += [False] * (len(sources) - len(flags))
     with ExitStack() as resources:
         images = []
-        for raw in sources:
+        image_flags: list[bool] = []
+        for raw, is_video in zip(sources, flags, strict=True):
             if len(raw) > MAX_ARTWORK_BYTES:
                 continue
             try:
@@ -215,9 +279,11 @@ def compose_collection_collage(
                     # Keep only reduced images across iterations, not six
                     # full-resolution decoded originals at once.
                     source.thumbnail((size, size), Image.Resampling.LANCZOS)
-                    images.append(
-                        resources.enter_context(ImageOps.exif_transpose(source))
-                    )
+                    image = resources.enter_context(ImageOps.exif_transpose(source))
+                    if is_video:
+                        image = resources.enter_context(_trim_letterbox(image))
+                    images.append(image)
+                    image_flags.append(is_video)
             except (OSError, TypeError, ValueError, Image.DecompressionBombError):
                 continue
         if len(images) < MIN_COLLAGE_ITEMS:
@@ -227,8 +293,11 @@ def compose_collection_collage(
             canvas = resources.enter_context(
                 Image.new("RGB", (size, size), (18, 18, 20))
             )
-            for image, box in zip(
-                images, _layout_boxes(len(images), size, gap), strict=True
+            for image, is_video, box in zip(
+                images,
+                image_flags,
+                _layout_boxes(len(images), size, gap),
+                strict=True,
             ):
                 left, top, right, bottom = box
                 target_size = (right - left, bottom - top)
@@ -241,6 +310,8 @@ def compose_collection_collage(
                     fitted.getchannel("A") as mask,
                 ):
                     tile.paste(fitted, mask=mask)
+                    if is_video:
+                        _draw_play_badge(tile)
                     canvas.paste(tile, (left, top))
 
             if label is not None:
@@ -253,6 +324,45 @@ def compose_collection_collage(
             return output.getvalue()
         except (OSError, TypeError, ValueError):
             return None
+
+
+def _trim_letterbox(image):
+    """YouTube's 4:3 thumbnails carry black bars around a 16:9 frame."""
+    width, height = image.size
+    if not width or not height or abs(width / height - 4 / 3) > 0.02:
+        return image.copy()
+    frame_height = round(width * 9 / 16)
+    top = (height - frame_height) // 2
+    return image.crop((0, top, width, top + frame_height))
+
+
+def _draw_play_badge(tile) -> None:
+    """A soft dark circle with a white triangle in the middle of the tile."""
+    from PIL import Image, ImageDraw
+
+    width, height = tile.size
+    radius = max(8, int(min(width, height) * 0.13))
+    cx, cy = width // 2, height // 2
+    with Image.new("RGBA", tile.size, (0, 0, 0, 0)) as overlay:
+        draw = ImageDraw.Draw(overlay)
+        draw.ellipse(
+            (cx - radius, cy - radius, cx + radius, cy + radius), fill=(0, 0, 0, 150)
+        )
+        side = radius * 0.9
+        draw.polygon(
+            [
+                (cx - side * 0.38, cy - side * 0.55),
+                (cx - side * 0.38, cy + side * 0.55),
+                (cx + side * 0.62, cy),
+            ],
+            fill=(255, 255, 255, 235),
+        )
+        with (
+            tile.convert("RGBA") as rgba,
+            Image.alpha_composite(rgba, overlay) as composed,
+            composed.convert("RGB") as result,
+        ):
+            tile.paste(result)
 
 
 def _layout_boxes(count: int, size: int, gap: int) -> list[tuple[int, int, int, int]]:
@@ -334,10 +444,18 @@ def _encode_payload(urls: list[str]) -> str:
     return base64.urlsafe_b64encode(encoded).decode().rstrip("=")
 
 
-def _signature(payload: str, secret: str, *, label: str | None = None) -> str:
+def _signature(
+    payload: str,
+    secret: str,
+    *,
+    label: str | None = None,
+    mode: str | None = None,
+) -> str:
     message = f"{COLLAGE_VERSION}:{payload}".encode()
     if label:
         message += b"\x00" + label.encode()
+    if mode:
+        message += b"\x01" + mode.encode()
     return hmac.new(secret.encode(), message, hashlib.sha256).hexdigest()[:32]
 
 

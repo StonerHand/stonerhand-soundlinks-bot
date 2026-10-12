@@ -325,11 +325,15 @@ def _build_youtube_collection_keyboard(
     *,
     include_channel_button: bool = False,
 ) -> InlineKeyboardMarkup:
+    from music_links_bot.video_kinds import video_kind_emoji
+
     buttons: list[InlineKeyboardButton] = []
     for index, video in enumerate(videos, start=1):
         buttons.append(
             _url_button(
-                text=_button_label(f"{index} · {video.title}"),
+                text=_button_label(
+                    f"{video_kind_emoji(video)} {index} · {video.title}"
+                ),
                 url=video.url,
                 style=None,
             )
@@ -400,6 +404,32 @@ def _build_artist_collection_keyboard(
     )
 
 
+def _build_track_videos_keyboard(
+    track: TrackMatch,
+    videos: list[VideoMatch],
+    *,
+    include_channel_button: bool = False,
+) -> InlineKeyboardMarkup:
+    """One "listen" button, then short named clip buttons: 🎬 Клип · 🎤 Live."""
+    from music_links_bot.video_kinds import video_kind_labels
+
+    rows: list[list[InlineKeyboardButton]] = []
+    destination = resolve_release_hub_url(
+        track.page_url, track.links, release_kind=track.kind
+    ) or _select_preview_url(track.links)
+    if destination:
+        rows.append(
+            [_url_button(text="🎧 Слушать песню", url=destination, style="primary")]
+        )
+    clips = [
+        _url_button(text=label, url=video.url, style=None)
+        for label, video in zip(video_kind_labels(videos), videos, strict=True)
+    ]
+    per_row = 3 if all(len(button.text) <= 14 for button in clips) else 2
+    rows.extend(clips[i : i + per_row] for i in range(0, len(clips), per_row))
+    return _keyboard_with_optional_channel(rows, include_channel_button)
+
+
 def _build_mixed_collection_keyboard(
     tracks: list[TrackMatch],
     videos: list[VideoMatch],
@@ -419,6 +449,10 @@ def _build_mixed_collection_keyboard(
         and not artists
         and not radios
     )
+    if len(tracks) == 1 and videos and not playlists and not artists and not radios:
+        return _build_track_videos_keyboard(
+            tracks[0], videos, include_channel_button=include_channel_button
+        )
     buttons: list[InlineKeyboardButton] = []
     index = 1
 

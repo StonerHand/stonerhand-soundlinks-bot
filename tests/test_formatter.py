@@ -461,9 +461,9 @@ class FormatterTests(unittest.TestCase):
 
         message = format_mixed_collection_message(tracks, videos)
 
-        self.assertIn("<b>Песня + клип</b>", message)
+        self.assertIn("<b>Песня + live</b>", message)
         self.assertIn("<b>Artist</b> — Song", message)
-        self.assertIn("📺 · <b>Live</b>", message)
+        self.assertIn("🎤 · <b>Live</b>", message)
         self.assertNotIn("<a href=", message)
         self.assertIn("#stonerhand #collection #track #video", message)
 
@@ -482,7 +482,7 @@ class FormatterTests(unittest.TestCase):
         message = format_mixed_collection_message([], videos, playlists)
 
         self.assertIn("🎛 · <b>Women of Punk</b>", message)
-        self.assertIn("📺 · <b>Live</b>", message)
+        self.assertIn("🎤 · <b>Live</b>", message)
         self.assertNotIn("<a href=", message)
         self.assertIn("#stonerhand #collection #playlist #video", message)
 
@@ -501,7 +501,7 @@ class FormatterTests(unittest.TestCase):
         message = format_mixed_collection_message([], videos, artists=artists)
 
         self.assertIn("🧬 · <b>1.Kla$</b>", message)
-        self.assertIn("📺 · <b>Live</b>", message)
+        self.assertIn("🎤 · <b>Live</b>", message)
         self.assertNotIn("<a href=", message)
         self.assertIn("#stonerhand #collection #artist #video", message)
 
@@ -520,7 +520,7 @@ class FormatterTests(unittest.TestCase):
         message = format_mixed_collection_message([], videos, radios=radios)
 
         self.assertIn("📻 · <b>Dark Energy</b>", message)
-        self.assertIn("📺 · <b>Live</b>", message)
+        self.assertIn("🎤 · <b>Live</b>", message)
         self.assertNotIn("<a href=", message)
         self.assertIn("#stonerhand #collection #radio #video", message)
 

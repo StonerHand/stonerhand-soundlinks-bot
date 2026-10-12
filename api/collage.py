@@ -20,6 +20,7 @@ if str(SRC_PATH) not in sys.path:
 from music_links_bot.branding import compose_cover
 from music_links_bot.collection_collage import (
     MAX_ARTWORK_BYTES,
+    collage_play_flags,
     compose_collection_collage,
     decode_collage_payload,
 )
@@ -51,12 +52,14 @@ class handler(BaseHTTPRequestHandler):
 
         signature = query.get("s", [""])[0]
         label_override = query.get("l", [""])[0][:MAX_BRAND_LABEL_LENGTH] or None
+        mode = query.get("m", [""])[0][:2] or None
         urls = decode_collage_payload(
             query.get("p", [""])[0],
             signature,
             signing_secret=os.getenv("BOT_TOKEN", "").strip(),
             allow_single=True,
             label=label_override,
+            mode=mode,
         )
         if urls is None:
             self.send_error(HTTPStatus.FORBIDDEN)
@@ -71,13 +74,21 @@ class handler(BaseHTTPRequestHandler):
             return
 
         with ThreadPoolExecutor(max_workers=min(2, len(urls))) as executor:
-            images = [image for image in executor.map(_fetch_artwork, urls) if image]
+            fetched = list(executor.map(_fetch_artwork, urls))
+        # Keep the ▶ flags attached to their own frame if one download fails.
+        flags = collage_play_flags(mode, len(fetched))
+        pairs = [
+            (image, flag) for image, flag in zip(fetched, flags, strict=True) if image
+        ]
+        images = [image for image, _flag in pairs]
         label = label_override or brand_label()
         if len(images) == 1 and photo_branding_enabled():
             collage = compose_cover(images[0], label=label, size=1200)
         elif len(images) >= 2:
             collage = compose_collection_collage(
-                images, label=label if photo_branding_enabled() else None
+                images,
+                label=label if photo_branding_enabled() else None,
+                play=[flag for _image, flag in pairs],
             )
         else:
             collage = None

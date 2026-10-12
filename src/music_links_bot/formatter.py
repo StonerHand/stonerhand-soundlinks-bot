@@ -199,7 +199,7 @@ def format_video_collection_message(
     lines = [f"<b>{escape(title or 'Видео')}</b>", ""]
     for index, video in enumerate(videos, start=1):
         heading = f"<b>{_display_text(video.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(f"{index}. 📺 · {heading}")
+        lines.append(f"{index}. {video_kind_emoji(video)} · {heading}")
 
     return _with_hashtags(
         lines, "#stonerhand #collection #video", include_hashtags=include_hashtags
@@ -237,15 +237,15 @@ def format_mixed_collection_message(
     radios = radios or []
     if (
         len(tracks) == 1
-        and len(videos) == 1
+        and videos
         and not playlists
         and not artists
         and not radios
         and not title
     ):
-        return format_track_video_pair_message(
+        return format_track_videos_message(
             tracks[0],
-            videos[0],
+            videos,
             include_hashtags=include_hashtags,
         )
 
@@ -274,7 +274,7 @@ def format_mixed_collection_message(
 
     for video in videos:
         heading = f"<b>{_display_text(video.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(f"{index}. 📺 · {heading}")
+        lines.append(f"{index}. {video_kind_emoji(video)} · {heading}")
         index += 1
 
     return _with_hashtags(
@@ -290,6 +290,12 @@ def format_mixed_collection_message(
     )
 
 
+def video_kind_emoji(video: VideoMatch) -> str:
+    from music_links_bot.video_kinds import video_kind_emoji as emoji
+
+    return emoji(video)
+
+
 def format_track_video_pair_message(
     track: TrackMatch,
     video: VideoMatch,
@@ -297,17 +303,43 @@ def format_track_video_pair_message(
     include_hashtags: bool = True,
 ) -> str:
     """A compact editorial layout for the most common mixed post."""
-    track_heading = format_track_heading(track)
-    video_heading = f"<b>{_display_text(video.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-    lines = [
-        "<b>Песня + клип</b>",
-        "",
-        f"🎧 · {track_heading}",
-        f"📺 · {video_heading}",
-    ]
-    if video.author:
+    return format_track_videos_message(
+        track, [video], include_hashtags=include_hashtags
+    )
+
+
+_KIND_HEADINGS = {
+    "clip": "клип",
+    "live": "live",
+    "lyric": "lyric video",
+    "acoustic": "акустика",
+    "visualizer": "визуализация",
+    "audio": "аудио",
+}
+
+
+def format_track_videos_message(
+    track: TrackMatch,
+    videos: list[VideoMatch],
+    *,
+    include_hashtags: bool = True,
+) -> str:
+    """One release with its clips: what to listen to, then what to watch."""
+    from music_links_bot.video_kinds import video_kind
+
+    if len(videos) == 1:
+        heading = "Песня + " + _KIND_HEADINGS.get(video_kind(videos[0]), "клип")
+    else:
+        heading = f"Песня + {len(videos)} видео"
+    lines = [f"<b>{escape(heading)}</b>", "", f"🎧 · {format_track_heading(track)}"]
+    for video in videos:
+        video_heading = (
+            f"<b>{_display_text(video.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
+        )
+        lines.append(f"{video_kind_emoji(video)} · {video_heading}")
+    if len(videos) == 1 and videos[0].author:
         lines.append(
-            f"   <i>{_display_text(video.author, MAX_COLLECTION_TEXT_LENGTH)}</i>"
+            f"   <i>{_display_text(videos[0].author, MAX_COLLECTION_TEXT_LENGTH)}</i>"
         )
     return _with_hashtags(
         lines,
