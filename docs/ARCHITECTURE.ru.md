@@ -1,6 +1,6 @@
 # Архитектура StonerHand Soundlinks Bot
 
-[← Документация](README.md) · [Запуск](SETUP.ru.md) · [Проверка релиза](RELEASE_CHECKLIST.ru.md)
+[← О боте](../README.md) · [Запуск](SETUP.ru.md)
 
 Документ описывает текущую production-архитектуру Telegram-бота.
 
@@ -39,8 +39,9 @@ webhook `/api/telegram`. Polling используется исключитель
 ## Основные модули
 
 - `bot_app.py` — единственная точка сборки PTB Application и регистрации handlers;
-- `bot.py` — линейная orchestration поиска, редактора и публикации без
-  переэкспорта команд, UI и lookup-реализаций;
+- `bot.py` — маршрутизация callback-кнопок по разделам;
+- `bot_lookup_flow.py` — путь от ссылки или запроса до карточки черновика;
+- `bot_editor.py` — кнопки и экраны редактора, публикация и доставка;
 - `lookup_transport.py` — доставка результатов в private/group/channel,
   ephemeral fallback и song+video media group;
 - `bot_pending.py` — нативный Force Reply, валидация ожидаемого ввода и
@@ -346,8 +347,8 @@ Webhook worker не запускает: пользовательский update 
   только HTTP(S)-ссылки до создания строгой модели релиза;
 - health endpoint параллельно и без побочных эффектов проверяет Telegram и
   webhook, выполняет Redis PING, читает очередь/метрики и возвращает version/commit;
-- отдельный GitHub workflow вызывает защищённый queue worker каждые пять минут,
-  а Vercel Cron остаётся суточным резервом; последний tick хранится в Redis;
+- расписание Upstash QStash вызывает queue worker каждые три минуты с подписью
+  запроса, а Vercel Cron остаётся суточным резервом; последний tick хранится в Redis;
 - перед вызовом Telegram задача переходит в `delivering`: подтверждённый отказ
   получает backoff, а потерянный ответ становится `uncertain` без слепого повтора;
 - production canary проверяет реальные API, commit deploy, просроченную очередь,
@@ -390,7 +391,7 @@ revision. Удалённая сессия или черновик не восс�
 проверка элементов. `publication_view` остаётся общим планом отдельного релиза,
 `PublicationService` используется немедленной отправкой, превью и очередью.
 `bot_search_handlers` и `bot_error_handlers` содержат сценарии поиска и
-восстановления; `bot.py` сохраняет совместимые точки входа и передаёт им явные
+восстановления; `bot_lookup_flow` сохраняет совместимые точки входа и передаёт им явные
 адаптеры транспорта. `shared_http` управляет соединениями текущего event loop,
 `operation_metrics` хранит ограниченные анонимные измерения задержек.
 Проверка Mypy расширена с четырёх до одиннадцати модулей, включая модель

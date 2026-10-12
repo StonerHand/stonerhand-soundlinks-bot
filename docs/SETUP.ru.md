@@ -1,6 +1,6 @@
 # Запуск и эксплуатация
 
-[← Документация](README.md) · [Архитектура](ARCHITECTURE.ru.md) · [Проверка релиза](RELEASE_CHECKLIST.ru.md)
+[← О боте](../README.md) · [Архитектура](ARCHITECTURE.ru.md)
 
 ## Локально
 
@@ -120,28 +120,20 @@ curl --fail-with-body --silent --show-error \
 
 ### Расписание и выпуск
 
-[queue-worker.yml](../.github/workflows/queue-worker.yml) вызывает обработчик
-каждые пять минут. Укажите одинаковый `CRON_SECRET` в Vercel и GitHub Actions;
-для своего домена задайте GitHub Actions variable `QUEUE_BASE_URL`. Запустите workflow
-вручную и проверьте `last_tick_at` в health. Плановые запуски GitHub могут
-задерживаться; время отправки зависит от фактического запуска обработчика.
-Ежедневный Vercel Cron служит резервом.
-
-Плановые запуски GitHub Actions часто опаздывают на 10–30 минут, а в публичном
-репозитории отключаются после 60 дней без коммитов. Для точного времени
-отложенных постов используйте расписание Upstash QStash (бесплатный тариф):
+Очередь отложенных постов обрабатывает расписание Upstash QStash (бесплатный
+тариф), ежедневный Vercel Cron служит резервом. Проверить работу можно по
+`last_tick_at` в `/api/health`.
 
 1. Vercel → Storage / Marketplace → Upstash → **QStash** → создать и подключить
    к проекту. Vercel сам добавит `QSTASH_CURRENT_SIGNING_KEY` и
    `QSTASH_NEXT_SIGNING_KEY`; сделайте Redeploy, чтобы функции их увидели.
 2. Upstash → QStash → **Schedules → Create**: Destination
-   `https://<ваш-домен>/api/queue_worker`, Cron `* * * * *`, метод `POST`.
+   `https://<ваш-домен>/api/queue_worker`, Cron `*/3 * * * *` (бесплатного лимита QStash хватает с запасом), метод `POST`.
 
 Обработчик проверяет подпись QStash (`Upstash-Signature`) по этим ключам, так
 что копировать секрет в заголовок не нужно. `GET`/`POST` с
 `Authorization: Bearer <CRON_SECRET>` тоже продолжают работать. Повторный тик
-безопасен: задания очереди захватываются атомарно, поэтому GitHub workflow можно
-оставить как запасной.
+безопасен: задания очереди захватываются атомарно.
 
 Регион функций закреплён в `vercel.json` (`iad1`) рядом с базой Upstash
 (`us-east-1`): каждая команда Redis — отдельный HTTPS-запрос, и межрегиональная
@@ -198,8 +190,7 @@ python tests/e2e/production_canary.py
 Публичные контракты провайдеров: `python tests/e2e/provider_canary.py`.
 Проверку с настоящими отправками `tests/e2e/telegram_canary.py --chat-id <ID>`
 запускают отдельно в выделенном закрытом чате; подтверждённые тестовые сообщения
-удаляются. Порядок визуальной проверки клиентов Telegram —
-в [списке проверки релиза](RELEASE_CHECKLIST.ru.md).
+удаляются.
 
 
 ### Надёжность доставки и удаления данных
