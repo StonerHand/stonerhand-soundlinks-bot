@@ -55,7 +55,7 @@ class BuilderJourneyTests(unittest.TestCase):
         }
 
     def test_home_opens_native_create_screen(self) -> None:
-        keyboard = build_start_keyboard("StonerHandBot", lang="ru")
+        keyboard = build_start_keyboard("StonerHandBot", lang="ru", first_visit=True)
         self.assertEqual(
             keyboard.inline_keyboard[0][0].callback_data,
             "v2|menu|create",
@@ -71,7 +71,7 @@ class BuilderJourneyTests(unittest.TestCase):
             active_draft_label="Deftones — Rickets",
         )
         self.assertEqual(
-            keyboard.inline_keyboard[1][0].text, "📝 Продолжить: Deftones — Rickets"
+            keyboard.inline_keyboard[0][0].text, "📝 Продолжить: Deftones — Rickets"
         )
         self.assertEqual(
             active_card_label({"item": {"artist": "A", "title": "B"}}, "fallback"),
@@ -79,7 +79,8 @@ class BuilderJourneyTests(unittest.TestCase):
         )
 
     def test_explicit_style_platform_intro_and_tag_flow(self) -> None:
-        self.assertEqual(builder_screen("zs"), BuilderScreen.STYLE)
+        # Style lives on the single "Вид" screen; old callbacks still open it.
+        self.assertEqual(builder_screen("zs"), BuilderScreen.APPEARANCE)
         self.assertEqual(select_preset(self.draft, 0), "minimal")
         self.assertEqual(
             selected_platforms(self.draft, self.track, self.order),
@@ -104,7 +105,8 @@ class BuilderJourneyTests(unittest.TestCase):
             for button in row
         }
         self.assertNotIn("✓", by_action["hi"].text)
-        self.assertIn("ht", by_action)
+        # With tags off, the one-tap way back is "auto tags" on the same screen.
+        self.assertIn("ha", by_action)
         self.assertFalse(
             any(button.text.startswith("✓") for row in none_rows for button in row)
         )
@@ -122,11 +124,14 @@ class BuilderJourneyTests(unittest.TestCase):
 
     def test_selector_keyboards_are_explicit_and_reversible(self) -> None:
         style_rows = editor_style_rows("abc", self.draft)
-        self.assertEqual(style_rows[0][0].callback_data, "v2|editor|z0|abc")
+        self.assertEqual(
+            [row[0].callback_data for row in style_rows[:2]],
+            ["v2|editor|z1|abc", "v2|editor|z2|abc"],
+        )
         platform_rows = editor_platform_rows("abc", self.draft, self.track, self.order)
         self.assertEqual(platform_rows[0][0].callback_data, "v2|editor|l0|abc")
         tag_rows = editor_hashtag_rows("abc", self.draft)
-        self.assertEqual(tag_rows[-1][0].callback_data, "v2|editor|b|abc")
+        self.assertEqual(tag_rows[-1][0].callback_data, "v2|editor|m|abc")
 
     def test_schedule_and_telegram_limits_are_deterministic(self) -> None:
         now = datetime(2026, 8, 10, 10, 0, tzinfo=timezone.utc)

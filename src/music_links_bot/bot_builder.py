@@ -45,15 +45,17 @@ SCREEN_ACTIONS = {
     "ap": BuilderScreen.APPEARANCE,
     "tx": BuilderScreen.TEXT,
     "tools": BuilderScreen.TOOLS,
-    "zs": BuilderScreen.STYLE,
+    # Style, format and artwork all live on the single "Вид" screen now; the
+    # old callbacks stay valid for keyboards already sent.
+    "zs": BuilderScreen.APPEARANCE,
     "ls": BuilderScreen.PLATFORMS,
     "ts": BuilderScreen.INTRO,
     "hs": BuilderScreen.HASHTAGS,
-    "ht": BuilderScreen.TAG_OPTIONS,
+    "ht": BuilderScreen.HASHTAGS,
     "pv": BuilderScreen.PREVIEW,
     "o": BuilderScreen.ACTIONS,
     "qs": BuilderScreen.SCHEDULE,
-    "rs": BuilderScreen.DELIVERY,
+    "rs": BuilderScreen.APPEARANCE,
     "tp": BuilderScreen.TEMPLATES,
 }
 
@@ -247,7 +249,15 @@ def parse_schedule_datetime(
         str(value or ""),
     )
     if match is None:
-        return None
+        # Natural phrases: "завтра 18:30", "пт 21:00", "через 2 часа".
+        from music_links_bot.human_time import parse_human_datetime
+
+        parsed = parse_human_datetime(
+            value, timezone_name=timezone_name, now=current.timestamp()
+        )
+        if parsed is None or parsed > current.timestamp() + MAX_SCHEDULE_DAYS * 86400:
+            return None
+        return int(parsed)
     day, month, year, hour, minute = match.groups()
     try:
         if day is None:

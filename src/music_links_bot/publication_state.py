@@ -101,6 +101,14 @@ async def mark_posted(
     )
 
 
+async def forget_posted(context, track: TrackMatch, target: int | str | None) -> None:
+    """Drop the duplicate guard after the owner cancelled a fresh publication."""
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    if kv is None:
+        return
+    await kv.delete(publication_key(context, track, target))
+
+
 def _message_url(target: int | str | None, message_id: object) -> str | None:
     if not isinstance(message_id, int) or message_id <= 0 or target is None:
         return None

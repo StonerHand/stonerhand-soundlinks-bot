@@ -35,6 +35,8 @@ MAX_LINKS_PER_MESSAGE = 10
 # One stable example powers first-run and empty-inline discovery.  Keeping it
 # here prevents the two entry points from drifting apart.
 INLINE_EXAMPLE_QUERY = "Deftones — Rickets"
+# Inline query that shares one exact edited post (see bot_inline).
+DRAFT_SHARE_PREFIX = "post:"
 
 PLATFORM_LABELS = {
     "spotify": "Spotify",

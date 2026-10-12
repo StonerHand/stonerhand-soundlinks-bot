@@ -43,8 +43,14 @@ async def crate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         lang=lang,
         title=title,
         share_query=build_crate_share_query(items),
+        can_publish=is_publisher(context, user_id),
     )
     await message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+
+
+def is_publisher(context, user_id: int) -> bool:
+    admin_chat_id = context.application.bot_data.get("admin_chat_id")
+    return admin_chat_id is not None and admin_chat_id == user_id
 
 
 async def dispatch_crate_action(query, context, action: CallbackAction) -> None:
@@ -71,6 +77,7 @@ async def dispatch_crate_action(query, context, action: CallbackAction) -> None:
             lang=lang,
             title=title,
             share_query=build_crate_share_query(current_items),
+            can_publish=is_publisher(context, user_id),
         )
         await safe_edit(query, text, keyboard)
         return
@@ -154,6 +161,23 @@ async def dispatch_crate_action(query, context, action: CallbackAction) -> None:
     if action.action == "preview":
         await _show_preview(query, context, user_id=user_id, lang=lang, title=title)
         return
+    if action.action in {"style", "more"}:
+        await query.answer()
+        text, keyboard = render_crate(
+            current_items, lang=lang, title=title, screen=action.action
+        )
+        await safe_edit(query, text, keyboard)
+        return
+    if action.action == "publish":
+        await _publish_crate(
+            query,
+            context,
+            user_id=user_id,
+            lang=lang,
+            title=title,
+            revision=action.payload,
+        )
+        return
     if action.action == "up":
         items = await move_crate_item(bot_data, user_id, reference, -1)
         selected_index = item_index(items, reference)
@@ -217,8 +241,96 @@ async def dispatch_crate_action(query, context, action: CallbackAction) -> None:
         can_undo=undo_record is not None,
         title=title,
         share_query=build_crate_share_query(items),
+        can_publish=is_publisher(context, user_id),
     )
     await safe_edit(query, text, keyboard)
+
+
+async def _publish_crate(
+    query, context, *, user_id: int, lang: str, title: str, revision: str
+) -> None:
+    """Post the whole collection to the channel in one tap (owner only)."""
+    from telegram.error import TelegramError
+
+    from music_links_bot.bot_crate import crate_revision
+    from music_links_bot.collection_plan import build_collection_plan, collection_issues
+    from music_links_bot.keyboards import CHANNEL_USERNAME, _build_link_preview_options
+    from music_links_bot.publication_contract import (
+        RenderedPublication,
+        require_valid_publication,
+    )
+    from music_links_bot.sharing import make_channel_safe_keyboard
+
+    if not is_publisher(context, user_id):
+        await query.answer(get_text(lang, "ed_admin_only"), show_alert=True)
+        return
+    items = await load_crate(context.application.bot_data, user_id)
+    if not items or revision != crate_revision(items):
+        await query.answer(get_text(lang, "state_conflict"), show_alert=True)
+        return
+    if any(issue.blocking for issue in collection_issues(items)):
+        await query.answer(get_text(lang, "crate_fix_first"), show_alert=True)
+        return
+    tracks = [
+        TrackMatch(**{"links": {}, **entry["item"]})
+        for entry in items
+        if isinstance(entry.get("item"), dict)
+    ]
+    plan = build_collection_plan(
+        tracks,
+        context=context,
+        title=title or get_text(lang, "crate_preview_title"),
+        include_channel_button=False,
+    )
+    keyboard = make_channel_safe_keyboard(plan.keyboard)
+    require_valid_publication(
+        RenderedPublication(
+            text=plan.text,
+            keyboard=keyboard,
+            preview_url=plan.preview_url,
+            source_urls=plan.source_urls,
+            found_count=len(tracks),
+            requested_count=len(tracks),
+        )
+    )
+    target = (
+        context.application.bot_data.get("publish_chat_id") or f"@{CHANNEL_USERNAME}"
+    )
+    try:
+        sent = await context.bot.send_message(
+            chat_id=target,
+            text=plan.text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=keyboard,
+            link_preview_options=_build_link_preview_options(
+                plan.preview_url, prefer_large_media=True
+            ),
+        )
+    except TelegramError:
+        await query.answer(get_text(lang, "ed_publish_failed"), show_alert=True)
+        return
+    await query.answer(get_text(lang, "ed_published_toast"))
+    from music_links_bot.publication_state import _message_url
+
+    url = _message_url(target, getattr(sent, "message_id", None))
+    rows = []
+    if url:
+        rows.append(
+            [InlineKeyboardButton(get_text(lang, "ed_open_publication"), url=url)]
+        )
+    rows.append(
+        [
+            InlineKeyboardButton(
+                get_text(lang, "crate_back"),
+                callback_data=encode_callback("crate", "open"),
+            )
+        ]
+    )
+    await safe_edit(
+        query,
+        get_text(lang, "crate_published").format(count=len(tracks)),
+        InlineKeyboardMarkup(rows),
+    )
 
 
 def _active_undo(undo_map: dict, user_id: int) -> dict | None:
@@ -300,7 +412,7 @@ async def _show_preview(query, context, *, user_id: int, lang: str, title: str) 
             *[list(row) for row in preview_keyboard.inline_keyboard],
             [
                 InlineKeyboardButton(
-                    get_text(lang, "back"),
+                    get_text(lang, "crate_back"),
                     callback_data=encode_callback("crate", "open"),
                 )
             ],

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import datetime
 from html import escape
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -10,11 +11,21 @@ from telegram import InlineKeyboardMarkup
 from music_links_bot.bot_builder import active_card_label
 from music_links_bot.bot_history import load_history_items
 from music_links_bot.bot_runtime import encode_callback
+from music_links_bot.human_time import human_date, human_datetime
 from music_links_bot.i18n import get_text
 from music_links_bot.publish_queue import QueueStorageError, load_jobs
 from music_links_bot.telegram_buttons import button as InlineKeyboardButton
 
-PAGE_SIZE = 5
+PAGE_SIZE = 6
+EXPIRY_WARNING_SECONDS = 2 * 86400
+STATUS_ICONS = {
+    "draft_editable": "📝",
+    "draft_scheduled": "🕒",
+    "draft_sending": "⏳",
+    "draft_uncertain": "⚠️",
+    "draft_queue_unknown": "🕒",
+    "draft_published": "✅",
+}
 
 
 def _page(items: list, page: int):
@@ -121,38 +132,55 @@ async def render_drafts_view(
         reverse=True,
     )
     visible, page, pages = _page(drafts, page)
-    lines = [
-        get_text(lang, "drafts_title"),
-        get_text(lang, "queue_page").format(page=page + 1, pages=pages),
-    ]
+    heading = get_text(lang, "drafts_title")
+    if pages > 1:
+        heading += f" · {page + 1}/{pages}"
+    lines = [heading]
     if search:
         lines.append("🔎 " + escape(search))
-    rows = []
-    filters = [
-        InlineKeyboardButton(
-            ("✓ " if key == filter_by else "") + get_text(lang, "posts_" + key),
-            callback_data=encode_callback("menu", "postfilter", key),
-        )
-        for key in ("all", "draft", "scheduled", "published", "saved")
+    lines.append(
+        "<i>" + get_text(lang, "posts_hint" if visible else "posts_no_match") + "</i>"
+        if visible or filter_by != "all" or search
+        else get_text(lang, "drafts_empty")
+    )
+    rows = [
+        [
+            InlineKeyboardButton(
+                ("✓ " if key == filter_by else "") + get_text(lang, "posts_" + key),
+                callback_data=encode_callback("menu", "postfilter", key),
+            )
+            for key in ("all", "draft", "scheduled", "published", "saved")
+        ]
     ]
-    rows.extend([filters[:2], filters[2:4], filters[4:]])
     zone = str(context.application.bot_data.get("timezone_name") or "Europe/Moscow")
-    for index, (draft_id, draft) in enumerate(visible, start=page * PAGE_SIZE + 1):
-        item = dict(draft["item"])
-        item.setdefault("ts", draft.get("created_at"))
-        _append_recent_line(lines, index, item, lang=lang, timezone_name=zone)
-        lines.append(f"<i>{escape(get_text(lang, status(draft_id, draft)))}</i>")
-        if draft.get("expires_at"):
-            try:
-                date = datetime.fromtimestamp(
-                    draft["expires_at"], ZoneInfo(zone)
-                ).strftime("%d.%m.%Y")
-            except (ValueError, TypeError, OverflowError, ZoneInfoNotFoundError):
-                date = "—"
-            lines.append(get_text(lang, "posts_expires").format(date=date))
-        label = ("🔖 " if draft.get("saved_at") else "") + active_card_label(
-            draft, get_text(lang, "drafts_open")
+    now = time.time()
+    for draft_id, draft in visible:
+        state = status(draft_id, draft)
+        moment = (
+            queued.get(draft_id, {}).get("publish_at")
+            if state == "draft_scheduled"
+            else draft.get("published_at") or draft.get("created_at")
         )
+        when = (
+            human_date(moment, timezone_name=zone, lang=lang)
+            if isinstance(moment, (int, float))
+            else ""
+        )
+        if state == "draft_scheduled" and isinstance(moment, (int, float)):
+            when = human_datetime(moment, timezone_name=zone, lang=lang)
+        expires_at = draft.get("expires_at")
+        if (
+            not draft.get("saved_at")
+            and isinstance(expires_at, (int, float))
+            and 0 < expires_at - now < EXPIRY_WARNING_SECONDS
+        ):
+            when = "⏳ " + get_text(lang, "posts_expiring")
+        icon = "🔖" if draft.get("saved_at") else STATUS_ICONS.get(state, "📝")
+        label = f"{icon} " + active_card_label(
+            draft, get_text(lang, "drafts_open"), max_length=34
+        )
+        if when:
+            label += f" · {when}"
         rows.append(
             [
                 InlineKeyboardButton(
@@ -170,42 +198,53 @@ async def render_drafts_view(
                 )
             ]
         )
-        lines.extend(
-            [
-                "",
-                get_text(
-                    lang,
-                    "posts_no_match"
-                    if filter_by != "all" or search
-                    else "drafts_empty",
-                ),
-            ]
+    search_row = [
+        InlineKeyboardButton(
+            get_text(lang, "posts_search"),
+            callback_data=encode_callback("menu", "postsearch"),
         )
-    lines.extend(["", "<i>" + get_text(lang, "posts_retention") + "</i>"])
-    rows.append(
-        [
-            InlineKeyboardButton(
-                get_text(lang, "posts_search"),
-                callback_data=encode_callback("menu", "postsearch"),
-            )
-        ]
-    )
+    ]
     if search:
-        rows[-1].append(
+        search_row.append(
             InlineKeyboardButton(
                 get_text(lang, "posts_search_clear"),
                 callback_data=encode_callback("menu", "postsearch_clear"),
             )
         )
+    rows.append(search_row)
+    _navigation(rows, lang=lang, action="drafts", page=page, pages=pages)
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
+
+
+async def render_search_view(
+    context, *, user_id: int, lang: str
+) -> tuple[str, InlineKeyboardMarkup]:
+    """Search screen: type a query, or reopen one of the latest releases."""
+    history = (await load_history_items(context, user_id))[:5]
+    lines = [get_text(lang, "posts_search_title")]
+    rows = []
+    if history:
+        lines.extend(["", get_text(lang, "posts_recent_title")])
+        rows.extend(
+            [
+                InlineKeyboardButton(
+                    "🔁 " + active_card_label({"item": item}, "—", max_length=40),
+                    switch_inline_query_current_chat=str(item.get("source_url") or "")[
+                        :256
+                    ],
+                )
+            ]
+            for item in history
+            if item.get("source_url")
+        )
     rows.append(
         [
             InlineKeyboardButton(
-                get_text(lang, "posts_history"),
-                callback_data=encode_callback("menu", "recent"),
+                get_text(lang, "library_back"),
+                callback_data=encode_callback("menu", "drafts"),
             )
         ]
     )
-    _navigation(rows, lang=lang, action="drafts", page=page, pages=pages)
     return "\n".join(lines), InlineKeyboardMarkup(rows)
 
 

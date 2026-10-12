@@ -13,7 +13,6 @@ from telegram import Chat, Message, Update, User
 from telegram.ext import Application
 
 from music_links_bot.bot import _handle_editor_action
-from music_links_bot.bot_builder import format_schedule_datetime
 from music_links_bot.bot_editor_state import remember_draft
 from music_links_bot.bot_preferences import (
     LocalizedApplication,
@@ -35,6 +34,7 @@ from music_links_bot.bot_ui import (
     editor_schedule_rows,
 )
 from music_links_bot.draft_model import new_track_draft
+from music_links_bot.human_time import human_datetime
 from music_links_bot.i18n import (
     get_text,
     language_context,
@@ -102,26 +102,26 @@ class PreferencesTests(unittest.IsolatedAsyncioTestCase):
         with language_context(None):
             for action, value in (
                 ("language", "en"),
-                ("appearance", "minimal"),
+                ("appearance", "longread"),
                 ("tags", "off"),
             ):
                 await dispatch_preferences(
                     query, context, CallbackAction("prefs", action, value)
                 )
             self.assertIn(
-                "New post tags", query.edit_message_text.call_args.kwargs["text"]
+                "Tags for new posts", query.edit_message_text.call_args.kwargs["text"]
             )
         restarted = BotRuntime(kv)
         saved = await restarted.get_session(7, lang="ru")
         self.assertEqual(
             (saved.preferred_lang, saved.default_preset, saved.default_hashtags),
-            ("en", "minimal", "off"),
+            ("en", "longread", "off"),
         )
         draft = draft_for()
         draft["prefix"] = "My original intro"
         apply_preferences(draft, saved)
         self.assertEqual(draft["lang"], "en")
-        self.assertFalse(draft["large_preview"])
+        self.assertEqual(draft["publication_mode"], "longread")
         self.assertFalse(draft["hashtags"])
         self.assertEqual(draft["prefix"], "My original intro")
         other = draft_for(8)
@@ -218,9 +218,9 @@ class EditorJourneyTests(unittest.IsolatedAsyncioTestCase):
         query = query_for()
         for action, heading in (
             ("m", "Sleep"),
-            ("ap", "Обложка поста"),
+            ("ap", "Вид поста"),
             ("tx", "Текст"),
-            ("ls", "Кнопки поста"),
+            ("ls", "🔗 Кнопки"),
             ("tools", "Ещё"),
             ("o", "Куда отправить"),
         ):
@@ -247,7 +247,13 @@ class EditorJourneyTests(unittest.IsolatedAsyncioTestCase):
         )
         parsed = decode_callback(rows[0][0].callback_data)
         timestamp = int(parsed.payload.split(":")[1])
-        self.assertEqual(rows[0][0].text, format_schedule_datetime(timestamp))
+        self.assertEqual(
+            rows[0][0].text,
+            "🕒 "
+            + human_datetime(
+                timestamp, timezone_name="Europe/Moscow", now=now.timestamp()
+            ),
+        )
         with patch("music_links_bot.bot.time.time", return_value=now.timestamp() + 60):
             await _handle_editor_action(query, context, parsed.action, parsed.payload)
             await _handle_editor_action(query, context, parsed.action, parsed.payload)
@@ -299,23 +305,21 @@ class DraftLibraryTests(unittest.IsolatedAsyncioTestCase):
             load_draft=load_draft,
             page=1,
         )
-        self.assertIn("Страница 2 из 3", text)
-        self.assertNotIn("Release 11", text)
-        self.assertNotIn("Release 12", text)
-        self.assertIn(
-            "Release 5",
-            next(
-                b.text
-                for row in keyboard.inline_keyboard
-                for b in row
-                if (b.callback_data or "").startswith("v2|editor|")
-            ),
-        )
+        # 11 visible posts (one deleted, one belongs to another user), 6 a page.
+        self.assertIn("📚 <b>Мои посты</b> · 2/2", text)
+        labels = [
+            b.text
+            for row in keyboard.inline_keyboard
+            for b in row
+            if (b.callback_data or "").startswith("v2|editor|")
+        ]
+        self.assertEqual(len(labels), 5)
+        self.assertFalse(any("Release 11" in label for label in labels))
+        self.assertFalse(any("Release 12" in label for label in labels))
+        self.assertTrue(labels[0].startswith("📝 Sleep — Release 4"))
         self.assertEqual(
-            keyboard.inline_keyboard[-2][0].callback_data, "v2|menu|drafts|0"
-        )
-        self.assertEqual(
-            keyboard.inline_keyboard[-2][1].callback_data, "v2|menu|drafts|2"
+            [b.callback_data for b in keyboard.inline_keyboard[-2]],
+            ["v2|menu|drafts|0"],
         )
 
     async def test_cancelled_scheduled_item_reverts_to_draft_status(self):
@@ -326,16 +330,27 @@ class DraftLibraryTests(unittest.IsolatedAsyncioTestCase):
         job = await add_job(
             context, await load_draft(context, "card"), draft["scheduled_at"]
         )
-        text, _ = await render_drafts_view(
+        _, keyboard = await render_drafts_view(
             context, user_id=7, lang="ru", draft_ids=["card"], load_draft=load_draft
         )
-        self.assertIn("Запланирован", text)
+        post = next(
+            b.text
+            for row in keyboard.inline_keyboard
+            for b in row
+            if (b.callback_data or "").startswith("v2|editor|")
+        )
+        self.assertTrue(post.startswith("🕒 "), post)
         await remove_job(context, job["id"])
-        text, _ = await render_drafts_view(
+        _, keyboard = await render_drafts_view(
             context, user_id=7, lang="ru", draft_ids=["card"], load_draft=load_draft
         )
-        self.assertNotIn("Запланирован", text)
-        self.assertIn("Черновик", text)
+        post = next(
+            b.text
+            for row in keyboard.inline_keyboard
+            for b in row
+            if (b.callback_data or "").startswith("v2|editor|")
+        )
+        self.assertTrue(post.startswith("📝 "), post)
 
     async def test_recent_releases_are_paged(self):
         context = context_for(

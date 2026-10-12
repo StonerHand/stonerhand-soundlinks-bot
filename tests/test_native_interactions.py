@@ -527,12 +527,10 @@ class PanelTests(unittest.IsolatedAsyncioTestCase):
                 await start_release_panel(Update(1, message=message()), ctx)
             )
         self.assertIn("Dig", send.await_args.args[0])
-        self.assertEqual(
-            send.await_args.kwargs["reply_markup"]
-            .inline_keyboard[-1][0]
-            .copy_text.text,
-            URL,
-        )
+        rows = send.await_args.kwargs["reply_markup"].inline_keyboard
+        self.assertEqual(rows[-2][0].copy_text.text, URL)
+        # The panel also opens this exact release in the private editor.
+        self.assertIn("?start=edit_", rows[-1][0].url)
 
 
 class FeedbackTests(unittest.IsolatedAsyncioTestCase):

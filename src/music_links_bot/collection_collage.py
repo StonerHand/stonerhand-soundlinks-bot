@@ -13,6 +13,7 @@ from urllib.parse import urlencode, urlparse
 
 from music_links_bot.cover_style import (
     apply_cover_signature,
+    brand_label_override,
     photo_branding_enabled,
     signature_cache_key,
 )
@@ -105,8 +106,13 @@ def _artwork_preview_url(
         return None
 
     payload = _encode_payload(artwork_urls)
-    signature = _signature(payload, secret)
-    query = urlencode({"p": payload, "s": signature, "v": signature_cache_key()})
+    label = brand_label_override()
+    signature = _signature(payload, secret, label=label)
+    params = {"p": payload, "s": signature, "v": signature_cache_key()}
+    if label:
+        # The image function has no Redis: the owner's label travels signed.
+        params["l"] = label
+    query = urlencode(params)
     preview_url = f"{public_origin}/api/collage?{query}"
     return preview_url if len(preview_url) <= MAX_PREVIEW_URL_LENGTH else None
 
@@ -131,6 +137,7 @@ def decode_collage_payload(
     *,
     signing_secret: str,
     allow_single: bool = False,
+    label: str | None = None,
 ) -> list[str] | None:
     """Verify a collage request and return only safe HTTPS artwork URLs."""
     if (
@@ -141,7 +148,7 @@ def decode_collage_payload(
         or len(payload) > MAX_PAYLOAD_LENGTH
     ):
         return None
-    if not secrets_match(signature, _signature(payload, signing_secret)):
+    if not secrets_match(signature, _signature(payload, signing_secret, label=label)):
         return None
 
     try:
@@ -327,8 +334,10 @@ def _encode_payload(urls: list[str]) -> str:
     return base64.urlsafe_b64encode(encoded).decode().rstrip("=")
 
 
-def _signature(payload: str, secret: str) -> str:
+def _signature(payload: str, secret: str, *, label: str | None = None) -> str:
     message = f"{COLLAGE_VERSION}:{payload}".encode()
+    if label:
+        message += b"\x00" + label.encode()
     return hmac.new(secret.encode(), message, hashlib.sha256).hexdigest()[:32]
 
 

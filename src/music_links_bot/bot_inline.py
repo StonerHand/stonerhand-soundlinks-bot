@@ -7,6 +7,7 @@ import logging
 from telegram import (
     InlineKeyboardMarkup,
     InlineQueryResultArticle,
+    InlineQueryResultCachedPhoto,
     InlineQueryResultPhoto,
     InlineQueryResultsButton,
     InputTextMessageContent,
@@ -18,7 +19,11 @@ from telegram.ext import ContextTypes
 
 from music_links_bot import bot_lookup
 from music_links_bot.bot_crate import load_crate, load_crate_title
-from music_links_bot.constants import INLINE_EXAMPLE_QUERY, MAX_LINKS_PER_MESSAGE
+from music_links_bot.constants import (
+    DRAFT_SHARE_PREFIX,
+    INLINE_EXAMPLE_QUERY,
+    MAX_LINKS_PER_MESSAGE,
+)
 from music_links_bot.formatter import (
     format_artist_message,
     format_playlist_message,
@@ -104,6 +109,16 @@ async def inline_query_handler(
     empty_query = not query_text.strip()
     user_id = inline_query.from_user.id if inline_query.from_user else 0
     channel_safe = getattr(inline_query, "chat_type", None) == "channel"
+    if query_text.startswith(DRAFT_SHARE_PREFIX):
+        await _answer_inline_draft(
+            inline_query,
+            context,
+            query_text[len(DRAFT_SHARE_PREFIX) :].strip(),
+            user_id=user_id,
+            lang=lang,
+            channel_safe=channel_safe,
+        )
+        return
     shared_urls = parse_share_query(query_text)
     source_urls = extract_supported_urls(query_text)[:MAX_LINKS_PER_MESSAGE]
     recovered_collection = False
@@ -472,6 +487,77 @@ async def _search_source_urls(
     urls = [candidate.url for candidate in candidates[:3]]
     await store_cached_search(bot_data, search_query, urls)
     return urls
+
+
+async def _answer_inline_draft(
+    inline_query,
+    context: ContextTypes.DEFAULT_TYPE,
+    draft_id: str,
+    *,
+    user_id: int,
+    lang: str,
+    channel_safe: bool,
+) -> None:
+    """Share the exact edited post (text, tags, buttons, cover) from the card."""
+    from music_links_bot.bot_editor_state import draft_owned_by
+    from music_links_bot.bot_storage import load_draft
+    from music_links_bot.collection_collage import branded_artwork_preview_url
+    from music_links_bot.publication_view import build_publication_view
+
+    draft = await load_draft(context, draft_id)
+    if not draft or not draft_owned_by(draft, user_id) or draft.get("deleted_at"):
+        await _answer_inline_hint(inline_query, get_text(lang, "ed_expired"))
+        return
+    track = TrackMatch(**draft["item"])
+    view = build_publication_view(
+        draft, track, context=context, include_channel_button=False
+    )
+    keyboard = (
+        make_channel_safe_keyboard(view.keyboard) if channel_safe else view.keyboard
+    )
+    title = f"{track.artist} — {track.title}" if track.artist else track.title
+    description = get_text(lang, "inline_my_post")
+    result_id = hashlib.sha256(
+        f"draft:{draft_id}:{draft.get('revision')}".encode()
+    ).hexdigest()[:32]
+    custom_cover = draft.get("custom_cover_file_id")
+    from music_links_bot.bot_builder import PHOTO_CAPTION_LIMIT
+    from music_links_bot.publication_budget import visible_length
+
+    if isinstance(custom_cover, str) and visible_length(view.text) <= (
+        PHOTO_CAPTION_LIMIT
+    ):
+        result = InlineQueryResultCachedPhoto(
+            id=result_id,
+            photo_file_id=custom_cover,
+            title=title,
+            description=description,
+            caption=view.text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=keyboard,
+        )
+    else:
+        result = InlineQueryResultArticle(
+            id=result_id,
+            title=title,
+            description=description,
+            thumbnail_url=track.thumbnail_url,
+            input_message_content=InputTextMessageContent(
+                message_text=view.text,
+                parse_mode=ParseMode.HTML,
+                link_preview_options=_build_link_preview_options(
+                    branded_artwork_preview_url(track.thumbnail_url)
+                    or view.preview_url,
+                    prefer_large_media=True,
+                ),
+            ),
+            reply_markup=keyboard,
+        )
+    try:
+        # Personal: never cache one user's draft for somebody else.
+        await inline_query.answer([result], cache_time=0, is_personal=True)
+    except TelegramError:
+        LOGGER.debug("Could not answer inline draft share", exc_info=True)
 
 
 async def _answer_inline_hint(inline_query, button_text: str) -> None:

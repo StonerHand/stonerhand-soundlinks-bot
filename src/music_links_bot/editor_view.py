@@ -41,19 +41,8 @@ def render_track_draft(
     lang = resolve_lang(draft.get("lang") or "ru")
     # Legacy settings/back callbacks share the same editor card.
     if draft_id is not None:
-        text = (
-            get_text(
-                lang,
-                "workspace_editing"
-                if settings
-                else "workspace_published"
-                if draft.get("published_at")
-                else "workspace_sent"
-                if draft.get("sent_at")
-                else "workspace_ready",
-            )
-            + "\n\n"
-            + text
+        text = _workspace_header(draft, context, lang=lang, settings=settings) + (
+            "\n\n" + text
         )
         notices = []
         preflight = validate_publication(draft, track)
@@ -85,6 +74,31 @@ def render_track_draft(
     return text, version_editor_keyboard(
         InlineKeyboardMarkup(editor_rows(draft_id, draft, settings=settings)), draft
     )
+
+
+def _workspace_header(draft: dict, context: Any, *, lang: str, settings: bool) -> str:
+    """ "📝 Черновик", "✏️ Редактор" or "✅ Опубликован · сегодня 14:05"."""
+    if settings:
+        return get_text(lang, "workspace_editing")
+    for key, field in (
+        ("workspace_published", "published_at"),
+        ("workspace_sent", "sent_at"),
+    ):
+        moment = draft.get(field)
+        if not moment:
+            continue
+        header = get_text(lang, key)
+        if isinstance(moment, (int, float)):
+            from music_links_bot.human_time import human_datetime
+
+            bot_data = getattr(getattr(context, "application", None), "bot_data", {})
+            header += " · " + human_datetime(
+                moment,
+                timezone_name=(bot_data or {}).get("timezone_name"),
+                lang=lang,
+            )
+        return header
+    return get_text(lang, "workspace_ready")
 
 
 def draft_intro_limit(draft: dict, context: Any) -> int:

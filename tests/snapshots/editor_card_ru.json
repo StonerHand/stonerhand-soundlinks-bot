@@ -1,5 +1,5 @@
 {
-  "text": "📝 <b>Твой пост · ещё не отправлен</b>\n\n🎧 · <b>Dopesmoker</b>\nSleep\n\nТрек\n\n#stonerhand #track",
+  "text": "📝 <b>Черновик</b>\n\n🎧 · <b>Dopesmoker</b>\nSleep\n\nТрек\n\n#stonerhand #track",
   "rows": [
     [
       [
@@ -9,7 +9,7 @@
         null
       ],
       [
-        "➕ В подборку",
+        "🎶 В подборку",
         "v2|editor|c|draft123",
         null,
         null
@@ -17,13 +17,13 @@
     ],
     [
       [
-        "👁 Как выглядит",
-        "v2|editor|pv|draft123",
+        "📩 Себе",
+        "v2|editor|s|draft123",
         null,
         null
       ],
       [
-        "🔖 Сохранить на 90 дней",
+        "🔖 В избранное",
         "v2|editor|sv|draft123",
         null,
         null
@@ -31,8 +31,8 @@
     ],
     [
       [
-        "↗️ Отправить…",
-        "v2|editor|o|draft123",
+        "↗️ Поделиться",
+        null,
         null,
         "primary"
       ]

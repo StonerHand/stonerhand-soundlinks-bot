@@ -291,12 +291,24 @@ def _build_ui_contract() -> dict[str, object]:
     }
     screens = {
         "home_ru": _summarize_ui_keyboard(
-            build_start_keyboard(None, lang="ru", crate_count=2),
-            expected_primary="➕ Новый пост",
+            build_start_keyboard(
+                None,
+                lang="ru",
+                crate_count=2,
+                active_draft_id="smoke",
+                active_draft_label="Sleep — Dopesmoker",
+            ),
+            expected_primary="📝 Продолжить: Sleep — Dopesmoker",
         ),
         "home_en": _summarize_ui_keyboard(
-            build_start_keyboard(None, lang="en", crate_count=2),
-            expected_primary="➕ New post",
+            build_start_keyboard(
+                None,
+                lang="en",
+                crate_count=2,
+                active_draft_id="smoke",
+                active_draft_label="Sleep — Dopesmoker",
+            ),
+            expected_primary="📝 Continue: Sleep — Dopesmoker",
         ),
         "first_run": _summarize_ui_keyboard(
             build_start_keyboard(
@@ -304,6 +316,7 @@ def _build_ui_contract() -> dict[str, object]:
                 lang="ru",
                 show_example=True,
                 show_tour=True,
+                first_visit=True,
             ),
             expected_primary="➕ Новый пост",
         ),
@@ -326,18 +339,18 @@ def _build_ui_contract() -> dict[str, object]:
         ),
         "error_crate": _summarize_ui_keyboard(
             build_error_keyboard(None, lang="ru", recovery="crate"),
-            expected_primary="Вернуться в подборку",
+            expected_primary="🎶 Открыть подборку",
         ),
         "delivery_success": _summarize_ui_keyboard(
             build_delivery_success_keyboard(
                 lang="ru",
                 share_query="sh5|t3E4MuCjetGIkeu2N8fFHgr",
             ),
-            expected_primary="Создать ещё",
+            expected_primary="➕ Новый пост",
         ),
         "editor_actions": _summarize_ui_keyboard(
             InlineKeyboardMarkup(editor_rows("smoke", draft)),
-            expected_primary="↗️ Отправить…",
+            expected_primary="↗️ Поделиться",
         ),
         "editor_settings": _summarize_ui_keyboard(
             InlineKeyboardMarkup(editor_more_rows("smoke", draft)),
@@ -352,11 +365,11 @@ def _build_ui_contract() -> dict[str, object]:
     create_text = get_text("ru", "create_prompt")
     copy_checks = {
         "home_explains_link": "ссылку" in home_text,
-        "home_explains_query": "артист — название" in home_text,
+        "home_explains_query": "артист — трек" in home_text,
         "home_explains_collection": "несколько ссылок" in home_text.casefold(),
-        "home_explains_intro": "подводка" in home_text,
+        "home_explains_intro": "свой текст" in home_text.casefold(),
         "create_explains_one_link_per_line": "каждую с новой строки" in create_text,
-        "create_explains_intro": "подводкой" in create_text,
+        "create_explains_intro": "текстом поста" in create_text,
         "localized_hierarchy_matches": (
             screens["home_ru"]["rows"] == screens["home_en"]["rows"]
         ),

@@ -167,6 +167,7 @@ class UserSession:
     collection_annotations: dict[str, dict[str, str]] = field(default_factory=dict)
     onboarding_seen: bool = False
     welcome_seen: bool = False
+    quick_publish: bool = False
     last_query: str = ""
     last_action: dict[str, Any] = field(default_factory=dict)
     last_collection_urls: list[str] = field(default_factory=list)
@@ -223,6 +224,7 @@ class UserSession:
                 ),
                 onboarding_seen=bool(payload.get("onboarding_seen")),
                 welcome_seen=bool(payload.get("welcome_seen")),
+                quick_publish=bool(payload.get("quick_publish")),
                 last_query=str(payload.get("last_query") or "")[
                     :MAX_SESSION_TEXT_LENGTH
                 ],
@@ -297,6 +299,7 @@ def _normalize_pending_input(value: object) -> dict[str, Any]:
         "cover",
         "template_name",
         "library_search",
+        "brand_label",
         "collection_links",
         "collection_replace",
     }:
