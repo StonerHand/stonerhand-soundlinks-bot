@@ -7,7 +7,10 @@ from telegram import Bot, InlineKeyboardMarkup, Message
 from telegram.ext import ContextTypes
 
 from music_links_bot.bot_runtime import encode_callback
-from music_links_bot.collection_collage import video_collage_preview_url
+from music_links_bot.collection_collage import (
+    media_collage_preview_url,
+    video_collage_preview_url,
+)
 from music_links_bot.formatter import (
     format_artist_collection_message,
     format_artist_message,
@@ -457,10 +460,14 @@ async def send_mixed_result(
             label=get_text(lang, "share_post"),
         )
     videos_in_post = False
-    if len(tracks) == 1 and videos and not playlists and not artists and not radios:
-        # One post: the release cover beside the clip frames, "🎧 Слушать" and
-        # named clip buttons — instead of an album plus a separate button panel.
-        collage = video_collage_preview_url(videos, track=tracks[0])
+    if tracks and videos and not playlists and not artists and not radios:
+        # One post: release covers beside the clip frames (▶ on each frame)
+        # instead of a single platform preview or an album plus a button panel.
+        collage = (
+            video_collage_preview_url(videos, track=tracks[0])
+            if len(tracks) == 1
+            else media_collage_preview_url(tracks, videos)
+        )
         if collage:
             preview_url = collage
             videos_in_post = True

@@ -525,13 +525,17 @@ def _build_mixed_collection_keyboard(
         )
         index += 1
 
+    from music_links_bot.video_kinds import video_kind_emoji
+
     for video in videos:
         buttons.append(
             _url_button(
                 text=(
                     "📺 Смотреть клип"
                     if is_track_video_pair
-                    else _button_label(f"{index} · {video.title}")
+                    else _button_label(
+                        f"{video_kind_emoji(video)} {index} · {video.title}"
+                    )
                 ),
                 url=video.url,
                 style=None,
