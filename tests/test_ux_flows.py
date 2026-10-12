@@ -176,7 +176,7 @@ def test_share_sends_the_exact_edited_post_to_its_owner():
     from music_links_bot.bot_storage import store_draft
 
     draft = _published_draft(published_at=None)
-    draft.update(prefix="<b>Моя подводка</b>\n", quote=True, hashtags=False)
+    draft.update(prefix="<b>Моя подводка</b>\n\n", quote=True, hashtags=False)
     context = _context({})
     context.application.bot_data["drafts"] = {}
     asyncio.run(store_draft(context, "abcdef0123456789", draft))

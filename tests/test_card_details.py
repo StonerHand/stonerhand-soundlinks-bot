@@ -421,5 +421,5 @@ def test_soundtrack_and_other_cards_have_consistent_ru_en_metadata():
         playlist = format_playlist_message(
             PlaylistMatch("Mix", "Apple Music", APPLE_ALBUM)
         )
-    assert "<b>Recording</b>\n📺 Video · YouTube · Uploader" in video
-    assert "<b>Mix</b>\n🎛 Playlist · Apple Music" in playlist
+    assert "<b>Recording</b>\n\n📺 Video · YouTube · Uploader" in video
+    assert "<b>Mix</b>\n\n🎛 Playlist · Apple Music" in playlist

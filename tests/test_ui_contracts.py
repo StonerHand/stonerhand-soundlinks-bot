@@ -56,7 +56,7 @@ class PublicationGoldenTests(unittest.TestCase):
 
         self.assertEqual(
             text,
-            "📝 <b>Черновик</b>\n\n<b>Sleep — Dopesmoker</b>\n🎧 Трек\n\n#stonerhand #track",
+            "📝 <b>Черновик</b>\n\n<b>Sleep — Dopesmoker</b>\n\n🎧 Трек\n\n#stonerhand #track",
         )
         self.assertEqual(draft["v"], CURRENT_DRAFT_VERSION)
         labels = [button.text for row in keyboard.inline_keyboard for button in row]
