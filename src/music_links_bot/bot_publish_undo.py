@@ -67,7 +67,9 @@ async def handle_unpublish(request) -> bool:
     text, keyboard = render_track_draft(
         draft, request.context, draft_id=request.draft_id
     )
-    from music_links_bot.bot import _edit_editor_message
+    from music_links_bot.bot_editor import (
+        _edit_editor_message,
+    )
 
     await _edit_editor_message(request.query, request.context, draft, text, keyboard)
     return True

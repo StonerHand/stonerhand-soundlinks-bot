@@ -161,7 +161,6 @@ async def inline_query_handler(
             context,
             collection_urls,
             lang=lang,
-            is_direct=is_direct_collection,
             channel_safe=channel_safe,
             user_id=user_id,
         )
@@ -377,7 +376,6 @@ async def _answer_inline_collection(
     source_urls: list[str],
     *,
     lang: str,
-    is_direct: bool,
     channel_safe: bool,
     user_id: int,
 ) -> None:

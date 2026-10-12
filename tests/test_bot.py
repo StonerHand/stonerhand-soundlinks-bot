@@ -18,13 +18,6 @@ from telegram.ext import CommandHandler
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from music_links_bot.artist import ArtistLookupError
-from music_links_bot.bot import (
-    _build_error_keyboard,
-    _build_intro_keyboard,
-    _delete_confirmation_keyboard,
-    _send_track_result,
-    track_lookup_message,
-)
 from music_links_bot.bot_admin import id_command, stats_command, status_command
 from music_links_bot.bot_app import (
     BOT_DESCRIPTIONS,
@@ -34,21 +27,26 @@ from music_links_bot.bot_app import (
     sync_application_commands,
 )
 from music_links_bot.bot_crate_handlers import crate_command
+from music_links_bot.bot_editor import (
+    _delete_confirmation_keyboard,
+)
 from music_links_bot.bot_inline import (
     _build_inline_collection_result,
     _build_inline_result,
 )
 from music_links_bot.bot_lookup import (
     _build_podcast_fallback,
-    _format_not_found_message,
-    _format_service_unavailable_message,
     _lookup_artists,
     _lookup_nts_radios,
     _lookup_playlists,
     _lookup_tracks,
     _lookup_youtube_videos,
-    _split_source_urls,
     _strip_bot_mention,
+)
+from music_links_bot.bot_lookup_flow import (
+    _build_error_keyboard,
+    _send_track_result,
+    track_lookup_message,
 )
 from music_links_bot.bot_menu import (
     channel_command,
@@ -1134,13 +1132,6 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertTrue(_should_include_hashtags(PrivateMessageStub()))
         self.assertTrue(_should_include_hashtags(GroupMessageStub()))
 
-    def test_section_keyboard_keeps_creation_actions_close(self) -> None:
-        keyboard = _build_intro_keyboard("StonerHandBot")
-
-        rows = keyboard.inline_keyboard
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[-1][0].callback_data, "v2|menu|start")
-
     def test_section_keyboard_offers_related_pages_and_back_last(self) -> None:
         keyboard = _build_section_keyboard(
             "StonerHandBot",
@@ -1386,36 +1377,6 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(_build_platform_order("yt music")[0], "youtubeMusic")
         self.assertEqual(_build_platform_order("yandex")[0], "yandexMusic")
 
-    def test_split_source_urls_separates_special_links_from_music(self) -> None:
-        (
-            artist_urls,
-            playlist_urls,
-            youtube_urls,
-            nts_urls,
-            music_urls,
-        ) = _split_source_urls(
-            [
-                "https://open.spotify.com/artist/abc",
-                "https://open.spotify.com/playlist/abc",
-                "https://music.apple.com/tr/playlist/test/pl.abc",
-                "https://youtu.be/video",
-                "https://www.nts.live/shows/example",
-                "https://open.spotify.com/track/123",
-            ]
-        )
-
-        self.assertEqual(artist_urls, ["https://open.spotify.com/artist/abc"])
-        self.assertEqual(
-            playlist_urls,
-            [
-                "https://open.spotify.com/playlist/abc",
-                "https://music.apple.com/tr/playlist/test/pl.abc",
-            ],
-        )
-        self.assertEqual(youtube_urls, ["https://youtu.be/video"])
-        self.assertEqual(nts_urls, ["https://www.nts.live/shows/example"])
-        self.assertEqual(music_urls, ["https://open.spotify.com/track/123"])
-
     def test_collection_keyboard_preserves_long_button_in_its_own_row(self) -> None:
         keyboard = _build_collection_keyboard(
             [
@@ -1490,43 +1451,6 @@ class BotKeyboardTests(unittest.TestCase):
         message = type("MessageStub", (), {"text": None, "caption": "caption link"})()
 
         self.assertEqual(_message_text(message), "caption link")
-
-    def test_not_found_message_uses_editorial_copy(self) -> None:
-        message = _format_not_found_message(["https://example.com/release"])
-
-        self.assertNotIn("Проверьте", message)
-
-    def test_not_found_message_does_not_repeat_recovery_hint(self) -> None:
-        with patch(
-            "music_links_bot.bot_lookup.pick_phrase",
-            return_value="ссылки не собрались - проверь, что это трек или альбом",
-        ):
-            message = _format_not_found_message(["https://example.com/release"])
-
-        self.assertEqual(
-            message,
-            "ссылки не собрались - проверь, что это трек или альбом",
-        )
-
-    def test_not_found_message_adds_detail_when_phrase_has_no_hint(self) -> None:
-        with patch(
-            "music_links_bot.bot_lookup.pick_phrase",
-            return_value="ничего подходящего не собралось",
-        ):
-            message = _format_not_found_message(["https://example.com/release"])
-
-        self.assertIn(
-            "Проверь, что это ссылка на трек, альбом, плейлист, артиста, "
-            "подкаст, YouTube-видео или NTS Radio",
-            message,
-        )
-
-    def test_service_unavailable_message_adds_next_step(self) -> None:
-        message = _format_service_unavailable_message(
-            "https://open.spotify.com/track/1"
-        )
-
-        self.assertIn("Попробуй еще раз чуть позже", message)
 
 
 class InlineModeTests(unittest.IsolatedAsyncioTestCase):
@@ -2659,7 +2583,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateSpotifyCollectionMessageStub()
         context = ContextStub(songlink_client=DistinctLookupClient())
         with patch(
-            "music_links_bot.bot._add_track_drafts_to_crate",
+            "music_links_bot.bot_lookup_flow._add_track_drafts_to_crate",
             AsyncMock(return_value=([], 0)),
         ):
             await track_lookup_message(UpdateStub(message), context)

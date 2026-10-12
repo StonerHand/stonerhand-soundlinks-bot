@@ -423,28 +423,6 @@ def _provider_statuses(
     return statuses
 
 
-def _split_source_urls(
-    source_urls: list[str],
-) -> tuple[list[str], list[str], list[str], list[str], list[str]]:
-    grouped = DEFAULT_PROVIDER_REGISTRY.group(source_urls)
-    return (
-        grouped["artists"],
-        grouped["playlists"],
-        grouped["youtube"],
-        grouped["nts"],
-        grouped["songlink"],
-    )
-
-
-def _format_not_found_message(source_urls: list[str]) -> str:
-    seed = ",".join(source_urls)
-    phrase = pick_phrase("not_found", seed)
-    if _has_recovery_hint(phrase):
-        return phrase
-
-    return f"{phrase}\n\n{NOT_FOUND_DETAIL}"
-
-
 def _strip_bot_mention(text: str, bot_username: str | None) -> str:
     if not bot_username:
         return text
@@ -467,27 +445,6 @@ def _format_no_url_message(
 
     seed = message_text or str(chat_id)
     return f"{pick_phrase('no_url', seed)}\n\n{hint}"
-
-
-def _format_service_unavailable_message(seed: str) -> str:
-    return (
-        f"{pick_phrase('service_unavailable', seed)}\n\n"
-        "Попробуй еще раз чуть позже или пришли другую ссылку на этот же релиз"
-    )
-
-
-def _has_recovery_hint(text: str) -> bool:
-    lowered = text.casefold()
-    return any(
-        marker in lowered
-        for marker in (
-            "проверь",
-            "попробуй",
-            "похоже",
-            "не трек",
-            "не альбом",
-        )
-    )
 
 
 async def _lookup_playlists(

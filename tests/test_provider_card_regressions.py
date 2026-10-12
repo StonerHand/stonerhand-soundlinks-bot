@@ -14,8 +14,10 @@ from test_bot import (
 from test_card_details import run_async
 from test_release_card import sample
 
-from music_links_bot.bot import track_lookup_message
 from music_links_bot.bot_inline import _build_inline_result
+from music_links_bot.bot_lookup_flow import (
+    track_lookup_message,
+)
 from music_links_bot.deezer import DeezerClient, DeezerLookupError
 from music_links_bot.draft_model import new_track_draft
 from music_links_bot.formatter import format_track_message

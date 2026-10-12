@@ -12,7 +12,9 @@ from unittest.mock import AsyncMock, patch
 from telegram import Chat, Message, Update, User
 from telegram.ext import Application
 
-from music_links_bot.bot import _handle_editor_action
+from music_links_bot.bot_editor import (
+    _handle_editor_action,
+)
 from music_links_bot.bot_editor_state import remember_draft
 from music_links_bot.bot_preferences import (
     LocalizedApplication,

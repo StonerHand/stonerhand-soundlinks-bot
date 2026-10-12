@@ -10,9 +10,11 @@ from music_links_bot.apple_radio import (
     AppleRadioLookupError,
     parse_apple_radio,
 )
-from music_links_bot.bot import track_lookup_message
 from music_links_bot.bot_inline import _build_inline_result
 from music_links_bot.bot_lookup import resolve_sources
+from music_links_bot.bot_lookup_flow import (
+    track_lookup_message,
+)
 from music_links_bot.formatter import format_radio_message
 from music_links_bot.provider_registry import DEFAULT_PROVIDER_REGISTRY
 from music_links_bot.url_utils import is_apple_music_radio_url

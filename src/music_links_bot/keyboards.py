@@ -618,19 +618,6 @@ def _adaptive_collection_rows(
     return rows
 
 
-def _track_button_icon(track: TrackMatch) -> str:
-    if track.kind == "video":
-        return "📺"
-
-    if track.kind == "album":
-        return "💿"
-
-    if track.kind == "podcast":
-        return "🎙️"
-
-    return "🎧"
-
-
 def _release_hub_button_label(
     release_kind: str,
     release_format: str | None,

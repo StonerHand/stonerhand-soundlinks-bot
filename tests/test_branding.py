@@ -63,7 +63,7 @@ class BrandingPublishTests(unittest.TestCase):
         from types import SimpleNamespace
         from unittest.mock import AsyncMock
 
-        from music_links_bot import bot
+        from music_links_bot import bot_editor as bot
 
         class _Bot:
             def __init__(self):

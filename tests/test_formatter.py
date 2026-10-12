@@ -18,7 +18,6 @@ from music_links_bot.formatter import (
     format_video_message,
     genre_hashtags,
     prepend_user_html,
-    prepend_user_text,
 )
 from music_links_bot.models import (
     ArtistMatch,
@@ -302,30 +301,6 @@ class FormatterTests(unittest.TestCase):
         self.assertIn("<b>Финал</b>", message)
         self.assertIn("<i>Слушать по порядку</i>", message)
         self.assertTrue(message.endswith("#stonerhand #doom"))
-
-    def test_prepend_user_text_formats_username_prefix(self) -> None:
-        self.assertEqual(
-            prepend_user_text("Твой текст", author_label="@username"),
-            "<blockquote>@username:\nТвой текст</blockquote>\n\n",
-        )
-
-    def test_prepend_user_text_escapes_html(self) -> None:
-        self.assertEqual(
-            prepend_user_text("<b>text</b>", author_label="@username"),
-            ("<blockquote>@username:\n&lt;b&gt;text&lt;/b&gt;</blockquote>\n\n"),
-        )
-
-    def test_prepend_user_text_preserves_paragraphs_and_spacing(self) -> None:
-        self.assertEqual(
-            prepend_user_text(
-                "Первый абзац\n\n  - пункт один\n  - пункт два",
-                author_label="@username",
-            ),
-            (
-                "<blockquote>@username:\nПервый абзац\n\n"
-                "  - пункт один\n  - пункт два</blockquote>\n\n"
-            ),
-        )
 
     def test_prepend_user_html_keeps_safe_generated_markup(self) -> None:
         self.assertEqual(

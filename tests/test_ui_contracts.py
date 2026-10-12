@@ -9,14 +9,18 @@ from unittest.mock import AsyncMock, patch
 from telegram import MessageEntity
 
 from music_links_bot.bot import (
-    _consume_pending_input,
     _dispatch_menu_action,
+)
+from music_links_bot.bot_actions import action_spec
+from music_links_bot.bot_builder import apply_intro_html
+from music_links_bot.bot_editor import (
     _draft_intro_limit,
     _handle_editor_action,
     _render_track_draft,
 )
-from music_links_bot.bot_actions import action_spec
-from music_links_bot.bot_builder import apply_intro_html
+from music_links_bot.bot_lookup_flow import (
+    _consume_pending_input,
+)
 from music_links_bot.bot_pipeline import delivery_kind
 from music_links_bot.bot_runtime import BotRuntime, CallbackAction
 from music_links_bot.bot_storage import store_retry_sources
@@ -291,11 +295,15 @@ class EditorFlowContractTests(unittest.IsolatedAsyncioTestCase):
         captured: list[str] = []
 
         async def capture_lookup(_update, _context) -> None:
-            from music_links_bot.bot import _INPUT_OVERRIDE
+            from music_links_bot.bot_lookup_flow import (
+                _INPUT_OVERRIDE,
+            )
 
             captured.append(str(_INPUT_OVERRIDE.get() or ""))
 
-        with patch("music_links_bot.bot.track_lookup_message", capture_lookup):
+        with patch(
+            "music_links_bot.bot_lookup_flow.track_lookup_message", capture_lookup
+        ):
             self.assertTrue(await _consume_pending_input(update, context))
 
         self.assertEqual(

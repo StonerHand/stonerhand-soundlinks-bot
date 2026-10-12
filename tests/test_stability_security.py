@@ -15,7 +15,7 @@ from telegram.error import BadRequest, NetworkError
 from api.queue_worker import is_authorized
 from api.set_webhook import _is_authorized
 from api.telegram import _is_telegram_request_authorized
-from music_links_bot.bot import (
+from music_links_bot.bot_editor import (
     EditorActionRequest,
     _handle_editor_action,
     _run_locked_editor_action,
@@ -199,7 +199,8 @@ class EditorSafetyTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(query.answer.await_args.kwargs["show_alert"])
             query.edit_message_text.assert_not_awaited()
         with patch(
-            "music_links_bot.bot._handle_editor_lifecycle", AsyncMock(return_value=True)
+            "music_links_bot.bot_editor._handle_editor_lifecycle",
+            AsyncMock(return_value=True),
         ) as restore:
             await _handle_editor_action(_query(), context, "du", "d1")
         restore.assert_awaited_once()
@@ -262,9 +263,9 @@ class EditorSafetyTests(unittest.IsolatedAsyncioTestCase):
             for action in ("pc", "x")
         ]
         with (
-            patch("music_links_bot.bot._show_action_busy", AsyncMock()),
+            patch("music_links_bot.bot_editor._show_action_busy", AsyncMock()),
             patch(
-                "music_links_bot.bot._run_primary_editor_action",
+                "music_links_bot.bot_editor._run_primary_editor_action",
                 AsyncMock(side_effect=send),
             ) as sender,
         ):
@@ -289,7 +290,7 @@ class EditorSafetyTests(unittest.IsolatedAsyncioTestCase):
             TrackMatch(**_draft()["item"]),
         )
         with patch(
-            "music_links_bot.bot._show_action_busy",
+            "music_links_bot.bot_editor._show_action_busy",
             AsyncMock(side_effect=asyncio.CancelledError),
         ):
             with self.assertRaises(asyncio.CancelledError):

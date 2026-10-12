@@ -4,11 +4,13 @@ import asyncio
 import unittest
 from types import SimpleNamespace
 
-from music_links_bot.bot import (
+from music_links_bot.bot_editor import (
     _duplicate_post_keyboard,
-    _send_partial_lookup_status,
 )
 from music_links_bot.bot_lookup import LookupBundle, SourceStatus
+from music_links_bot.bot_lookup_flow import (
+    _send_partial_lookup_status,
+)
 from music_links_bot.bot_runtime import BotRuntime
 from music_links_bot.bot_storage import load_retry_sources
 from music_links_bot.chat_access import check_publish_access

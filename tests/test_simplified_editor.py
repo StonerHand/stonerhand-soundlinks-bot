@@ -8,7 +8,12 @@ from unittest.mock import AsyncMock
 
 from telegram import ForceReply
 
-from music_links_bot.bot import _consume_pending_input, _handle_editor_action
+from music_links_bot.bot_editor import (
+    _handle_editor_action,
+)
+from music_links_bot.bot_lookup_flow import (
+    _consume_pending_input,
+)
 from music_links_bot.bot_menu import dispatch_menu_action
 from music_links_bot.bot_preferences import dispatch_preferences, preferences_view
 from music_links_bot.bot_runtime import (
