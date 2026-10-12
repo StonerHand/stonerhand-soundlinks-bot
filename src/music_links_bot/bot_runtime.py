@@ -384,16 +384,16 @@ class BotRuntime:
         }
         self._metrics_persisted_at = 0.0
 
-    def session_keys(self, user_id: int) -> list[str]:
-        """Keys a caller may batch-read and hand back via ``prefetched``."""
-        return [f"session:v2:{user_id}", f"session:v1:{user_id}"]
+    def session_key(self, user_id: int) -> str:
+        """The key a caller may batch-read and hand back via ``prefetched_raw``."""
+        return f"session:v2:{user_id}"
 
     async def get_session(
         self,
         user_id: int,
         *,
         lang: str = "ru",
-        prefetched: tuple[str | None, str | None] | None = None,
+        prefetched_raw: object = UNKNOWN_RAW,
     ) -> UserSession:
         scope = current_state.get()
         cache_key = (id(self), user_id)
@@ -408,51 +408,32 @@ class BotRuntime:
             return cached
 
         payload = None
-        legacy_payload = None
         raw_current: object = UNKNOWN_RAW
         if self.kv is not None:
-            current_key = f"session:v2:{user_id}"
-            legacy_key = f"session:v1:{user_id}"
-            raw_reader = getattr(self.kv, "mget_required", None)
-            batch_reader = getattr(self.kv, "mget_json_required", None) or getattr(
-                self.kv, "mget_json", None
-            )
-            if prefetched is not None or callable(raw_reader):
+            key = self.session_key(user_id)
+            raw_reader = getattr(self.kv, "get_required", None)
+            if prefetched_raw is not UNKNOWN_RAW or callable(raw_reader):
                 # Keep the exact stored text so the next save can go straight
                 # to compare-and-set instead of re-reading the session.
-                if prefetched is None:
-                    fetched = await raw_reader([current_key, legacy_key])
-                    prefetched = (fetched[0], fetched[1])
-                raw_current, raw_legacy = prefetched
+                raw_current = (
+                    prefetched_raw
+                    if prefetched_raw is not UNKNOWN_RAW
+                    else await raw_reader(key)
+                )
+                if raw_current is not None and not isinstance(raw_current, str):
+                    raise KVUnavailableError("Redis returned an invalid value")
                 try:
                     payload = (
                         json.loads(raw_current) if raw_current is not None else None
                     )
-                    legacy_payload = (
-                        json.loads(raw_legacy) if raw_legacy is not None else None
-                    )
                 except ValueError as exc:
                     raise KVUnavailableError("Redis contains invalid JSON") from exc
-            elif callable(batch_reader):
-                values = await batch_reader([current_key, legacy_key])
-                if isinstance(values, list) and len(values) == 2:
-                    payload, legacy_payload = values
-                else:
-                    payload = await read_json(self.kv, current_key)
-                    legacy_payload = await read_json(self.kv, legacy_key)
             else:
-                # Compatibility with lightweight storage adapters and old
-                # workers during a rolling deployment.
-                payload = await read_json(self.kv, current_key)
-                if payload is None:
-                    legacy_payload = await read_json(self.kv, legacy_key)
+                # Compatibility with lightweight storage adapters.
+                payload = await read_json(self.kv, key)
         exists = payload is not None
         if isinstance(payload, dict) and isinstance(payload.get("session"), dict):
             payload = payload["session"]
-        migrated = False
-        if payload is None:
-            payload = legacy_payload
-            migrated = isinstance(payload, dict)
         session = UserSession.from_dict(payload) if isinstance(payload, dict) else None
         if session is None:
             session = UserSession(user_id=user_id, lang=lang)
@@ -465,8 +446,6 @@ class BotRuntime:
         self.sessions[user_id] = session
         if scope is not None:
             scope[cache_key] = session
-        if migrated:
-            await self.save_session(session)
         return session
 
     async def save_session(self, session: UserSession) -> None:

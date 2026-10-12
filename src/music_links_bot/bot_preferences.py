@@ -37,7 +37,7 @@ class LocalizedApplication(Application):
             kv = self.bot_data.get("kv_store")
             try:
                 scope_kwargs: dict = {}
-                prefetched = None
+                session_kwargs: dict = {}
                 batch = getattr(kv, "mget_required", None)
                 if (
                     user is not None
@@ -48,17 +48,17 @@ class LocalizedApplication(Application):
                 ):
                     # The privacy fence and the session are read in one round
                     # trip instead of two at the start of every update.
-                    generation, *session_raw = await batch(
-                        [generation_key(user.id), *runtime.session_keys(user.id)]
+                    generation, session_raw = await batch(
+                        [generation_key(user.id), runtime.session_key(user.id)]
                     )
                     scope_kwargs["generation"] = generation
-                    prefetched = tuple(session_raw)
+                    session_kwargs["prefetched_raw"] = session_raw
                 async with user_state_scope(kv, user.id if user else 0, **scope_kwargs):
                     if user is not None and isinstance(runtime, BotRuntime):
                         session = await runtime.get_session(
                             user.id,
                             lang=resolve_lang(user.language_code),
-                            prefetched=prefetched,
+                            **session_kwargs,
                         )
                         preferred_language.set(session.preferred_lang or None)
                         current_presentation.set(preferences_from_session(session))

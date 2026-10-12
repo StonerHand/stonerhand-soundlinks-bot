@@ -8,7 +8,7 @@ from typing import Any
 from music_links_bot.bot_storage import remember_bounded
 from music_links_bot.durable_state import (
     delete_value,
-    read_json_with_legacy,
+    read_json,
     read_text,
     write_json,
     write_text,
@@ -67,19 +67,9 @@ async def load_crate(bot_data: dict, user_id: int) -> list[dict[str, Any]]:
     if kv is None and user_id in memory:
         return deepcopy(memory[user_id])
 
-    payload, legacy = (
-        await read_json_with_legacy(
-            kv, f"bot-crate:v2:{user_id}", f"bot-crate:v1:{user_id}"
-        )
-        if kv
-        else (None, None)
-    )
+    payload = await read_json(kv, f"bot-crate:v2:{user_id}") if kv else None
     if isinstance(payload, dict):
         payload = payload.get("items")
-    migrated = False
-    if payload is None and kv is not None:
-        payload = legacy
-        migrated = isinstance(payload, list)
     items = (
         [item for item in payload if isinstance(item, dict)]
         if isinstance(payload, list)
@@ -91,20 +81,7 @@ async def load_crate(bot_data: dict, user_id: int) -> list[dict[str, Any]]:
         items[:MAX_CRATE_ITEMS],
         max_size=MAX_MEMORY_CRATES,
     )
-    result = deepcopy(memory[user_id])
-    if migrated:
-        stored = await mutate_json(
-            kv,
-            f"bot-crate:v2:{user_id}",
-            lambda current: (
-                current
-                if current is not None
-                else {"v": CRATE_SCHEMA_VERSION, "items": result}
-            ),
-            ttl_seconds=CRATE_TTL_SECONDS,
-        )
-        result = deepcopy(stored.get("items", []))
-    return result
+    return deepcopy(memory[user_id])
 
 
 async def save_crate(bot_data: dict, user_id: int, items: list[dict[str, Any]]) -> None:
