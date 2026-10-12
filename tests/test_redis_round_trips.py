@@ -13,7 +13,7 @@ from test_bot import ContextStub, PrivateSpotifyTrackMessageStub, UpdateStub
 
 from music_links_bot.bot import track_lookup_message
 from music_links_bot.bot_runtime import BotRuntime
-from music_links_bot.durable_state import read_json_with_legacy, state_scope
+from music_links_bot.durable_state import state_scope
 from music_links_bot.kvstore import KVUnavailableError
 from music_links_bot.state_mutations import mutate_json, mutate_json_raw
 from music_links_bot.user_state import (
@@ -52,11 +52,11 @@ class LookupBudgetTests(unittest.IsolatedAsyncioTestCase):
         user_id = message.chat_id
         self.kv.commands.clear()
         with state_scope():
-            generation, *raw = await self.kv.mget_required(
-                [generation_key(user_id), *runtime.session_keys(user_id)]
+            generation, raw = await self.kv.mget_required(
+                [generation_key(user_id), runtime.session_key(user_id)]
             )
             async with user_state_scope(self.kv, user_id, generation=generation):
-                await runtime.get_session(user_id, prefetched=tuple(raw))
+                await runtime.get_session(user_id, prefetched_raw=raw)
                 await track_lookup_message(UpdateStub(message), context)
 
     async def test_first_lookup_stays_within_round_trip_budget(self):
@@ -128,25 +128,6 @@ class StorageHelperTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(value, {"seen": {"n": 3}})
-
-    async def test_legacy_pair_is_one_round_trip(self):
-        await self.kv.set_json_required("old", [1], ttl_seconds=60)
-        self.kv.commands.clear()
-
-        self.assertEqual(
-            await read_json_with_legacy(self.kv, "new", "old"), (None, [1])
-        )
-        self.assertEqual(len(self.kv.commands), 1)
-
-        await self.kv.set_json_required("new", {"v": 2}, ttl_seconds=60)
-        self.assertEqual(
-            await read_json_with_legacy(self.kv, "new", "old"), ({"v": 2}, None)
-        )
-
-    async def test_corrupt_current_value_is_an_outage_not_a_miss(self):
-        await self.kv.set_required("new", "{broken", ttl_seconds=60)
-        with self.assertRaises(KVUnavailableError):
-            await read_json_with_legacy(self.kv, "new", "old")
 
     async def test_owned_key_index_prunes_expired_entries_in_one_command(self):
         now = int(time.time())

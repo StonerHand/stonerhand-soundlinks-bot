@@ -1,10 +1,7 @@
 import unittest
-from types import SimpleNamespace
 
-from music_links_bot.bot_crate import load_crate
 from music_links_bot.bot_progress import adopt_progress_message, update_progress
 from music_links_bot.bot_runtime import BotRuntime
-from music_links_bot.channel_templates import load_channel_template
 from music_links_bot.draft_model import (
     CURRENT_DRAFT_VERSION,
     normalize_track_draft,
@@ -32,38 +29,6 @@ class KVStub:
 
 
 class StateMigrationTests(unittest.IsolatedAsyncioTestCase):
-    async def test_session_versions_are_loaded_in_one_batch_when_supported(
-        self,
-    ) -> None:
-        class BatchKV(KVStub):
-            def __init__(self, values: dict) -> None:
-                super().__init__(values)
-                self.batch_reads: list[list[str]] = []
-
-            async def mget_json(self, keys: list[str]):
-                self.batch_reads.append(keys)
-                return [self.values.get(key) for key in keys]
-
-        kv = BatchKV({"session:v2:7": {"session": {"user_id": 7}}})
-        runtime = BotRuntime(kv)
-
-        session = await runtime.get_session(7)
-
-        self.assertEqual(session.user_id, 7)
-        self.assertEqual(
-            kv.batch_reads,
-            [["session:v2:7", "session:v1:7"]],
-        )
-
-    async def test_session_v1_is_read_and_written_as_v2(self) -> None:
-        kv = KVStub({"session:v1:7": {"user_id": 7, "last_query": "Sleep"}})
-        runtime = BotRuntime(kv)
-
-        session = await runtime.get_session(7)
-
-        self.assertEqual(session.last_query, "Sleep")
-        self.assertTrue(any(key == "session:v2:7" for key, _ in kv.writes))
-
     async def test_latest_complete_collection_survives_runtime_restart(self) -> None:
         kv = KVStub({})
         urls = [
@@ -130,33 +95,6 @@ class StateMigrationTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertNotIn("collection:v1:7", kv.values)
         self.assertEqual(await runtime.get_collection(7, lang="ru"), [])
-
-    async def test_crate_v1_is_read_and_written_as_v2(self) -> None:
-        item = {"draft_id": "d1", "item": {"artist": "Sleep", "title": "Holy Mountain"}}
-        kv = KVStub({"bot-crate:v1:7": [item]})
-
-        crate = await load_crate({"kv_store": kv}, 7)
-
-        self.assertEqual(crate, [item])
-        key, payload = kv.writes[-1]
-        self.assertEqual(key, "bot-crate:v2:7")
-        self.assertEqual(payload["v"], 2)
-
-    async def test_template_v1_is_read_and_written_as_v2(self) -> None:
-        import hashlib
-
-        digest = hashlib.sha256(b"@stonerhand").hexdigest()[:20]
-        kv = KVStub({f"channel:template:v1:{digest}": {"hashtags": False}})
-        context = SimpleNamespace(
-            application=SimpleNamespace(bot_data={"kv_store": kv})
-        )
-
-        template = await load_channel_template(context, "@stonerhand")
-
-        self.assertEqual(template, {"hashtags": False})
-        self.assertTrue(
-            any(key.startswith("channel:template:v2:") for key, _ in kv.writes)
-        )
 
     def test_legacy_draft_gets_safe_defaults(self) -> None:
         draft = normalize_track_draft(
