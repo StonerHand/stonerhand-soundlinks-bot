@@ -643,27 +643,6 @@ def editor_tools_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardBut
     return rows
 
 
-def editor_delivery_rows(
-    draft_id: str, draft: dict
-) -> list[list[InlineKeyboardButton]]:
-    lang = draft.get("lang") or "ru"
-    selected = draft.get("delivery_mode", "auto")
-    rows = [
-        [
-            callback_button(
-                ("✓ " if selected == value else "") + get_text(lang, key),
-                encode_callback("editor", action, draft_id),
-            )
-        ]
-        for value, key, action in (
-            ("auto", "ed_delivery_auto_name", "ra"),
-            ("classic", "ed_delivery_classic_name", "rc"),
-        )
-    ]
-    rows.append(_back_to_editor(draft_id, lang))
-    return append_setting_undo(rows, draft_id, draft)
-
-
 def editor_template_rows(
     draft_id: str, draft: dict, presets: list[dict]
 ) -> list[list[InlineKeyboardButton]]:
@@ -695,11 +674,6 @@ def editor_template_rows(
     )
     rows.append(_back_to_editor(draft_id, lang))
     return rows
-
-
-def editor_style_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
-    """Compatibility for already-sent keyboards: the style lives in "Вид"."""
-    return editor_appearance_rows(draft_id, draft)
 
 
 def editor_platform_rows(
@@ -808,13 +782,6 @@ def editor_hashtag_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardB
         rows.append(extra)
     rows.append(_back_to_editor(draft_id, lang))
     return append_setting_undo(rows, draft_id, draft)
-
-
-def editor_tag_options_rows(
-    draft_id: str, draft: dict
-) -> list[list[InlineKeyboardButton]]:
-    """Compatibility for already-sent keyboards: options now live on "Теги"."""
-    return editor_hashtag_rows(draft_id, draft)
 
 
 def editor_schedule_rows(

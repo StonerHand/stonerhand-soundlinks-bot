@@ -419,13 +419,13 @@ class TelegramUiContractTests(unittest.TestCase):
         )
 
         self.assertEqual([len(row) for row in keyboard.inline_keyboard], [1, 1])
-        self.assertEqual(keyboard.inline_keyboard[0][0].text, "Повторить")
+        self.assertEqual(keyboard.inline_keyboard[0][0].text, "🔄 Повторить")
         self.assertEqual(keyboard.inline_keyboard[-1][0].text, "← Меню")
 
     def test_recovery_action_changes_with_error_context(self) -> None:
         cases = {
-            "change": "Изменить запрос",
-            "platforms": "Что поддерживается",
+            "change": "✏️ Изменить запрос",
+            "platforms": "❓ Что поддерживается",
             "crate": "🎶 Открыть подборку",
         }
         for recovery, expected in cases.items():

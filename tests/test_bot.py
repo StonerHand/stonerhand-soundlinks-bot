@@ -538,12 +538,12 @@ class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
                 button
                 for row in first_keyboard
                 for button in row
-                if button.text == "Попробовать на примере"
+                if button.text == "▶️ Попробовать на примере"
             ).switch_inline_query_current_chat,
             "Deftones — Rickets",
         )
         self.assertIn(
-            "Попробовать на примере",
+            "▶️ Попробовать на примере",
             [button.text for row in second_keyboard for button in row],
         )
 
@@ -1260,7 +1260,7 @@ class BotKeyboardTests(unittest.TestCase):
         rows = newcomer.inline_keyboard
         self.assertEqual(rows[0][0].text, "➕ Новый пост")
         self.assertEqual(rows[0][0].style, "primary")
-        self.assertEqual(rows[-1][0].text, "Как это работает")
+        self.assertEqual(rows[-1][0].text, "💡 Как это работает")
 
     def test_home_keeps_new_search_primary_when_a_card_can_be_restored(self) -> None:
         keyboard = _build_start_keyboard(
@@ -2296,10 +2296,10 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("<code>артист — трек</code>", message.replies[0])
         self.assertIn("<blockquote>привет</blockquote>", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
-        self.assertEqual(keyboard[0][0].text, "Изменить запрос")
+        self.assertEqual(keyboard[0][0].text, "✏️ Изменить запрос")
         self.assertEqual(keyboard[-1][0].text, "← Меню")
         self.assertEqual(keyboard[0][0].switch_inline_query_current_chat, "привет")
-        self.assertEqual(keyboard[1][0].text, "Отправить прямую ссылку")
+        self.assertEqual(keyboard[1][0].text, "🔗 Прислать ссылку")
         self.assertEqual(len(keyboard), 3)
         self.assertEqual(context.bot.sent_messages, [])
         self.assertEqual(context.bot.chat_actions, [])

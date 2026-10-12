@@ -87,10 +87,6 @@
     "en": "✏️ Title",
     "ru": "✏️ Название"
   },
-  "crate_reorder": {
-    "en": "Reorder",
-    "ru": "Порядок"
-  },
   "crate_restored": {
     "en": "Back in the collection",
     "ru": "Возвращено в подборку"
@@ -151,26 +147,6 @@
     "en": "Only the bot owner can publish to the channel",
     "ru": "Публиковать в канал может только владелец бота"
   },
-  "ed_clean_preview": {
-    "ru": "👁 Как выглядит",
-    "en": "👁 Preview"
-  },
-  "ed_constructor_hint": {
-    "ru": "Изменения сохранены для этого поста.",
-    "en": "Changes saved for this post."
-  },
-  "ed_constructor_title": {
-    "ru": "Редактор поста",
-    "en": "Post editor"
-  },
-  "ed_cover_auto": {
-    "en": "Artwork · auto",
-    "ru": "Обложка · авто"
-  },
-  "ed_cover_custom": {
-    "en": "Artwork · custom",
-    "ru": "Обложка · своя"
-  },
   "ed_cover_invalid": {
     "en": "Send a photo, not a document.",
     "ru": "Нужна фотография. Отправь изображение без файла-документа."
@@ -223,37 +199,9 @@
     "en": "<b>Post deleted</b>\n\nYou can bring it back for 15 seconds.",
     "ru": "<b>Пост удалён</b>\n\nВернуть можно в течение 15 секунд."
   },
-  "ed_delivery_auto": {
-    "ru": "Авто",
-    "en": "Auto"
-  },
-  "ed_delivery_auto_name": {
-    "ru": "Авто",
-    "en": "Auto"
-  },
-  "ed_delivery_classic": {
-    "ru": "Текст с превью",
-    "en": "Text with preview"
-  },
-  "ed_delivery_classic_name": {
-    "ru": "Текст с превью",
-    "en": "Text with preview"
-  },
-  "ed_delivery_title": {
-    "ru": "<b>🎨 Вид поста</b>\nС обложкой — крупная обложка с подписью. С историей — больше места для твоего текста.",
-    "en": "<b>🎨 Post look</b>\nWith cover — a large signed cover. With story — more room for your text."
-  },
-  "ed_done": {
-    "ru": "← К посту",
-    "en": "← Back to post"
-  },
   "ed_duplicate": {
     "en": "⚠️ This release was already published on {date}. Open that post, replace it or publish again.",
     "ru": "⚠️ Этот релиз уже публиковался {date}. Можно открыть тот пост, заменить его или опубликовать снова."
-  },
-  "ed_edit": {
-    "en": "Edit",
-    "ru": "Изменить"
   },
   "ed_expired": {
     "en": "This post has expired — send the link again",
@@ -272,8 +220,8 @@
     "ru": "# Без хэштегов"
   },
   "ed_hashtags_title": {
-    "ru": "<b># Теги</b>\nНажми на тег, чтобы включить или убрать — до 5. «📌 Запомнить» применит этот выбор, когда ты снова найдёшь этот релиз.",
-    "en": "<b># Tags</b>\nTap a tag to toggle it — up to 5. “📌 Remember” reuses this choice next time you find this release."
+    "ru": "<b># Теги</b>\nНажми на тег, чтобы включить или выключить (до 5). «📌 Запомнить» повторит этот выбор для релиза.",
+    "en": "<b># Tags</b>\nTap a tag to toggle it (up to 5). “📌 Remember” reuses this choice for the release."
   },
   "ed_intro_add": {
     "en": "➕ Add text",
@@ -282,10 +230,6 @@
   "ed_intro_change": {
     "en": "✏️ Edit text",
     "ru": "✏️ Изменить текст"
-  },
-  "ed_intro_counter": {
-    "ru": "Текст: {used}/{limit}",
-    "en": "Text: {used}/{limit}"
   },
   "ed_intro_prompt": {
     "ru": "<b>✏️ Текст поста</b>\nОтветь одним сообщением, до {limit} символов. Жирный текст, ссылки и другое оформление сохранятся.\n\n<code>/cancel</code> — вернуться без изменений.",
@@ -307,17 +251,9 @@
     "ru": "Текст не помещается целиком. Сократи его или выбери «🎨 Вид → С историей».",
     "en": "The text does not fit. Shorten it or choose “🎨 Look → With story”."
   },
-  "ed_last_template": {
-    "en": "↻ Same as last time",
-    "ru": "↻ Как в прошлый раз"
-  },
   "ed_last_template_applied": {
     "en": "Previous format restored",
     "ru": "Прошлый формат восстановлен"
-  },
-  "ed_more": {
-    "ru": "Отправить…",
-    "en": "Send…"
   },
   "ed_open_publication": {
     "en": "🔗 Open post",
@@ -327,21 +263,9 @@
     "en": "This post belongs to someone else",
     "ru": "Это чужой пост"
   },
-  "ed_platforms_all_short": {
-    "en": "all",
-    "ru": "все"
-  },
-  "ed_platforms_audio": {
-    "en": "Audio file: no buttons needed",
-    "ru": "Аудиофайл: кнопки не нужны"
-  },
   "ed_platforms_select_all": {
     "en": "Select all",
     "ru": "Выбрать все"
-  },
-  "ed_platforms_selected": {
-    "en": "Platforms · {count}",
-    "ru": "Площадки · {count}"
   },
   "ed_platforms_title": {
     "ru": "<b>🔗 Кнопки</b>\nОтметь площадки, которые увидят читатели.",
@@ -366,34 +290,6 @@
   "ed_preview_sent": {
     "en": "Clean preview sent below",
     "ru": "Чистое превью отправлено ниже"
-  },
-  "ed_preset_cover": {
-    "ru": "Вид · С обложкой",
-    "en": "Layout · With artwork"
-  },
-  "ed_preset_longread": {
-    "ru": "Вид · С историей",
-    "en": "Layout · With a story"
-  },
-  "ed_preset_minimal": {
-    "ru": "Вид · Компактно",
-    "en": "Layout · Compact"
-  },
-  "ed_preset_name_cover": {
-    "ru": "С обложкой",
-    "en": "With artwork"
-  },
-  "ed_preset_name_longread": {
-    "ru": "С историей",
-    "en": "With a story"
-  },
-  "ed_preset_name_minimal": {
-    "ru": "Компактно",
-    "en": "Compact"
-  },
-  "ed_publish": {
-    "ru": "Опубликовать",
-    "en": "Publish"
   },
   "ed_publish_failed": {
     "en": "Could not publish — check the bot's rights in the channel",
@@ -423,49 +319,17 @@
     "en": "📩 Send to me",
     "ru": "📩 Отправить себе"
   },
-  "ed_sent": {
-    "en": "Done — the post is below",
-    "ru": "Готово — пост отправлен ниже"
-  },
   "ed_sent_short": {
     "en": "Done — post sent",
     "ru": "Готово — пост отправлен"
-  },
-  "ed_status": {
-    "en": "{preset} ✓ · {tags} · {services} · {delivery}",
-    "ru": "{preset} ✓ · {tags} · {services} · {delivery}"
-  },
-  "ed_status_audio": {
-    "en": "Audio ✓ · {tags} · Telegram",
-    "ru": "Аудио ✓ · {tags} · Telegram"
   },
   "ed_status_custom_cover": {
     "en": "Own cover",
     "ru": "Своя обложка"
   },
-  "ed_status_delivery_auto": {
-    "en": "Auto",
-    "ru": "Авто"
-  },
-  "ed_status_delivery_classic": {
-    "en": "Text",
-    "ru": "Текст"
-  },
-  "ed_status_tags_auto": {
-    "en": "Auto tags",
-    "ru": "Теги авто"
-  },
-  "ed_status_tags_custom": {
-    "en": "Tags {count}",
-    "ru": "Теги {count}"
-  },
   "ed_status_tags_none": {
     "en": "no tags",
     "ru": "без тегов"
-  },
-  "ed_style_title": {
-    "ru": "<b>🎨 Вид поста</b>\nС обложкой — крупная обложка с подписью. С историей — больше места для твоего текста.",
-    "en": "<b>🎨 Post look</b>\nWith cover — a large signed cover. With story — more room for your text."
   },
   "ed_tags_auto": {
     "ru": "↺ Авто-теги",
@@ -539,13 +403,9 @@
     "en": "Undo time has expired",
     "ru": "Время для отмены истекло"
   },
-  "error_open_source": {
-    "en": "Open source",
-    "ru": "Открыть исходник"
-  },
   "error_platforms_button": {
-    "en": "What is supported",
-    "ru": "Что поддерживается"
+    "en": "❓ What is supported",
+    "ru": "❓ Что поддерживается"
   },
   "error_back_crate": {
     "en": "🎶 Open collection",
@@ -568,8 +428,8 @@
     "ru": "Релиз не найден. Уточни <code>артист — трек</code> или пришли прямую ссылку."
   },
   "error_send_link": {
-    "en": "Send a direct link",
-    "ru": "Отправить прямую ссылку"
+    "en": "🔗 Send a link",
+    "ru": "🔗 Прислать ссылку"
   },
   "error_title": {
     "en": "Could not build the post",
@@ -615,10 +475,6 @@
     "ru": "🎶 Подборка · {count}",
     "en": "🎶 Collection · {count}"
   },
-  "home_drafts": {
-    "ru": "Черновики",
-    "en": "Drafts"
-  },
   "home_create": {
     "ru": "➕ Новый пост",
     "en": "➕ New post"
@@ -639,10 +495,6 @@
     "ru": "🕒 В очереди · {count}",
     "en": "🕒 Scheduled · {count}"
   },
-  "home_recent": {
-    "ru": "История поиска",
-    "en": "Search history"
-  },
   "home_title": {
     "ru": "<b>Привет{name} 👋</b>",
     "en": "<b>Hi{name} 👋</b>"
@@ -652,16 +504,12 @@
     "en": "<b>Music worth sharing</b>"
   },
   "home_try_example": {
-    "ru": "Попробовать на примере",
-    "en": "Try an example"
+    "ru": "▶️ Попробовать на примере",
+    "en": "▶️ Try an example"
   },
   "inline_find_music": {
     "en": "Find music",
     "ru": "Найти музыку"
-  },
-  "inline_hint_empty": {
-    "en": "🎧 Type an artist and track or paste a link",
-    "ru": "🎧 Введи артиста и трек или вставь ссылку"
   },
   "inline_hint_collection_truncated": {
     "en": "Telegram cut the list — open the bot and tap Share",
@@ -760,8 +608,8 @@
     "ru": "⚠️ <b>Удалить данные без возможности восстановления?</b>\n\nБудут удалены черновики, история, подборка, шаблоны, настройки и запланированные тобой публикации. Уже опубликованные сообщения в Telegram останутся на месте."
   },
   "privacy_delete": {
-    "en": "Delete my data",
-    "ru": "Удалить мои данные"
+    "en": "🗑 Delete my data",
+    "ru": "🗑 Удалить мои данные"
   },
   "privacy_delete_confirm": {
     "en": "Delete permanently",
@@ -844,8 +692,8 @@
     "ru": "Страница {page} из {pages}"
   },
   "queue_refresh": {
-    "en": "Refresh",
-    "ru": "Обновить"
+    "en": "🔄 Refresh",
+    "ru": "🔄 Обновить"
   },
   "queue_retried": {
     "en": "Queued for a manual retry",
@@ -876,24 +724,8 @@
     "ru": "🔎 Найти"
   },
   "quick_tour": {
-    "ru": "Как это работает",
-    "en": "How it works"
-  },
-  "recent_add": {
-    "en": "+ To crate",
-    "ru": "+ В подборку"
-  },
-  "recent_empty": {
-    "ru": "<b>Здесь появятся недавние релизы</b>\n\nПришли первую ссылку.",
-    "en": "<b>Recent releases will appear here</b>\n\nSend your first link."
-  },
-  "recent_repeat": {
-    "en": "Repeat",
-    "ru": "Повторить"
-  },
-  "recent_title": {
-    "ru": "<b>Недавние релизы</b>\n<i>Выбери релиз, чтобы открыть его снова.</i>",
-    "en": "<b>Recent releases</b>\n<i>Choose a release to open it again.</i>"
+    "ru": "💡 Как это работает",
+    "en": "💡 How it works"
   },
   "replace_source": {
     "en": "Replace #{index}",
@@ -920,24 +752,12 @@
     "ru": "Этот поиск уже завершён"
   },
   "retry": {
-    "en": "Retry",
-    "ru": "Повторить"
+    "en": "🔄 Retry",
+    "ru": "🔄 Повторить"
   },
   "retry_failed": {
     "en": "Check all links again",
     "ru": "Проверить все ссылки"
-  },
-  "schedule_1d": {
-    "en": "Tomorrow at 12:00",
-    "ru": "Завтра в 12:00"
-  },
-  "schedule_1h": {
-    "en": "In 1 hour",
-    "ru": "Через 1 час"
-  },
-  "schedule_3h": {
-    "en": "In 3 hours",
-    "ru": "Через 3 часа"
   },
   "schedule_custom": {
     "en": "✍️ Custom time",
@@ -964,16 +784,16 @@
     "en": "<b>🕒 When to publish?</b>"
   },
   "search_change": {
-    "en": "Change query",
-    "ru": "Изменить запрос"
+    "en": "✏️ Change query",
+    "ru": "✏️ Изменить запрос"
   },
   "search_choose": {
     "en": "<b>Choose a release</b>\n\nI found several matches for “{query}”:",
     "ru": "<b>Выбери релиз</b>\n\nНашёл несколько вариантов по запросу «{query}»:"
   },
   "search_not_found": {
-    "en": "Found nothing for that query. Try refining it: artist + title",
-    "ru": "Ничего не нашел по этому запросу. Попробуй уточнить: артист + название"
+    "en": "Found nothing for that query. Try: artist — track.",
+    "ru": "Ничего не нашёл по этому запросу. Уточни: артист — трек."
   },
   "search_other": {
     "en": "🔄 Other release",
@@ -1044,8 +864,8 @@
     "en": "<b>Remove this scheduled post?</b>\n\n{release}\n\nThe scheduled delivery will be cancelled."
   },
   "queue_cancel_confirm_button": {
-    "ru": "Убрать из очереди",
-    "en": "Remove from queue"
+    "ru": "✕ Убрать из очереди",
+    "en": "✕ Remove from queue"
   },
   "queue_next": {
     "ru": "Вперёд →",
@@ -1067,18 +887,6 @@
     "ru": "⏳ Отправляется · дождись результата",
     "en": "⏳ Sending · waiting for confirmation"
   },
-  "ed_group_appearance": {
-    "ru": "Оформление",
-    "en": "Appearance"
-  },
-  "ed_group_text": {
-    "ru": "Текст",
-    "en": "Text"
-  },
-  "ed_group_buttons": {
-    "ru": "Кнопки площадок",
-    "en": "Platform buttons"
-  },
   "ed_appearance_title": {
     "ru": "<b>🎨 Вид поста</b>\nС обложкой — крупная обложка с подписью. С историей — больше места для твоего текста.",
     "en": "<b>🎨 Post look</b>\nWith cover — a large signed cover. With story — more room for your text."
@@ -1086,10 +894,6 @@
   "ed_text_title": {
     "ru": "<b>✏️ Текст</b>\nСвой текст над релизом и хэштеги.",
     "en": "<b>✏️ Text</b>\nYour own text above the release, and hashtags."
-  },
-  "ed_tools": {
-    "ru": "⋯ Ещё",
-    "en": "⋯ More"
   },
   "ed_tools_title": {
     "ru": "<b>⋯ Ещё</b>\nШаблоны оформления и редкие действия с постом.",
@@ -1236,8 +1040,8 @@
     "en": "Collection buttons · {value}"
   },
   "pref_layout_title": {
-    "ru": "<b>Кнопки подборок</b>\nОбщий вид для всех подборок. Длинные названия в режимах «Авто» и «Компактно» займут отдельный ряд.",
-    "en": "<b>Collection buttons</b>\nShared layout for all collections. Long titles get their own row in Auto and Compact modes."
+    "ru": "<b>🔘 Кнопки подборок</b>\nОбщий вид для всех подборок. Длинные названия в режимах «Авто» и «Компактно» займут отдельный ряд.",
+    "en": "<b>🔘 Collection buttons</b>\nShared layout for all collections. Long titles get their own row in Auto and Compact modes."
   },
   "pref_layout_column": {
     "ru": "Одна колонка",
@@ -1256,8 +1060,8 @@
     "en": "Collection sections · {value}"
   },
   "pref_grouping_title": {
-    "ru": "<b>Разделы подборок</b>\nОбщий вид для всех подборок. Заголовки разделяют соседние позиции; исходный порядок и номера сохраняются.",
-    "en": "<b>Collection sections</b>\nShared layout for all collections. Headings separate adjacent items; original order and numbers are preserved."
+    "ru": "<b>🗂 Разделы подборок</b>\nОбщий вид для всех подборок. Заголовки разделяют соседние позиции; исходный порядок и номера сохраняются.",
+    "en": "<b>🗂 Collection sections</b>\nShared layout for all collections. Headings separate adjacent items; original order and numbers are preserved."
   },
   "pref_grouping_none": {
     "ru": "Без разделов",
@@ -1287,14 +1091,6 @@
     "ru": "Чистая обложка",
     "en": "Clean artwork"
   },
-  "ed_artwork_native": {
-    "ru": "Превью площадки",
-    "en": "Platform preview"
-  },
-  "ed_artwork_clean": {
-    "ru": "Обложка релиза",
-    "en": "Release artwork"
-  },
   "ed_clean_unavailable": {
     "ru": "Для этого поста чистая обложка недоступна.",
     "en": "Clean artwork is unavailable for this post."
@@ -1302,10 +1098,6 @@
   "ed_tags_pin": {
     "ru": "📌 Запомнить",
     "en": "📌 Remember"
-  },
-  "ed_tags_reset": {
-    "ru": "Забыть запомненные теги",
-    "en": "Forget remembered tags"
   },
   "ed_tags_limit": {
     "ru": "Можно выбрать до 5 тегов. Сначала отключи ненужный.",
@@ -1355,10 +1147,6 @@
     "ru": "# Теги",
     "en": "# Tags"
   },
-  "ed_quick_cover": {
-    "ru": "🖼 Обложка",
-    "en": "🖼 Artwork"
-  },
   "ed_quick_buttons": {
     "ru": "🔗 Кнопки",
     "en": "🔗 Buttons"
@@ -1371,33 +1159,9 @@
     "ru": "📣 Опубликовать",
     "en": "📣 Publish"
   },
-  "ed_send_menu": {
-    "ru": "↗️ Отправить…",
-    "en": "↗️ Send…"
-  },
-  "ed_style_short": {
-    "ru": "Вид поста",
-    "en": "Post style"
-  },
-  "ed_delivery_settings": {
-    "ru": "Формат сообщения",
-    "en": "Message format"
-  },
-  "ed_tag_options": {
-    "ru": "Настройки тегов",
-    "en": "Tag options"
-  },
-  "ed_back_tags": {
-    "ru": "← К тегам",
-    "en": "← Back to tags"
-  },
   "ed_cover_upload": {
     "ru": "🖼 Своя обложка",
     "en": "🖼 Own cover"
-  },
-  "ed_tag_options_title": {
-    "ru": "<b># Теги</b>\nНажми на тег, чтобы включить или убрать — до 5. «📌 Запомнить» применит этот выбор, когда ты снова найдёшь этот релиз.",
-    "en": "<b># Tags</b>\nTap a tag to toggle it — up to 5. “📌 Remember” reuses this choice next time you find this release."
   },
   "pref_defaults": {
     "ru": "Новые посты",
@@ -1515,25 +1279,13 @@
     "ru": "Ничего не нашлось. Выбери другой фильтр или сбрось поиск.",
     "en": "Nothing found. Pick another filter or clear the search."
   },
-  "posts_expires": {
-    "ru": "Доступен до {date}",
-    "en": "Available until {date}"
-  },
-  "posts_retention": {
-    "ru": "Черновики: 7 дней после правки. 🔖 Сохранённые: 90 дней после сохранения или правки.",
-    "en": "Drafts: 7 days after an edit. 🔖 Saved: 90 days after saving or editing."
-  },
   "pending_for_post": {
     "ru": "Пост: <b>{release}</b>",
     "en": "Post: <b>{release}</b>"
   },
-  "pending_link_received": {
-    "ru": "Сейчас редактируется пост. Для новой ссылки нажми «Новый пост» или ответь на запрос ввода. Текущие правки сохранены.",
-    "en": "You are editing a post. Choose New post for this link, or reply to the input prompt. Your edits are saved."
-  },
   "tag_explanation": {
-    "ru": "ℹ️ <b>Откуда эти теги</b>\n\n{selected}\nРежим: {mode}\nТип релиза: {kind}\nЖанр в данных релиза: {genre}\nТеги жанра: {genre_tags}\n\n#stonerhand — тег канала. Свои теги задаёшь ты. Если жанр неизвестен, бот его не угадывает. «Запомнить для релиза» применит твой выбор при следующем добавлении.",
-    "en": "ℹ️ <b>About these tags</b>\n\n{selected}\nMode: {mode}\nRelease type: {kind}\nGenre in release metadata: {genre}\nGenre tags: {genre_tags}\n\n#stonerhand identifies the channel. Custom tags are yours. Unknown genres are not guessed. Remember for release applies your selection next time."
+    "ru": "ℹ️ <b>Откуда эти теги</b>\n\n{selected}\nРежим: {mode}\nТип релиза: {kind}\nЖанр в данных релиза: {genre}\nТеги жанра: {genre_tags}\n\n#stonerhand — тег канала. Свои теги задаёшь ты. Если жанр неизвестен, бот его не угадывает. «📌 Запомнить» повторит этот выбор, когда релиз встретится снова.",
+    "en": "ℹ️ <b>About these tags</b>\n\n{selected}\nMode: {mode}\nRelease type: {kind}\nGenre in release metadata: {genre}\nGenre tags: {genre_tags}\n\n#stonerhand identifies the channel. Custom tags are yours. Unknown genres are not guessed. “📌 Remember” reuses this choice when the release comes up again."
   },
   "tags_manual": {
     "ru": "твой выбор",
@@ -1618,10 +1370,6 @@
   "workspace_sent": {
     "ru": "✅ <b>Отправлен</b>",
     "en": "✅ <b>Sent</b>"
-  },
-  "posts_history": {
-    "ru": "🕘 История поиска",
-    "en": "🕘 Search history"
   },
   "old_post_not_removed": {
     "ru": "Новый пост опубликован. Старый пост удалить не удалось — убери его вручную в канале.",

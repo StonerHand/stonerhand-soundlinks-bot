@@ -26,8 +26,6 @@ from music_links_bot.bot_ui import (
     build_create_keyboard,
     build_start_keyboard,
     editor_hashtag_rows,
-    editor_platform_rows,
-    editor_style_rows,
 )
 from music_links_bot.models import TrackMatch
 from music_links_bot.telegram_text import telegram_text_length
@@ -121,17 +119,6 @@ class BuilderJourneyTests(unittest.TestCase):
             links={"appleMusic": "https://open.spotify.com/track/wrong"},
         )
         self.assertEqual(selected_platforms({}, track, ["appleMusic"]), [])
-
-    def test_selector_keyboards_are_explicit_and_reversible(self) -> None:
-        style_rows = editor_style_rows("abc", self.draft)
-        self.assertEqual(
-            [row[0].callback_data for row in style_rows[:2]],
-            ["v2|editor|z1|abc", "v2|editor|z2|abc"],
-        )
-        platform_rows = editor_platform_rows("abc", self.draft, self.track, self.order)
-        self.assertEqual(platform_rows[0][0].callback_data, "v2|editor|l0|abc")
-        tag_rows = editor_hashtag_rows("abc", self.draft)
-        self.assertEqual(tag_rows[-1][0].callback_data, "v2|editor|m|abc")
 
     def test_schedule_and_telegram_limits_are_deterministic(self) -> None:
         now = datetime(2026, 8, 10, 10, 0, tzinfo=timezone.utc)

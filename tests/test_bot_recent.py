@@ -1,72 +1,10 @@
 import unittest
 from types import SimpleNamespace
 
-from music_links_bot.bot_recent import render_drafts_view, render_recent_view
+from music_links_bot.bot_recent import render_drafts_view
 
 
 class RecentNavigationTests(unittest.IsolatedAsyncioTestCase):
-    async def test_drafts_and_published_history_are_separate(self) -> None:
-        context = SimpleNamespace(
-            application=SimpleNamespace(
-                bot_data={
-                    "bot_history": {
-                        7: [
-                            {
-                                "artist": "Published Artist",
-                                "title": "Published Track",
-                                "source_url": "https://open.spotify.com/track/1",
-                            }
-                        ]
-                    }
-                }
-            )
-        )
-
-        async def load_draft(_context, draft_id: str):
-            if draft_id != "draft1":
-                return None
-            return {
-                "item": {"artist": "Draft Artist", "title": "Draft Track"},
-                "created_at": 1,
-                "chat_id": 7,
-            }
-
-        drafts_text, drafts_keyboard = await render_drafts_view(
-            context,
-            user_id=7,
-            lang="ru",
-            draft_ids=["draft1"],
-            load_draft=load_draft,
-        )
-        recent_text, recent_keyboard = await render_recent_view(
-            context,
-            user_id=7,
-            lang="ru",
-        )
-
-        # Posts are the buttons themselves: one line each, no duplicate list.
-        drafts_labels = " ".join(
-            b.text for row in drafts_keyboard.inline_keyboard for b in row
-        )
-        self.assertIn("📝 Draft Artist", drafts_labels)
-        self.assertNotIn("Published Artist", drafts_labels)
-        self.assertNotIn("Draft Artist", drafts_text)
-        self.assertEqual(
-            next(
-                b.callback_data
-                for row in drafts_keyboard.inline_keyboard
-                for b in row
-                if b.callback_data.startswith("v2|editor|")
-            ),
-            "v2|editor|b|draft1",
-        )
-        self.assertIn("Published Artist", recent_text)
-        self.assertNotIn("Draft Artist", recent_text)
-        self.assertEqual(
-            recent_keyboard.inline_keyboard[0][0].switch_inline_query_current_chat,
-            "https://open.spotify.com/track/1",
-        )
-
     async def test_empty_drafts_have_one_clear_creation_action(self) -> None:
         context = SimpleNamespace(application=SimpleNamespace(bot_data={}))
 

@@ -69,14 +69,11 @@ from music_links_bot.bot_ui import (
     build_duplicate_post_keyboard as _duplicate_post_keyboard,
     build_publish_confirmation as _build_publish_confirmation,
     editor_appearance_rows,
-    editor_delivery_rows as _editor_delivery_rows,
     editor_hashtag_rows as _editor_hashtag_rows,
     editor_intro_rows as _editor_intro_rows,
     editor_overflow_rows as _editor_overflow_rows,
     editor_platform_rows as _editor_platform_rows,
     editor_schedule_rows as _editor_schedule_rows,
-    editor_style_rows as _editor_style_rows,
-    editor_tag_options_rows,
     editor_template_rows as _editor_template_rows,
     editor_text_rows,
     editor_tools_rows,
@@ -141,11 +138,8 @@ _SIMPLE_EDITOR_SCREENS = {
     BuilderScreen.APPEARANCE: ("ed_appearance_title", editor_appearance_rows),
     BuilderScreen.TEXT: ("ed_text_title", editor_text_rows),
     BuilderScreen.TOOLS: ("ed_tools_title", editor_tools_rows),
-    BuilderScreen.STYLE: ("ed_style_title", _editor_style_rows),
     BuilderScreen.INTRO: ("ed_intro_title", _editor_intro_rows),
     BuilderScreen.HASHTAGS: ("ed_hashtags_title", _editor_hashtag_rows),
-    BuilderScreen.TAG_OPTIONS: ("ed_tag_options_title", editor_tag_options_rows),
-    BuilderScreen.DELIVERY: ("ed_delivery_title", _editor_delivery_rows),
 }
 
 

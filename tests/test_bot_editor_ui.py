@@ -131,7 +131,7 @@ class PostEditorTests(unittest.TestCase):
         )
         self.assertEqual(search_row[0].text, "🔄 Другой релиз")
         self.assertEqual(search_row[0].callback_data, "v2|editor|a|abc123")
-        self.assertEqual(search_row[1].text, "Изменить запрос")
+        self.assertEqual(search_row[1].text, "✏️ Изменить запрос")
         self.assertEqual(
             search_row[1].switch_inline_query_current_chat,
             "Sleep — Dragonaut",
