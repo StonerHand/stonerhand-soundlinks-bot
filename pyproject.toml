@@ -120,6 +120,7 @@ files = [
   "src/music_links_bot/webhook_secret.py",
   "src/music_links_bot/config.py",
   "src/music_links_bot/update_execution.py",
+  "src/music_links_bot/qstash_auth.py",
 ]
 follow_imports = "skip"
 check_untyped_defs = true

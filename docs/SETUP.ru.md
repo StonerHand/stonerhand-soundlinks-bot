@@ -129,14 +129,17 @@ curl --fail-with-body --silent --show-error \
 
 Плановые запуски GitHub Actions часто опаздывают на 10–30 минут, а в публичном
 репозитории отключаются после 60 дней без коммитов. Для точного времени
-отложенных постов используйте расписание Upstash QStash (бесплатный тариф, та же
-консоль, что и Redis): **QStash → Schedules → Create**,
+отложенных постов используйте расписание Upstash QStash (бесплатный тариф):
 
-- Destination: `https://<ваш-домен>/api/queue_worker`;
-- Cron: `* * * * *` (раз в минуту);
-- Header: `Upstash-Forward-Authorization: Bearer <CRON_SECRET>`.
+1. Vercel → Storage / Marketplace → Upstash → **QStash** → создать и подключить
+   к проекту. Vercel сам добавит `QSTASH_CURRENT_SIGNING_KEY` и
+   `QSTASH_NEXT_SIGNING_KEY`; сделайте Redeploy, чтобы функции их увидели.
+2. Upstash → QStash → **Schedules → Create**: Destination
+   `https://<ваш-домен>/api/queue_worker`, Cron `* * * * *`, метод `POST`.
 
-Обработчик принимает и `GET`, и `POST` с тем же секретом. Повторный тик
+Обработчик проверяет подпись QStash (`Upstash-Signature`) по этим ключам, так
+что копировать секрет в заголовок не нужно. `GET`/`POST` с
+`Authorization: Bearer <CRON_SECRET>` тоже продолжают работать. Повторный тик
 безопасен: задания очереди захватываются атомарно, поэтому GitHub workflow можно
 оставить как запасной.
 
