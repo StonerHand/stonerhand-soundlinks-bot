@@ -8,7 +8,7 @@ from typing import Any
 from music_links_bot.bot_storage import remember_bounded
 from music_links_bot.durable_state import (
     delete_value,
-    read_json,
+    read_json_with_legacy,
     read_text,
     write_json,
     write_text,
@@ -67,12 +67,18 @@ async def load_crate(bot_data: dict, user_id: int) -> list[dict[str, Any]]:
     if kv is None and user_id in memory:
         return deepcopy(memory[user_id])
 
-    payload = await read_json(kv, f"bot-crate:v2:{user_id}") if kv else None
+    payload, legacy = (
+        await read_json_with_legacy(
+            kv, f"bot-crate:v2:{user_id}", f"bot-crate:v1:{user_id}"
+        )
+        if kv
+        else (None, None)
+    )
     if isinstance(payload, dict):
         payload = payload.get("items")
     migrated = False
     if payload is None and kv is not None:
-        payload = await read_json(kv, f"bot-crate:v1:{user_id}")
+        payload = legacy
         migrated = isinstance(payload, list)
     items = (
         [item for item in payload if isinstance(item, dict)]

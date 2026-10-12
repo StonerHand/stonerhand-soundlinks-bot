@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import logging
 import secrets
 from copy import deepcopy
@@ -21,15 +22,16 @@ from music_links_bot.errors import (
     BotErrorCode as _BotErrorCode,
     BotFlowError as _BotFlowError,
 )
-from music_links_bot.kvstore import KVStore
+from music_links_bot.kvstore import KVStore, KVUnavailableError
 from music_links_bot.release_preferences import (
     normalize_annotations,
     normalize_release_tags,
 )
 from music_links_bot.state_mutations import (
+    UNKNOWN_RAW,
     StateConflictError,
     merge_fields,
-    mutate_json,
+    mutate_json_raw,
 )
 from music_links_bot.url_utils import (
     cache_key_for_url,
@@ -180,6 +182,8 @@ class UserSession:
     updated_at: int = field(default_factory=lambda: int(time()))
     _baseline: dict = field(default_factory=dict, repr=False, compare=False)
     _exists: bool = field(default=False, repr=False, compare=False)
+    # Exact stored JSON last seen by this request (UNKNOWN_RAW when not read).
+    _raw: object = field(default=UNKNOWN_RAW, repr=False, compare=False)
 
     def payload(self) -> dict:
         return {
@@ -380,7 +384,17 @@ class BotRuntime:
         }
         self._metrics_persisted_at = 0.0
 
-    async def get_session(self, user_id: int, *, lang: str = "ru") -> UserSession:
+    def session_keys(self, user_id: int) -> list[str]:
+        """Keys a caller may batch-read and hand back via ``prefetched``."""
+        return [f"session:v2:{user_id}", f"session:v1:{user_id}"]
+
+    async def get_session(
+        self,
+        user_id: int,
+        *,
+        lang: str = "ru",
+        prefetched: tuple[str | None, str | None] | None = None,
+    ) -> UserSession:
         scope = current_state.get()
         cache_key = (id(self), user_id)
         cached = (
@@ -395,13 +409,32 @@ class BotRuntime:
 
         payload = None
         legacy_payload = None
+        raw_current: object = UNKNOWN_RAW
         if self.kv is not None:
             current_key = f"session:v2:{user_id}"
             legacy_key = f"session:v1:{user_id}"
+            raw_reader = getattr(self.kv, "mget_required", None)
             batch_reader = getattr(self.kv, "mget_json_required", None) or getattr(
                 self.kv, "mget_json", None
             )
-            if callable(batch_reader):
+            if prefetched is not None or callable(raw_reader):
+                # Keep the exact stored text so the next save can go straight
+                # to compare-and-set instead of re-reading the session.
+                raw_current, raw_legacy = (
+                    prefetched
+                    if prefetched is not None
+                    else await raw_reader([current_key, legacy_key])
+                )
+                try:
+                    payload = (
+                        json.loads(raw_current) if raw_current is not None else None
+                    )
+                    legacy_payload = (
+                        json.loads(raw_legacy) if raw_legacy is not None else None
+                    )
+                except ValueError as exc:
+                    raise KVUnavailableError("Redis contains invalid JSON") from exc
+            elif callable(batch_reader):
                 values = await batch_reader([current_key, legacy_key])
                 if isinstance(values, list) and len(values) == 2:
                     payload, legacy_payload = values
@@ -426,6 +459,7 @@ class BotRuntime:
             session = UserSession(user_id=user_id, lang=lang)
         session._baseline = session.payload()
         session._exists = exists
+        session._raw = raw_current
         if lang:
             session.lang = lang
         self._cap(self.sessions, MAX_MEMORY_SESSIONS)
@@ -456,11 +490,12 @@ class BotRuntime:
                 )
                 return {"v": SESSION_SCHEMA_VERSION, "session": data}
 
-            stored = await mutate_json(
+            stored, session._raw = await mutate_json_raw(
                 self.kv,
                 f"session:v2:{session.user_id}",
                 merge,
                 ttl_seconds=SESSION_TTL_SECONDS,
+                expected_raw=session._raw,
             )
             for key, value in stored["session"].items():
                 if key in desired:

@@ -8,7 +8,11 @@ from copy import deepcopy
 from music_links_bot.draft_model import normalize_track_draft
 from music_links_bot.durable_state import delete_value, read_json
 from music_links_bot.kvstore import KVStore
-from music_links_bot.state_mutations import StateConflictError, mutate_json
+from music_links_bot.state_mutations import (
+    UNKNOWN_RAW,
+    StateConflictError,
+    mutate_json,
+)
 from music_links_bot.user_state import register_owned_key
 
 DRAFT_TTL_SECONDS = 7 * 24 * 3600
@@ -66,7 +70,15 @@ async def store_draft(context, draft_id: str, draft: dict) -> None:
         await register_owned_key(
             kv, draft.get("chat_id"), f"draft:{draft_id}", ttl_seconds=ttl
         )
-        draft = await mutate_json(kv, f"draft:{draft_id}", update, ttl_seconds=ttl)
+        draft = await mutate_json(
+            kv,
+            f"draft:{draft_id}",
+            update,
+            ttl_seconds=ttl,
+            # A first revision is a brand-new random id: expect it to be absent
+            # instead of spending a round trip to confirm that.
+            expected_raw=None if not revision else UNKNOWN_RAW,
+        )
     else:
         draft = update(context.application.bot_data.get("drafts", {}).get(draft_id))
     original.update(draft)

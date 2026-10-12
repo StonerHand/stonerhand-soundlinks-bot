@@ -2441,9 +2441,14 @@ async def _track_lookup_message_impl(
     )
 
     async def resolve():
+        searched = not request.source_urls
         if not await _resolve_request_sources(message, context, request):
             return None
-        await _ensure_current_lookup(context, request, request_token)
+        if searched:
+            # Direct links reach this point microseconds after begin_request;
+            # only a slow search can be overtaken by a newer message. The
+            # check before delivery still covers every path.
+            await _ensure_current_lookup(context, request, request_token)
         if not await _ensure_channel_publish_access(message, context):
             return None
         await _start_lookup_progress(message, context, request)

@@ -129,6 +129,41 @@ class KVStore:
             raise KVUnavailableError("Redis did not confirm compare-and-set")
         return result == 1
 
+    async def index_expiring_key_required(
+        self, key: str, member: str, *, now: int, expires_at: int, ttl_seconds: int
+    ) -> None:
+        """Add ``member`` to a JSON ``{name: expiry}`` index in one round trip.
+
+        Same stored format as a read-modify-write in Python, but expired names
+        are pruned and the new one recorded atomically inside Redis.
+        """
+        script = (
+            "local raw = redis.call('get', KEYS[1]); "
+            "local ok, old = pcall(cjson.decode, raw or '{}'); "
+            "if not ok or type(old) ~= 'table' then old = {} end; "
+            "local now = tonumber(ARGV[2]); local fresh = {}; "
+            "for name, expiry in pairs(old) do "
+            "if type(name) == 'string' and type(expiry) == 'number' "
+            "and expiry > now then fresh[name] = expiry end end; "
+            "fresh[ARGV[1]] = tonumber(ARGV[3]); "
+            "redis.call('set', KEYS[1], cjson.encode(fresh), 'EX', ARGV[4]); "
+            "return 1"
+        )
+        result = await self._command_or_raise(
+            [
+                "EVAL",
+                script,
+                "1",
+                key,
+                member,
+                str(now),
+                str(expires_at),
+                str(ttl_seconds),
+            ]
+        )
+        if result != 1:
+            raise KVUnavailableError("Redis did not confirm the index update")
+
     async def delete_required(self, key: str) -> None:
         result = await self._command_or_raise(["DEL", key])
         if not isinstance(result, int) or result < 0:
@@ -236,6 +271,17 @@ class KVStore:
             except ValueError:
                 decoded.append(None)
         return decoded
+
+    async def mget_required(self, keys: list[str]) -> list[str | None]:
+        """Read raw values in one round trip, surfacing outages and bad replies."""
+        if not keys:
+            return []
+        values = await self._command_or_raise(["MGET", *keys])
+        if not isinstance(values, list) or len(values) != len(keys):
+            raise KVUnavailableError("Redis returned an invalid batch")
+        if any(value is not None and not isinstance(value, str) for value in values):
+            raise KVUnavailableError("Redis returned an invalid value")
+        return values
 
     async def mget_json_required(self, keys: list[str]) -> list[Any | None]:
         if not keys:
