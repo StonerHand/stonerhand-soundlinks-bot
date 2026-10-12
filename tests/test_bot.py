@@ -1071,7 +1071,7 @@ class BotKeyboardTests(unittest.TestCase):
         self.assertEqual(rows[0][0].text, "🎧 Слушать песню")
         self.assertEqual(rows[0][0].url, "https://song.link/transitions")
         self.assertEqual(rows[0][0].style, "primary")
-        self.assertEqual(rows[1][0].text, "📺 Смотреть клип")
+        self.assertEqual(rows[1][0].text, "🎤 Live")
         self.assertEqual(rows[1][0].url, "https://youtu.be/1")
         self.assertIsNone(rows[1][0].style)
 
@@ -2863,7 +2863,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         caption = media[0].caption
         self.assertIn("вечерний набор", caption)
         self.assertIn("<blockquote>", caption)
-        self.assertIn("<b>Песня + клип</b>", caption)
+        self.assertIn("<b>Песня + live</b>", caption)
         self.assertIn("<b>Youth Code</b> — Transitions", caption)
         self.assertIn("<b>SANSAE Live Session Vol.3 - Melon</b>", caption)
         self.assertNotIn("<a href=", caption)
@@ -2872,7 +2872,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(media[1].media, "https://img.youtube.example/abc123.jpg")
         keyboard = context.bot.sent_messages[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "🎧 Слушать песню")
-        self.assertEqual(keyboard[1][0].text, "📺 Смотреть клип")
+        self.assertEqual(keyboard[1][0].text, "🎤 Live")
         record_mixed.assert_called_once()
 
     async def test_mixed_playlist_and_youtube_links_keep_both_items(self) -> None:
