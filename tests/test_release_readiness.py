@@ -68,6 +68,9 @@ class ReleaseReadinessTests(unittest.TestCase):
         self.assertTrue(
             all(entry["path"] in route_paths for entry in config.get("crons", []))
         )
+        # Functions stay next to the Upstash database (AWS us-east-1); every
+        # Redis command is a sequential HTTPS round trip.
+        self.assertEqual(config["regions"], ["iad1"])
 
     def test_ci_enforces_complete_release_gate(self) -> None:
         workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")

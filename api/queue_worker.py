@@ -30,6 +30,20 @@ class handler(BaseHTTPRequestHandler):
     """Dedicated durable-queue tick for Vercel Cron and manual recovery."""
 
     def do_GET(self) -> None:
+        self._tick()
+
+    def do_POST(self) -> None:
+        # Upstash QStash schedules call with POST by default; the tick has no
+        # input, so drain a small body and run exactly the same handler.
+        try:
+            length = min(int(self.headers.get("content-length") or 0), 65_536)
+        except ValueError:
+            length = 0
+        if length > 0:
+            self.rfile.read(length)
+        self._tick()
+
+    def _tick(self) -> None:
         if not is_authorized(self.headers.get("authorization")):
             self._send_json(
                 {"ok": False, "error": "unauthorized"},
