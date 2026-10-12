@@ -14,7 +14,6 @@ from telegram.ext import ContextTypes
 from music_links_bot.bot_builder import (
     PENDING_INPUT_TTL_SECONDS,
     apply_intro_html,
-    format_schedule_datetime,
     normalize_crate_title,
     parse_custom_tags,
     parse_schedule_datetime,
@@ -95,6 +94,28 @@ async def consume_pending_input(
     kind = str(pending.get("kind") or "")
     value = (message_text(message) or "").strip()
     if not value and kind != "cover":
+        return True
+    if kind == "brand_label":
+        await _clear_pending(runtime, session)
+        admin_chat_id = context.application.bot_data.get("admin_chat_id")
+        if admin_chat_id is None or admin_chat_id != user.id:
+            return True
+        from music_links_bot.bot_preferences import preferences_view
+        from music_links_bot.brand_settings import save_brand_label
+        from music_links_bot.cover_style import brand_label
+
+        await save_brand_label(
+            context.application.bot_data.get("kv_store"),
+            "" if value in {"-", "—"} else value,
+        )
+        text, keyboard = preferences_view(session, lang=lang, is_admin=True)
+        notice = get_text(lang, "pref_brand_label_saved").format(
+            value=escape(brand_label())
+        )
+        await message.reply_text(
+            f"{notice}\n\n{text}", parse_mode=ParseMode.HTML, reply_markup=keyboard
+        )
+        await _delete_prompt(context, message, pending)
         return True
     if kind == "library_search":
         session.draft_query = value[:100]
@@ -347,9 +368,11 @@ async def _schedule_custom_time(
         await message.reply_text(get_text(lang, "ed_queue_unavailable"))
         return DraftInputResult()
     draft["scheduled_at"] = publish_at
+    from music_links_bot.human_time import human_datetime
+
     return DraftInputResult(
         "schedule_done",
-        format_schedule_datetime(publish_at, timezone_name=timezone_name),
+        human_datetime(publish_at, timezone_name=timezone_name, lang=lang),
     )
 
 
@@ -377,11 +400,14 @@ async def _restore_crate_screen(
 ) -> None:
     items = await load_crate(context.application.bot_data, user_id)
     title = await load_crate_title(context.application.bot_data, user_id)
+    from music_links_bot.bot_crate_handlers import is_publisher
+
     text, keyboard = render_crate(
         items,
         lang=lang,
         title=title,
         share_query=build_crate_share_query(items),
+        can_publish=is_publisher(context, user_id),
     )
     text = f"<b>{escape(get_text(lang, saved_key))}</b>\n\n{text}"
     restored = await edit_pending_screen(

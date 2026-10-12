@@ -202,7 +202,7 @@ class ProgressContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.edits), 2)
         self.assertTrue(message.edits[0].startswith("✓ Релиз"))
         self.assertTrue(message.edits[1].startswith("✓ Релиз"))
-        self.assertIn("Собираю карточку", message.edits[1])
+        self.assertIn("Собираю пост", message.edits[1])
 
 
 if __name__ == "__main__":

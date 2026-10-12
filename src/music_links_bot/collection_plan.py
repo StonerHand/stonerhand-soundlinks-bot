@@ -74,14 +74,23 @@ def collection_issues(items: list[dict]) -> tuple[CollectionIssue, ...]:
 
 
 def collection_check_text(items: list[dict], lang: str) -> str:
+    """One line per kind of problem, listing the affected numbers together."""
     issues = collection_issues(items)
     if not issues:
         return get_text(lang, "collection_check_ok")
-    lines = [get_text(lang, "collection_check_title")]
-    lines.extend(
-        get_text(lang, "collection_check_" + issue.code).format(index=issue.index)
-        for issue in issues
-    )
+    grouped: dict[str, list[int]] = {}
+    for issue in issues:
+        indexes = grouped.setdefault(issue.code, [])
+        if issue.index not in indexes:
+            indexes.append(issue.index)
+    lines = [
+        get_text(lang, "collection_check_" + code).format(
+            items=", ".join(f"№{index}" for index in grouped[code]),
+            index=grouped[code][0],
+        )
+        for code in ("metadata", "duplicate", "cover")
+        if grouped.get(code)
+    ]
     return escape("\n".join(lines))
 
 

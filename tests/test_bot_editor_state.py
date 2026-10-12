@@ -56,7 +56,7 @@ class BotEditorStateTests(unittest.TestCase):
         )
         self.assertEqual(
             draft_status({"preset": "cover"}, self.track, lang="ru"),
-            "С обложкой ✓ · Теги авто · 2 площадки · Авто",
+            "С обложкой · 2 тега · 2 площадки · без текста",
         )
         self.assertEqual(
             draft_status(
@@ -64,7 +64,7 @@ class BotEditorStateTests(unittest.TestCase):
                 self.track,
                 lang="ru",
             ),
-            "Аудио ✓ · Теги авто · Telegram",
+            "Аудиофайл · 2 тега · без текста",
         )
 
     def test_private_draft_rejects_another_user(self) -> None:

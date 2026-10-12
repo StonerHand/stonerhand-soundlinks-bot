@@ -57,7 +57,7 @@ class Release119Journeys(unittest.IsolatedAsyncioTestCase):
             value, ctx(RedisModel()), draft_id="d", settings=True
         )
         self.assertLessEqual(visible_length(text), 4096)
-        self.assertIn("сокращённый вид", text)
+        self.assertIn("В редакторе показано начало", text)
         self.assertEqual(value["prefix"], original)
         self.assertTrue(keyboard.inline_keyboard)
 
@@ -277,11 +277,14 @@ class Release119Journeys(unittest.IsolatedAsyncioTestCase):
             filter_by="published",
             search="Release",
         )
-        self.assertIn("Release 1", text)
-        self.assertNotIn("Release 0", text)
-        self.assertNotIn("Release 2", text)
+        labels = " ".join(b.text for row in keyboard.inline_keyboard for b in row)
+        self.assertIn("Release 1", labels)
+        self.assertNotIn("Release 0", labels)
+        self.assertNotIn("Release 2", labels)
         self.assertEqual(context.application.bot_data["kv_store"].batch_calls, 1)
-        self.assertTrue(all(len(row) <= 2 for row in keyboard.inline_keyboard))
+        # Filters are five short icons in one row; everything else stays wide.
+        self.assertEqual(len(keyboard.inline_keyboard[0]), 5)
+        self.assertTrue(all(len(row) <= 2 for row in keyboard.inline_keyboard[1:]))
 
     async def test_stale_editor_button_refreshes_without_applying_toggle(self):
         from music_links_bot.bot import _handle_editor_action

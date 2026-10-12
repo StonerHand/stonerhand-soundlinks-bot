@@ -209,7 +209,7 @@ class PublicationStateTests(unittest.IsolatedAsyncioTestCase):
         labels = [button.text for row in keyboard.inline_keyboard for button in row]
         self.assertIn("Опубликовать снова", labels)
         self.assertIn("Заменить старый пост", labels)
-        self.assertIn("Открыть старый пост", labels)
+        self.assertIn("🔗 Открыть тот пост", labels)
         self.assertIn("Отмена", labels)
 
 

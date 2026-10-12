@@ -204,8 +204,14 @@ async def deliver_collection_input(message, context, tracks, *, user_id, lang):
             context.application.bot_data, user_id, mode, asdict(tracks[0])
         )
     title = await load_crate_title(context.application.bot_data, user_id)
+    from music_links_bot.bot_crate_handlers import is_publisher
+
     text, keyboard = render_crate(
-        items, lang=lang, title=title, share_query=build_crate_share_query(items)
+        items,
+        lang=lang,
+        title=title,
+        share_query=build_crate_share_query(items),
+        can_publish=is_publisher(context, user_id),
     )
     await message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
     return True

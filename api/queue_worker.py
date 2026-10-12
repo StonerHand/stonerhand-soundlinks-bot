@@ -62,6 +62,12 @@ class handler(BaseHTTPRequestHandler):
         try:
             loop, application = _ensure_application()
             context = SimpleNamespace(application=application, bot=application.bot)
+            kv = getattr(application, "bot_data", {}).get("kv_store")
+            if kv is not None:
+                # Scheduled posts carry the owner's current cover label too.
+                from music_links_bot.brand_settings import load_brand_label
+
+                run_on_loop(loop, load_brand_label(kv), timeout=5)
             published = run_on_loop(
                 loop,
                 process_due_jobs(context),

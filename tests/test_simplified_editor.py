@@ -231,9 +231,8 @@ def test_tag_options_only_offer_relevant_saved_actions():
 
 def test_settings_sections_return_to_their_parent():
     for section, parent in [
-        ("tags", "defaults"),
-        ("artwork", "defaults"),
-        ("appearance", "defaults"),
+        ("tags", "open"),
+        ("appearance", "open"),
         ("layout", "collection"),
         ("grouping", "collection"),
         ("language", "open"),

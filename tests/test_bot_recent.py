@@ -44,8 +44,13 @@ class RecentNavigationTests(unittest.IsolatedAsyncioTestCase):
             lang="ru",
         )
 
-        self.assertIn("Draft Artist", drafts_text)
-        self.assertNotIn("Published Artist", drafts_text)
+        # Posts are the buttons themselves: one line each, no duplicate list.
+        drafts_labels = " ".join(
+            b.text for row in drafts_keyboard.inline_keyboard for b in row
+        )
+        self.assertIn("📝 Draft Artist", drafts_labels)
+        self.assertNotIn("Published Artist", drafts_labels)
+        self.assertNotIn("Draft Artist", drafts_text)
         self.assertEqual(
             next(
                 b.callback_data
@@ -76,7 +81,7 @@ class RecentNavigationTests(unittest.IsolatedAsyncioTestCase):
             load_draft=load_draft,
         )
 
-        self.assertIn("Черновиков пока нет", text)
+        self.assertIn("Здесь будут твои посты", text)
         self.assertIn(
             "➕ Новый пост", [b.text for row in keyboard.inline_keyboard for b in row]
         )

@@ -125,23 +125,31 @@ def remember_draft(session, draft_id: str) -> None:
 
 
 def draft_status(draft: dict, track: TrackMatch, *, lang: str) -> str:
+    """One plain line: look · tags · platforms · own text."""
+    from music_links_bot.publication_view import resolve_draft_hashtags
+
     preset = normalize_preset(draft.get("preset"), draft)
-    preset_label = get_text(
+    look = get_text(
         lang,
-        f"ed_preset_{preset}",
+        "ed_status_custom_cover"
+        if draft.get("custom_cover_file_id")
+        else "ed_look_story"
+        if preset == "longread"
+        else "ed_look_cover",
     )
-    preset_name = preset_label.split("·", 1)[-1].strip()
-    if draft.get("custom_cover_file_id"):
-        preset_name = get_text(lang, "ed_status_custom_cover")
-    custom_tags = draft.get("custom_tags")
-    if not draft.get("hashtags", True):
-        tags = get_text(lang, "ed_status_tags_none")
-    elif isinstance(custom_tags, list) and custom_tags:
-        tags = get_text(lang, "ed_status_tags_custom").format(count=len(custom_tags))
-    else:
-        tags = get_text(lang, "ed_status_tags_auto")
+    tag_count = len((resolve_draft_hashtags(draft, track) or "").split())
+    tags = plural(
+        tag_count,
+        lang=lang,
+        ru=("тег", "тега", "тегов"),
+        en=("tag", "tags"),
+        zero=get_text(lang, "ed_status_tags_none"),
+    )
+    text = get_text(
+        lang, "ed_status_text_on" if draft.get("quote") else "ed_status_text_off"
+    )
     if draft.get("source_audio_file_id"):
-        return get_text(lang, "ed_status_audio").format(tags=tags)
+        return " · ".join((get_text(lang, "ed_status_audio_short"), tags, text))
     selected = draft.get("platforms")
     service_count = (
         len(selected)
@@ -155,18 +163,30 @@ def draft_status(draft: dict, track: TrackMatch, *, lang: str) -> str:
         )
     )
     services = _platform_count_label(service_count, lang=lang)
-    delivery = get_text(
-        lang,
-        "ed_status_delivery_classic"
-        if draft.get("delivery_mode") == "classic"
-        else "ed_status_delivery_auto",
-    )
-    return get_text(lang, "ed_status").format(
-        preset=preset_name,
-        tags=tags,
-        services=services,
-        delivery=delivery,
-    )
+    return " · ".join((look, tags, services, text))
+
+
+def plural(
+    count: int,
+    *,
+    lang: str,
+    ru: tuple[str, str, str],
+    en: tuple[str, str],
+    zero: str | None = None,
+) -> str:
+    """ "2 тега", "5 тегов", "1 tag"; ``zero`` replaces "0 …" when given."""
+    count = max(0, int(count))
+    if count == 0 and zero is not None:
+        return zero
+    if lang == "en":
+        return f"{count} {en[0] if count == 1 else en[1]}"
+    if count % 10 == 1 and count % 100 != 11:
+        word = ru[0]
+    elif 2 <= count % 10 <= 4 and not 12 <= count % 100 <= 14:
+        word = ru[1]
+    else:
+        word = ru[2]
+    return f"{count} {word}"
 
 
 def _platform_count_label(count: int, *, lang: str) -> str:
@@ -240,7 +260,7 @@ def apply_editor_shortcut(
     if action in {"z0", "z1", "z2"}:
         remember_setting_state(draft)
         select_preset(draft, int(action[1]))
-        return "zs"
+        return "ap"
     if len(action) >= 2 and action.startswith("l") and action[1:].isdigit():
         remember_setting_state(draft)
         toggle_platform(draft, track, list(platform_order), int(action[1:]))

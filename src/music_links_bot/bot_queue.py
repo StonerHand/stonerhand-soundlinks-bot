@@ -7,8 +7,8 @@ from telegram import InlineKeyboardMarkup
 from telegram.constants import ParseMode
 from telegram.error import BadRequest
 
-from music_links_bot.bot_builder import format_schedule_datetime
 from music_links_bot.bot_runtime import CallbackAction, encode_callback
+from music_links_bot.human_time import human_datetime
 from music_links_bot.i18n import get_text, resolve_lang
 from music_links_bot.publish_queue import (
     JOB_DELIVERING,
@@ -87,8 +87,10 @@ async def render_queue(
             if part
         ) or get_text(lang, "queue_unknown")
         try:
-            when = format_schedule_datetime(
-                int(job.get("publish_at") or 0), timezone_name=timezone_name
+            when = human_datetime(
+                int(job.get("publish_at") or 0),
+                timezone_name=timezone_name,
+                lang=lang,
             )
         except (TypeError, ValueError, OverflowError):
             when = "—"
@@ -220,7 +222,7 @@ async def _confirm_queue_action(
             ],
             [
                 InlineKeyboardButton(
-                    get_text(lang, "back"),
+                    get_text(lang, "queue_back"),
                     callback_data=encode_callback("queue", "open", str(page)),
                 )
             ],

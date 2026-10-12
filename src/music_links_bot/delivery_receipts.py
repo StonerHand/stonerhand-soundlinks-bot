@@ -126,6 +126,16 @@ async def finish_delivery(context, intent, *, sent, confirmed_not_sent):
         receipts[key] = finish(receipts.get(key))
 
 
+async def forget_delivery(context, draft_id, target):
+    """Allow a new delivery after the previous one was deliberately removed."""
+    key = receipt_key(draft_id, target)
+    kv = context.application.bot_data.get("kv_store")
+    if kv:
+        await kv.delete(key)
+    else:
+        context.application.bot_data.get("delivery_receipts", {}).pop(key, None)
+
+
 async def load_delivery(context, draft_id, target):
     key = receipt_key(draft_id, target)
     kv = context.application.bot_data.get("kv_store")

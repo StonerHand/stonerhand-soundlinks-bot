@@ -31,6 +31,15 @@ PANEL_TTL = 180 * 24 * 3600
 TOKEN_RE = re.compile(r"^[a-f0-9]{32}$")
 
 
+def copy_link_button(track, *, lang):
+    link = track_share_url(track)
+    if not link or telegram_text_length(link) > 256:
+        return None
+    return InlineKeyboardButton(
+        get_text(lang, "copy_release_link"), copy_text=CopyTextButton(link)
+    )
+
+
 def copy_rows(track, *, lang):
     label = f"{track.artist} — {track.title}" if track.artist else track.title
     link = track_share_url(track)
@@ -94,7 +103,15 @@ async def load_panel(context, token):
         return None
 
 
-def panel_view(track, *, lang, close=False):
+def edit_in_bot_url(context, token: str) -> str | None:
+    """Deep link that opens this release in the private editor."""
+    username = getattr(getattr(context, "bot", None), "username", None)
+    if not username or not TOKEN_RE.fullmatch(token or ""):
+        return None
+    return f"https://t.me/{username}?start=edit_{token}"
+
+
+def panel_view(track, *, lang, close=False, edit_url=None):
     keyboard = _build_link_keyboard(
         track.links,
         release_page_url=track.page_url,
@@ -106,6 +123,10 @@ def panel_view(track, *, lang, close=False):
         *[list(row) for row in keyboard.inline_keyboard],
         *copy_rows(track, lang=lang),
     ]
+    if edit_url:
+        rows.append(
+            [InlineKeyboardButton(get_text(lang, "release_edit_in_bot"), url=edit_url)]
+        )
     if close:
         rows.append(
             [
@@ -124,16 +145,34 @@ async def start_release_panel(update, context):
     if message is None or message.chat.type != "private":
         return False
     args = getattr(context, "args", None) or []
-    if len(args) != 1 or not args[0].startswith("release_"):
+    if len(args) != 1 or not args[0].startswith(("release_", "edit_")):
         return False
     lang = resolve_lang(
         update.effective_user.language_code if update.effective_user else None
     )
-    track = await load_panel(context, args[0][8:])
+    editing = args[0].startswith("edit_")
+    token = args[0].split("_", 1)[1]
+    track = await load_panel(context, token)
     if track is None:
         await message.reply_text(get_text(lang, "release_panel_expired"))
+    elif editing:
+        # Opened from "✏️ Изменить в боте" in a group: a fresh private draft.
+        from music_links_bot.bot import _send_track_draft
+
+        user = update.effective_user
+        await _send_track_draft(
+            message,
+            context,
+            track,
+            user_prefix="",
+            lang=lang,
+            user_id=user.id if user else message.chat_id,
+            search_query="",
+        )
     else:
-        text, keyboard = panel_view(track, lang=lang)
+        text, keyboard = panel_view(
+            track, lang=lang, edit_url=edit_in_bot_url(context, token)
+        )
         await message.reply_text(
             text,
             parse_mode="HTML",
@@ -173,7 +212,9 @@ async def release_panel_callback(update, context):
             url=f"https://t.me/{context.bot.username}?start=release_{token}"
         )
         return
-    text, keyboard = panel_view(track, lang=lang, close=True)
+    text, keyboard = panel_view(
+        track, lang=lang, close=True, edit_url=edit_in_bot_url(context, token)
+    )
     data = {
         "chat_id": message.chat_id,
         "text": text,

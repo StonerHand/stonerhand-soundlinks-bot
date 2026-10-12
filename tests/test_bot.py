@@ -623,7 +623,7 @@ class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 2)
         self.assertEqual(context.bot.edited_messages, [])
         self.assertEqual(context.bot.deleted_messages[0]["message_id"], 1000)
-        self.assertIn("Как пользоваться", message.replies[-1])
+        self.assertIn("Как сделать пост", message.replies[-1])
 
     async def test_stale_home_delete_failure_does_not_hide_new_reply(self) -> None:
         message = PrivateMessageStub()
@@ -979,7 +979,7 @@ class BotKeyboardTests(unittest.TestCase):
             keyboard.inline_keyboard[0][0].callback_data,
             "v2|menu|create",
         )
-        self.assertEqual(keyboard.inline_keyboard[1][0].text, "← Главное меню")
+        self.assertEqual(keyboard.inline_keyboard[1][0].text, "← Меню")
         self.assertEqual(keyboard.inline_keyboard[1][0].callback_data, "v2|menu|start")
         self.assertEqual(len(keyboard.inline_keyboard), 2)
 
@@ -1141,15 +1141,21 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         rows = keyboard.inline_keyboard
+        # Help is one place: three topics, one per row, then the way home.
         self.assertEqual(
-            [button.callback_data for button in rows[0]],
-            ["v2|menu|guide", "v2|menu|platforms"],
+            [[button.callback_data for button in row] for row in rows],
+            [
+                ["v2|menu|help"],
+                ["v2|menu|guide"],
+                ["v2|menu|platforms"],
+                ["v2|menu|start"],
+            ],
         )
+        topic = _build_section_keyboard("StonerHandBot", lang="ru", active="guide")
         self.assertEqual(
-            [button.callback_data for button in rows[1]],
-            ["v2|menu|demo", "v2|menu|onboard1"],
+            [row[0].callback_data for row in topic.inline_keyboard],
+            ["v2|menu|help", "v2|menu|platforms", "v2|menu|start"],
         )
-        self.assertEqual(rows[-1][0].callback_data, "v2|menu|start")
 
     def test_onboarding_always_has_a_back_button(self) -> None:
         first = _build_onboarding_keyboard(1, "ru").inline_keyboard[0]
@@ -1176,9 +1182,13 @@ class BotKeyboardTests(unittest.TestCase):
         labels = [button.text for row in keyboard.inline_keyboard for button in row]
         self.assertIn("↓ Ниже", labels)
         self.assertIn("✕ Удалить", labels)
-        self.assertIn("Очистить", labels)
+        # Clearing is rare and destructive: it lives behind "⋯ Ещё".
+        self.assertIn("⋯ Ещё", labels)
+        self.assertNotIn("🗑 Очистить подборку", labels)
+        # Items without working links block sending and say what to fix.
+        self.assertIn("⚠️ Исправить №1, №2", labels)
         self.assertTrue(any(label.startswith("✓ 1 · Sleep") for label in labels))
-        self.assertEqual(keyboard.inline_keyboard[-1][0].text, "← Главное меню")
+        self.assertEqual(keyboard.inline_keyboard[-1][0].text, "← Меню")
         self.assertEqual(keyboard.inline_keyboard[-1][0].callback_data, "v2|menu|start")
 
     def test_crate_clear_and_card_delete_are_confirmed(self) -> None:
@@ -1208,7 +1218,7 @@ class BotKeyboardTests(unittest.TestCase):
     def test_empty_crate_can_restore_a_recent_clear(self) -> None:
         _, keyboard = _render_bot_crate([], lang="ru", can_undo=True)
 
-        self.assertEqual(keyboard.inline_keyboard[1][0].text, "Вернуть удалённый")
+        self.assertEqual(keyboard.inline_keyboard[1][0].text, "↩️ Вернуть удалённое")
         self.assertEqual(
             keyboard.inline_keyboard[1][0].callback_data,
             "v2|crate|undo",
@@ -1220,19 +1230,39 @@ class BotKeyboardTests(unittest.TestCase):
             lang="ru",
             crate_count=3,
             is_admin=True,
-            show_tour=True,
+            queue_count=2,
         )
 
         rows = keyboard.inline_keyboard
+        # The bot already waits for a link: no permanent "new post" button.
+        self.assertEqual(
+            [[button.text for button in row] for row in rows],
+            [
+                ["🎶 Подборка · 3"],
+                ["🕒 В очереди · 2"],
+                ["📚 Мои посты", "⚙️ Настройки"],
+            ],
+        )
+
+    def test_home_hides_an_empty_queue_and_greets_newcomers_with_creation(
+        self,
+    ) -> None:
+        returning = _build_start_keyboard("StonerHandBot", lang="ru", is_admin=True)
+        self.assertEqual(
+            [[button.text for button in row] for row in returning.inline_keyboard],
+            [["📚 Мои посты", "⚙️ Настройки"]],
+        )
+        newcomer = _build_start_keyboard(
+            "StonerHandBot",
+            lang="ru",
+            first_visit=True,
+            show_example=True,
+            show_tour=True,
+        )
+        rows = newcomer.inline_keyboard
         self.assertEqual(rows[0][0].text, "➕ Новый пост")
         self.assertEqual(rows[0][0].style, "primary")
-        self.assertEqual(rows[2][0].text, "📚 Мои посты")
-        self.assertIsNone(rows[1][0].style)
-        self.assertEqual(rows[2][1].text, "⚙️ Настройки")
-        self.assertEqual(rows[3][0].text, "Очередь публикаций")
-        self.assertEqual(rows[4][0].text, "Как это работает")
-        self.assertIsNone(rows[3][0].style)
-        self.assertEqual(len(rows), 5)
+        self.assertEqual(rows[-1][0].text, "Как это работает")
 
     def test_home_keeps_new_search_primary_when_a_card_can_be_restored(self) -> None:
         keyboard = _build_start_keyboard(
@@ -1242,10 +1272,9 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(rows[0][0].text, "➕ Новый пост")
+        # Returning with an unfinished post: continuing it is the main action.
+        self.assertEqual(rows[0][0].text, "Продолжить пост")
         self.assertEqual(rows[0][0].style, "primary")
-        self.assertEqual(rows[1][0].text, "Продолжить пост")
-        self.assertIsNone(rows[1][0].style)
 
     def test_home_text_is_personal_and_escapes_telegram_html(self) -> None:
         text = _build_home_text(
@@ -1255,11 +1284,11 @@ class BotKeyboardTests(unittest.TestCase):
             is_admin=True,
         )
 
-        self.assertIn("StonerHand, &lt;Артём&gt;", text)
+        self.assertIn("Привет, &lt;Артём&gt;", text)
         self.assertNotIn("Подборка · 4/10", text)
         self.assertIn("ссылку", text)
-        self.assertIn("<code>артист — название</code>", text)
-        self.assertIn("подводка", text)
+        self.assertIn("<code>артист — трек</code>", text)
+        self.assertIn("подборка", text)
 
     def test_first_visit_home_explains_every_supported_input_shape(self) -> None:
         text = _build_home_text(
@@ -1270,13 +1299,15 @@ class BotKeyboardTests(unittest.TestCase):
 
         self.assertIn("Музыка, которой хочется делиться", text)
         self.assertIn("ссылку", text)
-        self.assertIn("<code>артист — название</code>", text)
+        self.assertIn("<code>артист — трек</code>", text)
         self.assertIn("Несколько ссылок", text)
-        self.assertIn("подводка", text)
+        self.assertIn("Свой текст над ссылкой", text)
 
     def test_menu_text_uses_compact_html_headings(self) -> None:
         self.assertTrue(_menu_text("menu:start").startswith("🎧 <b>"))
-        self.assertTrue(_menu_text("menu:help").startswith("<b>Как пользоваться</b>"))
+        self.assertTrue(
+            _menu_text("menu:help").startswith("❓ <b>Как сделать пост</b>")
+        )
 
     def test_menu_sections_use_semantic_telegram_formatting(self) -> None:
         for menu in (
@@ -1291,6 +1322,8 @@ class BotKeyboardTests(unittest.TestCase):
                 self.assertIn("<b>", text)
                 if menu != "menu:help":
                     self.assertIn("<i>", text)
+                if menu not in {"menu:help", "menu:more"}:
+                    # The help hub is one line; the topics carry the detail.
                     self.assertIn("<blockquote>", text)
         for menu in ("menu:help", "menu:platforms", "menu:demo"):
             with self.subTest(code_menu=menu):
@@ -2329,11 +2362,11 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(message.replies), 1)
         self.assertIn("Релиз не найден", message.replies[0])
-        self.assertIn("<code>артист — название</code>", message.replies[0])
+        self.assertIn("<code>артист — трек</code>", message.replies[0])
         self.assertIn("<blockquote>привет</blockquote>", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "Изменить запрос")
-        self.assertEqual(keyboard[-1][0].text, "← Главное меню")
+        self.assertEqual(keyboard[-1][0].text, "← Меню")
         self.assertEqual(keyboard[0][0].switch_inline_query_current_chat, "привет")
         self.assertEqual(keyboard[1][0].text, "Отправить прямую ссылку")
         self.assertEqual(len(keyboard), 3)
@@ -2543,7 +2576,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("<blockquote>", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         labels = [button.text for row in keyboard for button in row]
-        self.assertEqual(labels, ["Открыть подборку", "Порядок", "↗️ Поделиться"])
+        self.assertEqual(labels, ["🎶 Открыть подборку", "↗️ Поделиться"])
         share_query = keyboard[-1][0].switch_inline_query
         self.assertEqual(len(parse_share_query(share_query or "") or []), 3)
 
@@ -2683,9 +2716,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("#stonerhand #track", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(keyboard[0][0].text, "✏️ Изменить")
-        self.assertEqual(keyboard[0][1].text, "➕ В подборку")
-        self.assertEqual(keyboard[1][0].text, "👁 Как выглядит")
-        self.assertEqual(keyboard[-1][0].text, "↗️ Отправить…")
+        self.assertEqual(keyboard[0][1].text, "🎶 В подборку")
+        self.assertEqual(keyboard[1][0].text, "📩 Себе")
+        self.assertEqual(keyboard[-1][0].text, "↗️ Поделиться")
         preview_options = message.reply_kwargs[0]["link_preview_options"]
         self.assertTrue(preview_options.prefer_large_media)
         self.assertFalse(bool(preview_options.prefer_small_media))

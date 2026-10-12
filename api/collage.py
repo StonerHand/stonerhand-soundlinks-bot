@@ -25,6 +25,7 @@ from music_links_bot.collection_collage import (
 )
 from music_links_bot.constants import HTTP_USER_AGENT
 from music_links_bot.cover_style import (
+    MAX_BRAND_LABEL_LENGTH,
     brand_label,
     photo_branding_enabled,
     signature_cache_key,
@@ -49,11 +50,13 @@ class handler(BaseHTTPRequestHandler):
             return
 
         signature = query.get("s", [""])[0]
+        label_override = query.get("l", [""])[0][:MAX_BRAND_LABEL_LENGTH] or None
         urls = decode_collage_payload(
             query.get("p", [""])[0],
             signature,
             signing_secret=os.getenv("BOT_TOKEN", "").strip(),
             allow_single=True,
+            label=label_override,
         )
         if urls is None:
             self.send_error(HTTPStatus.FORBIDDEN)
@@ -69,11 +72,12 @@ class handler(BaseHTTPRequestHandler):
 
         with ThreadPoolExecutor(max_workers=min(2, len(urls))) as executor:
             images = [image for image in executor.map(_fetch_artwork, urls) if image]
+        label = label_override or brand_label()
         if len(images) == 1 and photo_branding_enabled():
-            collage = compose_cover(images[0], label=brand_label(), size=1200)
+            collage = compose_cover(images[0], label=label, size=1200)
         elif len(images) >= 2:
             collage = compose_collection_collage(
-                images, label=brand_label() if photo_branding_enabled() else None
+                images, label=label if photo_branding_enabled() else None
             )
         else:
             collage = None

@@ -15,8 +15,13 @@ from music_links_bot.bot_admin import stats_text
 from music_links_bot.bot_builder import active_card_label
 from music_links_bot.bot_crate import load_crate
 from music_links_bot.bot_preferences import preferences_view
-from music_links_bot.bot_recent import render_drafts_view, render_recent_view
-from music_links_bot.bot_runtime import BotRuntime, CallbackAction, UserSession
+from music_links_bot.bot_recent import render_drafts_view, render_search_view
+from music_links_bot.bot_runtime import (
+    BotRuntime,
+    CallbackAction,
+    UserSession,
+    encode_callback,
+)
 from music_links_bot.bot_storage import load_draft
 from music_links_bot.bot_ui import (
     build_create_keyboard,
@@ -27,8 +32,9 @@ from music_links_bot.bot_ui import (
     build_start_keyboard,
 )
 from music_links_bot.i18n import get_text, resolve_lang
-from music_links_bot.keyboards import _channel_button
+from music_links_bot.keyboards import CHANNEL_USERNAME
 from music_links_bot.privacy import delete_user_data
+from music_links_bot.telegram_buttons import button as InlineKeyboardButton
 
 LOGGER = logging.getLogger(__name__)
 
@@ -138,6 +144,7 @@ async def home_view(query, context, *, lang: str) -> tuple[str, InlineKeyboardMa
     active_draft_id, active_draft_label = await _active_home_card(
         context, runtime, session, lang=lang
     )
+    pending = await queue_count(context, is_admin)
     return (
         build_home_text(
             lang=lang,
@@ -154,6 +161,8 @@ async def home_view(query, context, *, lang: str) -> tuple[str, InlineKeyboardMa
             show_example=not session.onboarding_seen and not active_draft_id,
             active_draft_id=active_draft_id,
             active_draft_label=active_draft_label,
+            queue_count=pending,
+            first_visit=not session.onboarding_seen and not active_draft_id,
         ),
     )
 
@@ -179,6 +188,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         context, runtime, session, lang=lang
     )
     first_visit = message.chat.type == "private" and not session.welcome_seen
+    pending = await queue_count(context, is_admin)
     if first_visit:
         session.welcome_seen = await _send_first_visit_demo(message, lang=lang)
     sent = await message.reply_text(
@@ -201,6 +211,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             show_example=not session.onboarding_seen and not session.active_draft_id,
             active_draft_id=active_draft_id,
             active_draft_label=active_draft_label,
+            queue_count=pending,
+            first_visit=not session.onboarding_seen and not session.active_draft_id,
         ),
     )
     if message.chat.type == "private":
@@ -303,7 +315,13 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if message is None or user is None:
         return
     session = await runtime_for(context).get_session(user.id, lang=update_lang(update))
-    text, keyboard = preferences_view(session, lang=update_lang(update))
+    text, keyboard = preferences_view(
+        session,
+        lang=update_lang(update),
+        is_admin=_is_owner(
+            context, update.effective_user.id if update.effective_user else 0
+        ),
+    )
     await message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
 
@@ -355,24 +373,101 @@ async def dispatch_privacy_action(query, context, action: CallbackAction) -> Non
 
 
 async def channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    del context
-    if update.message is not None:
-        await update.message.reply_text(
-            "StonerHand рядом",
-            reply_markup=InlineKeyboardMarkup([[_channel_button()]]),
+    """Check, in plain words, what the bot may do in a channel or group."""
+    message = update.message
+    if message is None:
+        return
+    lang = update_lang(update)
+    user_id = update.effective_user.id if update.effective_user else 0
+    if message.chat.type != "private":
+        target: int | str | None = message.chat_id
+    elif _is_owner(context, user_id):
+        target = (
+            context.application.bot_data.get("publish_chat_id")
+            or f"@{CHANNEL_USERNAME}"
         )
+    else:
+        target = None
+    rows = [
+        [
+            InlineKeyboardButton(
+                get_text(lang, "tab_guide"),
+                callback_data=encode_callback("menu", "guide"),
+            )
+        ]
+    ]
+    if target is None:
+        await message.reply_text(
+            get_text(lang, "channel_check_howto"),
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(rows),
+        )
+        return
+    from music_links_bot.chat_access import check_publish_access
+
+    # Always a fresh answer: the owner just changed the rights and asks again.
+    context.application.bot_data.setdefault("publish_access_cache", {}).pop(
+        str(target), None
+    )
+    access = await check_publish_access(context, target)
+    lines = [get_text(lang, "channel_check_title").format(target=escape(str(target)))]
+    if not access.checked:
+        lines.append(get_text(lang, "channel_check_unknown"))
+    else:
+        lines.append(
+            get_text(
+                lang,
+                "channel_check_post_ok" if access.allowed else "channel_check_post_no",
+            )
+        )
+        lines.append(
+            get_text(
+                lang,
+                "channel_check_delete_ok"
+                if access.can_delete
+                else "channel_check_delete_no",
+            )
+        )
+        lines.append("")
+        lines.append(
+            get_text(
+                lang,
+                "channel_check_ready"
+                if access.allowed and access.can_delete
+                else "channel_check_fix",
+            )
+        )
+    await message.reply_text(
+        "\n".join(lines),
+        parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup(rows),
+    )
 
 
 async def recent_view(
     query, context: ContextTypes.DEFAULT_TYPE, *, lang: str, page: int = 0
 ) -> tuple[str, InlineKeyboardMarkup]:
+    """Search history now lives on the library search screen."""
+    del page
     user_id = query.from_user.id if query.from_user else 0
-    return await render_recent_view(
-        context,
-        user_id=user_id,
-        lang=lang,
-        page=page,
-    )
+    return await render_search_view(context, user_id=user_id, lang=lang)
+
+
+def _is_owner(context, user_id: int) -> bool:
+    admin_chat_id = context.application.bot_data.get("admin_chat_id")
+    return admin_chat_id is not None and admin_chat_id == user_id
+
+
+async def queue_count(context: ContextTypes.DEFAULT_TYPE, is_admin: bool) -> int:
+    """Pending channel posts, shown on the home screen only when there are some."""
+    if not is_admin:
+        return 0
+    from music_links_bot.publish_queue import QueueStorageError, load_jobs
+
+    try:
+        return len(await load_jobs(context))
+    except QueueStorageError:
+        return 0
 
 
 async def drafts_view(
@@ -466,6 +561,13 @@ async def dispatch_menu_action(query, context, action: CallbackAction) -> None:
                 "created_at": int(time.time()),
                 "prompt_message_id": prompt.message_id,
             }
+            await runtime_for(context).save_session(session)
+            text, keyboard = await render_search_view(
+                context, user_id=user_id, lang=lang
+            )
+            await query.answer()
+            await safe_edit(query, text, keyboard)
+            return
         elif action.action == "postfilter":
             if action.payload in {"all", "draft", "scheduled", "published", "saved"}:
                 session.draft_filter = action.payload
@@ -487,7 +589,11 @@ async def dispatch_menu_action(query, context, action: CallbackAction) -> None:
         )
     elif action.action == "more":
         session = await runtime_for(context).get_session(query.from_user.id, lang=lang)
-        text, keyboard = preferences_view(session, lang=lang)
+        text, keyboard = preferences_view(
+            session,
+            lang=lang,
+            is_admin=_is_owner(context, query.from_user.id if query.from_user else 0),
+        )
     elif action.action == "privacy":
         text, keyboard = (
             get_text(lang, "privacy_title"),
@@ -528,7 +634,11 @@ async def legacy_menu_callback(
         text, keyboard = await home_view(query, context, lang=lang)
     elif menu_key == MENU_MORE:
         session = await runtime_for(context).get_session(query.from_user.id, lang=lang)
-        text, keyboard = preferences_view(session, lang=lang)
+        text, keyboard = preferences_view(
+            session,
+            lang=lang,
+            is_admin=_is_owner(context, query.from_user.id if query.from_user else 0),
+        )
     elif menu_key == MENU_DRAFTS:
         text, keyboard = await drafts_view(query, context, lang=lang)
     elif menu_key == MENU_RECENT:

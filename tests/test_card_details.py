@@ -346,10 +346,12 @@ def test_clean_default_preserves_saved_native_setting_old_drafts_and_longreads()
     assert UserSession(user_id=7).default_artwork == "clean"
     with presentation_context():
         assert new_track_draft(track, chat_id=7, lang="ru")["as_photo"]
+    # The old "platform preview" default never changed what was published;
+    # it is retired, so a saved value no longer turns the signed cover off.
     saved = UserSession.from_dict({"user_id": 7, "default_artwork": "native"})
     draft = new_track_draft(track, chat_id=7, lang="ru")
     apply_preferences(draft, saved)
-    assert not draft["as_photo"]
+    assert draft["as_photo"]
     old = {"type": "track", "item": asdict(track), "as_photo": False}
     assert not normalize_track_draft(old)["as_photo"]
     draft.update(publication_mode="longread", as_photo=False)

@@ -13,8 +13,23 @@ def photo_branding_enabled() -> bool:
     return os.getenv("BRAND_PHOTO_FRAME", "1").strip().casefold() in _TRUE
 
 
+# Set by the bot from Redis (owner edits it in Settings); wins over BRAND_LABEL.
+_LABEL_OVERRIDE: str | None = None
+MAX_BRAND_LABEL_LENGTH = 40
+
+
+def set_brand_label_override(value: str | None) -> None:
+    global _LABEL_OVERRIDE
+    cleaned = " ".join(str(value or "").split())[:MAX_BRAND_LABEL_LENGTH]
+    _LABEL_OVERRIDE = cleaned or None
+
+
+def brand_label_override() -> str | None:
+    return _LABEL_OVERRIDE
+
+
 def brand_label(default: str = "@stonerhand") -> str:
-    return os.getenv("BRAND_LABEL", "").strip() or default
+    return _LABEL_OVERRIDE or os.getenv("BRAND_LABEL", "").strip() or default
 
 
 def signature_cache_key() -> str:

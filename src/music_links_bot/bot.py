@@ -33,7 +33,6 @@ from music_links_bot.bot_builder import (
     active_card_label,
     builder_screen,
     fit_telegram_html,
-    format_schedule_datetime,
     schedule_timestamp,
 )
 from music_links_bot.bot_crate import (
@@ -165,7 +164,6 @@ from music_links_bot.keyboards import (
     _build_collection_keyboard,
     _build_link_keyboard,
     _build_link_preview_options,
-    _channel_button,
     _get_platform_order,
     _select_preview_url,
     _should_include_channel_button,
@@ -430,6 +428,15 @@ async def _send_track_draft(
     draft["crate_count"] = len(crate_items)
 
     await _store_draft(context, draft_id, draft)
+    from music_links_bot.bot_quick_publish import try_quick_publish
+
+    if await try_quick_publish(
+        message, context, draft_id=draft_id, draft=draft, track=track, user_id=user_id
+    ):
+        await _record_recent_item(
+            context, user_id, track, track_share_url(track) or track.page_url or ""
+        )
+        return
     text, keyboard = _render_track_draft(draft, context, draft_id=draft_id)
     await _reply_with_track(
         message,
@@ -1195,10 +1202,12 @@ async def _handle_editor_action(query, context, action: str, draft_id: str) -> N
         track=TrackMatch(**draft["item"]),
         schedule_at=schedule_at,
     )
+    from music_links_bot.bot_publish_undo import handle_unpublish
     from music_links_bot.bot_workspace import handle_workspace_action
 
     for handler in (
         handle_workspace_action,
+        handle_unpublish,
         _apply_last_editor_template,
         _reject_failed_editor_preflight,
         _handle_release_setting,
@@ -1302,7 +1311,9 @@ async def _schedule_editor_draft(
     draft["scheduled_at"] = publish_at
     if draft_id:
         await _store_draft(context, draft_id, draft)
-    date = format_schedule_datetime(publish_at, timezone_name=timezone_name)
+    from music_links_bot.human_time import human_datetime
+
+    date = human_datetime(publish_at, timezone_name=timezone_name, lang=lang)
     await query.answer(
         get_text(lang, "schedule_done").format(date=date), show_alert=True
     )
@@ -1495,7 +1506,9 @@ async def _finish_editor_publish(request: EditorActionRequest, published) -> Non
             message=published,
             target=target,
         )
-        request.draft["published_at"] = int(time.time())
+        from music_links_bot.bot_publish_undo import remember_publication
+
+        remember_publication(request.draft, published, target)
         await _store_draft(request.context, request.draft_id, request.draft)
         await _show_editor_publish_success(request, published)
         if request.user_id:
@@ -1509,7 +1522,7 @@ async def _finish_editor_publish(request: EditorActionRequest, published) -> Non
     await request.query.answer(
         get_text(
             request.lang,
-            "ed_published" if published else "ed_publish_failed",
+            "ed_published_toast" if published else "ed_publish_failed",
         ),
         show_alert=not bool(published),
     )
@@ -1524,37 +1537,24 @@ async def _show_editor_publish_success(
     published_link = (
         getattr(published, "link", None) if not isinstance(published, bool) else None
     )
-    secondary_row: list[InlineKeyboardButton]
-    if isinstance(published_link, str) and published_link.startswith("http"):
-        secondary_row = [
-            InlineKeyboardButton(
-                get_text(request.lang, "ed_open_publication"),
-                url=published_link,
-                style="success",
-            )
-        ]
-    else:
-        secondary_row = [_channel_button()]
-    keyboard = InlineKeyboardMarkup(
-        [
-            secondary_row,
-            [
-                InlineKeyboardButton(
-                    get_text(request.lang, "ed_create_more"),
-                    callback_data=encode_callback("menu", "create"),
-                )
-            ],
-        ]
+    from music_links_bot.bot_ui import build_publish_success_keyboard
+    from music_links_bot.human_time import human_datetime
+
+    keyboard = build_publish_success_keyboard(
+        request.draft_id,
+        lang=request.lang,
+        link=published_link
+        if isinstance(published_link, str) and published_link.startswith("http")
+        else None,
     )
     target = str(
         request.context.application.bot_data.get("publish_chat_id")
         or f"@{CHANNEL_USERNAME}"
     )
-    moment = format_schedule_datetime(
-        int(time.time()),
-        timezone_name=str(
-            request.context.application.bot_data.get("timezone_name") or "Europe/Moscow"
-        ),
+    moment = human_datetime(
+        time.time(),
+        timezone_name=request.context.application.bot_data.get("timezone_name"),
+        lang=request.lang,
     )
     success_text = (
         _editor_success_text(request, "ed_published")
@@ -1574,8 +1574,8 @@ async def _show_editor_publish_success(
 
 async def _show_editor_delivery_success(request: EditorActionRequest) -> None:
     """Replace the busy editor with a small, terminal success state."""
-    share_url = track_share_url(request.track)
-    share_query = build_share_query([share_url] if share_url else [])
+    from music_links_bot.bot_ui import draft_share_query
+
     await _edit_editor_message(
         request.query,
         request.context,
@@ -1583,7 +1583,7 @@ async def _show_editor_delivery_success(request: EditorActionRequest) -> None:
         _editor_success_text(request, "ed_post_ready"),
         _build_delivery_success_keyboard(
             lang=request.lang,
-            share_query=share_query,
+            share_query=draft_share_query(request.draft_id),
         ),
     )
 
@@ -2070,12 +2070,6 @@ async def _send_track_matches(
                         get_text(lang, "crate_view"),
                         callback_data=encode_callback("crate", "open"),
                         style="primary",
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        get_text(lang, "crate_reorder"),
-                        callback_data=encode_callback("crate", "open"),
                     )
                 ],
             ]

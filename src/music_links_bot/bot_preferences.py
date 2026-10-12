@@ -46,11 +46,21 @@ class LocalizedApplication(Application):
                     and isinstance(runtime, BotRuntime)
                     and runtime.kv is kv
                 ):
-                    # The privacy fence and the session are read in one round
-                    # trip instead of two at the start of every update.
-                    generation, session_raw = await batch(
-                        [generation_key(user.id), runtime.session_key(user.id)]
+                    # The privacy fence, the session and the owner's cover
+                    # label are read in one round trip at the start of an update.
+                    from music_links_bot.brand_settings import (
+                        BRAND_LABEL_KEY,
+                        apply_stored_label,
                     )
+
+                    generation, session_raw, label = await batch(
+                        [
+                            generation_key(user.id),
+                            runtime.session_key(user.id),
+                            BRAND_LABEL_KEY,
+                        ]
+                    )
+                    apply_stored_label(label)
                     scope_kwargs["generation"] = generation
                     session_kwargs["prefetched_raw"] = session_raw
                 async with user_state_scope(kv, user.id if user else 0, **scope_kwargs):
@@ -87,17 +97,12 @@ def apply_preferences(draft: dict, session: UserSession) -> None:
         draft["hashtags"] = session.default_hashtags == "auto"
         draft.pop("custom_tags", None)
     if (
-        session.default_artwork == "clean"
-        and draft.get("item", {}).get("kind") in {"song", "album"}
+        draft.get("item", {}).get("kind") in {"song", "album"}
         and draft.get("publication_mode") != "longread"
     ):
+        # The signed release cover is the house style; the old "platform
+        # preview" choice never changed what was published, so it is gone.
         draft["as_photo"] = bool(draft.get("item", {}).get("thumbnail_url"))
-    elif (
-        session.default_artwork == "native"
-        and draft.get("publication_mode") != "longread"
-    ):
-        draft["as_photo"] = False
-        draft["delivery_mode"] = "classic"
     track = TrackMatch(**draft["item"])
     saved = session.release_tags.get(release_preference_key(track))
     if saved is not None:
@@ -106,8 +111,15 @@ def apply_preferences(draft: dict, session: UserSession) -> None:
 
 
 def preferences_view(
-    session: UserSession, *, lang: str, section: str = "open", origin: str = ""
+    session: UserSession,
+    *,
+    lang: str,
+    section: str = "open",
+    origin: str = "",
+    is_admin: bool = False,
 ):
+    """One settings screen; every row shows its current value."""
+
     def cb(label, action, value="", **kwargs):
         return button(
             label, callback_data=encode_callback("prefs", action, value), **kwargs
@@ -130,10 +142,6 @@ def preferences_view(
                 ("album", "pref_grouping_album"),
             ],
         ),
-        "artwork": (
-            "default_artwork",
-            [("native", "pref_artwork_native"), ("clean", "pref_artwork_clean")],
-        ),
         "language": (
             "preferred_lang",
             [("", "pref_lang_auto"), ("ru", "pref_lang_ru"), ("en", "pref_lang_en")],
@@ -142,7 +150,6 @@ def preferences_view(
             "default_preset",
             [
                 ("", "pref_inherit"),
-                ("minimal", "pref_minimal"),
                 ("cover", "pref_cover"),
                 ("longread", "pref_longread"),
             ],
@@ -156,22 +163,22 @@ def preferences_view(
             ],
         ),
     }
+    back_to_settings = [cb(get_text(lang, "pref_back"), "open")]
     if section in choices:
         field, options = choices[section]
+        current = getattr(session, field)
+        if field == "default_preset" and current == "minimal":
+            current = "cover"
         rows = [
             [
                 cb(
-                    ("✓ " if getattr(session, field) == value else "")
-                    + get_text(lang, label),
+                    ("✓ " if current == value else "") + get_text(lang, label),
                     section,
                     ("crate:" if origin == "crate" else "") + (value or "inherit"),
                 )
             ]
             for value, label in options
         ]
-        parent = "collection" if section in {"layout", "grouping"} else "defaults"
-        if section == "language":
-            parent = "open"
         if origin == "crate":
             rows.append(
                 [
@@ -181,31 +188,12 @@ def preferences_view(
                     )
                 ]
             )
+        elif section in {"layout", "grouping"}:
+            rows.append([cb(get_text(lang, "pref_back_collection"), "collection")])
         else:
-            rows.append([cb(get_text(lang, "back"), parent)])
+            rows.append(back_to_settings)
         return get_text(lang, f"pref_{section}_title"), InlineKeyboardMarkup(rows)
-    language = get_text(lang, f"pref_lang_{session.preferred_lang or 'auto'}")
-    preset = get_text(lang, f"pref_{session.default_preset or 'inherit'}")
-    tags = (
-        get_text(lang, f"pref_tags_{session.default_hashtags}")
-        if session.default_hashtags
-        else get_text(lang, "pref_inherit")
-    )
-    if section == "defaults":
-        rows = [
-            [cb(get_text(lang, "pref_appearance").format(value=preset), "appearance")],
-            [cb(get_text(lang, "pref_tags").format(value=tags), "tags")],
-            [
-                cb(
-                    get_text(lang, "pref_artwork").format(
-                        value=get_text(lang, "pref_artwork_" + session.default_artwork)
-                    ),
-                    "artwork",
-                )
-            ],
-            [cb(get_text(lang, "back"), "open")],
-        ]
-    elif section == "collection":
+    if section == "collection":
         rows = [
             [
                 cb(
@@ -225,36 +213,87 @@ def preferences_view(
                     "grouping",
                 )
             ],
-            [cb(get_text(lang, "back"), "open")],
+            back_to_settings,
         ]
-    else:
-        section = "open"
-        rows = [
-            [cb(get_text(lang, "pref_language").format(value=language), "language")],
-            [
-                cb(get_text(lang, "pref_defaults"), "defaults"),
-                cb(get_text(lang, "pref_collection"), "collection"),
-            ],
-            [
-                button(
-                    get_text(lang, "tab_help"),
-                    callback_data=encode_callback("menu", "help"),
+        return get_text(lang, "pref_collection_title"), InlineKeyboardMarkup(rows)
+
+    preset = session.default_preset
+    preset = "cover" if preset == "minimal" else preset
+    values = {
+        "language": get_text(lang, f"pref_lang_{session.preferred_lang or 'auto'}"),
+        "appearance": get_text(lang, f"pref_{preset or 'inherit'}"),
+        "tags": get_text(lang, f"pref_tags_{session.default_hashtags}")
+        if session.default_hashtags
+        else get_text(lang, "pref_inherit"),
+        "collection": get_text(lang, "pref_layout_" + session.collection_layout),
+    }
+    rows = [
+        [
+            cb(
+                get_text(lang, "pref_language").format(value=values["language"]),
+                "language",
+            )
+        ],
+        [
+            cb(
+                get_text(lang, "pref_appearance").format(value=values["appearance"]),
+                "appearance",
+            )
+        ],
+        [cb(get_text(lang, "pref_tags").format(value=values["tags"]), "tags")],
+        [
+            cb(
+                get_text(lang, "pref_collection_value").format(
+                    value=values["collection"]
                 ),
-                button(
-                    get_text(lang, "tab_privacy"),
-                    callback_data=encode_callback("menu", "privacy"),
-                ),
-            ],
+                "collection",
+            )
+        ],
+    ]
+    if is_admin:
+        from music_links_bot.cover_style import brand_label
+
+        rows.append(
             [
-                button(
-                    get_text(lang, "home_back"),
-                    callback_data=encode_callback("menu", "start"),
+                cb(
+                    get_text(lang, "pref_brand_label").format(value=brand_label()),
+                    "label",
                 )
-            ],
+            ]
+        )
+        rows.append(
+            [
+                cb(
+                    get_text(lang, "pref_quick_publish").format(
+                        value=get_text(
+                            lang, "pref_on" if session.quick_publish else "pref_off"
+                        )
+                    ),
+                    "quick",
+                )
+            ]
+        )
+    rows.append(
+        [
+            button(
+                get_text(lang, "pref_help"),
+                callback_data=encode_callback("menu", "help"),
+            ),
+            button(
+                get_text(lang, "tab_privacy"),
+                callback_data=encode_callback("menu", "privacy"),
+            ),
         ]
-    return get_text(
-        lang, "pref_title" if section == "open" else f"pref_{section}_title"
-    ), InlineKeyboardMarkup(rows)
+    )
+    rows.append(
+        [
+            button(
+                get_text(lang, "home_back"),
+                callback_data=encode_callback("menu", "start"),
+            )
+        ]
+    )
+    return get_text(lang, "pref_title"), InlineKeyboardMarkup(rows)
 
 
 async def dispatch_preferences(query, context, action) -> None:
@@ -271,12 +310,25 @@ async def dispatch_preferences(query, context, action) -> None:
     choices = {
         "layout": ("collection_layout", {"auto", "column", "compact"}),
         "grouping": ("collection_grouping", {"none", "artist", "album"}),
-        "artwork": ("default_artwork", {"native", "clean"}),
         "language": ("preferred_lang", {"", "ru", "en"}),
-        "appearance": ("default_preset", {"", "minimal", "cover", "longread"}),
+        "appearance": ("default_preset", {"", "cover", "longread"}),
         "tags": ("default_hashtags", {"", "auto", "off"}),
     }
+    admin_chat_id = context.application.bot_data.get("admin_chat_id")
+    is_admin = admin_chat_id is not None and admin_chat_id == query.from_user.id
+    section = action.action
+    if section in {"defaults", "artwork"}:
+        # Old keyboards: these screens merged into the main settings screen.
+        section = "open"
+    if section == "label" and is_admin:
+        await _start_brand_label_input(query, context, runtime, session)
+        return
     changed = False
+    if section == "quick" and is_admin:
+        session.quick_publish = not session.quick_publish
+        await runtime.save_session(session)
+        changed = True
+        section = "open"
     payload = action.payload or ""
     origin = "crate" if payload == "crate" or payload.startswith("crate:") else ""
     if origin:
@@ -292,10 +344,36 @@ async def dispatch_preferences(query, context, action) -> None:
     current_presentation.set(preferences_from_session(session))
     lang = resolve_lang(query.from_user.language_code)
     text, keyboard = preferences_view(
-        session, lang=lang, section=action.action, origin=origin
+        session, lang=lang, section=section, origin=origin, is_admin=is_admin
     )
     await query.answer(get_text(lang, "settings_saved") if changed else None)
     # Import locally to keep menu rendering and settings independent at import.
     from music_links_bot.bot_menu import safe_edit
 
     await safe_edit(query, text, keyboard)
+
+
+async def _start_brand_label_input(query, context, runtime, session) -> None:
+    """Ask the owner for the cover signature text with a native reply prompt."""
+    import time
+
+    from telegram import ForceReply
+
+    lang = resolve_lang(query.from_user.language_code)
+    if query.message is None:
+        await query.answer()
+        return
+    prompt = await query.message.reply_text(
+        get_text(lang, "pref_brand_label_prompt"),
+        parse_mode="HTML",
+        reply_markup=ForceReply(selective=True),
+    )
+    session.pending_input = {
+        "kind": "brand_label",
+        "created_at": int(time.time()),
+        "prompt_message_id": prompt.message_id,
+        "editor_chat_id": query.message.chat_id,
+        "editor_message_id": query.message.message_id,
+    }
+    await runtime.save_session(session)
+    await query.answer()

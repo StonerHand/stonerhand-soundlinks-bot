@@ -52,12 +52,12 @@ class PublicationGoldenTests(unittest.TestCase):
 
         self.assertEqual(
             text,
-            "📝 <b>Твой пост · ещё не отправлен</b>\n\n🎧 · <b>Dopesmoker</b>\nSleep\n\nТрек\n\n#stonerhand #track",
+            "📝 <b>Черновик</b>\n\n🎧 · <b>Dopesmoker</b>\nSleep\n\nТрек\n\n#stonerhand #track",
         )
         self.assertEqual(draft["v"], CURRENT_DRAFT_VERSION)
         labels = [button.text for row in keyboard.inline_keyboard for button in row]
-        self.assertEqual(labels[:2], ["✏️ Изменить", "➕ В подборку"])
-        self.assertIn("🔖 Сохранить на 90 дней", labels)
+        self.assertEqual(labels[:2], ["✏️ Изменить", "🎶 В подборку"])
+        self.assertIn("🔖 В избранное", labels)
 
     def test_editor_card_snapshots_are_stable(self) -> None:
         context = SimpleNamespace(application=SimpleNamespace(bot_data={}))
@@ -343,17 +343,24 @@ class EditorFlowContractTests(unittest.IsolatedAsyncioTestCase):
 
         draft = new_track_draft(_track(), chat_id=7, lang="ru")
         context.application.bot_data["drafts"]["draft123"] = draft
-        await _handle_editor_action(query, context, "z0", "draft123")
+        await _handle_editor_action(query, context, "z2", "draft123")
         self.assertEqual(
             context.application.bot_data["drafts"]["draft123"]["preset"],
-            "minimal",
+            "longread",
         )
         callbacks = [
             button.callback_data
             for row in query.edits[-1]["reply_markup"].inline_keyboard
             for button in row
         ]
-        self.assertIn("v2|editor|z0|draft123~1", callbacks)
+        # The choice re-renders the same "Вид" screen, one tap from either look.
+        self.assertIn("v2|editor|z1|draft123~1", callbacks)
+        labels = [
+            button.text
+            for row in query.edits[-1]["reply_markup"].inline_keyboard
+            for button in row
+        ]
+        self.assertIn("✓ С историей", labels)
 
     async def test_publish_opens_confirmation_in_the_same_message(self) -> None:
         draft = new_track_draft(_track(), chat_id=7, lang="ru", can_publish=True)
@@ -405,13 +412,13 @@ class TelegramUiContractTests(unittest.TestCase):
 
         self.assertEqual([len(row) for row in keyboard.inline_keyboard], [1, 1])
         self.assertEqual(keyboard.inline_keyboard[0][0].text, "Повторить")
-        self.assertEqual(keyboard.inline_keyboard[-1][0].text, "← Главное меню")
+        self.assertEqual(keyboard.inline_keyboard[-1][0].text, "← Меню")
 
     def test_recovery_action_changes_with_error_context(self) -> None:
         cases = {
             "change": "Изменить запрос",
             "platforms": "Что поддерживается",
-            "crate": "Вернуться в подборку",
+            "crate": "🎶 Открыть подборку",
         }
         for recovery, expected in cases.items():
             keyboard = build_error_keyboard(
