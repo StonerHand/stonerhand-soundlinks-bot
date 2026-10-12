@@ -4,7 +4,11 @@ import hashlib
 
 from music_links_bot.bot_storage import remember_bounded
 from music_links_bot.constants import PLATFORM_LABELS
-from music_links_bot.durable_state import delete_value, read_json, write_json
+from music_links_bot.durable_state import (
+    delete_value,
+    read_json_with_legacy,
+    write_json,
+)
 from music_links_bot.kvstore import KVStore
 from music_links_bot.release_presentation import apply_preset, normalize_preset
 
@@ -67,12 +71,16 @@ async def load_channel_template(context, target: int | str) -> dict:
     cached = memory.get(key) if kv is None else None
     if isinstance(cached, dict):
         return dict(cached)
-    stored = await read_json(kv, key) if kv is not None else None
+    stored, legacy = (
+        await read_json_with_legacy(kv, key, _template_key(target, version=1))
+        if kv is not None
+        else (None, None)
+    )
     if isinstance(stored, dict) and isinstance(stored.get("template"), dict):
         stored = stored["template"]
     migrated = False
     if stored is None and kv is not None:
-        stored = await read_json(kv, _template_key(target, version=1))
+        stored = legacy
         migrated = isinstance(stored, dict)
     template = _sanitize_template(stored)
     if template:

@@ -22,11 +22,16 @@ def generation_key(user_id):
     return f"privacy-generation:v1:{user_id}"
 
 
+_NOT_READ = object()
+
+
 @asynccontextmanager
-async def user_state_scope(kv, user_id):
-    generation = (
-        await read_text(kv, generation_key(user_id)) if kv and user_id > 0 else None
-    )
+async def user_state_scope(kv, user_id, *, generation=_NOT_READ):
+    """Fence this update's writes; ``generation`` may come from a batch read."""
+    if generation is _NOT_READ:
+        generation = (
+            await read_text(kv, generation_key(user_id)) if kv and user_id > 0 else None
+        )
     token = _guard.set((kv, user_id, generation or "") if kv and user_id > 0 else None)
     try:
         yield
@@ -95,6 +100,17 @@ async def register_owned_key(kv, user_id, key, *, ttl_seconds):
     if kv is None or not isinstance(user_id, int) or user_id <= 0:
         return
     now = int(time.time())
+    index_key = f"user-keys:v1:{user_id}"
+    indexer = getattr(kv, "index_expiring_key_required", None)
+    if indexer is not None:
+        await indexer(
+            index_key,
+            key,
+            now=now,
+            expires_at=now + ttl_seconds,
+            ttl_seconds=INDEX_TTL,
+        )
+        return
 
     def update(previous):
         previous = previous if isinstance(previous, dict) else {}
@@ -107,7 +123,7 @@ async def register_owned_key(kv, user_id, key, *, ttl_seconds):
             key: now + ttl_seconds,
         }
 
-    await mutate_json(kv, f"user-keys:v1:{user_id}", update, ttl_seconds=INDEX_TTL)
+    await mutate_json(kv, index_key, update, ttl_seconds=INDEX_TTL)
 
 
 async def owned_keys(kv, user_id):

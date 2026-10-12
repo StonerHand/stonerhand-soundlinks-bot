@@ -29,18 +29,36 @@ class LocalizedApplication(Application):
     __slots__ = ()
 
     async def process_update(self, update: object) -> None:
-        from music_links_bot.user_state import user_state_scope
+        from music_links_bot.user_state import generation_key, user_state_scope
 
         with state_scope(), language_context(None), presentation_context():
             runtime = self.bot_data.get("runtime")
             user = update.effective_user if isinstance(update, Update) else None
+            kv = self.bot_data.get("kv_store")
             try:
-                async with user_state_scope(
-                    self.bot_data.get("kv_store"), user.id if user else 0
+                scope_kwargs: dict = {}
+                prefetched = None
+                batch = getattr(kv, "mget_required", None)
+                if (
+                    user is not None
+                    and user.id > 0
+                    and callable(batch)
+                    and isinstance(runtime, BotRuntime)
+                    and runtime.kv is kv
                 ):
+                    # The privacy fence and the session are read in one round
+                    # trip instead of two at the start of every update.
+                    generation, *session_raw = await batch(
+                        [generation_key(user.id), *runtime.session_keys(user.id)]
+                    )
+                    scope_kwargs["generation"] = generation
+                    prefetched = tuple(session_raw)
+                async with user_state_scope(kv, user.id if user else 0, **scope_kwargs):
                     if user is not None and isinstance(runtime, BotRuntime):
                         session = await runtime.get_session(
-                            user.id, lang=resolve_lang(user.language_code)
+                            user.id,
+                            lang=resolve_lang(user.language_code),
+                            prefetched=prefetched,
                         )
                         preferred_language.set(session.preferred_lang or None)
                         current_presentation.set(preferences_from_session(session))

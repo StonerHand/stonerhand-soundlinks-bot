@@ -1,31 +1,20 @@
 from __future__ import annotations
 
-import asyncio
-import secrets
+import logging
 import time
 
 from music_links_bot.bot_storage import remember_bounded
 from music_links_bot.durable_state import delete_value, read_json
 from music_links_bot.formatter import pick_track_emoji
-from music_links_bot.kvstore import KVStore
+from music_links_bot.kvstore import KVStore, KVUnavailableError
 from music_links_bot.models import TrackMatch
 from music_links_bot.publication_state import release_fingerprint
+from music_links_bot.state_mutations import mutate_json
 
+LOGGER = logging.getLogger(__name__)
 MAX_HISTORY_ITEMS = 10
 HISTORY_TTL_SECONDS = 90 * 24 * 3600
 MAX_MEMORY_USERS = 500
-
-
-async def _acquire_kv_lock(
-    kv: KVStore, key: str, *, tries: int = 5, delay: float = 0.1, ttl: int = 10
-) -> str | None:
-    owner = secrets.token_hex(12)
-    for attempt in range(tries):
-        if await kv.set(key, owner, ttl_seconds=ttl, nx=True):
-            return owner
-        if attempt < tries - 1:
-            await asyncio.sleep(delay)
-    return None
 
 
 async def record_history(
@@ -41,29 +30,35 @@ async def record_history(
         "ts": int(time.time()),
     }
     fingerprint = release_fingerprint(track.artist, track.title)
-    kv: KVStore | None = context.application.bot_data.get("kv_store")
-    lock_key = f"hist:lock:{user_id}"
-    lock_owner = await _acquire_kv_lock(kv, lock_key) if kv is not None else None
-    if kv is not None and lock_owner is None:
-        return
-    try:
-        items = await load_history_items(context, user_id)
+
+    def prepend(previous) -> list[dict]:
         items = [
             item
-            for item in items
-            if release_fingerprint(
+            for item in (previous if isinstance(previous, list) else [])
+            if isinstance(item, dict)
+            and release_fingerprint(
                 str(item.get("artist") or ""), str(item.get("title") or "")
             )
             != fingerprint
         ]
-        items = [entry, *items][:MAX_HISTORY_ITEMS]
-        histories: dict = context.application.bot_data.setdefault("bot_history", {})
-        remember_bounded(histories, user_id, items, max_size=MAX_MEMORY_USERS)
-        if kv is not None:
-            await kv.set_json(f"hist:{user_id}", items, ttl_seconds=HISTORY_TTL_SECONDS)
-    finally:
-        if lock_owner is not None and kv is not None:
-            await kv.delete_if_value(lock_key, lock_owner)
+        return [entry, *items][:MAX_HISTORY_ITEMS]
+
+    histories: dict = context.application.bot_data.setdefault("bot_history", {})
+    kv: KVStore | None = context.application.bot_data.get("kv_store")
+    if kv is None:
+        items = prepend(histories.get(user_id))
+    else:
+        # Compare-and-set replaces the old lock/read/write/unlock sequence:
+        # two Redis round trips instead of four, and no lock to leak.
+        try:
+            items = await mutate_json(
+                kv, f"hist:{user_id}", prepend, ttl_seconds=HISTORY_TTL_SECONDS
+            )
+        except KVUnavailableError:
+            # History is a convenience; it must never fail the lookup itself.
+            LOGGER.debug("Could not record history", exc_info=True)
+            return
+    remember_bounded(histories, user_id, items, max_size=MAX_MEMORY_USERS)
 
 
 async def load_history_items(context, user_id: int) -> list[dict]:
@@ -85,4 +80,3 @@ async def clear_history(context, user_id: int) -> None:
     kv: KVStore | None = context.application.bot_data.get("kv_store")
     if kv is not None:
         await delete_value(kv, f"hist:{user_id}")
-        await kv.delete(f"hist:lock:{user_id}")

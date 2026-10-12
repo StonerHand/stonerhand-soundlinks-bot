@@ -10,10 +10,12 @@ from types import SimpleNamespace
 from api.telegram import _ensure_application
 from music_links_bot.loop_runner import run_on_loop
 from music_links_bot.publish_queue import QueueStorageError, process_due_jobs
+from music_links_bot.qstash_auth import verify_qstash_signature
 from music_links_bot.webhook_secret import queue_worker_secret, secrets_match
 
 LOGGER = logging.getLogger(__name__)
 QUEUE_TICK_TIMEOUT_SECONDS = 20
+QUEUE_WORKER_PATH = "/api/queue_worker"
 
 
 def is_authorized(authorization_header: str | None) -> bool:
@@ -30,7 +32,27 @@ class handler(BaseHTTPRequestHandler):
     """Dedicated durable-queue tick for Vercel Cron and manual recovery."""
 
     def do_GET(self) -> None:
-        if not is_authorized(self.headers.get("authorization")):
+        self._tick(authorized=is_authorized(self.headers.get("authorization")))
+
+    def do_POST(self) -> None:
+        # Upstash QStash schedules call with POST. The tick has no input; the
+        # body is read only to check the signature that covers it.
+        try:
+            length = min(int(self.headers.get("content-length") or 0), 65_536)
+        except ValueError:
+            length = 0
+        body = self.rfile.read(length) if length > 0 else b""
+        authorized = is_authorized(
+            self.headers.get("authorization")
+        ) or verify_qstash_signature(
+            self.headers.get("upstash-signature"),
+            body,
+            expected_path=QUEUE_WORKER_PATH,
+        )
+        self._tick(authorized=authorized)
+
+    def _tick(self, *, authorized: bool) -> None:
+        if not authorized:
             self._send_json(
                 {"ok": False, "error": "unauthorized"},
                 HTTPStatus.UNAUTHORIZED,

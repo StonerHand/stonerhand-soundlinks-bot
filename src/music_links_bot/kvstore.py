@@ -10,6 +10,8 @@ import httpx
 from music_links_bot.constants import HTTP_USER_AGENT
 
 LOGGER = logging.getLogger(__name__)
+# /stats shows a top 10; a bounded map keeps every activity event O(1).
+MAX_STATS_IDENTITIES = 200
 
 
 class KVUnavailableError(RuntimeError):
@@ -129,6 +131,41 @@ class KVStore:
             raise KVUnavailableError("Redis did not confirm compare-and-set")
         return result == 1
 
+    async def index_expiring_key_required(
+        self, key: str, member: str, *, now: int, expires_at: int, ttl_seconds: int
+    ) -> None:
+        """Add ``member`` to a JSON ``{name: expiry}`` index in one round trip.
+
+        Same stored format as a read-modify-write in Python, but expired names
+        are pruned and the new one recorded atomically inside Redis.
+        """
+        script = (
+            "local raw = redis.call('get', KEYS[1]); "
+            "local ok, old = pcall(cjson.decode, raw or '{}'); "
+            "if not ok or type(old) ~= 'table' then old = {} end; "
+            "local now = tonumber(ARGV[2]); local fresh = {}; "
+            "for name, expiry in pairs(old) do "
+            "if type(name) == 'string' and type(expiry) == 'number' "
+            "and expiry > now then fresh[name] = expiry end end; "
+            "fresh[ARGV[1]] = tonumber(ARGV[3]); "
+            "redis.call('set', KEYS[1], cjson.encode(fresh), 'EX', ARGV[4]); "
+            "return 1"
+        )
+        result = await self._command_or_raise(
+            [
+                "EVAL",
+                script,
+                "1",
+                key,
+                member,
+                str(now),
+                str(expires_at),
+                str(ttl_seconds),
+            ]
+        )
+        if result != 1:
+            raise KVUnavailableError("Redis did not confirm the index update")
+
     async def delete_required(self, key: str) -> None:
         result = await self._command_or_raise(["DEL", key])
         if not isinstance(result, int) or result < 0:
@@ -188,11 +225,38 @@ class KVStore:
             "local old = stats[key][id] or {}; "
             "entry.count = (tonumber(old.count) or 0) + (tonumber(entry.count) or 0); "
             "stats[key][id] = entry end end end; "
+            # Keep only the most active users/chats (plus the ones in this
+            # event) so the blob, and this script's cost, stop growing.
+            "local cap = tonumber(ARGV[3]); "
+            "for _, name in ipairs({'users', 'chats'}) do "
+            "local map = stats[name]; "
+            "if type(map) == 'table' then "
+            "local list = {}; "
+            "for id, entry in pairs(map) do "
+            "list[#list + 1] = {id, type(entry) == 'table' "
+            "and tonumber(entry.count) or 0} end; "
+            "if #list > cap then "
+            "table.sort(list, function(a, b) return a[2] > b[2] end); "
+            "local touched = type(delta[name]) == 'table' and delta[name] or {}; "
+            "local kept = {}; "
+            "for i, item in ipairs(list) do "
+            "if i <= cap or touched[item[1]] ~= nil then "
+            "kept[item[1]] = map[item[1]] end end; "
+            "stats[name] = kept end end end; "
             "redis.call('set', KEYS[1], cjson.encode(stats)); "
             "redis.call('set', KEYS[2], '1', 'EX', ARGV[2]); return 1"
         )
         return await self._command_or_raise(
-            ["EVAL", script, "2", key, event_key, json.dumps(delta), str(7 * 86400)]
+            [
+                "EVAL",
+                script,
+                "2",
+                key,
+                event_key,
+                json.dumps(delta),
+                str(7 * 86400),
+                str(MAX_STATS_IDENTITIES),
+            ]
         )
 
     async def ranked_events(self, key, *, limit=5):
@@ -236,6 +300,17 @@ class KVStore:
             except ValueError:
                 decoded.append(None)
         return decoded
+
+    async def mget_required(self, keys: list[str]) -> list[str | None]:
+        """Read raw values in one round trip, surfacing outages and bad replies."""
+        if not keys:
+            return []
+        values = await self._command_or_raise(["MGET", *keys])
+        if not isinstance(values, list) or len(values) != len(keys):
+            raise KVUnavailableError("Redis returned an invalid batch")
+        if any(value is not None and not isinstance(value, str) for value in values):
+            raise KVUnavailableError("Redis returned an invalid value")
+        return values
 
     async def mget_json_required(self, keys: list[str]) -> list[Any | None]:
         if not keys:

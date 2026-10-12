@@ -13,24 +13,43 @@ class StateConflictError(KVUnavailableError):
     """The visible edit was based on a version that has since changed."""
 
 
-async def mutate_json(kv, key, transform, *, ttl_seconds):
+# Marks "the stored raw value is not known yet" (``None`` means "key missing").
+UNKNOWN_RAW = object()
+
+
+async def mutate_json(kv, key, transform, *, ttl_seconds, expected_raw=UNKNOWN_RAW):
     """Retry only pure state transforms; never repeat a Telegram side effect."""
+    value, _raw = await mutate_json_raw(
+        kv, key, transform, ttl_seconds=ttl_seconds, expected_raw=expected_raw
+    )
+    return value
+
+
+async def mutate_json_raw(kv, key, transform, *, ttl_seconds, expected_raw=UNKNOWN_RAW):
+    """Like ``mutate_json`` but also return the exact raw value now stored.
+
+    A caller that already read ``key`` in this request passes that raw value as
+    ``expected_raw``: the first compare-and-set then needs no extra GET, and a
+    stale guess simply fails the compare and falls back to a fresh read.
+    """
     compare = getattr(kv, "compare_set_required", None)
     if compare is None:  # Compatibility with local/test storage adapters.
         value = transform(deepcopy(await read_json(kv, key)))
         await write_json(kv, key, value, ttl_seconds=ttl_seconds)
-        return value
+        return value, UNKNOWN_RAW
+    raw = expected_raw
     for _ in range(6):
-        raw = await kv.get_required(key)
+        if raw is UNKNOWN_RAW:
+            raw = await kv.get_required(key)
         try:
             previous = json.loads(raw) if raw is not None else None
         except (TypeError, ValueError) as exc:
             raise KVUnavailableError("Invalid durable state") from exc
         value = transform(previous)
-        if await compare(
-            key, raw, json.dumps(value, ensure_ascii=False), ttl_seconds=ttl_seconds
-        ):
-            return value
+        encoded = json.dumps(value, ensure_ascii=False)
+        if await compare(key, raw, encoded, ttl_seconds=ttl_seconds):
+            return value, encoded
+        raw = UNKNOWN_RAW
     raise StateConflictError("State changed repeatedly; reopen the current view")
 
 
