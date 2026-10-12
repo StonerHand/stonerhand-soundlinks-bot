@@ -509,9 +509,14 @@ def build_rich_collection_html(
         pieces.append(media_html)
     # Reuse the same complete, numbered text as the classic preview and delivery.
     body = format_collection_message(tracks, title=title, include_hashtags=False)
-    body = body.split("\n\n", 1)[-1]
+    header, _, body = body.partition("\n\n")
+    # <h1> already holds the title. When the classic heading names the shared
+    # artist instead ("🎶 <b>Blur</b>"), keep that artist above the list.
+    named = header.split("\n", 1)[0].removeprefix("🎶 ")
+    if named != f"<b>{html.escape(title)}</b>" and named.startswith("<b>"):
+        body = f"{named}\n{body}"
     # Rich layouts number lists themselves; keep "1." instead of <code>01</code>.
-    body = re.sub(r"<code>0*(\d+)</code> ", r"\1. ", body)
+    body = re.sub(r"<code>0*(\d+)</code> (?:· )?", r"\1. ", body)
     if body:
         pieces.append("<p>" + body.replace("\n", "<br/>") + "</p>")
     buttons = rich_button_rows_html(reply_markup)
