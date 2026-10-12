@@ -326,12 +326,14 @@ class Release119StateTests(unittest.IsolatedAsyncioTestCase):
     async def test_no_telegram_send_if_intent_cannot_be_persisted(self):
         from unittest.mock import patch
 
-        from music_links_bot.bot import _deliver_draft
+        from music_links_bot.bot_editor import (
+            _deliver_draft,
+        )
 
         kv = RedisModel()
         kv.available = False
         sender = AsyncMock()
-        with patch("music_links_bot.bot.PublicationService", sender):
+        with patch("music_links_bot.bot_editor.PublicationService", sender):
             with self.assertRaises(KVUnavailableError):
                 await _deliver_draft(
                     ctx(kv), {"editor_draft_id": "d"}, target=7, channel_style=False

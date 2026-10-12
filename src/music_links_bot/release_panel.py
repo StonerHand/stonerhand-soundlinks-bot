@@ -157,7 +157,7 @@ async def start_release_panel(update, context):
         await message.reply_text(get_text(lang, "release_panel_expired"))
     elif editing:
         # Opened from "✏️ Изменить в боте" in a group: a fresh private draft.
-        from music_links_bot.bot import _send_track_draft
+        from music_links_bot.bot_lookup_flow import _send_track_draft
 
         user = update.effective_user
         await _send_track_draft(

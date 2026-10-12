@@ -62,21 +62,6 @@ class RequestBudget:
         return max(0.0, self.deadline - monotonic())
 
 
-async def run_provider_tasks(
-    bot_data: dict,
-    tasks: list[ProviderTask],
-    *,
-    timeout_seconds: float = PROVIDER_TIMEOUT_SECONDS,
-) -> dict[str, Any]:
-    """Run independent providers concurrently and keep successful partial data."""
-    outcomes = await run_provider_tasks_detailed(
-        bot_data,
-        tasks,
-        timeout_seconds=timeout_seconds,
-    )
-    return {name: outcome.value for name, outcome in outcomes.items()}
-
-
 async def run_provider_tasks_detailed(
     bot_data: dict,
     tasks: list[ProviderTask],

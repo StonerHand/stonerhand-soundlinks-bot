@@ -149,29 +149,6 @@ def build_start_keyboard(
     return InlineKeyboardMarkup(rows)
 
 
-def build_library_keyboard(*, lang: str, crate_count: int = 0) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        [
-            [
-                callback_button(
-                    get_text(lang, "home_drafts"), encode_callback("menu", "drafts")
-                )
-            ],
-            [_crate_button(lang, crate_count)],
-            [
-                callback_button(
-                    get_text(lang, "home_recent"), encode_callback("menu", "recent")
-                )
-            ],
-            [
-                callback_button(
-                    get_text(lang, "home_back"), encode_callback("menu", "start")
-                )
-            ],
-        ]
-    )
-
-
 HELP_TOPICS = ("help", "guide", "platforms")
 
 

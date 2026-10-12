@@ -375,7 +375,9 @@ class RichPublicationTransportTests(unittest.IsolatedAsyncioTestCase):
     async def test_bot_delivery_falls_back_to_regular_html(self) -> None:
         from types import SimpleNamespace
 
-        from music_links_bot.bot import _deliver_draft
+        from music_links_bot.bot_editor import (
+            _deliver_draft,
+        )
 
         class FallbackBot(_RawBot):
             def __init__(self) -> None:

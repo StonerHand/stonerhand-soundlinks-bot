@@ -100,6 +100,8 @@ def build_application(settings: Settings) -> Application:
     from music_links_bot import bot as handlers
     from music_links_bot.apple_radio import AppleRadioClient
     from music_links_bot.artist import ArtistClient
+    from music_links_bot.bot_editor import editor_callback
+    from music_links_bot.bot_lookup_flow import track_lookup_message
     from music_links_bot.nts import NTSClient
     from music_links_bot.playlist import PlaylistClient
     from music_links_bot.search import SearchClient
@@ -176,16 +178,14 @@ def build_application(settings: Settings) -> Application:
     application.add_handler(
         CallbackQueryHandler(legacy_menu_callback, pattern=r"^menu:")
     )
-    application.add_handler(
-        CallbackQueryHandler(handlers.editor_callback, pattern=r"^ed\|")
-    )
+    application.add_handler(CallbackQueryHandler(editor_callback, pattern=r"^ed\|"))
     application.add_handler(InlineQueryHandler(inline_query_handler))
     application.add_handler(ChosenInlineResultHandler(chosen_inline_result_handler))
     application.add_handler(
         MessageHandler(
             (filters.TEXT | filters.CAPTION | filters.PHOTO | filters.AUDIO)
             & ~filters.COMMAND,
-            handlers.track_lookup_message,
+            track_lookup_message,
         )
     )
     application.add_error_handler(handlers._application_error_handler)

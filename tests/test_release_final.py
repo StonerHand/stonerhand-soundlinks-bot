@@ -67,7 +67,9 @@ def draft():
 
 class FinalReleaseStateTests(unittest.IsolatedAsyncioTestCase):
     async def test_full_crate_does_not_claim_an_eleventh_release_was_added(self):
-        from music_links_bot.bot import _add_editor_item_to_crate
+        from music_links_bot.bot_editor import (
+            _add_editor_item_to_crate,
+        )
 
         ctx = context(None)
         entries = [
@@ -83,7 +85,9 @@ class FinalReleaseStateTests(unittest.IsolatedAsyncioTestCase):
             query=SimpleNamespace(answer=AsyncMock()),
             lang="ru",
         )
-        with patch("music_links_bot.bot._restore_editor_card", new_callable=AsyncMock):
+        with patch(
+            "music_links_bot.bot_editor._restore_editor_card", new_callable=AsyncMock
+        ):
             await _add_editor_item_to_crate(request)
         self.assertFalse(request.draft.get("in_crate"))
         self.assertEqual(await load_crate(ctx.application.bot_data, 7), entries)
@@ -91,7 +95,9 @@ class FinalReleaseStateTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(request.query.answer.await_args.kwargs["show_alert"])
 
     async def test_storage_failure_answers_inline_query_without_stale_results(self):
-        from music_links_bot.bot import _application_error_handler
+        from music_links_bot.bot import (
+            _application_error_handler,
+        )
 
         query = InlineQuery(
             "q", User(7, "Owner", False, language_code="ru"), "query", ""

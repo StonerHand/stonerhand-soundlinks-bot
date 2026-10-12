@@ -62,7 +62,9 @@ class Release119Journeys(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(keyboard.inline_keyboard)
 
     async def test_explicit_new_collection_does_not_append_to_existing_crate(self):
-        from music_links_bot.bot import _send_track_matches
+        from music_links_bot.bot_lookup_flow import (
+            _send_track_matches,
+        )
 
         context = ctx(RedisModel())
         context.bot = SimpleNamespace()
@@ -71,10 +73,13 @@ class Release119Journeys(unittest.IsolatedAsyncioTestCase):
         try:
             with (
                 patch(
-                    "music_links_bot.bot._add_track_drafts_to_crate", AsyncMock()
+                    "music_links_bot.bot_lookup_flow._add_track_drafts_to_crate",
+                    AsyncMock(),
                 ) as add,
-                patch("music_links_bot.bot._send_track_result", AsyncMock()) as send,
-                patch("music_links_bot.bot._record_matches_safely"),
+                patch(
+                    "music_links_bot.bot_lookup_flow._send_track_result", AsyncMock()
+                ) as send,
+                patch("music_links_bot.bot_lookup_flow._record_matches_safely"),
             ):
                 await _send_track_matches(
                     q.message,
@@ -94,7 +99,9 @@ class Release119Journeys(unittest.IsolatedAsyncioTestCase):
             collection_input.reset(token)
 
     async def test_replace_does_not_delete_existing_post_on_uncertain_send(self):
-        from music_links_bot.bot import _run_primary_editor_action
+        from music_links_bot.bot_editor import (
+            _run_primary_editor_action,
+        )
         from music_links_bot.delivery_receipts import DeliveryBlockedError
 
         context = ctx(RedisModel())
@@ -111,15 +118,15 @@ class Release119Journeys(unittest.IsolatedAsyncioTestCase):
         )
         with (
             patch(
-                "music_links_bot.bot._find_posted_record",
+                "music_links_bot.bot_editor._find_posted_record",
                 AsyncMock(return_value={"message_id": 1}),
             ),
             patch(
-                "music_links_bot.bot._publish_draft",
+                "music_links_bot.bot_editor._publish_draft",
                 AsyncMock(side_effect=DeliveryBlockedError({"status": "uncertain"})),
             ),
             patch(
-                "music_links_bot.bot._delete_duplicate_editor_post", AsyncMock()
+                "music_links_bot.bot_editor._delete_duplicate_editor_post", AsyncMock()
             ) as remove,
         ):
             with self.assertRaises(DeliveryBlockedError):
@@ -287,7 +294,9 @@ class Release119Journeys(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(all(len(row) <= 2 for row in keyboard.inline_keyboard[1:]))
 
     async def test_stale_editor_button_refreshes_without_applying_toggle(self):
-        from music_links_bot.bot import _handle_editor_action
+        from music_links_bot.bot_editor import (
+            _handle_editor_action,
+        )
 
         context = ctx(RedisModel())
         value = draft()

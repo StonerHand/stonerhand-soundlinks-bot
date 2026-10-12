@@ -11,7 +11,9 @@ import unittest
 from test_audit_reliability import RedisREST
 from test_bot import ContextStub, PrivateSpotifyTrackMessageStub, UpdateStub
 
-from music_links_bot.bot import track_lookup_message
+from music_links_bot.bot_lookup_flow import (
+    track_lookup_message,
+)
 from music_links_bot.bot_runtime import BotRuntime
 from music_links_bot.durable_state import state_scope
 from music_links_bot.kvstore import KVUnavailableError

@@ -20,29 +20,6 @@ from music_links_bot.rich_publications import (
 LOGGER = logging.getLogger(__name__)
 
 
-def as_video_track(video: VideoMatch) -> TrackMatch:
-    """Represent a video in the ordered collection model."""
-    return TrackMatch(
-        title=video.title,
-        artist=video.author,
-        links={},
-        page_url=video.url,
-        kind="video",
-        thumbnail_url=video.thumbnail_url,
-    )
-
-
-def split_track_video_pair(
-    items: list[TrackMatch],
-) -> tuple[TrackMatch, TrackMatch] | None:
-    if len(items) != 2 or {item.kind for item in items} != {"song", "video"}:
-        return None
-    return (
-        next(item for item in items if item.kind == "song"),
-        next(item for item in items if item.kind == "video"),
-    )
-
-
 async def send_track_video_album(
     bot: Bot,
     *,

@@ -210,39 +210,6 @@ class SearchClient:
         self._genre_cache.set(cache_key, genre or "")
         return genre
 
-    async def lookup_preview(self, artist: str, title: str) -> str | None:
-        """Best-effort 30-second audio preview URL for a release; empty-string
-        cache entries mark known misses so they are not retried."""
-        query = normalize_search_query(f"{artist} {title}")
-        if query is None:
-            return None
-
-        cache_key = query.casefold()
-        cached_preview = self._preview_cache.get(cache_key)
-        if cached_preview is not None:
-            return cached_preview or None
-
-        try:
-            response = await self._client.get(
-                "/search",
-                params={
-                    "term": query,
-                    "media": "music",
-                    "entity": "song",
-                    "limit": 3,
-                    "country": self._country,
-                },
-            )
-            response.raise_for_status()
-            payload = response.json()
-        except (httpx.HTTPError, ValueError):
-            LOGGER.debug("Preview lookup failed for %s", query, exc_info=True)
-            return None
-
-        preview_url = _extract_preview_url(payload)
-        self._preview_cache.set(cache_key, preview_url or "")
-        return preview_url
-
     async def search_release_candidates(self, query: str) -> list[SearchCandidate]:
         normalized_query = normalize_search_query(query)
         if normalized_query is None:
@@ -385,23 +352,6 @@ def _large_artwork_url(value: str | None) -> str | None:
     if not value:
         return None
     return value.replace("100x100bb", "1200x1200bb").replace("60x60bb", "1200x1200bb")
-
-
-def _extract_preview_url(payload: object) -> str | None:
-    if not isinstance(payload, dict):
-        return None
-
-    results = payload.get("results")
-    if not isinstance(results, list):
-        return None
-
-    for result in results:
-        if isinstance(result, dict):
-            preview = result.get("previewUrl")
-            if isinstance(preview, str) and preview.startswith("http"):
-                return preview
-
-    return None
 
 
 def _extract_matching_genre(

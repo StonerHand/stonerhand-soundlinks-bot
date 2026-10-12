@@ -348,13 +348,6 @@ def _active_undo(undo_map: dict, user_id: int) -> dict | None:
     return value if isinstance(value, dict) else None
 
 
-def _item_index(payload: str) -> int:
-    try:
-        return int(payload)
-    except (TypeError, ValueError):
-        return -1
-
-
 async def _start_rename(query, context, *, user_id: int, lang: str) -> None:
     if query.message is None:
         await query.answer()

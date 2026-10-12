@@ -290,7 +290,9 @@ class StopTests(unittest.IsolatedAsyncioTestCase):
             _PLACEHOLDER.reset(token)
 
     async def test_complete_private_lookup_reuses_progress_and_creates_editor(self):
-        from music_links_bot.bot import track_lookup_message
+        from music_links_bot.bot_lookup_flow import (
+            track_lookup_message,
+        )
 
         msg = PrivateMessageStub()
         msg.message_id = 42
@@ -303,7 +305,9 @@ class StopTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(ctx.application.bot_data["drafts"])
 
     async def test_full_stop_journey_delivers_found_cards_without_publishing(self):
-        from music_links_bot.bot import track_lookup_message
+        from music_links_bot.bot_lookup_flow import (
+            track_lookup_message,
+        )
 
         started = asyncio.Event()
 

@@ -128,7 +128,9 @@ def _context(draft):
 
 
 def test_undo_publish_deletes_the_post_and_restores_the_draft():
-    from music_links_bot.bot import _handle_editor_action
+    from music_links_bot.bot_editor import (
+        _handle_editor_action,
+    )
 
     draft = _published_draft(published_at=int(time.time()) - 30)
     context = _context(draft)
@@ -145,7 +147,9 @@ def test_undo_publish_deletes_the_post_and_restores_the_draft():
 
 
 def test_undo_publish_refuses_after_two_minutes():
-    from music_links_bot.bot import _handle_editor_action
+    from music_links_bot.bot_editor import (
+        _handle_editor_action,
+    )
 
     draft = _published_draft(published_at=int(time.time()) - 600)
     context = _context(draft)
@@ -392,11 +396,15 @@ def test_quick_publish_posts_right_away_with_undo():
     from music_links_bot.models import TrackMatch
 
     with (
-        patch("music_links_bot.bot._publish_draft", new=AsyncMock(return_value=sent)),
         patch(
-            "music_links_bot.bot._find_posted_record", new=AsyncMock(return_value=None)
+            "music_links_bot.bot_editor._publish_draft",
+            new=AsyncMock(return_value=sent),
         ),
-        patch("music_links_bot.bot._schedule_mark_posted", new=AsyncMock()),
+        patch(
+            "music_links_bot.bot_editor._find_posted_record",
+            new=AsyncMock(return_value=None),
+        ),
+        patch("music_links_bot.bot_editor._schedule_mark_posted", new=AsyncMock()),
     ):
         published = asyncio.run(
             try_quick_publish(
@@ -434,9 +442,9 @@ def test_quick_publish_never_reposts_a_release_silently():
     context.application.bot_data.update(runtime=runtime)
     publish = AsyncMock()
     with (
-        patch("music_links_bot.bot._publish_draft", new=publish),
+        patch("music_links_bot.bot_editor._publish_draft", new=publish),
         patch(
-            "music_links_bot.bot._find_posted_record",
+            "music_links_bot.bot_editor._find_posted_record",
             new=AsyncMock(return_value={"date": "01.01.2026"}),
         ),
     ):
@@ -511,7 +519,9 @@ def test_edit_in_bot_link_opens_a_private_draft_of_that_release():
         effective_message=SimpleNamespace(chat=SimpleNamespace(type="private")),
         effective_user=SimpleNamespace(id=7, language_code="ru"),
     )
-    with patch("music_links_bot.bot._send_track_draft", new=AsyncMock()) as send:
+    with patch(
+        "music_links_bot.bot_lookup_flow._send_track_draft", new=AsyncMock()
+    ) as send:
         assert asyncio.run(start_release_panel(update, context)) is True
     assert send.await_args.args[2].title == "Dragonaut"
     assert send.await_args.kwargs["user_id"] == 7

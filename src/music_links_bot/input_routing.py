@@ -111,7 +111,7 @@ async def guard_input(update, context, *, text):
 
 
 async def dispatch_input_action(query, context, action):
-    from music_links_bot import bot
+    from music_links_bot import bot_lookup_flow as bot
     from music_links_bot.bot_menu import runtime_for, safe_edit, update_lang
     from music_links_bot.bot_storage import valid_state_id
 
@@ -178,7 +178,7 @@ async def deliver_collection_input(message, context, tracks, *, user_id, lang):
     """Return True once an explicitly requested collection edit was handled."""
     from dataclasses import asdict
 
-    from music_links_bot import bot
+    from music_links_bot import bot_lookup_flow as bot
     from music_links_bot.bot_crate import load_crate_title, replace_crate_item
     from music_links_bot.bot_ui import render_crate
     from music_links_bot.sharing import build_crate_share_query

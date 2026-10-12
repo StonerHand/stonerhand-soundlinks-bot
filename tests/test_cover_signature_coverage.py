@@ -167,7 +167,9 @@ def test_song_clip_album_uploads_the_signed_cover():
 def test_group_link_card_uses_the_signed_cover():
     from test_bot import ContextStub, ReplaceableMessageStub, UpdateStub
 
-    from music_links_bot.bot import track_lookup_message
+    from music_links_bot.bot_lookup_flow import (
+        track_lookup_message,
+    )
 
     class Songlink:
         async def lookup_track(self, url):

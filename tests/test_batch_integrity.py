@@ -8,11 +8,14 @@ from unittest.mock import AsyncMock, patch
 from telegram import MessageEntity
 
 from music_links_bot import bot_lookup
-from music_links_bot.bot import _deliver_lookup_bundle, _send_track_matches
 from music_links_bot.bot_lookup import (
     LookupBundle,
     SourceStatus,
     _send_youtube_result,
+)
+from music_links_bot.bot_lookup_flow import (
+    _deliver_lookup_bundle,
+    _send_track_matches,
 )
 from music_links_bot.bot_pipeline import LookupRequest
 from music_links_bot.bot_runtime import BotRuntime
@@ -328,7 +331,9 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
             bot=object(), application=SimpleNamespace(bot_data={})
         )
 
-        with patch("music_links_bot.bot._send_track_result", new=AsyncMock()) as sender:
+        with patch(
+            "music_links_bot.bot_lookup_flow._send_track_result", new=AsyncMock()
+        ) as sender:
             await _send_track_matches(
                 message,
                 context,
@@ -367,7 +372,9 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
             bot=object(), application=SimpleNamespace(bot_data={})
         )
 
-        with patch("music_links_bot.bot._send_track_result", new=AsyncMock()) as sender:
+        with patch(
+            "music_links_bot.bot_lookup_flow._send_track_result", new=AsyncMock()
+        ) as sender:
             await _send_track_matches(
                 message,
                 context,
@@ -472,9 +479,11 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with (
-            patch("music_links_bot.bot._send_track_matches", new=AsyncMock()) as send,
             patch(
-                "music_links_bot.bot._send_partial_lookup_status",
+                "music_links_bot.bot_lookup_flow._send_track_matches", new=AsyncMock()
+            ) as send,
+            patch(
+                "music_links_bot.bot_lookup_flow._send_partial_lookup_status",
                 new=AsyncMock(),
             ) as status,
         ):
@@ -532,9 +541,11 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with (
-            patch("music_links_bot.bot._send_track_matches", new=AsyncMock()),
             patch(
-                "music_links_bot.bot._send_partial_lookup_status",
+                "music_links_bot.bot_lookup_flow._send_track_matches", new=AsyncMock()
+            ),
+            patch(
+                "music_links_bot.bot_lookup_flow._send_partial_lookup_status",
                 new=AsyncMock(),
             ),
         ):
@@ -595,7 +606,9 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
             include_hashtags=True,
         )
 
-        with patch("music_links_bot.bot._send_track_matches", new=AsyncMock()) as send:
+        with patch(
+            "music_links_bot.bot_lookup_flow._send_track_matches", new=AsyncMock()
+        ) as send:
             await _deliver_lookup_bundle(
                 message,
                 SimpleNamespace(
@@ -638,7 +651,9 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
                 "music_links_bot.collection_plan.collection_collage_preview_url",
                 return_value=collage_url,
             ),
-            patch("music_links_bot.bot._send_track_result", new=AsyncMock()) as send,
+            patch(
+                "music_links_bot.bot_lookup_flow._send_track_result", new=AsyncMock()
+            ) as send,
         ):
             await _send_track_matches(
                 message,

@@ -4,14 +4,11 @@ from unittest.mock import patch
 
 from music_links_bot import bot_lookup
 from music_links_bot.bot_lookup import LookupBundle
-from music_links_bot.bot_runtime import BotRuntime
 from music_links_bot.models import VideoMatch
 from music_links_bot.provider_runtime import (
     ProviderOutcome,
-    ProviderTask,
     get_cached_lookup,
     lookup_cache_key,
-    run_provider_tasks,
     set_cached_lookup,
     set_cached_negative_lookup,
 )
@@ -40,59 +37,6 @@ class ProviderRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(calls, 1)
         self.assertIs(first_result, second_result)
         self.assertEqual(bot_data["lookup_inflight"], {})
-
-    async def test_failed_provider_keeps_successful_partial_result(self) -> None:
-        async def ok():
-            return ["track"]
-
-        async def broken():
-            raise TimeoutError
-
-        runtime = BotRuntime()
-        results = await run_provider_tasks(
-            {"runtime": runtime},
-            [
-                ProviderTask("music", ok(), []),
-                ProviderTask("video", broken(), []),
-            ],
-        )
-
-        self.assertEqual(results, {"music": ["track"], "video": []})
-        snapshot = {item["provider"]: item for item in runtime.provider_snapshot()}
-        self.assertTrue(snapshot["music"]["ok"])
-        self.assertFalse(snapshot["video"]["ok"])
-
-    async def test_provider_timeout_returns_fallback(self) -> None:
-        async def slow():
-            await asyncio.sleep(0.05)
-            return "late"
-
-        result = await run_provider_tasks(
-            {},
-            [ProviderTask("slow", slow(), "fallback")],
-            timeout_seconds=0.001,
-        )
-        self.assertEqual(result["slow"], "fallback")
-
-    async def test_task_specific_timeout_can_preserve_longer_batch_work(self) -> None:
-        async def slightly_slow():
-            await asyncio.sleep(0.01)
-            return "complete"
-
-        result = await run_provider_tasks(
-            {},
-            [
-                ProviderTask(
-                    "batch",
-                    slightly_slow(),
-                    "fallback",
-                    timeout_seconds=0.05,
-                )
-            ],
-            timeout_seconds=0.001,
-        )
-
-        self.assertEqual(result["batch"], "complete")
 
     async def test_lookup_cache_preserves_source_order(self) -> None:
         urls = ["https://example.test/b", "https://example.test/a"]

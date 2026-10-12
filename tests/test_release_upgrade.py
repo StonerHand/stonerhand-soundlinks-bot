@@ -14,8 +14,10 @@ import pytest
 from telegram import Chat, Message, Update, User
 from telegram.ext import Application
 
-from music_links_bot.bot import _handle_editor_action
 from music_links_bot.bot_crate import save_crate, save_crate_title
+from music_links_bot.bot_editor import (
+    _handle_editor_action,
+)
 from music_links_bot.bot_inline import (
     _build_inline_collection_result,
     _build_inline_result,

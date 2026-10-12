@@ -177,8 +177,3 @@ def action_spec(scope: str, code: str) -> ActionSpec | None:
         kind = ActionKind.SETTING if scope == "editor" else ActionKind.NAVIGATION
         return ActionSpec(scope, code, value, kind)
     return None
-
-
-def is_mutating_action(scope: str, code: str) -> bool:
-    spec = action_spec(scope, code)
-    return bool(spec and spec.mutating)

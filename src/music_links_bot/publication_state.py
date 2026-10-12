@@ -43,13 +43,6 @@ def publication_key(context, track: TrackMatch, target=None) -> str:
     return f"posted:v3:{digest}"
 
 
-async def find_posted_date(context, track: TrackMatch) -> str | None:
-    record = await find_posted_record(context, track)
-    if record is None:
-        return None
-    return str(record.get("date") or "") or None
-
-
 async def find_posted_record(context, track: TrackMatch) -> dict[str, Any] | None:
     kv: KVStore | None = context.application.bot_data.get("kv_store")
     if kv is None:

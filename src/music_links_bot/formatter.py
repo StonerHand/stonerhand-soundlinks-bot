@@ -50,10 +50,6 @@ def _list_number(index: int) -> str:
     return f"<code>{index:02}</code>"
 
 
-def format_track_label(track: TrackMatch) -> str:
-    return f"{_display_text(track.artist)} - {_display_text(track.title)}"
-
-
 def format_track_heading(track: TrackMatch) -> str:
     artist = _display_text(track.artist, MAX_COLLECTION_TEXT_LENGTH)
     title = _display_text(track.title, MAX_COLLECTION_TEXT_LENGTH)
@@ -514,17 +510,6 @@ def _fit_collection_message(value: str) -> str:
         line if line.startswith("#") else fit_telegram_html(line, int(size * ratio))
         for line, size in zip(lines, lengths, strict=True)
     )
-
-
-def prepend_user_text(message_text: str, *, author_label: str | None = None) -> str:
-    header = message_text.strip()
-    if not header:
-        return ""
-
-    if author_label:
-        return f"<blockquote>{escape(author_label)}:\n{escape(header)}</blockquote>\n\n"
-
-    return f"<blockquote>{escape(header)}</blockquote>\n\n"
 
 
 def prepend_user_html(message_html: str, *, author_label: str | None = None) -> str:
