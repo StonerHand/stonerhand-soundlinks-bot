@@ -73,7 +73,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             message,
-            "🎧 · <b>Rickets</b>\nDeftones\n\nТрек\n\n#stonerhand #track #hardrock",
+            "<b>Deftones — Rickets</b>\n🎧 Трек\n\n#stonerhand #track #hardrock",
         )
 
     def test_track_heading_stays_plain_when_release_hub_exists(self) -> None:
@@ -87,7 +87,7 @@ class FormatterTests(unittest.TestCase):
         message = format_track_message(track, include_hashtags=False)
 
         self.assertNotIn("<a href=", message)
-        self.assertIn("🎧 · <b>Paranoid</b>\nBlack Sabbath", message)
+        self.assertIn("<b>Black Sabbath — Paranoid</b>\n🎧 Трек", message)
 
     def test_format_track_message_shows_verified_year_and_genre(self) -> None:
         track = TrackMatch(
@@ -101,7 +101,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "🎧 · <b>Song</b>\nArtist\n\nТрек · 2006\n\n#stonerhand #track #single #hardrock",
+            "<b>Artist — Song</b>\n🎧 Трек · 2006\n\n#stonerhand #track #single #hardrock",
         )
 
     def test_format_track_message_without_metadata_stays_compact(self) -> None:
@@ -113,7 +113,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "🎧 · <b>Song</b>\nArtist\n\nТрек\n\n#stonerhand #track",
+            "<b>Artist — Song</b>\n🎧 Трек\n\n#stonerhand #track",
         )
 
     def test_format_track_message_normalizes_untrusted_metadata(self) -> None:
@@ -125,7 +125,7 @@ class FormatterTests(unittest.TestCase):
 
         message = format_track_message(track)
 
-        self.assertIn("🎧 · <b>Song with broken spacing", message)
+        self.assertIn("<b>Artist Name — Song with broken spacing", message)
         self.assertIn("…", message)
         self.assertNotIn("Song\nwith", message)
 
@@ -138,7 +138,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track, include_hashtags=False),
-            "🎧 · <b>Song</b>\nArtist\n\nТрек",
+            "<b>Artist — Song</b>\n🎧 Трек",
         )
 
     def test_format_track_message_marks_album(self) -> None:
@@ -152,7 +152,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "💿 · <b>Album</b>\nArtist\n\nАльбом · 2007\n\n#stonerhand #album",
+            "<b>Artist — Album</b>\n💿 Альбом · 2007\n\n#stonerhand #album",
         )
 
     def test_format_track_message_marks_ep(self) -> None:
@@ -166,7 +166,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "💿 · <b>EP</b>\nArtist\n\nEP\n\n#stonerhand #ep",
+            "<b>Artist — EP</b>\n💿 EP\n\n#stonerhand #ep",
         )
 
     def test_format_track_message_marks_podcast(self) -> None:
@@ -179,7 +179,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "🎙️ · <b>Episode</b>\nPodcast Show\n\nПодкаст\n\n#stonerhand #podcast",
+            "<b>Podcast Show — Episode</b>\n🎙️ Подкаст\n\n#stonerhand #podcast",
         )
 
     def test_format_track_message_marks_podcast_show(self) -> None:
@@ -193,7 +193,7 @@ class FormatterTests(unittest.TestCase):
 
         self.assertEqual(
             format_track_message(track),
-            "🎙️ · <b>Podcast show</b>\nSpotify\n\nПодкаст\n\n#stonerhand #podcast #show",
+            "<b>Spotify — Podcast show</b>\n🎙️ Подкаст\n\n#stonerhand #podcast #show",
         )
 
     def test_format_collection_message_lists_tracks(self) -> None:
@@ -205,9 +205,9 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_collection_message(tracks),
             (
-                "<b>Подборка</b>\n\n<i>1 трек · 1 альбом</i>\n\n"
-                "1. <b>Artist</b> — Song\n"
-                "2. <b>Band</b> — Album\n\n"
+                "<b>Подборка</b> · 1 трек · 1 альбом\n\n"
+                "<code>01</code> <b>Artist</b> — Song\n"
+                "<code>02</code> <b>Band</b> — Album\n\n"
                 "#stonerhand #collection #track #album"
             ),
         )
@@ -225,8 +225,8 @@ class FormatterTests(unittest.TestCase):
         message = format_collection_message(tracks)
 
         self.assertIn("<b>Kokomo</b>\n", message)
-        self.assertIn("1. A Torinói Ló", message)
-        self.assertIn("2. The Lonesome Foghorn Blows", message)
+        self.assertIn("<code>01</code> A Torinói Ló", message)
+        self.assertIn("<code>02</code> The Lonesome Foghorn Blows", message)
         self.assertEqual(message.count("<b>Kokomo</b>"), 1)
 
     def test_collection_keeps_release_count_and_preserves_remaster_suffixes(
@@ -243,9 +243,10 @@ class FormatterTests(unittest.TestCase):
 
         message = format_collection_message(tracks, title="Подборка · 2 релиза")
 
-        self.assertIn("<b>Подборка · 2 релиза</b>", message)
+        # A generated title already carries the count: it is not repeated.
+        self.assertIn("<b>Подборка · 2 релиза</b>\n", message)
         self.assertIn(
-            "<b>Blur</b>\n1. There&#x27;s No Other Way - 2012 Remaster\n2. Fool (Remastered 2012)",
+            "<b>Blur</b>\n<code>01</code> There&#x27;s No Other Way - 2012 Remaster\n<code>02</code> Fool (Remastered 2012)",
             message,
         )
         self.assertIn("Remaster", message)
@@ -343,8 +344,8 @@ class FormatterTests(unittest.TestCase):
         )
         self.assertEqual(
             format_video_message(video),
-            "📺 · <b>SANSAE Live Session Vol.3 - Melon</b>\n\n"
-            "Видео · YouTube\nИсточник: SANSAE\n\n"
+            "<b>SANSAE Live Session Vol.3 - Melon</b>\n"
+            "🎤 Live · YouTube · SANSAE\n\n"
             "#stonerhand #video",
         )
 
@@ -356,9 +357,7 @@ class FormatterTests(unittest.TestCase):
         )
         self.assertEqual(
             format_radio_message(radio),
-            "📻 · <b>Dark Energy w/ Guest</b>\n\n"
-            "Радио · NTS Radio\n\n"
-            "#stonerhand #radio",
+            "<b>Dark Energy w/ Guest</b>\n📻 Радио · NTS Radio\n\n#stonerhand #radio",
         )
 
     def test_format_playlist_message_uses_playlist_style(self) -> None:
@@ -369,7 +368,7 @@ class FormatterTests(unittest.TestCase):
         )
         self.assertEqual(
             format_playlist_message(playlist),
-            "🎛 · <b>Women of Punk</b>\n\nПлейлист · Spotify\n\n#stonerhand #playlist",
+            "<b>Women of Punk</b>\n🎛 Плейлист · Spotify\n\n#stonerhand #playlist",
         )
 
     def test_format_artist_message_uses_artist_style(self) -> None:
@@ -380,7 +379,7 @@ class FormatterTests(unittest.TestCase):
         )
         self.assertEqual(
             format_artist_message(artist),
-            "🧬 · <b>1.Kla$</b>\n\nИсполнитель · Spotify\n\n#stonerhand #artist",
+            "<b>1.Kla$</b>\n🧬 Исполнитель · Spotify\n\n#stonerhand #artist",
         )
 
     def test_format_playlist_collection_message_lists_playlists(self) -> None:
@@ -399,8 +398,8 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_playlist_collection_message(playlists),
             "<b>Плейлисты</b>\n\n"
-            "1. 🎛 · <b>Women of Punk</b>\n"
-            "2. 🎛 · <b>Dark Wave</b>\n\n"
+            "<code>01</code> 🎛 <b>Women of Punk</b>\n"
+            "<code>02</code> 🎛 <b>Dark Wave</b>\n\n"
             "#stonerhand #collection #playlist",
         )
 
@@ -420,8 +419,8 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_artist_collection_message(artists),
             "<b>Артисты</b>\n\n"
-            "1. 🧬 · <b>1.Kla$</b>\n"
-            "2. 🧬 · <b>Hotbox</b>\n\n"
+            "<code>01</code> 🧬 <b>1.Kla$</b>\n"
+            "<code>02</code> 🧬 <b>Hotbox</b>\n\n"
             "#stonerhand #collection #artist",
         )
 
@@ -433,8 +432,8 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_video_collection_message(videos),
             "<b>Видео</b>\n\n"
-            "1. 📺 · <b>First</b>\n"
-            "2. 📺 · <b>Second</b>\n\n"
+            "<code>01</code> 📺 <b>First</b>\n"
+            "<code>02</code> 📺 <b>Second</b>\n\n"
             "#stonerhand #collection #video",
         )
 
@@ -446,8 +445,8 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(
             format_radio_collection_message(radios),
             "<b>Радио</b>\n\n"
-            "1. 📻 · <b>First</b>\n"
-            "2. 📻 · <b>Second</b>\n\n"
+            "<code>01</code> 📻 <b>First</b>\n"
+            "<code>02</code> 📻 <b>Second</b>\n\n"
             "#stonerhand #collection #radio",
         )
 
@@ -481,8 +480,8 @@ class FormatterTests(unittest.TestCase):
 
         message = format_mixed_collection_message([], videos, playlists)
 
-        self.assertIn("🎛 · <b>Women of Punk</b>", message)
-        self.assertIn("🎤 · <b>Live</b>", message)
+        self.assertIn("🎛 <b>Women of Punk</b>", message)
+        self.assertIn("🎤 <b>Live</b>", message)
         self.assertNotIn("<a href=", message)
         self.assertIn("#stonerhand #collection #playlist #video", message)
 
@@ -500,8 +499,8 @@ class FormatterTests(unittest.TestCase):
 
         message = format_mixed_collection_message([], videos, artists=artists)
 
-        self.assertIn("🧬 · <b>1.Kla$</b>", message)
-        self.assertIn("🎤 · <b>Live</b>", message)
+        self.assertIn("🧬 <b>1.Kla$</b>", message)
+        self.assertIn("🎤 <b>Live</b>", message)
         self.assertNotIn("<a href=", message)
         self.assertIn("#stonerhand #collection #artist #video", message)
 
@@ -519,8 +518,8 @@ class FormatterTests(unittest.TestCase):
 
         message = format_mixed_collection_message([], videos, radios=radios)
 
-        self.assertIn("📻 · <b>Dark Energy</b>", message)
-        self.assertIn("🎤 · <b>Live</b>", message)
+        self.assertIn("📻 <b>Dark Energy</b>", message)
+        self.assertIn("🎤 <b>Live</b>", message)
         self.assertNotIn("<a href=", message)
         self.assertIn("#stonerhand #collection #radio #video", message)
 

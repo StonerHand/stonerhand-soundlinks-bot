@@ -160,7 +160,7 @@ class UserSession:
     preferred_lang: str = ""
     default_preset: str = ""
     default_hashtags: str = ""
-    collection_layout: str = "column"
+    collection_layout: str = "auto"
     collection_grouping: str = "none"
     default_artwork: str = "clean"
     release_tags: dict[str, list[str]] = field(default_factory=dict)
@@ -209,7 +209,7 @@ class UserSession:
                 collection_layout=_choice(
                     payload.get("collection_layout"), {"auto", "column", "compact"}
                 )
-                or "column",
+                or "auto",
                 collection_grouping=_choice(
                     payload.get("collection_grouping"), {"none", "artist", "album"}
                 )

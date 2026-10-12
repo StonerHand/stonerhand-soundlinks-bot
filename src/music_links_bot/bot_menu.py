@@ -145,6 +145,11 @@ async def home_view(query, context, *, lang: str) -> tuple[str, InlineKeyboardMa
         context, runtime, session, lang=lang
     )
     pending = await queue_count(context, is_admin)
+    summary = (
+        await owner_summary(context, session, queued=pending, lang=lang)
+        if is_admin
+        else ""
+    )
     return (
         build_home_text(
             lang=lang,
@@ -152,6 +157,7 @@ async def home_view(query, context, *, lang: str) -> tuple[str, InlineKeyboardMa
             crate_count=crate_count,
             is_admin=is_admin,
             first_visit=not session.onboarding_seen and not active_draft_id,
+            summary=summary,
         ),
         build_start_keyboard(
             context.bot.username,
@@ -189,6 +195,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     )
     first_visit = message.chat.type == "private" and not session.welcome_seen
     pending = await queue_count(context, is_admin)
+    summary = (
+        await owner_summary(context, session, queued=pending, lang=lang)
+        if is_admin and session.onboarding_seen
+        else ""
+    )
     if first_visit:
         session.welcome_seen = await _send_first_visit_demo(message, lang=lang)
     sent = await message.reply_text(
@@ -200,6 +211,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             crate_count=crate_count,
             is_admin=is_admin,
             first_visit=not session.onboarding_seen and not session.active_draft_id,
+            summary=summary,
         ),
         parse_mode=ParseMode.HTML,
         reply_markup=build_start_keyboard(
@@ -225,10 +237,15 @@ async def _send_first_visit_demo(message: Message, *, lang: str) -> bool:
     """A single branded introduction; the interactive menu still works on failure."""
     try:
         resource = files("music_links_bot").joinpath("assets/brandmark.png")
+        from music_links_bot.message_effects import send_with_effect
+
         with resource.open("rb") as photo:
-            await message.reply_photo(
-                photo=photo, caption=get_text(lang, "welcome_demo_caption")
-            )
+            payload = photo.read()
+        await send_with_effect(
+            message.reply_photo,
+            photo=payload,
+            caption=get_text(lang, "welcome_demo_caption"),
+        )
         return True
     except (AttributeError, OSError, TelegramError, TypeError):
         LOGGER.debug("Could not send welcome artwork")
@@ -456,6 +473,47 @@ async def recent_view(
 def _is_owner(context, user_id: int) -> bool:
     admin_chat_id = context.application.bot_data.get("admin_chat_id")
     return admin_chat_id is not None and admin_chat_id == user_id
+
+
+async def owner_summary(context, session, *, queued: int, lang: str) -> str:
+    """One line for the owner: what went out this week and what is waiting."""
+    import time as _time
+
+    from music_links_bot.bot_storage import load_drafts
+
+    ids = list(dict.fromkeys([*session.saved_draft_ids, *session.recent_draft_ids]))
+    try:
+        drafts = [draft for draft in await load_drafts(context, ids) if draft]
+    except Exception:  # noqa: BLE001 — the summary is optional decoration
+        return ""
+    week_ago = _time.time() - 7 * 86400
+    published = sum(
+        1
+        for draft in drafts
+        if isinstance(draft.get("published_at"), (int, float))
+        and draft["published_at"] >= week_ago
+    )
+    editable = sum(
+        1
+        for draft in drafts
+        if not draft.get("published_at")
+        and not draft.get("scheduled_at")
+        and not draft.get("deleted_at")
+    )
+    from music_links_bot.bot_editor_state import plural
+
+    return get_text(lang, "home_owner_summary").format(
+        published=plural(
+            published, lang=lang, ru=("пост", "поста", "постов"), en=("post", "posts")
+        ),
+        queued=queued,
+        drafts=plural(
+            editable,
+            lang=lang,
+            ru=("черновик", "черновика", "черновиков"),
+            en=("draft", "drafts"),
+        ),
+    )
 
 
 async def queue_count(context: ContextTypes.DEFAULT_TYPE, is_admin: bool) -> int:

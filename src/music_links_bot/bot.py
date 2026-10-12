@@ -2433,6 +2433,19 @@ async def _track_lookup_message_impl(
     accepted, request_token = await _admit_private_lookup(message, context, request)
     if not accepted:
         return
+    from music_links_bot.reactions import finish_reaction, start_reaction
+
+    reaction = start_reaction(context.bot, message) if request.is_private else None
+    delivered = False
+    try:
+        delivered = await _run_admitted_lookup(message, context, request, request_token)
+    finally:
+        if reaction is not None:
+            await finish_reaction(reaction, context.bot, message, success=delivered)
+
+
+async def _run_admitted_lookup(message, context, request, request_token) -> bool:
+    """Resolve and deliver one admitted request; True once a post went out."""
     from music_links_bot.lookup_control import (
         LookupStopped,
         interruptible,
@@ -2487,9 +2500,9 @@ async def _track_lookup_message_impl(
                 if request.prefix_is_noise
                 else _build_user_prefix(message, bot_username=context.bot.username),
             )
-        return
+        return False
     if bundle is None:
-        return
+        return False
     user_prefix = (
         ""
         if request.prefix_is_noise
@@ -2506,7 +2519,7 @@ async def _track_lookup_message_impl(
         request.source_urls,
         lang=request.lang,
     ):
-        return
+        return False
     await _deliver_lookup_bundle(
         message,
         context,
@@ -2514,6 +2527,7 @@ async def _track_lookup_message_impl(
         request=request,
         user_prefix=user_prefix,
     )
+    return True
 
 
 async def _deliver_lookup_bundle(

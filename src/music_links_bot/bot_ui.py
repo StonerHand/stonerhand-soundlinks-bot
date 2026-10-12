@@ -45,6 +45,7 @@ def build_home_text(
     crate_count: int = 0,
     is_admin: bool = False,
     first_visit: bool = False,
+    summary: str = "",
 ) -> str:
     safe_name = escape(first_name.strip()[:40])
     greeting = get_text(lang, "home_title_new" if first_visit else "home_title")
@@ -54,11 +55,16 @@ def build_home_text(
         greeting = greeting.replace("{name}", "")
     mode = get_text(lang, "home_mode_admin" if is_admin else "home_mode_user")
     body_key = "home_body_new" if first_visit else "home_body"
-    return get_text(lang, body_key).format(
+    text = get_text(lang, body_key).format(
         greeting=greeting,
         crate_count=max(0, min(10, crate_count)),
         mode=mode,
     )
+    if summary and not first_visit:
+        # The owner's dashboard line sits right under the greeting.
+        head, _, rest = text.partition("\n\n")
+        text = f"{head}\n{summary}\n\n{rest}" if rest else f"{head}\n{summary}"
+    return text
 
 
 def build_start_keyboard(
@@ -102,17 +108,18 @@ def build_start_keyboard(
                 )
             ]
         )
+    status_row = []
     if crate_count:
-        rows.append([_crate_button(lang, crate_count)])
+        status_row.append(_crate_button(lang, crate_count))
     if queue_count:
-        rows.append(
-            [
-                callback_button(
-                    get_text(lang, "home_queue").format(count=queue_count),
-                    encode_callback("queue", "open"),
-                )
-            ]
+        status_row.append(
+            callback_button(
+                get_text(lang, "home_queue").format(count=queue_count),
+                encode_callback("queue", "open"),
+            )
         )
+    if status_row:
+        rows.append(status_row)
     if show_example:
         rows.append(
             [

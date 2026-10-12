@@ -40,7 +40,7 @@ class AppleRadioTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(radio.title, "The Alligator Hour")
         self.assertEqual(radio.url, URL)
         text = format_radio_message(radio)
-        self.assertIn("📻 · <b>The Alligator Hour</b>", text)
+        self.assertIn("<b>The Alligator Hour</b>\n📻 Радиошоу", text)
         self.assertIn("Радиошоу · Apple Music", text)
         self.assertIn("#stonerhand #radio", text)
         self.assertNotIn("#track", text)

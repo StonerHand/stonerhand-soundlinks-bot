@@ -314,7 +314,7 @@ def test_settings_are_one_level_and_owner_rows_only_for_the_owner():
         "🌐 Язык · Как в Telegram",
         "🎨 Вид новых постов · Как в прошлый раз",
         "# Теги · Как в прошлый раз",
-        "🎶 Подборки · Одна колонка",
+        "🎶 Подборки · Авто",
     ]
     assert not any("Подпись" in label for label in guest_labels)
 
@@ -515,3 +515,64 @@ def test_edit_in_bot_link_opens_a_private_draft_of_that_release():
         assert asyncio.run(start_release_panel(update, context)) is True
     assert send.await_args.args[2].title == "Dragonaut"
     assert send.await_args.kwargs["user_id"] == 7
+
+
+def test_message_effect_falls_back_when_telegram_rejects_it():
+    from telegram.error import BadRequest
+
+    from music_links_bot.message_effects import CELEBRATE, send_with_effect
+
+    calls = []
+
+    async def send(**kwargs):
+        calls.append(kwargs)
+        if "message_effect_id" in kwargs:
+            raise BadRequest("Effect_id_invalid")
+        return "sent"
+
+    assert asyncio.run(send_with_effect(send, text="hi")) == "sent"
+    assert calls == [{"message_effect_id": CELEBRATE, "text": "hi"}, {"text": "hi"}]
+
+
+def test_message_effect_never_retries_other_errors():
+    from telegram.error import BadRequest
+
+    from music_links_bot.message_effects import send_with_effect
+
+    send = AsyncMock(side_effect=BadRequest("Chat not found"))
+    with pytest.raises(BadRequest):
+        asyncio.run(send_with_effect(send, text="hi"))
+    assert send.await_count == 1
+
+
+def test_reactions_mark_work_and_success_on_the_users_message():
+    from music_links_bot.reactions import finish_reaction, start_reaction
+
+    bot = SimpleNamespace(set_message_reaction=AsyncMock())
+    message = SimpleNamespace(chat_id=7, message_id=42)
+
+    async def run(success):
+        task = start_reaction(bot, message)
+        await finish_reaction(task, bot, message, success=success)
+
+    asyncio.run(run(True))
+    emojis = [
+        [r.emoji for r in call.kwargs["reaction"]]
+        for call in bot.set_message_reaction.await_args_list
+    ]
+    assert emojis == [["👀"], ["🔥"]]
+    bot.set_message_reaction.reset_mock()
+    asyncio.run(run(False))
+    assert bot.set_message_reaction.await_args_list[-1].kwargs["reaction"] == []
+
+
+def test_reactions_never_break_the_lookup():
+    from music_links_bot.reactions import finish_reaction, start_reaction
+
+    bot = SimpleNamespace(set_message_reaction=AsyncMock(side_effect=RuntimeError()))
+    message = SimpleNamespace(chat_id=7, message_id=42)
+
+    async def run():
+        await finish_reaction(start_reaction(bot, message), bot, message, success=True)
+
+    asyncio.run(run())  # no exception

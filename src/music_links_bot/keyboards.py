@@ -37,10 +37,11 @@ CHANNEL_URL = f"https://t.me/{CHANNEL_USERNAME}"
 CHANNEL_BUTTON_TEXT = "🪨 Открыть канал"
 DEFAULT_UI_MODE = "stonerhand"
 MAX_TWO_COLUMN_BUTTON_TEXT_LENGTH = 24
-MAX_VISIBLE_PLATFORM_BUTTONS = 1
+# The three most used services sit in one row under the "listen" hub button.
+MAX_VISIBLE_PLATFORM_BUTTONS = 3
 PLATFORM_BUTTON_ICONS = {
     "spotify": "🟢",
-    "appleMusic": "⚪",
+    "appleMusic": "🍎",
     "applePodcasts": "🟣",
     "youtubeMusic": "🔴",
     "soundcloud": "🟠",
@@ -174,6 +175,8 @@ def _build_link_keyboard(
 
     buttons = []
     seen_urls = {cache_key_for_url(release_hub_url)} if release_hub_url else set()
+    # Three services fit one row only with short names ("Apple", "YouTube").
+    short = len(final_platforms) >= 3
     for platform_key in final_platforms:
         address = cache_key_for_url(links[platform_key])
         if address in seen_urls:
@@ -181,7 +184,7 @@ def _build_link_keyboard(
         seen_urls.add(address)
         buttons.append(
             _url_button(
-                text=f"{prefix}{_platform_button_label(platform_key, context)}",
+                text=f"{prefix}{_platform_button_label(platform_key, context, short=short)}",
                 url=links[platform_key],
                 # The provider is a convenient shortcut; Songlink/Odesli is
                 # the canonical cross-platform destination and owns the only
@@ -202,16 +205,30 @@ def _build_link_keyboard(
                 )
             ]
         )
-    rows.extend(_button_rows(buttons))
+    rows.extend(_button_rows(buttons, per_row=3 if short else 2))
 
     return _keyboard_with_optional_channel(rows, include_channel_button)
+
+
+PLATFORM_SHORT_LABELS = {
+    "appleMusic": "Apple",
+    "applePodcasts": "Podcasts",
+    "youtubeMusic": "YouTube",
+    "yandexMusic": "Яндекс",
+}
 
 
 def _platform_button_label(
     platform_key: str,
     context: ContextTypes.DEFAULT_TYPE | None = None,
+    *,
+    short: bool = False,
 ) -> str:
-    label = PLATFORM_LABELS[platform_key]
+    label = (
+        PLATFORM_SHORT_LABELS.get(platform_key, PLATFORM_LABELS[platform_key])
+        if short
+        else PLATFORM_LABELS[platform_key]
+    )
     if _get_ui_mode(context) == "minimal":
         return label
     return f"{PLATFORM_BUTTON_ICONS[platform_key]} {label}"
@@ -647,9 +664,11 @@ def _get_ui_mode(context: ContextTypes.DEFAULT_TYPE | None = None) -> str:
 
 
 def _button_rows(
-    buttons: list[InlineKeyboardButton],
+    buttons: list[InlineKeyboardButton], *, per_row: int = 2
 ) -> list[list[InlineKeyboardButton]]:
-    return [buttons[index : index + 2] for index in range(0, len(buttons), 2)]
+    return [
+        buttons[index : index + per_row] for index in range(0, len(buttons), per_row)
+    ]
 
 
 def _keyboard_with_optional_channel(

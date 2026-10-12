@@ -246,7 +246,7 @@ class Release119StateTests(unittest.IsolatedAsyncioTestCase):
         a, b = BotRuntime(kv), BotRuntime(kv)
         left, right = await asyncio.gather(a.get_session(7), b.get_session(7))
         left.collection_layout = "compact"
-        right.collection_layout = "auto"
+        right.collection_layout = "column"
         await a.save_session(left)
         with self.assertRaises(StateConflictError):
             await b.save_session(right)

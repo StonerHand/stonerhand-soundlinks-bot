@@ -12,7 +12,7 @@ from music_links_bot.models import (
     TrackMatch,
     VideoMatch,
 )
-from music_links_bot.release_metadata import duration_label, metadata_url
+from music_links_bot.release_metadata import duration_label, duration_ms, metadata_url
 from music_links_bot.release_preferences import (
     current_presentation,
     release_preference_key,
@@ -45,6 +45,11 @@ def pick_track_emoji(track: TrackMatch) -> str:
     return release_emoji(track)
 
 
+def _list_number(index: int) -> str:
+    """Aligned monospace numbers: 01, 02 … 10."""
+    return f"<code>{index:02}</code>"
+
+
 def format_track_label(track: TrackMatch) -> str:
     return f"{_display_text(track.artist)} - {_display_text(track.title)}"
 
@@ -58,17 +63,22 @@ def format_track_heading(track: TrackMatch) -> str:
 
 
 def format_release_heading(track: TrackMatch) -> str:
+    """ "Artist — Title" on one bold line, then one line of release details."""
     artist, title = _display_text(track.artist), _display_text(track.title)
-    lines = [f"{release_emoji(track)} · <b>{title}</b>"]
     various_artists = track.artist.strip().casefold() in {
         "various artists",
         "разные исполнители",
     }
     if artist and not (track.kind == "album" and various_artists):
-        lines.append(_metadata_link(artist, track.artist_url, "artist"))
+        lines = [
+            f"<b>{_metadata_link(artist, track.artist_url, 'artist')} — {title}</b>"
+        ]
+    else:
+        lines = [f"<b>{title}</b>"]
     details = release_details(track)
-    if details:
-        lines.extend(["", escape(details)])
+    lines.append(f"{release_emoji(track)} {escape(details)}" if details else "")
+    if not lines[-1]:
+        lines.pop()
     # Album membership is provider metadata, never inferred from the song title.
     if track.kind == "song" and track.album_title:
         album = _display_text(track.album_title)
@@ -99,15 +109,21 @@ def format_track_message(
 
 
 def format_video_message(video: VideoMatch, *, include_hashtags: bool = True) -> str:
-    lines = [
-        f"📺 · <b>{_display_text(video.title)}</b>",
-        "",
-        "Video · YouTube" if resolve_lang(None) == "en" else "Видео · YouTube",
-    ]
+    from music_links_bot.video_kinds import video_kind, video_kind_label
+
+    kind = video_kind(video)
+    label = (
+        ("Video" if resolve_lang(None) == "en" else "Видео")
+        if kind == "video"
+        else video_kind_label(kind).split(" ", 1)[1]
+    )
+    details = [label, "YouTube"]
     if video.author.strip():
-        lines.append(
-            f"{'Source' if resolve_lang(None) == 'en' else 'Источник'}: {_display_text(video.author)}"
-        )
+        details.append(_display_text(video.author))
+    lines = [
+        f"<b>{_display_text(video.title)}</b>",
+        f"{video_kind_emoji(video)} " + " · ".join(details),
+    ]
     return _with_hashtags(
         lines, "#stonerhand #video", include_hashtags=include_hashtags
     )
@@ -115,9 +131,9 @@ def format_video_message(video: VideoMatch, *, include_hashtags: bool = True) ->
 
 def format_radio_message(radio: RadioMatch, *, include_hashtags: bool = True) -> str:
     lines = [
-        f"📻 · <b>{_display_text(radio.title)}</b>",
-        "",
-        (
+        f"<b>{_display_text(radio.title)}</b>",
+        "📻 "
+        + (
             f"{'Radio show' if resolve_lang(None) == 'en' else 'Радиошоу'} · {_display_text(radio.station)}"
             if radio.station == "Apple Music"
             else f"{'Radio' if resolve_lang(None) == 'en' else 'Радио'} · {_display_text(radio.station)}"
@@ -134,9 +150,8 @@ def format_playlist_message(
     include_hashtags: bool = True,
 ) -> str:
     lines = [
-        f"🎛 · <b>{_display_text(playlist.title)}</b>",
-        "",
-        f"{'Playlist' if resolve_lang(None) == 'en' else 'Плейлист'} · {_display_text(playlist.platform)}",
+        f"<b>{_display_text(playlist.title)}</b>",
+        f"🎛 {'Playlist' if resolve_lang(None) == 'en' else 'Плейлист'} · {_display_text(playlist.platform)}",
     ]
     return _with_hashtags(
         lines, "#stonerhand #playlist", include_hashtags=include_hashtags
@@ -149,9 +164,8 @@ def format_artist_message(
     include_hashtags: bool = True,
 ) -> str:
     lines = [
-        f"🧬 · <b>{_display_text(artist.title)}</b>",
-        "",
-        f"{'Artist' if resolve_lang(None) == 'en' else 'Исполнитель'} · {_display_text(artist.platform)}",
+        f"<b>{_display_text(artist.title)}</b>",
+        f"🧬 {'Artist' if resolve_lang(None) == 'en' else 'Исполнитель'} · {_display_text(artist.platform)}",
     ]
     return _with_hashtags(
         lines, "#stonerhand #artist", include_hashtags=include_hashtags
@@ -167,7 +181,7 @@ def format_artist_collection_message(
     lines = [f"<b>{escape(title or 'Артисты')}</b>", ""]
     for index, artist in enumerate(artists, start=1):
         heading = f"<b>{_display_text(artist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(f"{index}. 🧬 · {heading}")
+        lines.append(f"{_list_number(index)} 🧬 {heading}")
 
     return _with_hashtags(
         lines, "#stonerhand #collection #artist", include_hashtags=include_hashtags
@@ -183,7 +197,7 @@ def format_playlist_collection_message(
     lines = [f"<b>{escape(title or 'Плейлисты')}</b>", ""]
     for index, playlist in enumerate(playlists, start=1):
         heading = f"<b>{_display_text(playlist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(f"{index}. 🎛 · {heading}")
+        lines.append(f"{_list_number(index)} 🎛 {heading}")
 
     return _with_hashtags(
         lines, "#stonerhand #collection #playlist", include_hashtags=include_hashtags
@@ -199,7 +213,7 @@ def format_video_collection_message(
     lines = [f"<b>{escape(title or 'Видео')}</b>", ""]
     for index, video in enumerate(videos, start=1):
         heading = f"<b>{_display_text(video.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(f"{index}. {video_kind_emoji(video)} · {heading}")
+        lines.append(f"{_list_number(index)} {video_kind_emoji(video)} {heading}")
 
     return _with_hashtags(
         lines, "#stonerhand #collection #video", include_hashtags=include_hashtags
@@ -215,7 +229,7 @@ def format_radio_collection_message(
     lines = [f"<b>{escape(title or 'Радио')}</b>", ""]
     for index, radio in enumerate(radios, start=1):
         heading = f"<b>{_display_text(radio.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(f"{index}. 📻 · {heading}")
+        lines.append(f"{_list_number(index)} 📻 {heading}")
 
     return _with_hashtags(
         lines, "#stonerhand #collection #radio", include_hashtags=include_hashtags
@@ -254,27 +268,27 @@ def format_mixed_collection_message(
     index = 1
     for track in tracks:
         emoji = pick_track_emoji(track)
-        lines.append(f"{index}. {emoji} · {format_track_heading(track)}")
+        lines.append(f"{_list_number(index)} {emoji} {format_track_heading(track)}")
         index += 1
 
     for playlist in playlists:
         heading = f"<b>{_display_text(playlist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(f"{index}. 🎛 · {heading}")
+        lines.append(f"{_list_number(index)} 🎛 {heading}")
         index += 1
 
     for artist in artists:
         heading = f"<b>{_display_text(artist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(f"{index}. 🧬 · {heading}")
+        lines.append(f"{_list_number(index)} 🧬 {heading}")
         index += 1
 
     for radio in radios:
         heading = f"<b>{_display_text(radio.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(f"{index}. 📻 · {heading}")
+        lines.append(f"{_list_number(index)} 📻 {heading}")
         index += 1
 
     for video in videos:
         heading = f"<b>{_display_text(video.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(f"{index}. {video_kind_emoji(video)} · {heading}")
+        lines.append(f"{_list_number(index)} {video_kind_emoji(video)} {heading}")
         index += 1
 
     return _with_hashtags(
@@ -378,10 +392,21 @@ def format_collection_message(
         )
 
     lines: list[str] = []
-    if title:
-        lines.extend([f"<b>{_display_text(title)}</b>", ""])
-    elif not intro:
-        lines.extend(["<b>Подборка</b>", ""])
+    composition = escape(collection_composition(tracks)) if len(tracks) > 1 else ""
+    if title or not intro:
+        # "Тяжёлый вечер · 5 треков": what it is and how big, on one line.
+        # Generated titles ("Подборка · 2 релиза") already carry a count.
+        heading = f"<b>{_display_text(title) if title else 'Подборка'}</b>"
+        counted = bool(title) and any(char.isdigit() for char in title)
+        lines.extend(
+            [
+                f"{heading} · {composition}"
+                if composition and not counted
+                else heading,
+                "",
+            ]
+        )
+        composition = ""
     if intro:
         lines.extend([_display_text(intro), ""])
 
@@ -406,8 +431,8 @@ def format_collection_message(
             )
             for track, item in zip(tracks, annotations, strict=True)
         ]
-    if len(tracks) > 1:
-        lines.extend([f"<i>{escape(collection_composition(tracks))}</i>", ""])
+    if composition:
+        lines.extend([f"<i>{composition}</i>", ""])
     active_section = ""
     shared_artist = (
         shared_collection_artist(tracks)
@@ -431,11 +456,12 @@ def format_collection_message(
             compact_release_title(track.title),
             MAX_COLLECTION_TEXT_LENGTH,
         )
+        number = _list_number(index)
         if shared_artist:
-            lines.append(f"{index}. {title_text}")
+            lines.append(f"{number} {title_text}")
         else:
             artist = _display_text(track.artist, MAX_COLLECTION_TEXT_LENGTH)
-            lines.append(f"{index}. <b>{artist}</b> — {title_text}")
+            lines.append(f"{number} <b>{artist}</b> — {title_text}")
         note = (
             item_notes[index - 1].strip()
             if item_notes and index <= len(item_notes)
@@ -607,6 +633,12 @@ def release_details(track: TrackMatch) -> str:
         and 0 < track.track_count <= 9999
     ):
         details.append(count_label(track.track_count, "track"))
-    if duration := duration_label(track.duration_ms):
+    if track.kind == "album" and (total := duration_ms(track.duration_ms)):
+        # Albums read better in minutes: "63 мин", not "1:03:00".
+        minutes = max(1, round(total / 60000))
+        details.append(
+            f"{minutes} min" if resolve_lang(None) == "en" else f"{minutes} мин"
+        )
+    elif duration := duration_label(track.duration_ms):
         details.append(duration)
     return " · ".join(details)

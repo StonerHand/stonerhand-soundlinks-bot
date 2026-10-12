@@ -297,4 +297,5 @@ class PublicationOverrideTests(unittest.TestCase):
             for button in row
             if button.url and "song.link" not in button.url and "t.me" not in button.url
         ]
-        self.assertEqual(len(urls), 1)
+        # An unknown selection falls back to the default: up to three services.
+        self.assertEqual(len(urls), 3)
