@@ -20,7 +20,7 @@ jobs:
       github.event_name != 'workflow_run' ||
       github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 14
     steps:
       - uses: actions/checkout@v7
       - name: Verify bot, webhook, Redis and collection artwork
@@ -29,8 +29,9 @@ jobs:
         env:
           CANARY_EXPECT_COMMIT: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
           CANARY_RELEASE_ONLY: ${{ github.event_name == 'workflow_run' && '1' || '0' }}
+        # Vercel sometimes needs 5+ minutes to promote a build: wait up to ~8.
         run: |
-          for attempt in 1 2 3 4 5 6 7 8 9; do
+          for attempt in $(seq 1 24); do
             python tests/e2e/production_canary.py && exit 0
             sleep 20
           done
