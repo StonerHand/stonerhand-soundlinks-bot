@@ -76,7 +76,7 @@ python -m music_links_bot
 ```
 Telegram ──▶ Vercel /api/telegram ──▶ поиск релиза (Songlink, iTunes, MusicBrainz, YouTube)
                                    └─▶ черновик в Upstash Redis ──▶ пост в чат или канал
-QStash каждые 3 мин ──▶ /api/queue_worker ──▶ отложенные публикации
+QStash каждые 5 мин ──▶ /api/queue_worker ──▶ отложенные публикации
 ```
 
 Python, [python-telegram-bot](https://python-telegram-bot.org), serverless-функции Vercel. CI проверяет Python 3.10–3.12, тесты с покрытием, типы, стиль и безопасность. Подробности — в [архитектуре](docs/ARCHITECTURE.ru.md), изменения — в [CHANGELOG](CHANGELOG.md).

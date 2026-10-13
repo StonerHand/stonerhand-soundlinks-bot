@@ -500,5 +500,24 @@ class FormatterTests(unittest.TestCase):
         self.assertIn("#stonerhand #collection #radio #video", message)
 
 
+class ArtistRunTests(unittest.TestCase):
+    def test_consecutive_releases_by_one_artist_share_a_heading(self) -> None:
+        tracks = [
+            TrackMatch(artist="Kyuss", title="Green Machine", links={}),
+            TrackMatch(artist="MSI", title="Pay For It", links={}),
+            TrackMatch(artist="MSI", title="1989", links={}),
+            TrackMatch(artist="Deftones", title="Rickets", links={}),
+        ]
+
+        message = format_collection_message(tracks, include_hashtags=False)
+
+        self.assertIn(
+            "<code>01</code> · <b>Kyuss</b> — Green Machine\n\n"
+            "<b>MSI</b>\n<code>02</code> · Pay For It\n<code>03</code> · 1989\n\n"
+            "<code>04</code> · <b>Deftones</b> — Rickets",
+            message,
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

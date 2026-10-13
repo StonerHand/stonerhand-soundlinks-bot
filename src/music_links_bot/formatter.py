@@ -454,6 +454,12 @@ def format_collection_message(
     if shared_artist and not title_named_artist:
         # The heading names something else: keep the artist above the list.
         lines.append(f"<b>{_display_text(shared_artist)}</b>")
+    groups = (
+        _artist_runs(tracks)
+        if not shared_artist
+        and not any(section.strip() for section in (item_sections or []))
+        else [""] * len(tracks)
+    )
     for index, track in enumerate(tracks, start=1):
         section = (
             item_sections[index - 1].strip()
@@ -465,12 +471,21 @@ def format_collection_message(
                 lines.append("")
             lines.append(f"<b>{_display_text(section, 64)}</b>")
             active_section = section
+        group = groups[index - 1]
+        previous = groups[index - 2] if index > 1 else ""
+        if group and group != previous:
+            # Several releases in a row by one artist: name them once.
+            if lines and lines[-1]:
+                lines.append("")
+            lines.append(f"<b>{_display_text(group, MAX_COLLECTION_TEXT_LENGTH)}</b>")
+        elif previous and not group:
+            lines.append("")
         title_text = _display_text(
             compact_release_title(track.title),
             MAX_COLLECTION_TEXT_LENGTH,
         )
         number = _list_number(index)
-        if shared_artist:
+        if shared_artist or group:
             lines.append(f"{number} · {title_text}")
         else:
             artist = _display_text(track.artist, MAX_COLLECTION_TEXT_LENGTH)
@@ -493,6 +508,21 @@ def format_collection_message(
             include_hashtags=include_hashtags,
         )
     )
+
+
+def _artist_runs(tracks: list[TrackMatch]) -> list[str]:
+    """The artist of each item that sits in a run of 2+ by that artist, else ""."""
+    keys = [" ".join(track.artist.split()).casefold() for track in tracks]
+    runs = [""] * len(tracks)
+    start = 0
+    while start < len(tracks):
+        end = start
+        while end + 1 < len(tracks) and keys[start] and keys[end + 1] == keys[start]:
+            end += 1
+        if end > start:
+            runs[start : end + 1] = [tracks[start].artist] * (end - start + 1)
+        start = end + 1
+    return runs
 
 
 def _fit_collection_message(value: str) -> str:
