@@ -1015,8 +1015,10 @@ def render_crate(
         lines = [heading, ""]
         for index, entry in enumerate(items, 1):
             item = entry.get("item") or {}
+            # Same list style as the published collection: "01 · Artist — Title".
             lines.append(
-                f"<b>{index}.</b> {escape(str(item.get('artist') or '—'))} — "
+                f"<code>{index:02}</code> · "
+                f"<b>{escape(str(item.get('artist') or '—'))}</b> — "
                 f"{escape(str(item.get('title') or '—'))}"
             )
         from music_links_bot.collection_plan import (

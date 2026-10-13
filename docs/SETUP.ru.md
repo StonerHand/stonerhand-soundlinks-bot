@@ -136,7 +136,7 @@ curl --fail-with-body --silent --show-error \
    к проекту. Vercel сам добавит `QSTASH_CURRENT_SIGNING_KEY` и
    `QSTASH_NEXT_SIGNING_KEY`; сделайте Redeploy, чтобы функции их увидели.
 2. Upstash → QStash → **Schedules → Create**: Destination
-   `https://<ваш-домен>/api/queue_worker`, Cron `*/3 * * * *` (бесплатного лимита QStash хватает с запасом), метод `POST`.
+   `https://<ваш-домен>/api/queue_worker`, Cron `*/5 * * * *` (288 запросов в день — с запасом в бесплатном лимите 500), метод `POST`.
 
 Обработчик проверяет подпись QStash (`Upstash-Signature`) по этим ключам, так
 что копировать секрет в заголовок не нужно. `GET`/`POST` с
