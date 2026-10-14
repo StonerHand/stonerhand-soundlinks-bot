@@ -20,10 +20,13 @@
 
 - 🔗 **Any link or query** — Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, Bandcamp, Yandex Music, NTS, or just `artist — track`.
 - 🖼 **Posts with artwork** — signed cover, title, year, length, smart tags and buttons for every platform.
-- 🎶 **Collections** — up to 10 tracks, albums and videos in one post with a shared collage.
+- 🎶 **Collections** — up to 10 tracks, albums and videos in one post: a shared collage, a `01 · Artist — Title` list and short buttons.
+- 🎬 **Song + videos** — a track with its music videos, live and lyric videos in one post.
 - ✏️ **In-chat editor** — your own text, tags, look and buttons.
-- 📣 **Channel publishing** — now, on a schedule ("tomorrow 18:30") or with one-tap quick publish; 2 minutes to undo.
+- 📣 **Channel publishing** — now, on a schedule ("tomorrow 18:30") or in one tap; 2 minutes to undo. Every reader sees times in their own time zone.
+- 👥 **Groups and channels** — make the bot an admin and a posted link turns into a finished post; `/channel` checks the rights. In groups `/help` and `/channel` answer only you.
 - ⚡ **Inline mode** — `@StonerHandBot artist — track` in any chat.
+- 🌍 **Russian and English** — follows your Telegram language or the one set in settings.
 
 | Channel post | Draft in the bot | Collection with videos |
 | :---: | :---: | :---: |

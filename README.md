@@ -16,7 +16,7 @@
 <p align="center">
   <a href="https://github.com/StonerHand/stonerhand-soundlinks-bot/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/StonerHand/stonerhand-soundlinks-bot/ci.yml?branch=main&amp;style=flat-square&amp;label=CI&amp;color=12E2B0" alt="Статус CI"></a>
   <a href="https://github.com/StonerHand/stonerhand-soundlinks-bot/releases"><img src="https://img.shields.io/github/v/release/StonerHand/stonerhand-soundlinks-bot?style=flat-square&amp;color=12E2B0&amp;label=release" alt="Последний релиз"></a>
-  <a href="pyproject.toml"><img src="https://img.shields.io/badge/Python-3.10%2B-12E2B0?style=flat-square" alt="Python 3.10 и новее"></a>
+  <a href="pyproject.toml"><img src="https://img.shields.io/badge/Python-3.10%E2%80%933.14-12E2B0?style=flat-square" alt="Python 3.10–3.14"></a>
   <a href="https://vercel.com"><img src="https://img.shields.io/badge/Deploy-Vercel-12E2B0?style=flat-square" alt="Работает на Vercel"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-12E2B0?style=flat-square" alt="Лицензия MIT"></a>
 </p>
@@ -29,11 +29,13 @@
 
 - 🔗 **Любая ссылка или запрос.** Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, Bandcamp, Яндекс Музыка, NTS — или просто `артист — трек`.
 - 🖼 **Пост с обложкой.** Обложка с подписью канала, название, год, длительность, умные теги и кнопки всех площадок.
-- 🎶 **Подборки.** До 10 треков, альбомов и клипов в одном посте с общим коллажем.
+- 🎶 **Подборки.** До 10 треков, альбомов и клипов в одном посте: общий коллаж, список «01 · Артист — Трек» и короткие кнопки.
+- 🎬 **Песня + клипы.** Трек и его клипы, лайвы и lyric-видео — одним постом с кадрами в коллаже.
 - ✏️ **Редактор в чате.** Свой текст, теги, вид поста и набор кнопок — без команд и форм.
-- 📣 **Публикация в канал.** Сразу, по расписанию («завтра 18:30») или быстрой публикацией в одно касание; 2 минуты на отмену.
+- 📣 **Публикация в канал.** Сразу, по расписанию («завтра 18:30») или в одно касание; 2 минуты на отмену. Время каждый видит в своём часовом поясе.
+- 👥 **Группы и каналы.** Добавьте бота администратором — присланная ссылка превратится в готовый пост; `/channel` проверит права. В группах `/help` и `/channel` отвечают только вам.
 - ⚡ **Inline-режим.** `@StonerHandBot артист — трек` в любом чате.
-- 🕒 **Время по вашим часам.** Время публикации каждый видит в своём часовом поясе; в группах `/help` и `/channel` отвечают только вам.
+- 🌍 **Русский и английский.** Язык берётся из Telegram или выбирается в настройках.
 
 ## 📱 Как выглядит
 
@@ -79,7 +81,7 @@ Telegram ──▶ Vercel /api/telegram ──▶ поиск релиза (Songl
 QStash каждые 5 мин ──▶ /api/queue_worker ──▶ отложенные публикации
 ```
 
-Python, [python-telegram-bot](https://python-telegram-bot.org), serverless-функции Vercel. CI проверяет Python 3.10–3.14, тесты с покрытием, типы, стиль и безопасность. Подробности — в [архитектуре](docs/ARCHITECTURE.ru.md), изменения — в [CHANGELOG](CHANGELOG.md).
+Python, [python-telegram-bot](https://python-telegram-bot.org), serverless-функции Vercel, Telegram Bot API 10.3. CI проверяет Python 3.10–3.14: 1000+ тестов с покрытием, типы, стиль, безопасность и аудит зависимостей. Подробности — в [архитектуре](docs/ARCHITECTURE.ru.md), изменения — в [CHANGELOG](CHANGELOG.md) и [релизах](https://github.com/StonerHand/stonerhand-soundlinks-bot/releases).
 
 ## 📄 Лицензия
 
