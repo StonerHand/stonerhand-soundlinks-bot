@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import re
+
 from telegram import (
+    InlineKeyboardButton as TelegramInlineKeyboardButton,
     InlineKeyboardMarkup,
     LinkPreviewOptions,
     Message,
@@ -186,25 +189,25 @@ def _build_link_keyboard(
             _url_button(
                 text=f"{prefix}{_platform_button_label(platform_key, context, short=short)}",
                 url=links[platform_key],
-                # The provider is a convenient shortcut; Songlink/Odesli is
-                # the canonical cross-platform destination and owns the only
-                # primary accent whenever it is available.
-                style="primary" if not buttons and not release_hub_url else None,
+                # Post buttons stay neutral: a colored accent fights the cover.
+                style=None,
             )
         )
-    # The universal release hub is the canonical destination, so it owns the
-    # first full-width row. Provider shortcuts stay secondary underneath it.
+    # The universal release hub is the canonical destination, so it comes
+    # first. A single provider shortcut shares its row instead of adding a
+    # second full-width bar; two or three get their own row underneath.
     rows: list[list[InlineKeyboardButton]] = []
     if release_hub_url:
-        rows.append(
-            [
-                _url_button(
-                    _release_hub_button_label(release_kind, release_format, context),
-                    url=release_hub_url,
-                    style="primary",
-                )
-            ]
+        hub = _url_button(
+            _release_hub_button_label(release_kind, release_format, context),
+            url=release_hub_url,
+            style=None,
         )
+        if len(buttons) == 1:
+            return _keyboard_with_optional_channel(
+                [[hub, buttons[0]]], include_channel_button
+            )
+        rows.append([hub])
     rows.extend(_button_rows(buttons, per_row=3 if short else 2))
 
     return _keyboard_with_optional_channel(rows, include_channel_button)
@@ -270,9 +273,7 @@ def _build_collection_keyboard(
             _url_button(
                 text=text,
                 url=destination,
-                style="primary"
-                if is_track_video_pair and track.kind == "song"
-                else None,
+                style=None,
             )
         )
 
@@ -289,7 +290,7 @@ def _build_youtube_keyboard(
     return _single_url_keyboard(
         "📺 Смотреть на YouTube",
         url=url,
-        style="primary",
+        style=None,
         include_channel_button=include_channel_button,
     )
 
@@ -306,7 +307,7 @@ def _build_nts_keyboard(
         if is_apple_music_radio_url(url)
         else "📻 Открыть на NTS",
         url=url,
-        style="primary",
+        style=None,
         include_channel_button=include_channel_button,
     )
 
@@ -319,7 +320,7 @@ def _build_playlist_keyboard(
     return _single_url_keyboard(
         "🎛 Открыть плейлист",
         url=url,
-        style="primary",
+        style=None,
         include_channel_button=include_channel_button,
     )
 
@@ -332,7 +333,7 @@ def _build_artist_keyboard(
     return _single_url_keyboard(
         "🧬 Открыть артиста",
         url=url,
-        style="primary",
+        style=None,
         include_channel_button=include_channel_button,
     )
 
@@ -435,9 +436,7 @@ def _build_track_videos_keyboard(
         track.page_url, track.links, release_kind=track.kind
     ) or _select_preview_url(track.links)
     if destination:
-        rows.append(
-            [_url_button(text="🎧 Слушать песню", url=destination, style="primary")]
-        )
+        rows.append([_url_button(text="🎧 Слушать песню", url=destination, style=None)])
     clips = [
         _url_button(text=label, url=video.url, style=None)
         for label, video in zip(video_kind_labels(videos), videos, strict=True)
@@ -490,7 +489,7 @@ def _build_mixed_collection_keyboard(
                     else _button_label(f"{index} · {track.artist} — {track.title}")
                 ),
                 url=destination,
-                style="primary" if is_track_video_pair else None,
+                style=None,
             )
         )
         index += 1
@@ -588,12 +587,48 @@ def _button_label(text: str) -> str:
     return " ".join(text.split())
 
 
+_NUMBERED_LABEL = re.compile(r"^(?:(?P<icon>\S+) )?(?P<number>\d{1,2}) · ")
+KEYPAD_ROW_SIZE = 5
+
+
+def _number_keypad(
+    buttons: list[InlineKeyboardButton],
+) -> list[list[TelegramInlineKeyboardButton]] | None:
+    """Collections list their titles in the post, so buttons show only numbers.
+
+    1–5 items fit one row; 6–10 split into two even rows ("4 + 4", "5 + 5").
+    Video items keep their kind icon ("🎬 3"). Returns None when a button is
+    not a numbered item, e.g. the song + clip pair.
+    """
+    keys: list[TelegramInlineKeyboardButton] = []
+    for button in buttons:
+        match = _NUMBERED_LABEL.match(button.text)
+        if match is None:
+            return None
+        icon = match.group("icon")
+        label = f"{icon} {match.group('number')}" if icon else match.group("number")
+        keys.append(
+            TelegramInlineKeyboardButton.de_json(
+                {**button.to_dict(), "text": label}, None
+            )
+        )
+    if not keys:
+        return None
+    row_count = -(-len(keys) // KEYPAD_ROW_SIZE)
+    per_row = -(-len(keys) // row_count)
+    return [keys[i : i + per_row] for i in range(0, len(keys), per_row)]
+
+
 def _adaptive_collection_rows(
     buttons: list[InlineKeyboardButton],
     *,
     layout: str | None = None,
 ) -> list[list[InlineKeyboardButton]]:
     layout = layout or current_presentation.get().layout
+    if layout == "auto":
+        keypad = _number_keypad(buttons)
+        if keypad:
+            return keypad
     if layout == "column" or (
         layout == "auto"
         and any(len(b.text) > MAX_TWO_COLUMN_BUTTON_TEXT_LENGTH for b in buttons)

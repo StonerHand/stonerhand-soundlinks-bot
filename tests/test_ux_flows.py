@@ -318,7 +318,7 @@ def test_settings_are_one_level_and_owner_rows_only_for_the_owner():
         "🌐 Язык · Как в Telegram",
         "🎨 Вид новых постов · Как в прошлый раз",
         "# Теги · Как в прошлый раз",
-        "🎶 Подборки · Авто",
+        "🎶 Подборки · Номера",
     ]
     assert not any("Подпись" in label for label in guest_labels)
 
