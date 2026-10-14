@@ -65,8 +65,8 @@
     "collection_complete": {
       "buttons": [
         "1 · A Torinói Ló",
-        "2 · The Lonesome Foghorn Blows",
-        "3 · 1758 Times of Weird Sadness"
+        "2 · The Lonesome Fog…",
+        "3 · 1758 Times of We…"
       ],
       "checks": {},
       "count": [
@@ -94,8 +94,8 @@
     "collection_partial": {
       "buttons": [
         "1 · A Torinói Ló",
-        "2 · The Lonesome Foghorn Blows",
-        "3 · 1758 Times of Weird Sadness"
+        "2 · The Lonesome Fog…",
+        "3 · 1758 Times of We…"
       ],
       "checks": {},
       "count": [
@@ -243,16 +243,16 @@
     },
     "ten_items_auto": {
       "buttons": [
-        "1 · Track 1 (Live 2001)",
-        "2 · Track 2 (Live 2001)",
-        "3 · Track 3 (Live 2001)",
-        "4 · Track 4 (Live 2001)",
-        "5 · Track 5 (Live 2001)",
-        "6 · Track 6 (Live 2001)",
-        "7 · Track 7 (Live 2001)",
-        "8 · Track 8 (Live 2001)",
-        "9 · Track 9 (Live 2001)",
-        "10 · Track 10 (Live 2001)"
+        "1 · Track 1 (Live 20…",
+        "2 · Track 2 (Live 20…",
+        "3 · Track 3 (Live 20…",
+        "4 · Track 4 (Live 20…",
+        "5 · Track 5 (Live 20…",
+        "6 · Track 6 (Live 20…",
+        "7 · Track 7 (Live 20…",
+        "8 · Track 8 (Live 20…",
+        "9 · Track 9 (Live 20…",
+        "10 · Track 10 (Live 2…"
       ],
       "checks": {
         "all_buttons_present": true,
@@ -297,16 +297,16 @@
     },
     "ten_items_column": {
       "buttons": [
-        "1 · Track 1 (Live 2001)",
-        "2 · Track 2 (Live 2001)",
-        "3 · Track 3 (Live 2001)",
-        "4 · Track 4 (Live 2001)",
-        "5 · Track 5 (Live 2001)",
-        "6 · Track 6 (Live 2001)",
-        "7 · Track 7 (Live 2001)",
-        "8 · Track 8 (Live 2001)",
-        "9 · Track 9 (Live 2001)",
-        "10 · Track 10 (Live 2001)"
+        "1 · Track 1 (Live 20…",
+        "2 · Track 2 (Live 20…",
+        "3 · Track 3 (Live 20…",
+        "4 · Track 4 (Live 20…",
+        "5 · Track 5 (Live 20…",
+        "6 · Track 6 (Live 20…",
+        "7 · Track 7 (Live 20…",
+        "8 · Track 8 (Live 20…",
+        "9 · Track 9 (Live 20…",
+        "10 · Track 10 (Live 2…"
       ],
       "checks": {
         "all_buttons_present": true,
@@ -351,16 +351,16 @@
     },
     "ten_items_compact": {
       "buttons": [
-        "1 · Track 1 (Live 2001)",
-        "2 · Track 2 (Live 2001)",
-        "3 · Track 3 (Live 2001)",
-        "4 · Track 4 (Live 2001)",
-        "5 · Track 5 (Live 2001)",
-        "6 · Track 6 (Live 2001)",
-        "7 · Track 7 (Live 2001)",
-        "8 · Track 8 (Live 2001)",
-        "9 · Track 9 (Live 2001)",
-        "10 · Track 10 (Live 2001)"
+        "1 · Track 1 (Live 20…",
+        "2 · Track 2 (Live 20…",
+        "3 · Track 3 (Live 20…",
+        "4 · Track 4 (Live 20…",
+        "5 · Track 5 (Live 20…",
+        "6 · Track 6 (Live 20…",
+        "7 · Track 7 (Live 20…",
+        "8 · Track 8 (Live 20…",
+        "9 · Track 9 (Live 20…",
+        "10 · Track 10 (Live 2…"
       ],
       "checks": {
         "all_buttons_present": true,

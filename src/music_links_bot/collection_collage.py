@@ -129,22 +129,34 @@ def media_collage_preview_url(
     """
     if not feature_enabled("COLLECTION_COLLAGE_ENABLED", default=True):
         return None
-    urls: list[str] = []
-    flags: list[bool] = []
-    for item, is_video in [*((t, False) for t in tracks), *((v, True) for v in videos)]:
-        image = str(getattr(item, "thumbnail_url", "") or "").strip()
-        if image and _safe_source_url(image) and image not in urls:
-            urls.append(image)
-            flags.append(is_video)
-        if len(urls) == MAX_COLLAGE_ITEMS:
-            break
-    if len(urls) < MIN_COLLAGE_ITEMS or not any(flags):
+
+    def images(items) -> list[str]:
+        found: list[str] = []
+        for item in items:
+            image = str(getattr(item, "thumbnail_url", "") or "").strip()
+            if image and _safe_source_url(image) and image not in found:
+                found.append(image)
+        return found
+
+    covers, frames = images(tracks), images(videos)
+    frames = [frame for frame in frames if frame not in covers]
+    # Clips keep a place even when six songs come first: covers take what is
+    # left after up to two frames, then any unused slots go back to either.
+    clip_slots = min(len(frames), 2)
+    chosen_covers = covers[: MAX_COLLAGE_ITEMS - clip_slots]
+    chosen_frames = frames[: MAX_COLLAGE_ITEMS - len(chosen_covers)]
+    urls = [*chosen_covers, *chosen_frames]
+    flags = [False] * len(chosen_covers) + [True] * len(chosen_frames)
+    if len(urls) < MIN_COLLAGE_ITEMS:
         return None
     return _artwork_preview_url(
         urls,
         base_url=base_url,
         signing_secret=signing_secret,
-        mode="b" + "".join("1" if flag else "0" for flag in flags),
+        # Without any clip frame this is a plain cover collage.
+        mode="b" + "".join("1" if flag else "0" for flag in flags)
+        if any(flags)
+        else None,
     )
 
 
