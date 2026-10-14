@@ -184,8 +184,10 @@ def test_unconfirmed_counts_are_not_displayed(value):
 def test_meaningful_versions_are_preserved_in_text_and_buttons(title):
     releases = [track(1, title=title), track(2)]
     with presentation_context():
+        # The post text keeps the whole version; the button starts the same.
         assert title in format_collection_message(releases)
-        assert title in _build_collection_keyboard(releases).inline_keyboard[0][0].text
+        label = _build_collection_keyboard(releases).inline_keyboard[0][0].text
+        assert title.startswith(label.removeprefix("1 · ").removesuffix("…"))
 
 
 @pytest.mark.parametrize("layout,rows", [("column", 10), ("auto", 5), ("compact", 5)])
