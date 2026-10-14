@@ -824,10 +824,10 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(len(rows), 2)
+        self.assertEqual(len(rows), 1)
         self.assertEqual(
             [button.text for row in rows for button in row],
-            ["1 · There's No Other Way - 2012 Remaster", "2 · Fool - 2012 Remaster"],
+            ["1 · There's No Other…", "2 · Fool - 2012 Rema…"],
         )
 
     def test_collection_repairs_stale_apple_hub_to_direct_provider(self) -> None:
@@ -1392,13 +1392,10 @@ class BotKeyboardTests(unittest.TestCase):
             ]
         )
 
+        # The post lists the full title; the button keeps a short one.
         button_text = keyboard.inline_keyboard[0][0].text
-        self.assertIn(
-            "A Very Long Track Title That Would Make A Telegram Button Too Wide",
-            button_text,
-        )
+        self.assertEqual(button_text, "1 · A Very Long Trac…")
         self.assertEqual(len(keyboard.inline_keyboard[0]), 1)
-        self.assertNotIn("…", button_text)
 
     def test_spotify_episode_fallback_builds_podcast_match(self) -> None:
         source_url = "https://open.spotify.com/episode/abc?si=123"
@@ -1485,8 +1482,10 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
             if button.text == "🎧 Слушать трек"
         )
         self.assertEqual(all_platforms_button.url, "https://song.link/transitions")
-        self.assertEqual(keyboard[-1][0].text, "↗️ Поделиться")
-        self.assertTrue(keyboard[-1][0].switch_inline_query.startswith("sh5|"))
+        # Inline posts land in another chat: Telegram's forward arrow shares them.
+        self.assertFalse(
+            any(button.switch_inline_query for row in keyboard for button in row)
+        )
 
     async def test_inline_track_result_can_fall_back_to_classic_post(self) -> None:
         result = await _build_inline_result(
@@ -1502,8 +1501,9 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         )
         keyboard = result.reply_markup.inline_keyboard
         self.assertEqual(keyboard[0][0].text, "🎧 Слушать трек")
-        self.assertEqual(keyboard[-1][0].text, "↗️ Поделиться")
-        self.assertTrue(keyboard[-1][0].switch_inline_query.startswith("sh5|"))
+        self.assertFalse(
+            any(button.switch_inline_query for row in keyboard for button in row)
+        )
 
     async def test_inline_clean_cover_stays_classic_with_cached_media(self) -> None:
         with (
@@ -1648,8 +1648,12 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.title, "Подборка · 2 релиза")
         self.assertIn("<code>01</code>", result.input_message_content.message_text)
         self.assertIn("<code>02</code>", result.input_message_content.message_text)
-        self.assertEqual(
-            result.reply_markup.inline_keyboard[-1][0].switch_inline_query, query
+        self.assertFalse(
+            any(
+                button.switch_inline_query
+                for row in result.reply_markup.inline_keyboard
+                for button in row
+            )
         )
 
     async def test_inline_collection_recovers_provider_failure_from_owner_crate(
@@ -2827,9 +2831,8 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("<a href=", message.replies[0])
         self.assertIn("#stonerhand #collection #playlist #video", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
-        self.assertEqual(keyboard[0][0].text, "1 · Women of Punk")
         self.assertEqual(
-            keyboard[1][0].text, "🎤 2 · SANSAE Live Session Vol.3 - Melon"
+            [b.text for b in keyboard[0]], ["1 · Women of Punk", "🎤 2 · Melon"]
         )
         record_mixed.assert_called_once()
 
@@ -2851,9 +2854,8 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("<a href=", message.replies[0])
         self.assertIn("#stonerhand #collection #radio #video", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
-        self.assertEqual(keyboard[0][0].text, "1 · Dark Energy w/ Guest")
         self.assertEqual(
-            keyboard[1][0].text, "🎤 2 · SANSAE Live Session Vol.3 - Melon"
+            [b.text for b in keyboard[0]], ["1 · Dark Energy w/ G…", "🎤 2 · Melon"]
         )
         record_mixed.assert_called_once()
 

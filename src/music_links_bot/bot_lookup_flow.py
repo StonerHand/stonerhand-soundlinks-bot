@@ -1120,7 +1120,9 @@ async def _deliver_lookup_bundle(
             requested_count=(
                 len(bundle.tracks) if not partial else len(request.source_urls)
             ),
-            allow_share=not partial,
+            # «Поделиться» only in the bot chat: groups and channels have
+            # Telegram's own forward arrow next to the post.
+            allow_share=not partial and request.is_private,
             **common,
         )
     elif kind == "videos":
@@ -1129,7 +1131,9 @@ async def _deliver_lookup_bundle(
             message,
             bundle.videos,
             requested_count=len(request.source_urls),
-            allow_share=not partial,
+            # «Поделиться» only in the bot chat: groups and channels have
+            # Telegram's own forward arrow next to the post.
+            allow_share=not partial and request.is_private,
             **common,
         )
         await _record_videos_safely(bundle.videos, message, context=context)
@@ -1139,7 +1143,9 @@ async def _deliver_lookup_bundle(
             message,
             bundle.radios,
             requested_count=len(request.source_urls),
-            allow_share=not partial,
+            # «Поделиться» only in the bot chat: groups and channels have
+            # Telegram's own forward arrow next to the post.
+            allow_share=not partial and request.is_private,
             **common,
         )
         await _record_radios_safely(bundle.radios, message, context=context)
@@ -1160,7 +1166,9 @@ async def _deliver_lookup_bundle(
             message,
             bundle.playlists,
             requested_count=len(request.source_urls),
-            allow_share=not partial,
+            # «Поделиться» only in the bot chat: groups and channels have
+            # Telegram's own forward arrow next to the post.
+            allow_share=not partial and request.is_private,
             import_id=import_id,
             **common,
         )
@@ -1171,7 +1179,9 @@ async def _deliver_lookup_bundle(
             message,
             bundle.artists,
             requested_count=len(request.source_urls),
-            allow_share=not partial,
+            # «Поделиться» only in the bot chat: groups and channels have
+            # Telegram's own forward arrow next to the post.
+            allow_share=not partial and request.is_private,
             **common,
         )
         await _record_artists_safely(bundle.artists, message, context=context)
@@ -1186,7 +1196,9 @@ async def _deliver_lookup_bundle(
             bundle.artists,
             context=context,
             requested_count=len(request.source_urls),
-            allow_share=not partial,
+            # «Поделиться» only in the bot chat: groups and channels have
+            # Telegram's own forward arrow next to the post.
+            allow_share=not partial and request.is_private,
             **common,
         )
         await _record_mixed_safely(
