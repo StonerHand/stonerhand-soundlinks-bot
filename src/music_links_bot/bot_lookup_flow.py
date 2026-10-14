@@ -1152,8 +1152,8 @@ async def _deliver_lookup_bundle(
         ):
             import_id = await _store_retry_sources(
                 context,
-                request.user_id,
-                bundle.playlists[0].track_urls[:MAX_LINKS_PER_MESSAGE],
+                user_id=request.user_id,
+                urls=bundle.playlists[0].track_urls[:MAX_LINKS_PER_MESSAGE],
             )
         await _send_playlist_result(
             context.bot,

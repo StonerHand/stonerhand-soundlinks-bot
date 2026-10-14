@@ -65,7 +65,7 @@ def infer_release_format(title: str, *metadata: object) -> str | None:
 
 
 def positive_track_count(value: object) -> int | None:
-    if isinstance(value, bool) or isinstance(value, float) and not value.is_integer():
+    if isinstance(value, bool) or (isinstance(value, float) and not value.is_integer()):
         return None
     try:
         count = int(value)

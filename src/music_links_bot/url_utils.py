@@ -185,8 +185,10 @@ def is_platform_destination_url(platform_key: object, value: object) -> bool:
         and port in {None, 443}
         and (
             normalize_host(parsed.hostname) in allowed_hosts
-            or canonical_platform_key(platform_key) == "bandcamp"
-            and normalize_host(parsed.hostname).endswith(".bandcamp.com")
+            or (
+                canonical_platform_key(platform_key) == "bandcamp"
+                and normalize_host(parsed.hostname).endswith(".bandcamp.com")
+            )
         )
     )
 

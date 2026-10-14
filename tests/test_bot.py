@@ -2743,6 +2743,34 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(preview_options.show_above_text)
         record_playlists.assert_called_once()
 
+    async def test_playlist_with_tracks_offers_an_import_button(self) -> None:
+        """Regression: storing the import list used to raise a TypeError."""
+        message = PrivateSpotifyPlaylistMessageStub()
+        context = ContextStub()
+
+        async def with_tracks(self, source_url: str) -> PlaylistMatch:
+            return PlaylistMatch(
+                title="Women of Punk",
+                platform="Spotify",
+                url=source_url,
+                track_urls=[f"https://open.spotify.com/track/{n}" for n in "abc"],
+            )
+
+        with (
+            patch.object(PlaylistClientStub, "lookup_playlist", with_tracks),
+            patch("music_links_bot.bot_stats.record_playlists"),
+        ):
+            await track_lookup_message(UpdateStub(message), context)
+
+        self.assertEqual(len(message.replies), 1)
+        callbacks = [
+            button.callback_data
+            for row in message.reply_kwargs[0]["reply_markup"].inline_keyboard
+            for button in row
+            if button.callback_data
+        ]
+        self.assertTrue(any("playlist" in data for data in callbacks))
+
     async def test_apple_music_playlist_links_use_playlist_post(self) -> None:
         message = PrivateApplePlaylistMessageStub()
         context = ContextStub(playlist_client=ApplePlaylistClientStub())

@@ -353,6 +353,14 @@ _KIND_HEADINGS = {
     "visualizer": "визуализация",
     "audio": "аудио",
 }
+_KIND_HEADINGS_EN = {
+    "clip": "music video",
+    "live": "live",
+    "lyric": "lyric video",
+    "acoustic": "acoustic",
+    "visualizer": "visualizer",
+    "audio": "audio",
+}
 
 
 def format_track_videos_message(
@@ -364,7 +372,13 @@ def format_track_videos_message(
     """One release with its clips: what to listen to, then what to watch."""
     from music_links_bot.video_kinds import video_kind
 
-    if len(videos) == 1:
+    if resolve_lang(None) == "en":
+        heading = (
+            "Song + " + _KIND_HEADINGS_EN.get(video_kind(videos[0]), "video")
+            if len(videos) == 1
+            else f"Song + {len(videos)} videos"
+        )
+    elif len(videos) == 1:
         heading = "Песня + " + _KIND_HEADINGS.get(video_kind(videos[0]), "клип")
     else:
         heading = f"Песня + {len(videos)} видео"
