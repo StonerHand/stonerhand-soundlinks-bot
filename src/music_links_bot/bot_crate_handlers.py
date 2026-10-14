@@ -424,7 +424,7 @@ async def _remove_item(
     undo_map: dict,
     *,
     user_id: int,
-    index: int,
+    index: str,
     lang: str,
 ) -> tuple[list[dict], dict | None, int | None, str | None]:
     items, (index, removed) = await pop_crate_item(bot_data, user_id, index)

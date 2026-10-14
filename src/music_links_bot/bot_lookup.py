@@ -1079,7 +1079,7 @@ async def _fill_release_metadata(client, search_client, tracks):
         if (
             track.duration_ms
             and track.artist_url
-            and (track.kind == "album" or track.album_url and track.album_title)
+            and (track.kind == "album" or (track.album_url and track.album_title))
         ):
             return
         provider = search_client if track.links.get("appleMusic") else client
@@ -1102,10 +1102,8 @@ async def _fill_release_metadata(client, search_client, tracks):
             else details.album_title
         )
         # Keep an existing title/link pair intact if stores describe different editions.
-        if (
-            not track.album_title
-            or album
-            and track.album_title.casefold() == album.casefold()
+        if not track.album_title or (
+            album and track.album_title.casefold() == album.casefold()
         ):
             track.album_title = track.album_title or album
             track.album_url = track.album_url or metadata_url(

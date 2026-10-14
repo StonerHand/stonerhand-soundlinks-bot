@@ -317,3 +317,20 @@ def test_six_songs_and_clips_still_get_a_collage_with_frames():
     assert url is not None
     query = parse_qs(urlparse(url).query)
     assert query["m"] == ["b000011"]
+
+
+def test_video_kinds_and_pair_heading_are_translated():
+    from music_links_bot.formatter import (
+        format_track_videos_message,
+        format_video_message,
+    )
+    from music_links_bot.i18n import preferred_language
+
+    token = preferred_language.set("en")
+    try:
+        text = format_track_videos_message(TRACK, [clip("Song (Official Video)", "a")])
+        single = format_video_message(clip("Song (Official Video)", "a"))
+    finally:
+        preferred_language.reset(token)
+    assert text.startswith("<b>Song + music video</b>")
+    assert "🎬 Music video · YouTube" in single

@@ -46,7 +46,20 @@ def video_kind(video: VideoMatch) -> str:
     return _DEFAULT[0]
 
 
+_ENGLISH = {
+    "acoustic": "🎸 Acoustic",
+    "visualizer": "🌀 Visualizer",
+    "audio": "🎧 Audio",
+    "clip": "🎬 Music video",
+    "video": "📺 Video",
+}
+
+
 def video_kind_label(kind: str) -> str:
+    from music_links_bot.i18n import resolve_lang
+
+    if resolve_lang(None) == "en" and kind in _ENGLISH:
+        return _ENGLISH[kind]
     for name, label, _pattern in _KINDS:
         if name == kind:
             return label

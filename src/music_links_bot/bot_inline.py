@@ -753,6 +753,8 @@ async def _build_inline_result(
         ),
         thumbnail_url=track.thumbnail_url,
         channel_safe=channel_safe,
+        # A single release always stays an article with the signed cover as
+        # its link preview; the optional branded photo is for collections.
         force_classic=True,
     )
 
