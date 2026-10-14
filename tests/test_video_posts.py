@@ -296,3 +296,24 @@ def test_collage_with_only_songs_never_uses_the_media_mode():
 
     with patch.dict(os.environ, ENV):
         assert media_collage_preview_url([TRACK, TRACK], []) is None
+
+
+def test_six_songs_and_clips_still_get_a_collage_with_frames():
+    """Six songs used to fill every tile, so the mixed collage was dropped."""
+    from music_links_bot.collection_collage import media_collage_preview_url
+
+    songs = [
+        TrackMatch(
+            artist="POEXXXALI",
+            title=f"Song {index}",
+            thumbnail_url=f"https://i.scdn.co/image/cover{index}",
+            links={"spotify": f"https://open.spotify.com/track/{index}"},
+        )
+        for index in range(6)
+    ]
+    videos = [clip(f"Clip {index}", f"v{index}") for index in range(4)]
+    with patch.dict(os.environ, ENV):
+        url = media_collage_preview_url(songs, videos)
+    assert url is not None
+    query = parse_qs(urlparse(url).query)
+    assert query["m"] == ["b000011"]
