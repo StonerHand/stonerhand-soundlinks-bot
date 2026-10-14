@@ -132,6 +132,7 @@ def preferences_view(
                 ("column", "pref_layout_column"),
                 ("auto", "pref_layout_auto"),
                 ("compact", "pref_layout_compact"),
+                ("numbers", "pref_layout_numbers"),
             ],
         ),
         "grouping": (
@@ -310,7 +311,7 @@ async def dispatch_preferences(query, context, action) -> None:
         query.from_user.id, lang=resolve_lang(query.from_user.language_code)
     )
     choices = {
-        "layout": ("collection_layout", {"auto", "column", "compact"}),
+        "layout": ("collection_layout", {"auto", "column", "compact", "numbers"}),
         "grouping": ("collection_grouping", {"none", "artist", "album"}),
         "language": ("preferred_lang", {"", "ru", "en"}),
         "appearance": ("default_preset", {"", "cover", "longread"}),

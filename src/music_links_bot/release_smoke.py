@@ -472,8 +472,8 @@ def _summarize(
     destinations = [_button_destination(button) for button in buttons]
     checks = dict(extra_checks or {})
     # A single-release Songlink button is the canonical cross-platform CTA and
-    # leads the keyboard. Post buttons carry no color accent: it competes with
-    # the cover. Collection rows also use Songlink, one per release.
+    # leads the keyboard as the only accented button. Collection rows also use
+    # Songlink, one per release, and stay neutral for a calm scan pattern.
     hub_buttons = (
         [
             button
@@ -485,7 +485,9 @@ def _summarize(
     )
     if hub_buttons:
         checks["hub_leads"] = bool(buttons) and buttons[0] is hub_buttons[0]
-        checks["hub_is_neutral"] = all(button.style is None for button in hub_buttons)
+        checks["hub_is_primary"] = all(
+            button.style == "primary" for button in hub_buttons
+        )
         checks["provider_shortcuts_are_neutral"] = all(
             button.style is None
             for button in buttons

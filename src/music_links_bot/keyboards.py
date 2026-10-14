@@ -189,8 +189,8 @@ def _build_link_keyboard(
             _url_button(
                 text=f"{prefix}{_platform_button_label(platform_key, context, short=short)}",
                 url=links[platform_key],
-                # Post buttons stay neutral: a colored accent fights the cover.
-                style=None,
+                # Without a release hub the first provider is the main action.
+                style="primary" if not buttons and not release_hub_url else None,
             )
         )
     # The universal release hub is the canonical destination, so it comes
@@ -201,7 +201,8 @@ def _build_link_keyboard(
         hub = _url_button(
             _release_hub_button_label(release_kind, release_format, context),
             url=release_hub_url,
-            style=None,
+            # The hub is the main action and the only accented button.
+            style="primary",
         )
         if len(buttons) == 1:
             return _keyboard_with_optional_channel(
@@ -273,7 +274,9 @@ def _build_collection_keyboard(
             _url_button(
                 text=text,
                 url=destination,
-                style=None,
+                style="primary"
+                if is_track_video_pair and track.kind == "song"
+                else None,
             )
         )
 
@@ -290,7 +293,7 @@ def _build_youtube_keyboard(
     return _single_url_keyboard(
         "📺 Смотреть на YouTube",
         url=url,
-        style=None,
+        style="primary",
         include_channel_button=include_channel_button,
     )
 
@@ -307,7 +310,7 @@ def _build_nts_keyboard(
         if is_apple_music_radio_url(url)
         else "📻 Открыть на NTS",
         url=url,
-        style=None,
+        style="primary",
         include_channel_button=include_channel_button,
     )
 
@@ -320,7 +323,7 @@ def _build_playlist_keyboard(
     return _single_url_keyboard(
         "🎛 Открыть плейлист",
         url=url,
-        style=None,
+        style="primary",
         include_channel_button=include_channel_button,
     )
 
@@ -333,7 +336,7 @@ def _build_artist_keyboard(
     return _single_url_keyboard(
         "🧬 Открыть артиста",
         url=url,
-        style=None,
+        style="primary",
         include_channel_button=include_channel_button,
     )
 
@@ -436,7 +439,9 @@ def _build_track_videos_keyboard(
         track.page_url, track.links, release_kind=track.kind
     ) or _select_preview_url(track.links)
     if destination:
-        rows.append([_url_button(text="🎧 Слушать песню", url=destination, style=None)])
+        rows.append(
+            [_url_button(text="🎧 Слушать песню", url=destination, style="primary")]
+        )
     clips = [
         _url_button(text=label, url=video.url, style=None)
         for label, video in zip(video_kind_labels(videos), videos, strict=True)
@@ -489,7 +494,7 @@ def _build_mixed_collection_keyboard(
                     else _button_label(f"{index} · {track.artist} — {track.title}")
                 ),
                 url=destination,
-                style=None,
+                style="primary" if is_track_video_pair else None,
             )
         )
         index += 1
@@ -625,7 +630,7 @@ def _adaptive_collection_rows(
     layout: str | None = None,
 ) -> list[list[InlineKeyboardButton]]:
     layout = layout or current_presentation.get().layout
-    if layout == "auto":
+    if layout == "numbers":
         keypad = _number_keypad(buttons)
         if keypad:
             return keypad

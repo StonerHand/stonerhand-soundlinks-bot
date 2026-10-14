@@ -75,7 +75,7 @@ def test_song_with_clips_is_one_post_with_named_buttons():
 
     rows = _build_mixed_collection_keyboard([TRACK], videos).inline_keyboard
     assert [b.text for b in rows[0]] == ["🎧 Слушать песню"]
-    assert rows[0][0].style is None
+    assert rows[0][0].style == "primary"
     assert [b.text for b in rows[1]] == ["🎬 Клип", "🎤 Live", "📝 Lyric video"]
     assert [b.url for b in rows[1]] == [v.url for v in videos]
 
@@ -189,7 +189,7 @@ def test_several_videos_show_a_frame_collage_instead_of_one_player():
     kwargs = send_track_result.await_args.kwargs
     assert "m=v" in kwargs["preview_url"]
     labels = [b.text for row in kwargs["reply_markup"].inline_keyboard for b in row]
-    assert labels[:2] == ["🎬 1", "🎤 2"]
+    assert labels[0].startswith("🎬 1 · ") and labels[1].startswith("🎤 2 · ")
 
 
 def test_collage_endpoint_draws_play_badges_for_the_signed_mode():
@@ -288,7 +288,7 @@ def test_several_songs_and_clips_share_one_collage_with_badges_only_on_frames():
     kwargs = send_track_result.await_args.kwargs
     assert "m=b0011" in kwargs["preview_url"]
     labels = [b.text for row in kwargs["reply_markup"].inline_keyboard for b in row]
-    assert "🎬 3" in labels
+    assert any(label.startswith("🎬 3 · ") for label in labels)
 
 
 def test_collage_with_only_songs_never_uses_the_media_mode():

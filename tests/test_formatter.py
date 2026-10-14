@@ -501,22 +501,36 @@ class FormatterTests(unittest.TestCase):
 
 
 class ArtistRunTests(unittest.TestCase):
-    def test_consecutive_releases_by_one_artist_share_a_heading(self) -> None:
+    def test_runs_that_cover_the_whole_list_get_artist_headings(self) -> None:
         tracks = [
-            TrackMatch(artist="Kyuss", title="Green Machine", links={}),
             TrackMatch(artist="MSI", title="Pay For It", links={}),
             TrackMatch(artist="MSI", title="1989", links={}),
-            TrackMatch(artist="Deftones", title="Rickets", links={}),
+            TrackMatch(artist="Kyuss", title="Green Machine", links={}),
+            TrackMatch(artist="Kyuss", title="Gardenia", links={}),
         ]
 
         message = format_collection_message(tracks, include_hashtags=False)
 
         self.assertIn(
-            "<code>01</code> · <b>Kyuss</b> — Green Machine\n\n"
-            "<b>MSI</b>\n<code>02</code> · Pay For It\n<code>03</code> · 1989\n\n"
-            "<code>04</code> · <b>Deftones</b> — Rickets",
+            "<b>MSI</b>\n<code>01</code> · Pay For It\n<code>02</code> · 1989\n\n"
+            "<b>Kyuss</b>\n<code>03</code> · Green Machine\n<code>04</code> · Gardenia",
             message,
         )
+
+    def test_partial_runs_keep_one_flat_style(self) -> None:
+        tracks = [
+            TrackMatch(artist="NONCONS", title="Dance", links={}),
+            TrackMatch(artist="NONCONS", title="Born Dead Fighter", links={}),
+            TrackMatch(artist="The Growlers", title="Dope on a Rope", links={}),
+        ]
+
+        message = format_collection_message(
+            tracks, title="Подборка · 3 релиза", include_hashtags=False
+        )
+
+        self.assertTrue(message.startswith("🎶 <b>Подборка</b>\n3 трека\n\n"))
+        self.assertIn("<code>01</code> · <b>NONCONS</b> — Dance", message)
+        self.assertIn("<code>03</code> · <b>The Growlers</b> — Dope on a Rope", message)
 
 
 if __name__ == "__main__":

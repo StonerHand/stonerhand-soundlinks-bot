@@ -207,7 +207,8 @@ class UserSession:
                     payload.get("default_hashtags"), {"auto", "off"}
                 ),
                 collection_layout=_choice(
-                    payload.get("collection_layout"), {"auto", "column", "compact"}
+                    payload.get("collection_layout"),
+                    {"auto", "column", "compact", "numbers"},
                 )
                 or "auto",
                 collection_grouping=_choice(

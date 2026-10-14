@@ -1,4 +1,4 @@
-"""Post buttons: a lone provider beside the hub, no color accent, number keypad."""
+"""Post buttons: a lone provider beside the blue hub; optional number keypad."""
 
 from music_links_bot.keyboards import (
     _build_collection_keyboard,
@@ -28,14 +28,15 @@ def _texts(keyboard) -> list[list[str]]:
     return [[button.text for button in row] for row in keyboard.inline_keyboard]
 
 
-def test_one_provider_shares_the_hub_row_without_accent() -> None:
+def test_one_provider_shares_the_row_with_the_blue_hub() -> None:
     keyboard = _build_link_keyboard(
         {"spotify": "https://open.spotify.com/track/1"},
         release_page_url="https://song.link/s/1",
     )
 
     assert _texts(keyboard) == [["🎧 Слушать трек", "🟢 Spotify"]]
-    assert all(b.style is None for row in keyboard.inline_keyboard for b in row)
+    hub, spotify = keyboard.inline_keyboard[0]
+    assert hub.style == "primary" and spotify.style is None
 
 
 def test_three_providers_keep_their_own_row_under_the_hub() -> None:
@@ -52,8 +53,8 @@ def test_three_providers_keep_their_own_row_under_the_hub() -> None:
     assert len(_texts(keyboard)[1]) == 3
 
 
-def test_collection_buttons_are_a_balanced_number_keypad() -> None:
-    with presentation_context():
+def test_numbers_only_layout_is_a_balanced_keypad() -> None:
+    with presentation_context(PresentationPreferences(layout="numbers")):
         for count, rows in ((2, [2]), (5, [5]), (6, [3, 3]), (8, [4, 4]), (10, [5, 5])):
             keyboard = _build_collection_keyboard(_tracks(count))
             assert [len(row) for row in keyboard.inline_keyboard] == rows
@@ -67,14 +68,14 @@ def test_videos_keep_their_kind_icon_on_the_keypad() -> None:
         VideoMatch(title="Song (Official Video)", author="A", url="https://youtu.be/1"),
         VideoMatch(title="Song (Live)", author="A", url="https://youtu.be/2"),
     ]
-    with presentation_context():
+    with presentation_context(PresentationPreferences(layout="numbers")):
         keyboard = _build_mixed_collection_keyboard(_tracks(2), videos)
 
     assert _texts(keyboard) == [["1", "2", "🎬 3", "🎤 4"]]
 
 
-def test_titled_layout_keeps_titles_on_buttons() -> None:
-    with presentation_context(PresentationPreferences(layout="compact")):
+def test_default_collection_buttons_keep_titles() -> None:
+    with presentation_context():
         keyboard = _build_collection_keyboard(_tracks(2))
 
     assert _texts(keyboard) == [["1 · Song 1", "2 · Song 2"]]

@@ -1040,20 +1040,20 @@
     "en": "Collection buttons · {value}"
   },
   "pref_layout_title": {
-    "ru": "<b>🔘 Кнопки подборок</b>\nНомера — компактные кнопки 1–10, названия уже есть в посте. С названиями — кнопка с названием релиза, длинные займут отдельный ряд.",
-    "en": "<b>🔘 Collection buttons</b>\nNumbers — compact 1–10 buttons, the titles are already in the post. With titles — each button shows its release, long ones get their own row."
+    "ru": "<b>🔘 Кнопки подборок</b>\nОбщий вид для всех подборок. Длинные названия в режимах «Авто» и «Компактно» займут отдельный ряд. «Только номера» — компактные кнопки 1–10.",
+    "en": "<b>🔘 Collection buttons</b>\nShared layout for all collections. Long titles get their own row in Auto and Compact modes. “Numbers only” shows compact 1–10 buttons."
   },
   "pref_layout_column": {
     "ru": "Одна колонка",
     "en": "One column"
   },
   "pref_layout_auto": {
-    "ru": "Номера",
-    "en": "Numbers"
+    "ru": "Авто",
+    "en": "Auto"
   },
   "pref_layout_compact": {
-    "ru": "С названиями",
-    "en": "With titles"
+    "ru": "Компактно",
+    "en": "Compact"
   },
   "pref_grouping": {
     "ru": "Разделы подборок · {value}",
@@ -1694,5 +1694,9 @@
   "group_open_bot": {
     "ru": "🎧 Открыть бота",
     "en": "🎧 Open the bot"
+  },
+  "pref_layout_numbers": {
+    "ru": "Только номера",
+    "en": "Numbers only"
   }
 }
