@@ -79,22 +79,3 @@ def test_default_collection_buttons_keep_titles() -> None:
         keyboard = _build_collection_keyboard(_tracks(2))
 
     assert _texts(keyboard) == [["1 · Song 1", "2 · Song 2"]]
-
-
-def test_video_buttons_keep_only_the_song_name() -> None:
-    from music_links_bot.keyboards import _short_video_title
-
-    assert _short_video_title("ПОЕХАЛИ – Зарплата / POEXXXALI – Payday") == "Зарплата"
-    assert _short_video_title("Sleep - Dragonaut (Official Video)") == "Dragonaut"
-    assert _short_video_title("POEXXXALI 3") == "POEXXXALI 3"
-
-
-def test_long_titles_are_cut_to_fit_two_columns() -> None:
-    from music_links_bot.keyboards import _collection_label
-
-    assert (
-        _collection_label(8, "Взаимно Познакомиться", "📺")
-        == "📺 8 · Взаимно Познаком…"
-    )
-    assert _collection_label(1, "Заложник Ритма - Демо") == "1 · Заложник Ритма…"
-    assert _collection_label(2, "Котик") == "2 · Котик"

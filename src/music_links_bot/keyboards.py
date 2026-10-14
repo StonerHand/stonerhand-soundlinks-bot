@@ -269,7 +269,7 @@ def _build_collection_keyboard(
         else:
             # The post lists "Artist — Title"; the button needs only the title,
             # which keeps it short enough for two columns.
-            text = _collection_label(index, compact_release_title(track.title))
+            text = _button_label(f"{index} · {compact_release_title(track.title)}")
         buttons.append(
             _url_button(
                 text=text,
@@ -352,8 +352,8 @@ def _build_youtube_collection_keyboard(
     for index, video in enumerate(videos, start=1):
         buttons.append(
             _url_button(
-                text=_collection_label(
-                    index, _short_video_title(video.title), video_kind_emoji(video)
+                text=_button_label(
+                    f"{video_kind_emoji(video)} {index} · {video.title}"
                 ),
                 url=video.url,
                 style=None,
@@ -374,7 +374,7 @@ def _build_nts_collection_keyboard(
     for index, radio in enumerate(radios, start=1):
         buttons.append(
             _url_button(
-                text=_collection_label(index, radio.title),
+                text=_button_label(f"{index} · {radio.title}"),
                 url=radio.url,
                 style=None,
             )
@@ -394,7 +394,7 @@ def _build_playlist_collection_keyboard(
     for index, playlist in enumerate(playlists, start=1):
         buttons.append(
             _url_button(
-                text=_collection_label(index, playlist.title),
+                text=_button_label(f"{index} · {playlist.title}"),
                 url=playlist.url,
                 style=None,
             )
@@ -414,7 +414,7 @@ def _build_artist_collection_keyboard(
     for index, artist in enumerate(artists, start=1):
         buttons.append(
             _url_button(
-                text=_collection_label(index, artist.title),
+                text=_button_label(f"{index} · {artist.title}"),
                 url=artist.url,
                 style=None,
             )
@@ -495,7 +495,9 @@ def _build_mixed_collection_keyboard(
                 text=(
                     _label("btn_listen_song")
                     if is_track_video_pair
-                    else _collection_label(index, compact_release_title(track.title))
+                    else _button_label(
+                        f"{index} · {compact_release_title(track.title)}"
+                    )
                 ),
                 url=destination,
                 style="primary" if is_track_video_pair else None,
@@ -506,7 +508,7 @@ def _build_mixed_collection_keyboard(
     for playlist in playlists:
         buttons.append(
             _url_button(
-                text=_collection_label(index, playlist.title),
+                text=_button_label(f"{index} · {playlist.title}"),
                 url=playlist.url,
                 style=None,
             )
@@ -516,7 +518,7 @@ def _build_mixed_collection_keyboard(
     for artist in artists:
         buttons.append(
             _url_button(
-                text=_collection_label(index, artist.title),
+                text=_button_label(f"{index} · {artist.title}"),
                 url=artist.url,
                 style=None,
             )
@@ -526,7 +528,7 @@ def _build_mixed_collection_keyboard(
     for radio in radios:
         buttons.append(
             _url_button(
-                text=_collection_label(index, radio.title),
+                text=_button_label(f"{index} · {radio.title}"),
                 url=radio.url,
                 style=None,
             )
@@ -541,8 +543,8 @@ def _build_mixed_collection_keyboard(
                 text=(
                     _label("btn_watch_clip")
                     if is_track_video_pair
-                    else _collection_label(
-                        index, _short_video_title(video.title), video_kind_emoji(video)
+                    else _button_label(
+                        f"{video_kind_emoji(video)} {index} · {video.title}"
                     )
                 ),
                 url=video.url,
@@ -594,37 +596,6 @@ def _normalize_platform_key(platform: str) -> str | None:
 def _label(key: str) -> str:
     """A post button label in the reader's interface language."""
     return get_text(resolve_lang(None), key)
-
-
-MAX_COLLECTION_BUTTON_TITLE = 16
-_VIDEO_TITLE_NOISE = re.compile(
-    r"\s*[(\[][^)\]]*(?:official|video|клип|audio|lyric|visuali[sz]er|mv)[^)\]]*[)\]]",
-    re.IGNORECASE,
-)
-
-
-def _short_video_title(title: str) -> str:
-    """ "ПОЕХАЛИ – Зарплата / POEXXXALI – Payday" → "Зарплата".
-
-    A YouTube title repeats the artist (and sometimes a translation) that the
-    post list already shows; the button keeps just the song.
-    """
-    first = title.split(" / ", 1)[0]
-    parts = re.split(r"\s+[–—-]\s+", first, maxsplit=1)
-    name = parts[1] if len(parts) == 2 and parts[1].strip() else first
-    return _VIDEO_TITLE_NOISE.sub("", name).strip() or first.strip()
-
-
-def _collection_label(index: int, title: str, icon: str = "") -> str:
-    """ "3 · Зарплата": short enough for two buttons per row.
-
-    The post list carries the full title, so long names end in "…".
-    """
-    name = " ".join(str(title or "").split())
-    if len(name) > MAX_COLLECTION_BUTTON_TITLE:
-        name = name[:MAX_COLLECTION_BUTTON_TITLE].rstrip(" -–—·,.:") + "…"
-    label = f"{index} · {name}"
-    return f"{icon} {label}" if icon else label
 
 
 def _button_label(text: str) -> str:
