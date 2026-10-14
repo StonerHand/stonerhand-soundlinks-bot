@@ -433,7 +433,10 @@ def format_collection_message(
             lines.append(f"🎶 <b>{_display_text(shared_artist)}</b>")
             details = _display_text(title) if title else f"{label} · {composition}"
         else:
-            name = _display_text(title) if title else ""
+            # A generated title ("Подборка · 3 релиза") splits into the label
+            # and a details line, like every other post.
+            name = _display_text(title) if title and not generated else ""
+            counted = counted and not generated
             # "⚠️ Подборка · 3 из 4" already starts with its own icon.
             icon = "" if title and not title.lstrip()[:1].isalnum() else "🎶 "
             lines.append(f"{icon}<b>{name or label}</b>")
@@ -460,6 +463,10 @@ def format_collection_message(
         and not any(section.strip() for section in (item_sections or []))
         else [""] * len(tracks)
     )
+    # Group only when every item sits in a run; a half-grouped list reads as
+    # two different styles ("NONCONS / 01 · Dance" next to "03 · The Growlers — …").
+    if not all(groups):
+        groups = [""] * len(tracks)
     for index, track in enumerate(tracks, start=1):
         section = (
             item_sections[index - 1].strip()
