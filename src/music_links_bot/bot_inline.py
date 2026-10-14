@@ -66,7 +66,6 @@ from music_links_bot.search import (
 )
 from music_links_bot.sharing import (
     add_share_button,
-    build_share_query,
     make_channel_safe_keyboard,
     parse_share_query,
     render_inline_share_card,
@@ -582,7 +581,9 @@ async def _build_inline_result(
     force_classic: bool = False,
 ) -> InlineQueryResultArticle | InlineQueryResultPhoto | None:
     bot_data = context.application.bot_data
-    share_query = build_share_query([source_url])
+    # An inline post lands in someone else's chat, where Telegram's own forward
+    # arrow already shares it; an extra «Поделиться» row only adds weight.
+    share_query = None
     share_label = get_text(lang, "share_post")
 
     if is_spotify_artist_url(source_url):
@@ -796,7 +797,6 @@ async def _build_inline_collection_result(
     if bundle.item_count == 0:
         return None
 
-    share_query = build_share_query(source_urls)
     intro_html = ""
     collection_name = None
     if user_id > 0:
@@ -830,7 +830,7 @@ async def _build_inline_collection_result(
         bundle,
         context=context,
         lang=lang,
-        share_query=share_query,
+        share_query=None,
         share_label=get_text(lang, "share_post"),
         requested_count=len(source_urls),
         intro_html=intro_html,
