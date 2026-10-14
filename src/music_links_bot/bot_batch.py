@@ -68,7 +68,7 @@ async def send_partial_lookup_status(
         else:
             marker = "·"
             label = get_text(lang, "partial_not_found")
-        details.append(f"{marker} {index}. {escape(label)}")
+        details.append(f"{marker} <code>{index:02}</code> · {escape(label)}")
     text += "\n\n<blockquote>" + "\n".join(details) + "</blockquote>"
 
     keyboard = None

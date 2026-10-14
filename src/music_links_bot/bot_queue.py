@@ -67,7 +67,11 @@ async def render_queue(
     page = min(max(0, page), page_count - 1)
     page_start = page * QUEUE_PAGE_SIZE
     visible_jobs = jobs[page_start : page_start + QUEUE_PAGE_SIZE]
-    lines = [get_text(lang, "queue_title").format(count=len(jobs))]
+    lines = [
+        get_text(lang, "queue_title").format(count=len(jobs))
+        if jobs
+        else get_text(lang, "queue_title_empty")
+    ]
     if page_count > 1:
         lines.append(
             "\n" + get_text(lang, "queue_page").format(page=page + 1, pages=page_count)
@@ -78,14 +82,16 @@ async def render_queue(
     for index, job in enumerate(visible_jobs, start=page_start + 1):
         draft = job.get("draft") if isinstance(job.get("draft"), dict) else {}
         item = draft.get("item") if isinstance(draft.get("item"), dict) else {}
-        label = " — ".join(
-            part
-            for part in (
-                str(item.get("artist") or "").strip(),
-                str(item.get("title") or "").strip(),
-            )
-            if part
-        ) or get_text(lang, "queue_unknown")
+        artist = str(item.get("artist") or "").strip()[:60]
+        title = str(item.get("title") or "").strip()[:60]
+        # Same list style as posts: "01 · Artist — Title".
+        label = (
+            f"<b>{escape(artist)}</b> — {escape(title)}"
+            if artist and title
+            else f"<b>{escape(artist or title)}</b>"
+            if artist or title
+            else escape(get_text(lang, "queue_unknown"))
+        )
         try:
             when = local_time_html(
                 int(job.get("publish_at") or 0),
@@ -94,7 +100,7 @@ async def render_queue(
             )
         except (TypeError, ValueError, OverflowError):
             when = "—"
-        lines.append(f"\n\n<b>{index}. {escape(label[:120])}</b>\n🕒 {when}")
+        lines.append(f"\n\n<code>{index:02}</code> · {label}\n🕒 {when}")
         overdue_seconds = max(
             0,
             int(time.time())

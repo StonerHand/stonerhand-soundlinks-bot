@@ -280,8 +280,10 @@ async def _handle_editor_navigation(
         timezone_name = str(
             context.application.bot_data.get("timezone_name") or "Europe/Moscow"
         )
+        from music_links_bot.human_time import human_zone
+
         text += "\n\n" + get_text(lang, "schedule_timezone").format(
-            zone=escape(timezone_name)
+            zone=escape(human_zone(timezone_name, lang=lang))
         )
         keyboard = InlineKeyboardMarkup(
             _editor_schedule_rows(draft_id, draft, timezone_name=timezone_name)

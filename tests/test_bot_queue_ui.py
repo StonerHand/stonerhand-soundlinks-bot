@@ -12,7 +12,7 @@ class BotQueueUiTests(unittest.IsolatedAsyncioTestCase):
 
         text, keyboard = await render_queue(context, lang="ru")
 
-        self.assertIn("0", text)
+        self.assertIn("🕒 <b>Очередь</b>", text)
         self.assertEqual(len(keyboard.inline_keyboard), 2)
 
     async def test_queue_lists_release_time_and_cancel_action(self) -> None:
@@ -39,7 +39,7 @@ class BotQueueUiTests(unittest.IsolatedAsyncioTestCase):
 
         text, keyboard = await render_queue(context, lang="ru")
 
-        self.assertIn("Sleep — Dragonaut", text)
+        self.assertIn("<code>01</code> · <b>Sleep</b> — Dragonaut", text)
         self.assertIn('<tg-time unix="1800000000" format="wdt">', text)
         self.assertEqual(
             keyboard.inline_keyboard[0][0].callback_data,
@@ -65,7 +65,7 @@ class BotQueueUiTests(unittest.IsolatedAsyncioTestCase):
         text, keyboard = await render_queue(context, lang="ru", page=1)
 
         self.assertIn("Страница 2 из 2", text)
-        self.assertIn("9. Artist — Track 9", text)
+        self.assertIn("<code>09</code> · <b>Artist</b> — Track 9", text)
         self.assertNotIn("Track 1</b>", text)
         callbacks = [
             button.callback_data for row in keyboard.inline_keyboard for button in row
