@@ -8,7 +8,8 @@
       ],
       "checks": {
         "channel_safe": true,
-        "hub_is_primary": true,
+        "hub_is_neutral": true,
+        "hub_leads": true,
         "provider_shortcuts_are_neutral": true
       },
       "count": [
@@ -37,7 +38,8 @@
         "🍎 Apple Music"
       ],
       "checks": {
-        "hub_is_primary": true,
+        "hub_is_neutral": true,
+        "hub_leads": true,
         "provider_copy_absent": true,
         "provider_shortcuts_are_neutral": true
       },
@@ -62,9 +64,9 @@
     },
     "collection_complete": {
       "buttons": [
-        "1 · A Torinói Ló",
-        "2 · The Lonesome Foghorn Blows",
-        "3 · 1758 Times of Weird Sadness"
+        "1",
+        "2",
+        "3"
       ],
       "checks": {},
       "count": [
@@ -91,9 +93,9 @@
     },
     "collection_partial": {
       "buttons": [
-        "1 · A Torinói Ló",
-        "2 · The Lonesome Foghorn Blows",
-        "3 · 1758 Times of Weird Sadness"
+        "1",
+        "2",
+        "3"
       ],
       "checks": {},
       "count": [
@@ -126,7 +128,8 @@
         "↗️ Поделиться"
       ],
       "checks": {
-        "hub_is_primary": true,
+        "hub_is_neutral": true,
+        "hub_leads": true,
         "provider_shortcuts_are_neutral": true
       },
       "count": [
@@ -158,7 +161,8 @@
       "checks": {
         "has_buttons": true,
         "has_media": true,
-        "hub_is_primary": true,
+        "hub_is_neutral": true,
+        "hub_leads": true,
         "provider_copy_absent": true,
         "provider_shortcuts_are_neutral": true,
         "within_html_limit": true
@@ -214,7 +218,8 @@
       "checks": {
         "count_confirmed": true,
         "exact_format": true,
-        "hub_is_primary": true,
+        "hub_is_neutral": true,
+        "hub_leads": true,
         "provider_shortcuts_are_neutral": true,
         "seo_removed": true
       },
@@ -238,16 +243,16 @@
     },
     "ten_items_auto": {
       "buttons": [
-        "1 · Artist 1 — Track 1 (Live 2001)",
-        "2 · Artist 2 — Track 2 (Live 2001)",
-        "3 · Artist 3 — Track 3 (Live 2001)",
-        "4 · Artist 4 — Track 4 (Live 2001)",
-        "5 · Artist 5 — Track 5 (Live 2001)",
-        "6 · Artist 6 — Track 6 (Live 2001)",
-        "7 · Artist 7 — Track 7 (Live 2001)",
-        "8 · Artist 8 — Track 8 (Live 2001)",
-        "9 · Artist 9 — Track 9 (Live 2001)",
-        "10 · Artist 10 — Track 10 (Live 2001)"
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10"
       ],
       "checks": {
         "all_buttons_present": true,

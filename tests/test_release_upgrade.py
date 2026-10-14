@@ -185,10 +185,12 @@ def test_meaningful_versions_are_preserved_in_text_and_buttons(title):
     releases = [track(1, title=title), track(2)]
     with presentation_context():
         assert title in format_collection_message(releases)
+    # Titled buttons ("С названиями") keep the version too.
+    with presentation_context(PresentationPreferences(layout="compact")):
         assert title in _build_collection_keyboard(releases).inline_keyboard[0][0].text
 
 
-@pytest.mark.parametrize("layout,rows", [("column", 10), ("auto", 5), ("compact", 5)])
+@pytest.mark.parametrize("layout,rows", [("column", 10), ("auto", 2), ("compact", 5)])
 def test_ten_item_layouts_preserve_order_and_destinations(layout, rows):
     tracks = [track(index) for index in range(1, 11)]
     with presentation_context(PresentationPreferences(layout=layout)):
@@ -199,7 +201,9 @@ def test_ten_item_layouts_preserve_order_and_destinations(layout, rows):
     assert len(buttons) == 10
     assert [button.url for button in buttons] == [item.page_url for item in tracks]
     for index, button in enumerate(buttons, start=1):
-        assert button.text == f"{index} · Song {index}"
+        # The default keypad shows numbers; the post text carries the titles.
+        expected = str(index) if layout == "auto" else f"{index} · Song {index}"
+        assert button.text == expected
         assert f"<code>{index:02}</code> · Song {index}" in text
 
 
@@ -228,7 +232,8 @@ def test_long_labels_get_full_width_and_single_primary_action_is_deduplicated():
         "🟢 Spotify",
         "🍎 Apple Music",
     ]
-    assert sum(button.style == "primary" for button in buttons) == 1
+    # Post buttons stay neutral so no accent competes with the cover.
+    assert all(button.style is None for button in buttons)
     assert len({button.url for button in buttons}) == 3
 
 
