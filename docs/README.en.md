@@ -19,7 +19,7 @@
 ## ✨ Features
 
 - 🔗 **Any link or query** — Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, Bandcamp, Yandex Music, NTS, or just `artist — track`.
-- 🖼 **Posts with artwork** — signed cover, title, year, length, smart hashtags and buttons for every platform.
+- 🖼 **Posts with artwork** — signed cover, title, year, length, smart tags and buttons for every platform.
 - 🎶 **Collections** — up to 10 tracks, albums and videos in one post with a shared collage.
 - ✏️ **In-chat editor** — your own text, tags, look and buttons.
 - 📣 **Channel publishing** — now, on a schedule ("tomorrow 18:30") or with one-tap quick publish; 2 minutes to undo.
