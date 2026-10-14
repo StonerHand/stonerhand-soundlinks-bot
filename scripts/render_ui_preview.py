@@ -135,7 +135,7 @@ async def main():
         "schedule": screen(
             get_text("ru", "schedule_title")
             + "\n\nSleep — Dopesmoker\n\n"
-            + get_text("ru", "schedule_timezone").format(zone="Europe/Moscow"),
+            + get_text("ru", "schedule_timezone").format(zone="Москва, UTC+3"),
             InlineKeyboardMarkup(
                 editor_schedule_rows(
                     "demo",

@@ -180,7 +180,7 @@ async def render_drafts_view(
             when = "⏳ " + get_text(lang, "posts_expiring")
         icon = "🔖" if draft.get("saved_at") else STATUS_ICONS.get(state, "📝")
         label = f"{icon} " + active_card_label(
-            draft, get_text(lang, "drafts_open"), max_length=34
+            draft, get_text(lang, "drafts_open"), max_length=32
         )
         if when:
             label += f" · {when}"

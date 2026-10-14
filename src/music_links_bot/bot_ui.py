@@ -638,9 +638,7 @@ def editor_tools_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardBut
                 current_chat_button(get_text(lang, "search_change"), query[:120]),
             ]
         )
-    rows.append(
-        [cb("ed_reset_original", "reset"), cb("ed_delete", "d", tone=ButtonTone.DANGER)]
-    )
+    rows.append([cb("ed_reset_original", "reset"), cb("ed_delete", "d")])
     rows.append(_back_to_editor(draft_id, lang))
     return rows
 
@@ -661,7 +659,7 @@ def editor_template_rows(
                 InlineKeyboardButton(
                     get_text(lang, "ed_template_delete"),
                     callback_data=encode_callback("editor", f"td{index}", draft_id),
-                    style="danger",
+                    style=None,
                 ),
             ]
         )
@@ -726,7 +724,7 @@ def editor_intro_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardBut
                 InlineKeyboardButton(
                     get_text(lang, "ed_intro_remove"),
                     callback_data=encode_callback("editor", "t0", draft_id),
-                    style="danger",
+                    style=None,
                 )
             ]
         )
@@ -998,7 +996,7 @@ def render_crate(
         return get_text(lang, "crate_more_title"), InlineKeyboardMarkup(
             [
                 [cb("crate_preview", "preview")],
-                [cb("crate_clear", "clear", style="danger")],
+                [cb("crate_clear", "clear")],
                 back_to_crate,
             ]
         )
@@ -1065,7 +1063,7 @@ def render_crate(
                 rows.append(controls)
             rows.append(
                 [
-                    cb("crate_remove", "remove", key, style="danger"),
+                    cb("crate_remove", "remove", key),
                     cb("crate_replace", "replace", key),
                 ]
             )

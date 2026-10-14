@@ -99,7 +99,9 @@ async def _resolve_search_sources(
                     if value
                 ]
                 suffix = f" <i>· {' · '.join(meta)}</i>" if meta else ""
-                lines.append(f"<b>{index}.</b> {artist} — {title}{suffix}")
+                lines.append(
+                    f"<code>{index:02}</code> · <b>{artist}</b> — {title}{suffix}"
+                )
             text = "\n".join(lines)
             keyboard = InlineKeyboardMarkup(
                 [

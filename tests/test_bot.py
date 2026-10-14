@@ -2455,8 +2455,8 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 1)
         self.assertIn("Выбери релиз", message.replies[0])
         self.assertIn("привет", message.replies[0])
-        self.assertIn("Youth Code — Transitions", message.replies[0])
-        self.assertIn("Youth Code — Anagnorisis", message.replies[0])
+        self.assertIn("<b>Youth Code</b> — Transitions", message.replies[0])
+        self.assertIn("<b>Youth Code</b> — Anagnorisis", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         callback_data = [
             button.callback_data

@@ -62,6 +62,23 @@ def local_time_html(
     return f'<tg-time unix="{int(timestamp)}" format="wdt">{escape(label)}</tg-time>'
 
 
+_ZONE_NAMES = {"Europe/Moscow": ("Москва", "Moscow")}
+
+
+def human_zone(timezone_name: str | None, *, lang: str = "ru") -> str:
+    """ "Москва, UTC+3" instead of the technical "Europe/Moscow"."""
+    name = timezone_name or "Europe/Moscow"
+    tz = zone(name)
+    offset = datetime.now(tz).utcoffset()
+    minutes = int(offset.total_seconds() // 60) if offset is not None else 0
+    sign = "+" if minutes >= 0 else "−"
+    hours, rest = divmod(abs(minutes), 60)
+    utc = f"UTC{sign}{hours}" + (f":{rest:02}" if rest else "")
+    city = _ZONE_NAMES.get(name, (None, None))[0 if lang != "en" else 1]
+    city = city or name.rsplit("/", 1)[-1].replace("_", " ")
+    return f"{city}, {utc}"
+
+
 def human_datetime(
     timestamp: float,
     *,
@@ -93,11 +110,11 @@ def human_date(
     lang: str = "ru",
     now: float | None = None,
 ) -> str:
-    """Like ``human_datetime`` but without the clock for anything older than today."""
+    """Compact list date: "07:17" today, then "вчера", "пт" or "08.09"."""
     text = human_datetime(timestamp, timezone_name=timezone_name, lang=lang, now=now)
-    word = text.split(" ", 1)[0]
+    word, _, clock = text.partition(" ")
     if word in _DAY_WORDS["ru"][:1] + _DAY_WORDS["en"][:1]:
-        return text
+        return clock
     return word
 
 
