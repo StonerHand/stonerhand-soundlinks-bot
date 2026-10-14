@@ -20,8 +20,8 @@
     "en": "← Back"
   },
   "cancel": {
-    "en": "Cancel",
-    "ru": "Отмена"
+    "en": "✕ Cancel",
+    "ru": "✕ Отмена"
   },
   "crate_clear": {
     "en": "🗑 Clear collection",
@@ -32,8 +32,8 @@
     "ru": "<b>Очистить всю подборку?</b>\n\nВсе релизы будут убраны. Вернуть их можно будет кнопкой «↩️ Вернуть удалённое»."
   },
   "crate_clear_confirm_button": {
-    "en": "Clear crate",
-    "ru": "Очистить подборку"
+    "en": "🗑 Clear crate",
+    "ru": "🗑 Очистить подборку"
   },
   "crate_down": {
     "en": "↓ Down",
@@ -56,8 +56,8 @@
     "ru": "Напиши название подборки одним сообщением."
   },
   "crate_name_saved": {
-    "en": "Name saved",
-    "ru": "Название сохранено"
+    "en": "✓ Name saved",
+    "ru": "✓ Название сохранено"
   },
   "crate_preview": {
     "en": "👁 See the post",
@@ -72,8 +72,8 @@
     "ru": "✕ Удалить"
   },
   "crate_removed": {
-    "en": "Removed from the collection",
-    "ru": "Удалено из подборки"
+    "en": "✓ Removed from the collection",
+    "ru": "✓ Удалено из подборки"
   },
   "crate_order_updated": {
     "en": "Order updated",
@@ -128,12 +128,12 @@
     "en": "📚 <b>My posts</b>"
   },
   "duplicate_repeat": {
-    "en": "Publish again",
-    "ru": "Опубликовать снова"
+    "en": "📣 Publish again",
+    "ru": "📣 Опубликовать снова"
   },
   "duplicate_replace": {
-    "en": "Replace the old post",
-    "ru": "Заменить старый пост"
+    "en": "🔄 Replace the old post",
+    "ru": "🔄 Заменить старый пост"
   },
   "ed_actions_title": {
     "ru": "<b>↗️ Куда отправить пост?</b>",
@@ -160,8 +160,8 @@
     "ru": "↺ Вернуть обложку релиза"
   },
   "ed_cover_saved": {
-    "en": "Artwork saved",
-    "ru": "Обложка сохранена"
+    "en": "✓ Artwork saved",
+    "ru": "✓ Обложка сохранена"
   },
   "ed_crate_added": {
     "en": "Added · {count}/10",
@@ -236,12 +236,12 @@
     "en": "<b>✏️ Post text</b>\nReply with one message, up to {limit} characters. Bold text, links and other formatting are kept.\n\n<code>/cancel</code> — go back without changes."
   },
   "ed_intro_remove": {
-    "ru": "Убрать свой текст",
-    "en": "Remove own text"
+    "ru": "🗑 Убрать свой текст",
+    "en": "🗑 Remove own text"
   },
   "ed_intro_saved": {
-    "ru": "Текст сохранён",
-    "en": "Text saved"
+    "ru": "✓ Текст сохранён",
+    "en": "✓ Text saved"
   },
   "ed_intro_title": {
     "ru": "<b>✏️ Текст поста</b>\nОписание, мнение или личная заметка над релизом.",
@@ -340,40 +340,40 @@
     "en": "➕ Own tags"
   },
   "ed_tags_none": {
-    "ru": "Без тегов",
-    "en": "No tags"
+    "ru": "🚫 Без тегов",
+    "en": "🚫 No tags"
   },
   "ed_tags_prompt": {
     "ru": "<b>Добавить теги</b>\nПришли теги через пробел — с # или без. Они добавятся к выбранным; всего до 5.\n\n<code>/cancel</code> — вернуться без изменений.",
     "en": "<b>Add tags</b>\nSend tags separated by spaces, with or without #. They will be added to your selection, up to 5 in total.\n\n<code>/cancel</code> — go back without changes."
   },
   "ed_tags_saved": {
-    "ru": "Теги сохранены",
-    "en": "Tags saved"
+    "ru": "✓ Теги сохранены",
+    "en": "✓ Tags saved"
   },
   "ed_template_applied": {
     "en": "Template applied",
     "ru": "Шаблон применён"
   },
   "ed_template_deleted": {
-    "en": "Template deleted",
-    "ru": "Шаблон удалён"
+    "en": "✓ Template deleted",
+    "ru": "✓ Шаблон удалён"
   },
   "ed_template_delete": {
-    "en": "Delete",
-    "ru": "Удалить"
+    "en": "🗑 Delete",
+    "ru": "🗑 Удалить"
   },
   "ed_template_prompt": {
     "en": "<b>Template name</b>\nFor example: <code>Album of the week</code> or <code>Minimal</code>.\n<code>/cancel</code> — cancel",
     "ru": "<b>Название шаблона</b>\nНапример: <code>Альбом недели</code> или <code>Минимал</code>.\n<code>/cancel</code> — отменить"
   },
   "ed_template_save": {
-    "ru": "Сохранить как шаблон",
-    "en": "Save as template"
+    "ru": "💾 Сохранить как шаблон",
+    "en": "💾 Save as template"
   },
   "ed_template_saved": {
-    "en": "Template saved",
-    "ru": "Шаблон сохранён"
+    "en": "✓ Template saved",
+    "ru": "✓ Шаблон сохранён"
   },
   "ed_template_unnamed": {
     "en": "Untitled",
@@ -388,12 +388,12 @@
     "en": "<b>📋 Templates</b>\nSave this post's layout or apply a saved one. Your last layout is applied to new posts automatically."
   },
   "ed_text_off": {
-    "en": "Own text · none",
-    "ru": "Свой текст · нет"
+    "en": "✏️ Own text · none",
+    "ru": "✏️ Свой текст · нет"
   },
   "ed_text_on": {
-    "en": "Own text · yes",
-    "ru": "Свой текст · есть"
+    "en": "✏️ Own text · yes",
+    "ru": "✏️ Свой текст · есть"
   },
   "ed_undo_delete": {
     "en": "↩️ Restore post",
@@ -524,8 +524,8 @@
     "ru": "Ничего не найдено — измени запрос"
   },
   "input_cancelled": {
-    "en": "Input cancelled",
-    "ru": "Ввод отменён"
+    "en": "✓ Input cancelled",
+    "ru": "✓ Ввод отменён"
   },
   "input_nothing": {
     "en": "Nothing is waiting for input",
@@ -612,8 +612,8 @@
     "ru": "🗑 Удалить мои данные"
   },
   "privacy_delete_confirm": {
-    "en": "Delete permanently",
-    "ru": "Удалить безвозвратно"
+    "en": "🗑 Delete permanently",
+    "ru": "🗑 Удалить безвозвратно"
   },
   "privacy_deleted": {
     "en": "✅ <b>Data deleted</b>\n\nDrafts removed: <b>{drafts}</b>\nScheduled posts removed: <b>{scheduled}</b>\n\nYou can start over by sending a music link.",
@@ -648,8 +648,8 @@
     "ru": "В работе"
   },
   "progress_cancelled": {
-    "en": "Search cancelled.",
-    "ru": "Поиск отменён."
+    "en": "✓ Search cancelled",
+    "ru": "✓ Поиск отменён"
   },
   "progress_card": {
     "en": "✓ Release\n✓ Platforms\n🎨 Building the post",
@@ -672,12 +672,12 @@
     "en": "Publish now"
   },
   "queue_cancel_item": {
-    "en": "Remove #{index}",
-    "ru": "Убрать №{index}"
+    "en": "✕ Remove #{index}",
+    "ru": "✕ Убрать №{index}"
   },
   "queue_cancelled": {
-    "en": "Removed from queue",
-    "ru": "Убрано из очереди"
+    "en": "✓ Removed from queue",
+    "ru": "✓ Убрано из очереди"
   },
   "queue_empty": {
     "ru": "Пока пусто. Открой пост → «📣 Опубликовать» → «🕒 Запланировать».",
@@ -700,8 +700,8 @@
     "ru": "Поставлено на ручной повтор"
   },
   "queue_retry_item": {
-    "ru": "Проверить отправку №{index}",
-    "en": "Review delivery #{index}"
+    "ru": "🔄 Проверить отправку №{index}",
+    "en": "🔄 Review delivery #{index}"
   },
   "queue_title": {
     "ru": "🕒 <b>Очередь · {count}</b>",
@@ -740,12 +740,12 @@
     "ru": "<b>Замена ссылки №{index}</b>\nПришли одну новую музыкальную ссылку.\n<code>/cancel</code> — отменить"
   },
   "request_cancel": {
-    "en": "Cancel search",
-    "ru": "Отменить поиск"
+    "en": "✕ Cancel search",
+    "ru": "✕ Отменить поиск"
   },
   "request_cancelled": {
-    "en": "Search cancelled",
-    "ru": "Поиск отменён"
+    "en": "✓ Search cancelled",
+    "ru": "✓ Поиск отменён"
   },
   "request_not_running": {
     "en": "This search has already finished",
@@ -756,8 +756,8 @@
     "ru": "🔄 Повторить"
   },
   "retry_failed": {
-    "en": "Check all links again",
-    "ru": "Проверить все ссылки"
+    "en": "🔄 Check all links again",
+    "ru": "🔄 Проверить все ссылки"
   },
   "schedule_custom": {
     "en": "✍️ Custom time",
@@ -804,8 +804,8 @@
     "ru": "Изменение отменено"
   },
   "settings_saved": {
-    "en": "Saved · you can undo",
-    "ru": "Сохранено · можно отменить"
+    "en": "✓ Saved · you can undo",
+    "ru": "✓ Сохранено · можно отменить"
   },
   "settings_undo": {
     "en": "Undo change",
@@ -880,8 +880,8 @@
     "en": "<b>Check the channel first</b>\n\n{release}\n\nTelegram may have sent the post without returning confirmation. Retry only if the post is missing from the channel."
   },
   "queue_retry_confirm_button": {
-    "ru": "Поста нет — отправить повторно",
-    "en": "Post is missing — retry delivery"
+    "ru": "📤 Поста нет — отправить повторно",
+    "en": "📤 Post is missing — retry delivery"
   },
   "queue_sending": {
     "ru": "⏳ Отправляется · дождись результата",
@@ -1036,8 +1036,8 @@
     "en": "Watch video"
   },
   "pref_layout": {
-    "ru": "Кнопки подборок · {value}",
-    "en": "Collection buttons · {value}"
+    "ru": "🔘 Кнопки подборок · {value}",
+    "en": "🔘 Collection buttons · {value}"
   },
   "pref_layout_title": {
     "ru": "<b>🔘 Кнопки подборок</b>\nОбщий вид для всех подборок. Длинные названия в режимах «Авто» и «Компактно» займут отдельный ряд. «Только номера» — компактные кнопки 1–10.",
@@ -1056,8 +1056,8 @@
     "en": "Compact"
   },
   "pref_grouping": {
-    "ru": "Разделы подборок · {value}",
-    "en": "Collection sections · {value}"
+    "ru": "🗂 Разделы подборок · {value}",
+    "en": "🗂 Collection sections · {value}"
   },
   "pref_grouping_title": {
     "ru": "<b>🗂 Разделы подборок</b>\nОбщий вид для всех подборок. Заголовки разделяют соседние позиции; исходный порядок и номера сохраняются.",
@@ -1698,5 +1698,33 @@
   "pref_layout_numbers": {
     "ru": "Только номера",
     "en": "Numbers only"
+  },
+  "btn_listen_song": {
+    "ru": "🎧 Слушать песню",
+    "en": "🎧 Listen to the song"
+  },
+  "btn_watch_clip": {
+    "ru": "📺 Смотреть клип",
+    "en": "📺 Watch the video"
+  },
+  "btn_watch_youtube": {
+    "ru": "📺 Смотреть на YouTube",
+    "en": "📺 Watch on YouTube"
+  },
+  "btn_listen_apple_radio": {
+    "ru": "📻 Слушать в Apple Music",
+    "en": "📻 Listen on Apple Music"
+  },
+  "btn_open_nts": {
+    "ru": "📻 Открыть на NTS",
+    "en": "📻 Open on NTS"
+  },
+  "btn_open_playlist": {
+    "ru": "🎛 Открыть плейлист",
+    "en": "🎛 Open the playlist"
+  },
+  "btn_open_artist": {
+    "ru": "🧬 Открыть артиста",
+    "en": "🧬 Open the artist"
   }
 }

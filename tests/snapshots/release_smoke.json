@@ -243,16 +243,16 @@
     },
     "ten_items_auto": {
       "buttons": [
-        "1 · Artist 1 — Track 1 (Live 2001)",
-        "2 · Artist 2 — Track 2 (Live 2001)",
-        "3 · Artist 3 — Track 3 (Live 2001)",
-        "4 · Artist 4 — Track 4 (Live 2001)",
-        "5 · Artist 5 — Track 5 (Live 2001)",
-        "6 · Artist 6 — Track 6 (Live 2001)",
-        "7 · Artist 7 — Track 7 (Live 2001)",
-        "8 · Artist 8 — Track 8 (Live 2001)",
-        "9 · Artist 9 — Track 9 (Live 2001)",
-        "10 · Artist 10 — Track 10 (Live 2001)"
+        "1 · Track 1 (Live 2001)",
+        "2 · Track 2 (Live 2001)",
+        "3 · Track 3 (Live 2001)",
+        "4 · Track 4 (Live 2001)",
+        "5 · Track 5 (Live 2001)",
+        "6 · Track 6 (Live 2001)",
+        "7 · Track 7 (Live 2001)",
+        "8 · Track 8 (Live 2001)",
+        "9 · Track 9 (Live 2001)",
+        "10 · Track 10 (Live 2001)"
       ],
       "checks": {
         "all_buttons_present": true,
@@ -297,16 +297,16 @@
     },
     "ten_items_column": {
       "buttons": [
-        "1 · Artist 1 — Track 1 (Live 2001)",
-        "2 · Artist 2 — Track 2 (Live 2001)",
-        "3 · Artist 3 — Track 3 (Live 2001)",
-        "4 · Artist 4 — Track 4 (Live 2001)",
-        "5 · Artist 5 — Track 5 (Live 2001)",
-        "6 · Artist 6 — Track 6 (Live 2001)",
-        "7 · Artist 7 — Track 7 (Live 2001)",
-        "8 · Artist 8 — Track 8 (Live 2001)",
-        "9 · Artist 9 — Track 9 (Live 2001)",
-        "10 · Artist 10 — Track 10 (Live 2001)"
+        "1 · Track 1 (Live 2001)",
+        "2 · Track 2 (Live 2001)",
+        "3 · Track 3 (Live 2001)",
+        "4 · Track 4 (Live 2001)",
+        "5 · Track 5 (Live 2001)",
+        "6 · Track 6 (Live 2001)",
+        "7 · Track 7 (Live 2001)",
+        "8 · Track 8 (Live 2001)",
+        "9 · Track 9 (Live 2001)",
+        "10 · Track 10 (Live 2001)"
       ],
       "checks": {
         "all_buttons_present": true,
@@ -351,16 +351,16 @@
     },
     "ten_items_compact": {
       "buttons": [
-        "1 · Artist 1 — Track 1 (Live 2001)",
-        "2 · Artist 2 — Track 2 (Live 2001)",
-        "3 · Artist 3 — Track 3 (Live 2001)",
-        "4 · Artist 4 — Track 4 (Live 2001)",
-        "5 · Artist 5 — Track 5 (Live 2001)",
-        "6 · Artist 6 — Track 6 (Live 2001)",
-        "7 · Artist 7 — Track 7 (Live 2001)",
-        "8 · Artist 8 — Track 8 (Live 2001)",
-        "9 · Artist 9 — Track 9 (Live 2001)",
-        "10 · Artist 10 — Track 10 (Live 2001)"
+        "1 · Track 1 (Live 2001)",
+        "2 · Track 2 (Live 2001)",
+        "3 · Track 3 (Live 2001)",
+        "4 · Track 4 (Live 2001)",
+        "5 · Track 5 (Live 2001)",
+        "6 · Track 6 (Live 2001)",
+        "7 · Track 7 (Live 2001)",
+        "8 · Track 8 (Live 2001)",
+        "9 · Track 9 (Live 2001)",
+        "10 · Track 10 (Live 2001)"
       ],
       "checks": {
         "all_buttons_present": true,

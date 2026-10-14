@@ -23,7 +23,6 @@ from music_links_bot.release_hubs import resolve_release_hub_url
 from music_links_bot.release_preferences import current_presentation
 from music_links_bot.release_presentation import (
     compact_release_title,
-    shared_collection_artist,
 )
 from music_links_bot.telegram_buttons import (
     ButtonTone,
@@ -258,18 +257,19 @@ def _build_collection_keyboard(
             continue
         available.append((index, track, destination))
 
-    omit_artist = shared_collection_artist([track for _, track, _ in available])
     buttons: list[InlineKeyboardButton] = []
 
     for index, track, destination in available:
         if is_track_video_pair:
-            text = "📺 Смотреть клип" if track.kind == "video" else "🎧 Слушать песню"
+            text = (
+                _label("btn_watch_clip")
+                if track.kind == "video"
+                else _label("btn_listen_song")
+            )
         else:
-            title = compact_release_title(track.title)
-            text = f"{index} · {title}"
-            if not omit_artist:
-                text = f"{index} · {track.artist} — {title}"
-            text = _button_label(text)
+            # The post lists "Artist — Title"; the button needs only the title,
+            # which keeps it short enough for two columns.
+            text = _button_label(f"{index} · {compact_release_title(track.title)}")
         buttons.append(
             _url_button(
                 text=text,
@@ -291,7 +291,7 @@ def _build_youtube_keyboard(
     include_channel_button: bool = False,
 ) -> InlineKeyboardMarkup:
     return _single_url_keyboard(
-        "📺 Смотреть на YouTube",
+        _label("btn_watch_youtube"),
         url=url,
         style="primary",
         include_channel_button=include_channel_button,
@@ -306,9 +306,9 @@ def _build_nts_keyboard(
     from music_links_bot.url_utils import is_apple_music_radio_url
 
     return _single_url_keyboard(
-        "📻 Слушать в Apple Music"
+        _label("btn_listen_apple_radio")
         if is_apple_music_radio_url(url)
-        else "📻 Открыть на NTS",
+        else _label("btn_open_nts"),
         url=url,
         style="primary",
         include_channel_button=include_channel_button,
@@ -321,7 +321,7 @@ def _build_playlist_keyboard(
     include_channel_button: bool = False,
 ) -> InlineKeyboardMarkup:
     return _single_url_keyboard(
-        "🎛 Открыть плейлист",
+        _label("btn_open_playlist"),
         url=url,
         style="primary",
         include_channel_button=include_channel_button,
@@ -334,7 +334,7 @@ def _build_artist_keyboard(
     include_channel_button: bool = False,
 ) -> InlineKeyboardMarkup:
     return _single_url_keyboard(
-        "🧬 Открыть артиста",
+        _label("btn_open_artist"),
         url=url,
         style="primary",
         include_channel_button=include_channel_button,
@@ -440,7 +440,11 @@ def _build_track_videos_keyboard(
     ) or _select_preview_url(track.links)
     if destination:
         rows.append(
-            [_url_button(text="🎧 Слушать песню", url=destination, style="primary")]
+            [
+                _url_button(
+                    text=_label("btn_listen_song"), url=destination, style="primary"
+                )
+            ]
         )
     clips = [
         _url_button(text=label, url=video.url, style=None)
@@ -489,9 +493,11 @@ def _build_mixed_collection_keyboard(
         buttons.append(
             _url_button(
                 text=(
-                    "🎧 Слушать песню"
+                    _label("btn_listen_song")
                     if is_track_video_pair
-                    else _button_label(f"{index} · {track.artist} — {track.title}")
+                    else _button_label(
+                        f"{index} · {compact_release_title(track.title)}"
+                    )
                 ),
                 url=destination,
                 style="primary" if is_track_video_pair else None,
@@ -535,7 +541,7 @@ def _build_mixed_collection_keyboard(
         buttons.append(
             _url_button(
                 text=(
-                    "📺 Смотреть клип"
+                    _label("btn_watch_clip")
                     if is_track_video_pair
                     else _button_label(
                         f"{video_kind_emoji(video)} {index} · {video.title}"
@@ -587,6 +593,11 @@ def _normalize_platform_key(platform: str) -> str | None:
     return PRIMARY_PLATFORM_ALIASES.get(compact_value)
 
 
+def _label(key: str) -> str:
+    """A post button label in the reader's interface language."""
+    return get_text(resolve_lang(None), key)
+
+
 def _button_label(text: str) -> str:
     """Preserve the complete name; use row layout, not destructive truncation."""
     return " ".join(text.split())
@@ -634,10 +645,7 @@ def _adaptive_collection_rows(
         keypad = _number_keypad(buttons)
         if keypad:
             return keypad
-    if layout == "column" or (
-        layout == "auto"
-        and any(len(b.text) > MAX_TWO_COLUMN_BUTTON_TEXT_LENGTH for b in buttons)
-    ):
+    if layout == "column":
         return [[button] for button in buttons]
     rows: list[list[InlineKeyboardButton]] = []
     pending: InlineKeyboardButton | None = None

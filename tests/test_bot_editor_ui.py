@@ -98,8 +98,8 @@ class PostEditorTests(unittest.TestCase):
             self._draft(prefix="<blockquote>интро</blockquote>\n", quote=True),
         )
 
-        self.assertEqual(rows_without_quote[0][0].text, "Свой текст · нет")
-        self.assertEqual(rows_with_quote[0][0].text, "Свой текст · есть")
+        self.assertEqual(rows_without_quote[0][0].text, "✏️ Свой текст · нет")
+        self.assertEqual(rows_with_quote[0][0].text, "✏️ Свой текст · есть")
         self.assertFalse(
             any(
                 button.callback_data == "v2|editor|v|abc123"
