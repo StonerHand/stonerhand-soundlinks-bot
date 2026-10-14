@@ -209,10 +209,10 @@ class PublicationStateTests(unittest.IsolatedAsyncioTestCase):
             lang="ru",
         )
         labels = [button.text for row in keyboard.inline_keyboard for button in row]
-        self.assertIn("Опубликовать снова", labels)
-        self.assertIn("Заменить старый пост", labels)
+        self.assertIn("📣 Опубликовать снова", labels)
+        self.assertIn("🔄 Заменить старый пост", labels)
         self.assertIn("🔗 Открыть тот пост", labels)
-        self.assertIn("Отмена", labels)
+        self.assertIn("✕ Отмена", labels)
 
 
 class InlineStorageTests(unittest.IsolatedAsyncioTestCase):

@@ -173,16 +173,41 @@ def format_artist_message(
     )
 
 
+def _collection_header(icon: str, title: str | None, counts: list[str]) -> list[str]:
+    """Every collection opens the same way as a single release:
+
+        🎶 Название
+        Подборка · 2 трека · 1 видео
+
+    A custom title takes the bold line; otherwise "Подборка" does and the
+    details line carries only the counts.
+    """
+    label = "Collection" if resolve_lang(None) == "en" else "Подборка"
+    details = " · ".join(counts)
+    name = _display_text(title) if title else ""
+    lines = [f"{icon} <b>{name or label}</b>"]
+    if details:
+        lines.append(f"{label} · {details}" if name else details)
+    return [*lines, ""]
+
+
+def _collection_item(index: int, icon: str, title: str) -> str:
+    """ "01 · 🎛 Women of Punk": number, kind icon, plain title."""
+    return (
+        f"{_list_number(index)} · {icon} "
+        f"{_display_text(title, MAX_COLLECTION_TEXT_LENGTH)}"
+    )
+
+
 def format_artist_collection_message(
     artists: list[ArtistMatch],
     *,
     include_hashtags: bool = True,
     title: str | None = None,
 ) -> str:
-    lines = [f"<b>{escape(title or 'Артисты')}</b>", ""]
+    lines = _collection_header("🧬", title, [count_label(len(artists), "artist")])
     for index, artist in enumerate(artists, start=1):
-        heading = f"<b>{_display_text(artist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(f"{_list_number(index)} 🧬 {heading}")
+        lines.append(_collection_item(index, "🧬", artist.title))
 
     return _with_hashtags(
         lines, "#stonerhand #collection #artist", include_hashtags=include_hashtags
@@ -195,10 +220,9 @@ def format_playlist_collection_message(
     include_hashtags: bool = True,
     title: str | None = None,
 ) -> str:
-    lines = [f"<b>{escape(title or 'Плейлисты')}</b>", ""]
+    lines = _collection_header("🎛", title, [count_label(len(playlists), "playlist")])
     for index, playlist in enumerate(playlists, start=1):
-        heading = f"<b>{_display_text(playlist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(f"{_list_number(index)} 🎛 {heading}")
+        lines.append(_collection_item(index, "🎛", playlist.title))
 
     return _with_hashtags(
         lines, "#stonerhand #collection #playlist", include_hashtags=include_hashtags
@@ -211,10 +235,9 @@ def format_video_collection_message(
     include_hashtags: bool = True,
     title: str | None = None,
 ) -> str:
-    lines = [f"<b>{escape(title or 'Видео')}</b>", ""]
+    lines = _collection_header("📺", title, [count_label(len(videos), "video")])
     for index, video in enumerate(videos, start=1):
-        heading = f"<b>{_display_text(video.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(f"{_list_number(index)} {video_kind_emoji(video)} {heading}")
+        lines.append(_collection_item(index, video_kind_emoji(video), video.title))
 
     return _with_hashtags(
         lines, "#stonerhand #collection #video", include_hashtags=include_hashtags
@@ -227,10 +250,9 @@ def format_radio_collection_message(
     include_hashtags: bool = True,
     title: str | None = None,
 ) -> str:
-    lines = [f"<b>{escape(title or 'Радио')}</b>", ""]
+    lines = _collection_header("📻", title, [count_label(len(radios), "radio")])
     for index, radio in enumerate(radios, start=1):
-        heading = f"<b>{_display_text(radio.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(f"{_list_number(index)} 📻 {heading}")
+        lines.append(_collection_item(index, "📻", radio.title))
 
     return _with_hashtags(
         lines, "#stonerhand #collection #radio", include_hashtags=include_hashtags
@@ -264,32 +286,32 @@ def format_mixed_collection_message(
             include_hashtags=include_hashtags,
         )
 
-    lines = [f"<b>{escape(title or 'Подборка')}</b>", ""]
+    counts = [
+        *([collection_composition(tracks)] if tracks else []),
+        *[
+            count_label(len(items), kind)
+            for items, kind in (
+                (playlists, "playlist"),
+                (artists, "artist"),
+                (radios, "radio"),
+                (videos, "video"),
+            )
+            if items
+        ],
+    ]
+    lines = _collection_header("🎶", title, counts)
 
     index = 1
     for track in tracks:
         emoji = pick_track_emoji(track)
-        lines.append(f"{_list_number(index)} {emoji} {format_track_heading(track)}")
+        lines.append(f"{_list_number(index)} · {emoji} {format_track_heading(track)}")
         index += 1
-
-    for playlist in playlists:
-        heading = f"<b>{_display_text(playlist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(f"{_list_number(index)} 🎛 {heading}")
-        index += 1
-
-    for artist in artists:
-        heading = f"<b>{_display_text(artist.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(f"{_list_number(index)} 🧬 {heading}")
-        index += 1
-
-    for radio in radios:
-        heading = f"<b>{_display_text(radio.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(f"{_list_number(index)} 📻 {heading}")
-        index += 1
-
+    for items, icon in ((playlists, "🎛"), (artists, "🧬"), (radios, "📻")):
+        for item in items:
+            lines.append(_collection_item(index, icon, item.title))
+            index += 1
     for video in videos:
-        heading = f"<b>{_display_text(video.title, MAX_COLLECTION_TEXT_LENGTH)}</b>"
-        lines.append(f"{_list_number(index)} {video_kind_emoji(video)} {heading}")
+        lines.append(_collection_item(index, video_kind_emoji(video), video.title))
         index += 1
 
     return _with_hashtags(
@@ -608,6 +630,9 @@ def count_label(count: int, kind: str) -> str:
             "soundtrack": "soundtrack",
             "video": "video",
             "podcast": "podcast",
+            "playlist": "playlist",
+            "artist": "artist",
+            "radio": "radio show",
         }.get(kind, "release")
         return f"{count} {singular}{'' if count == 1 else 's'}"
     forms = {
@@ -619,6 +644,9 @@ def count_label(count: int, kind: str) -> str:
         "soundtrack": ("саундтрек", "саундтрека", "саундтреков"),
         "video": ("видео", "видео", "видео"),
         "podcast": ("подкаст", "подкаста", "подкастов"),
+        "playlist": ("плейлист", "плейлиста", "плейлистов"),
+        "artist": ("артист", "артиста", "артистов"),
+        "radio": ("радиошоу", "радиошоу", "радиошоу"),
     }.get(kind, ("релиз", "релиза", "релизов"))
     form = (
         0

@@ -799,11 +799,11 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(rows[0][0].text, "1 · Youth Code — Transitions")
+        self.assertEqual(rows[0][0].text, "1 · Transitions")
         self.assertEqual(rows[0][0].url, "https://song.link/track-1")
-        self.assertEqual(rows[1][0].text, "2 · Show Me The Body — Camp Orchestra")
-        self.assertEqual(rows[1][0].url, "https://song.link/track-2")
-        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0][1].text, "2 · Camp Orchestra")
+        self.assertEqual(rows[0][1].url, "https://song.link/track-2")
+        self.assertEqual(len(rows), 1)
 
     def test_same_artist_collection_uses_column_and_preserves_versions(self) -> None:
         keyboard = _build_collection_keyboard(
@@ -1007,7 +1007,7 @@ class BotKeyboardTests(unittest.TestCase):
         button_texts = [
             button.text for row in keyboard.inline_keyboard for button in row
         ]
-        self.assertEqual(button_texts, ["1 · Youth Code — Transitions"])
+        self.assertEqual(button_texts, ["1 · Transitions"])
         self.assertFalse(keyboard.inline_keyboard[0][0].api_kwargs)
 
     def test_youtube_keyboard_can_hide_channel_button(self) -> None:
@@ -2819,9 +2819,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 1)
         self.assertIn("пачка ссылок", message.replies[0])
         self.assertIn("<blockquote>", message.replies[0])
-        self.assertIn("<b>Women of Punk</b>", message.replies[0])
+        self.assertIn("🎛 Women of Punk", message.replies[0])
         self.assertIn(
-            "<b>SANSAE Live Session Vol.3 - Melon</b>",
+            "🎤 SANSAE Live Session Vol.3 - Melon",
             message.replies[0],
         )
         self.assertNotIn("<a href=", message.replies[0])
@@ -2843,9 +2843,9 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 1)
         self.assertIn("радио и видео", message.replies[0])
         self.assertIn("<blockquote>", message.replies[0])
-        self.assertIn("<b>Dark Energy w/ Guest</b>", message.replies[0])
+        self.assertIn("📻 Dark Energy w/ Guest", message.replies[0])
         self.assertIn(
-            "<b>SANSAE Live Session Vol.3 - Melon</b>",
+            "🎤 SANSAE Live Session Vol.3 - Melon",
             message.replies[0],
         )
         self.assertNotIn("<a href=", message.replies[0])
