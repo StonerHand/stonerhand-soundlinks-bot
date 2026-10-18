@@ -260,3 +260,53 @@ class PublicationServiceTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LongIntroTests(unittest.IsolatedAsyncioTestCase):
+    """A long formatted note keeps every character and its formatting."""
+
+    def _draft(self, note: str) -> dict:
+        return {
+            "item": {
+                "artist": "Sleep",
+                "title": "Dopesmoker",
+                "kind": "song",
+                "links": {"spotify": "https://open.spotify.com/track/abc"},
+                "thumbnail_url": "https://img.example/cover.jpg",
+            },
+            "preset": "cover",
+            "as_photo": True,
+            "quote": True,
+            "prefix": f"<blockquote>{note}</blockquote>\n\n",
+        }
+
+    async def _send(self, draft: dict):
+        bot = SimpleNamespace(
+            send_photo=AsyncMock(return_value=SimpleNamespace()),
+            send_message=AsyncMock(return_value=SimpleNamespace()),
+        )
+        context = SimpleNamespace(application=SimpleNamespace(bot_data={}), bot=bot)
+        service = PublicationService(context, channel_username="stonerhand")
+        await service._send(
+            prepare_publication_draft(draft).data,
+            TrackMatch(**draft["item"]),
+            target=7,
+            channel_style=False,
+        )
+        return bot
+
+    async def test_long_note_becomes_a_message_with_the_cover_above(self) -> None:
+        note = "<b>Жирный</b> и <i>курсив</i> " + "слово " * 400
+        bot = await self._send(self._draft(note))
+
+        bot.send_photo.assert_not_awaited()
+        payload = bot.send_message.await_args.kwargs
+        self.assertIn("<b>Жирный</b> и <i>курсив</i>", payload["text"])
+        self.assertIn("Dopesmoker", payload["text"])
+        self.assertTrue(payload["link_preview_options"].show_above_text)
+
+    async def test_short_note_stays_a_photo_post(self) -> None:
+        bot = await self._send(self._draft("<b>Коротко</b>"))
+
+        bot.send_message.assert_not_awaited()
+        self.assertIn("<b>Коротко</b>", bot.send_photo.await_args.kwargs["caption"])

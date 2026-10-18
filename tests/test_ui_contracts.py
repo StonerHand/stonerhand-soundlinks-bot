@@ -100,7 +100,12 @@ class PublicationGoldenTests(unittest.TestCase):
         context = SimpleNamespace(application=SimpleNamespace(bot_data={}))
         draft = new_track_draft(_track(), chat_id=7, lang="ru")
         message_limit = _draft_intro_limit(draft, context)
+        # A long photo post is sent as a message with the cover above it,
+        # so the photo look no longer shrinks the text budget...
         draft["as_photo"] = True
+        self.assertEqual(_draft_intro_limit(draft, context), message_limit)
+        # ...unless the cover is an uploaded file, which must stay a caption.
+        draft["custom_cover_file_id"] = "file-id"
         caption_limit = _draft_intro_limit(draft, context)
 
         self.assertGreater(message_limit, caption_limit)

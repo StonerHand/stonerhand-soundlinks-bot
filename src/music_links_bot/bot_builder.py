@@ -15,7 +15,7 @@ from music_links_bot.url_utils import is_platform_destination_url
 
 MESSAGE_TEXT_LIMIT = 4096
 PHOTO_CAPTION_LIMIT = 1024
-MAX_INTRO_LENGTH = 3_000
+MAX_INTRO_LENGTH = 4_000
 MAX_CRATE_TITLE_LENGTH = 72
 MAX_CUSTOM_TAGS = 5
 MAX_SELECTED_PLATFORMS = 6
@@ -318,6 +318,10 @@ def fit_telegram_html(text: str, limit: int = MESSAGE_TEXT_LIMIT) -> str:
     suffix = "…"
     if limit == 1:
         return suffix
+    if markup_is_well_formed_enough:
+        # Keep bold, italic, quotes and links: cut the visible text and close
+        # whatever tags are still open, instead of flattening the whole post.
+        return _truncate_html(value, limit - telegram_text_length(suffix), suffix)
     low, high = 0, len(plain)
     while low < high:
         middle = (low + high + 1) // 2
@@ -326,6 +330,49 @@ def fit_telegram_html(text: str, limit: int = MESSAGE_TEXT_LIMIT) -> str:
         else:
             high = middle - 1
     return escape(plain[:low].rstrip()) + suffix
+
+
+def _truncate_html(value: str, budget: int, suffix: str) -> str:
+    """Cut well-formed Telegram HTML to ``budget`` visible UTF-16 units."""
+    out: list[str] = []
+    open_tags: list[str] = []
+    used = 0
+    for token in re.split(r"(<[^>]+>)", value):
+        if not token:
+            continue
+        if token.startswith("<"):
+            match = re.match(r"<(/?)([A-Za-z][A-Za-z0-9-]*)", token)
+            if match:
+                closing, name = match.groups()
+                if closing:
+                    if open_tags and open_tags[-1] == name.casefold():
+                        open_tags.pop()
+                else:
+                    open_tags.append(name.casefold())
+            out.append(token)
+            continue
+        text = unescape(token)
+        size = telegram_text_length(text)
+        if used + size <= budget:
+            out.append(token)
+            used += size
+            continue
+        low, high = 0, len(text)
+        while low < high:
+            middle = (low + high + 1) // 2
+            if used + telegram_text_length(text[:middle]) <= budget:
+                low = middle
+            else:
+                high = middle - 1
+        out.append(escape(text[:low].rstrip()) + suffix)
+        break
+    else:
+        return value
+    # Drop tags opened after the cut point, then close the ones still open.
+    html = "".join(out)
+    for name in reversed(open_tags):
+        html += f"</{name}>"
+    return re.sub(r"<([A-Za-z][A-Za-z0-9-]*)[^>]*></\1>", "", html)
 
 
 def _balanced_html_tags(value: str) -> bool:

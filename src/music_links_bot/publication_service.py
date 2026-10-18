@@ -228,8 +228,16 @@ class PublicationService:
 
         generated_cover = is_generated_artwork_url(view.preview_url)
         photo_fits = visible_length(text) <= PHOTO_CAPTION_LIMIT
+        # A custom cover is a Telegram file and cannot be a link preview, so it
+        # stays a photo; any other cover moves above a longer text instead of
+        # cutting the caption to Telegram's 1024 characters.
+        custom_cover = bool(draft.get("custom_cover_file_id"))
         photo_rejected = False
-        if (view.as_photo or (generated_cover and photo_fits)) and view.cover:
+        if (
+            view.as_photo
+            and (photo_fits or custom_cover)
+            or (generated_cover and photo_fits)
+        ) and view.cover:
             try:
                 return await self._send_photo(
                     draft,
@@ -276,7 +284,8 @@ class PublicationService:
             text=text,
             keyboard=keyboard,
             preview_url=fallback_preview,
-            prefer_large_preview=view.prefer_large_preview,
+            prefer_large_preview=view.prefer_large_preview
+            or (view.as_photo and not photo_fits),
         )
 
     async def _send_audio(

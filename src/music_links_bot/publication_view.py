@@ -37,8 +37,11 @@ def publication_contract_from_view(
     view: PublicationPlan,
     track: TrackMatch,
 ) -> RenderedPublication:
+    from music_links_bot.bot_builder import PHOTO_CAPTION_LIMIT
+    from music_links_bot.publication_budget import visible_length
+
     mode = "classic"
-    if view.as_photo:
+    if view.as_photo and visible_length(view.text) <= PHOTO_CAPTION_LIMIT:
         mode = "photo"
     if view.source_audio_file_id:
         mode = "audio"
