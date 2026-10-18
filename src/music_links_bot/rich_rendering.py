@@ -512,8 +512,11 @@ def build_rich_collection_html(
     header, _, body = body.partition("\n\n")
     # <h1> already holds the title. When the classic heading names the shared
     # artist instead ("🎶 <b>Blur</b>"), keep that artist above the list.
+    from music_links_bot.release_presentation import shared_collection_artist
+
+    artist = shared_collection_artist(tracks)
     named = header.split("\n", 1)[0].removeprefix("🎶 ")
-    if named != f"<b>{html.escape(title)}</b>" and named.startswith("<b>"):
+    if artist and named == f"<b>{html.escape(' '.join(artist.split()))}</b>":
         body = f"{named}\n{body}"
     # Rich layouts number lists themselves; keep "1." instead of <code>01</code>.
     body = re.sub(r"<code>0*(\d+)</code> (?:· )?", r"\1. ", body)

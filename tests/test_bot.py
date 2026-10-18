@@ -1489,7 +1489,6 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         result = await _build_inline_result(
             "https://open.spotify.com/track/abc",
             ContextStub(),
-            force_classic=True,
         )
 
         self.assertIsNotNone(result)

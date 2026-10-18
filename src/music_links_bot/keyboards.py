@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 
 from telegram import (
     InlineKeyboardButton as TelegramInlineKeyboardButton,
@@ -598,9 +599,12 @@ def _label(key: str) -> str:
 
 MAX_COLLECTION_BUTTON_TITLE = 16
 _VIDEO_TITLE_NOISE = re.compile(
-    r"\s*[(\[][^)\]]*(?:official|video|клип|audio|lyric|visuali[sz]er|mv)[^)\]]*[)\]]",
+    r"\s*[(\[][^)\]]*\b(?:official|video|клип|audio|lyrics?|visuali[sz]er|mv|m/v)\b"
+    r"[^)\]]*[)\]]",
     re.IGNORECASE,
 )
+# Characters that only make sense attached to what follows or precedes them.
+_DANGLING = "\u200d\ufe0f\ufe0e\u20e3"
 
 
 def _short_video_title(title: str) -> str:
@@ -622,7 +626,13 @@ def _collection_label(index: int, title: str, icon: str = "") -> str:
     """
     name = " ".join(str(title or "").split())
     if len(name) > MAX_COLLECTION_BUTTON_TITLE:
-        name = name[:MAX_COLLECTION_BUTTON_TITLE].rstrip(" -–—·,.:") + "…"
+        cut = name[:MAX_COLLECTION_BUTTON_TITLE]
+        # Never end on half an emoji sequence or a lone accent.
+        while cut and (
+            cut[-1] in _DANGLING or unicodedata.category(cut[-1]) in {"Mn", "Me"}
+        ):
+            cut = cut[:-1]
+        name = cut.rstrip(" -–—·,.:") + "…"
     label = f"{index} · {name}"
     return f"{icon} {label}" if icon else label
 

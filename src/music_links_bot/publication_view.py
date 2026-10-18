@@ -25,6 +25,7 @@ class PublicationPlan:
     cover: str | None
     source_audio_file_id: str | None
     as_photo: bool
+    custom_cover: bool
     prefer_large_preview: bool
     delivery_mode: str
 
@@ -37,11 +38,12 @@ def publication_contract_from_view(
     view: PublicationPlan,
     track: TrackMatch,
 ) -> RenderedPublication:
-    from music_links_bot.bot_builder import PHOTO_CAPTION_LIMIT
-    from music_links_bot.publication_budget import visible_length
+    from music_links_bot.publication_budget import sends_as_photo
 
     mode = "classic"
-    if view.as_photo and visible_length(view.text) <= PHOTO_CAPTION_LIMIT:
+    if sends_as_photo(
+        as_photo=view.as_photo, custom_cover=view.custom_cover, text=view.text
+    ):
         mode = "photo"
     if view.source_audio_file_id:
         mode = "audio"
@@ -121,7 +123,8 @@ def build_publication_view(
     if not isinstance(source_audio_file_id, str) or not source_audio_file_id:
         source_audio_file_id = None
     custom_cover = draft.get("custom_cover_file_id")
-    cover = custom_cover if isinstance(custom_cover, str) and custom_cover else None
+    has_custom_cover = isinstance(custom_cover, str) and bool(custom_cover)
+    cover = custom_cover if has_custom_cover else None
     cover = cover or track.thumbnail_url
     return PublicationPlan(
         text=text,
@@ -134,6 +137,7 @@ def build_publication_view(
         cover=cover,
         source_audio_file_id=source_audio_file_id,
         as_photo=bool(draft.get("as_photo")),
+        custom_cover=has_custom_cover,
         prefer_large_preview=bool(draft.get("large_preview")),
         delivery_mode=(
             "auto"
