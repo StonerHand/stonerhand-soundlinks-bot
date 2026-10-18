@@ -289,8 +289,6 @@ class FormatterTests(unittest.TestCase):
         message = format_collection_message(
             tracks,
             title="Тяжёлый <вечер>",
-            intro="Два важных релиза",
-            outro="Слушать по порядку",
             hashtags="#stonerhand #doom",
             item_sections=["Новинки", "Финал"],
             item_notes=["Начинаем отсюда", "Закрывает сет"],
@@ -300,7 +298,6 @@ class FormatterTests(unittest.TestCase):
         self.assertIn("<b>Новинки</b>", message)
         self.assertIn("<i>↳ Начинаем отсюда</i>", message)
         self.assertIn("<b>Финал</b>", message)
-        self.assertIn("<i>Слушать по порядку</i>", message)
         self.assertTrue(message.endswith("#stonerhand #doom"))
 
     def test_prepend_user_html_keeps_safe_generated_markup(self) -> None:

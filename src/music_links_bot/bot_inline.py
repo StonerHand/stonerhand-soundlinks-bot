@@ -273,7 +273,6 @@ async def inline_query_handler(
                         lang=lang,
                         channel_safe=channel_safe,
                         history=history_mode,
-                        force_classic=True,
                     )
                     for source_url in page_urls
                 ),
@@ -579,8 +578,9 @@ async def _build_inline_result(
     lang: str = "ru",
     channel_safe: bool = False,
     history: bool = False,
-    force_classic: bool = False,
 ) -> InlineQueryResultArticle | InlineQueryResultPhoto | None:
+    """Single-release inline result: always an article whose link preview is
+    the signed cover, so it needs no separate classic fallback."""
     bot_data = context.application.bot_data
     share_query = build_share_query([source_url])
     share_label = get_text(lang, "share_post")
@@ -781,7 +781,6 @@ async def _build_inline_collection_result(
             context,
             lang=lang,
             channel_safe=channel_safe,
-            force_classic=force_classic,
         )
 
     bundle = await bot_lookup.resolve_sources(

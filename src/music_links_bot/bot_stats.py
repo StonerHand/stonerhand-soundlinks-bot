@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from telegram import Message, MessageEntity
 from telegram.ext import ContextTypes
 
+from music_links_bot.bot_builder import MAX_INTRO_LENGTH
 from music_links_bot.constants import STATS_KV_KEY
 from music_links_bot.formatter import prepend_user_html
 from music_links_bot.kvstore import KVStore
@@ -38,7 +39,7 @@ from music_links_bot.url_utils import (
 )
 
 LOGGER = logging.getLogger(__name__)
-MAX_USER_NOTE_LENGTH = 4_000
+MAX_USER_NOTE_LENGTH = MAX_INTRO_LENGTH
 
 
 def message_text(message: Message) -> str | None:

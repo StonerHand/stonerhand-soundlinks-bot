@@ -5,13 +5,14 @@ from dataclasses import dataclass
 from html import unescape
 
 from music_links_bot.bot_builder import (
+    MAX_INTRO_LENGTH,
     MESSAGE_TEXT_LIMIT,
     PHOTO_CAPTION_LIMIT,
     fit_telegram_html,
 )
 from music_links_bot.telegram_text import telegram_text_length
 
-INTRO_HARD_LIMIT = 4_000
+INTRO_HARD_LIMIT = MAX_INTRO_LENGTH
 _BLOCKQUOTE_OPEN = "<blockquote>"
 _BLOCKQUOTE_CLOSE = "</blockquote>"
 _BLOCKQUOTE_SUFFIX = f"{_BLOCKQUOTE_CLOSE}\n\n"
@@ -25,6 +26,21 @@ class IntroBudget:
     truncated: bool = False
 
 
+def stays_caption(*, audio: bool, as_photo: bool, custom_cover: bool) -> bool:
+    """An audio file or an uploaded cover is a Telegram file, never a link
+    preview, so such a post keeps the 1024-character caption."""
+    return audio or (as_photo and custom_cover)
+
+
+def sends_as_photo(*, as_photo: bool, custom_cover: bool, text: str) -> bool:
+    """The single photo-or-message rule used by budgets, contract and delivery.
+
+    A photo post whose text outgrows the caption becomes a message with the
+    cover above the text; an uploaded cover cannot do that and stays a photo.
+    """
+    return as_photo and (custom_cover or visible_length(text) <= PHOTO_CAPTION_LIMIT)
+
+
 def publication_limit(draft: dict) -> int:
     """How long the finished post may be.
 
@@ -32,8 +48,10 @@ def publication_limit(draft: dict) -> int:
     cover above it, so only an uploaded audio file or a custom cover (both
     Telegram files that cannot be a link preview) keep the caption limit.
     """
-    if draft.get("source_audio_file_id") or (
-        draft.get("as_photo") and draft.get("custom_cover_file_id")
+    if stays_caption(
+        audio=bool(draft.get("source_audio_file_id")),
+        as_photo=bool(draft.get("as_photo")),
+        custom_cover=bool(draft.get("custom_cover_file_id")),
     ):
         return PHOTO_CAPTION_LIMIT
     return MESSAGE_TEXT_LIMIT

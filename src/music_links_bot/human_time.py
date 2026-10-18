@@ -153,7 +153,8 @@ def parse_human_datetime(
             step = timedelta(hours=amount)
         if step > timedelta(days=60) or step <= timedelta(0):
             return None
-        return (current + step).timestamp()
+        # An absolute duration: "через 2 часа" is two real hours across DST.
+        return current.timestamp() + step.total_seconds()
 
     clock = re.search(r"(?<!\d)(\d{1,2})[:.](\d{2})(?!\d)$", text)
     if clock is None:

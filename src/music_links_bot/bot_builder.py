@@ -15,6 +15,8 @@ from music_links_bot.url_utils import is_platform_destination_url
 
 MESSAGE_TEXT_LIMIT = 4096
 PHOTO_CAPTION_LIMIT = 1024
+# One limit for every user-written note: the editor, the text above a link
+# and the publication budget all read it from here.
 MAX_INTRO_LENGTH = 4_000
 MAX_CRATE_TITLE_LENGTH = 72
 MAX_CUSTOM_TAGS = 5
@@ -357,6 +359,13 @@ def _truncate_html(value: str, budget: int, suffix: str) -> str:
             out.append(token)
             used += size
             continue
+        if open_tags and open_tags[-1] == "tg-emoji":
+            # A custom emoji is atomic: drop it whole rather than leave "…"
+            # as its content, which Telegram rejects.
+            out.pop()
+            open_tags.pop()
+            out.append(suffix)
+            break
         low, high = 0, len(text)
         while low < high:
             middle = (low + high + 1) // 2
