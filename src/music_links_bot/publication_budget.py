@@ -11,7 +11,7 @@ from music_links_bot.bot_builder import (
 )
 from music_links_bot.telegram_text import telegram_text_length
 
-INTRO_HARD_LIMIT = 3_000
+INTRO_HARD_LIMIT = 4_000
 _BLOCKQUOTE_OPEN = "<blockquote>"
 _BLOCKQUOTE_CLOSE = "</blockquote>"
 _BLOCKQUOTE_SUFFIX = f"{_BLOCKQUOTE_CLOSE}\n\n"
@@ -26,7 +26,17 @@ class IntroBudget:
 
 
 def publication_limit(draft: dict) -> int:
-    return PHOTO_CAPTION_LIMIT if draft.get("as_photo") else MESSAGE_TEXT_LIMIT
+    """How long the finished post may be.
+
+    A photo post whose text outgrows the caption is sent as a message with the
+    cover above it, so only an uploaded audio file or a custom cover (both
+    Telegram files that cannot be a link preview) keep the caption limit.
+    """
+    if draft.get("source_audio_file_id") or (
+        draft.get("as_photo") and draft.get("custom_cover_file_id")
+    ):
+        return PHOTO_CAPTION_LIMIT
+    return MESSAGE_TEXT_LIMIT
 
 
 def visible_length(value: str) -> int:

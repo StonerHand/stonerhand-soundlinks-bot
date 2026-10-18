@@ -154,10 +154,12 @@ class BuilderJourneyTests(unittest.TestCase):
         formatted = "<b>" + "🎧" * 10 + "</b>"
         self.assertEqual(fit_telegram_html(formatted, 20), formatted)
 
+        # Cutting keeps the formatting and closes the open tag.
         limited = fit_telegram_html("<b>" + "🎧" * 11 + "</b>", 20)
-        self.assertLessEqual(telegram_text_length(limited), 20)
-        self.assertTrue(limited.endswith("…"))
-        self.assertNotIn("<b>", limited)
+        visible = limited.removeprefix("<b>").removesuffix("</b>")
+        self.assertLessEqual(telegram_text_length(visible), 20)
+        self.assertTrue(limited.startswith("<b>"))
+        self.assertTrue(limited.endswith("…</b>"))
 
         malformed = fit_telegram_html("<b>Sleep — Dragonaut", 100)
         self.assertNotIn("<b>", malformed)

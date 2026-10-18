@@ -38,7 +38,7 @@ from music_links_bot.url_utils import (
 )
 
 LOGGER = logging.getLogger(__name__)
-MAX_USER_NOTE_LENGTH = 3_000
+MAX_USER_NOTE_LENGTH = 4_000
 
 
 def message_text(message: Message) -> str | None:
