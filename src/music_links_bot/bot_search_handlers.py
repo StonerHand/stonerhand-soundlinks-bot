@@ -16,6 +16,7 @@ from music_links_bot.i18n import get_text
 from music_links_bot.search import (
     SearchClient,
     SearchLookupError,
+    find_release_candidates,
     normalize_search_query,
 )
 from music_links_bot.telegram_buttons import (
@@ -62,17 +63,7 @@ async def _resolve_search_sources(
     await hooks.send_loading_placeholder(message, lang)
     search_client: SearchClient = context.application.bot_data["search_client"]
     try:
-        if hasattr(search_client, "search_release_candidates"):
-            candidates = await search_client.search_release_candidates(search_query)
-        else:
-            source_url = await search_client.search_release_url(search_query)
-            candidates = [
-                type(
-                    "SearchChoice",
-                    (),
-                    {"url": source_url, "artist": "", "title": search_query},
-                )()
-            ]
+        candidates = await find_release_candidates(search_client, search_query)
         if len(candidates) > 1:
             selection_id = await hooks.store_search_selection(
                 context,

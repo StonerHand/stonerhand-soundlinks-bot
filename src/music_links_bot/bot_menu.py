@@ -31,8 +31,8 @@ from music_links_bot.bot_ui import (
     build_section_keyboard,
     build_start_keyboard,
 )
+from music_links_bot.constants import channel_target
 from music_links_bot.i18n import get_text, resolve_lang
-from music_links_bot.keyboards import CHANNEL_USERNAME
 from music_links_bot.privacy import delete_user_data
 from music_links_bot.telegram_buttons import button as InlineKeyboardButton
 
@@ -442,10 +442,7 @@ async def channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if message.chat.type != "private":
         target: int | str | None = message.chat_id
     elif _is_owner(context, user_id):
-        target = (
-            context.application.bot_data.get("publish_chat_id")
-            or f"@{CHANNEL_USERNAME}"
-        )
+        target = channel_target(context.application.bot_data)
     else:
         target = None
     rows = [

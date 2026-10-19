@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import re
-import unicodedata
 from collections.abc import Mapping
 
 import httpx
 
 from music_links_bot.cache import TTLCache
 from music_links_bot.constants import HTTP_USER_AGENT
+from music_links_bot.metadata_cleaning import match_key
 from music_links_bot.url_utils import cache_key_for_url, spotify_url_type
 
 MUSICBRAINZ_CACHE_TTL_SECONDS = 7 * 24 * 3600
@@ -72,8 +72,8 @@ class MusicBrainzClient:
     ) -> str | None:
         entity_type = "release-group" if kind == "album" else "recording"
         expected_spotify_type = "album" if kind == "album" else "track"
-        artist_key = _match_key(artist)
-        title_key = _match_key(title)
+        artist_key = match_key(artist)
+        title_key = match_key(title)
         if not artist_key or not title_key:
             return None
 
@@ -256,17 +256,6 @@ def _escape_lucene_phrase(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
-def _match_key(value: object) -> str:
-    if not isinstance(value, str):
-        return ""
-    normalized = unicodedata.normalize("NFKD", value).casefold()
-    return "".join(
-        character
-        for character in normalized
-        if character.isalnum() and not unicodedata.combining(character)
-    )
-
-
 def _extract_exact_entity_id(
     payload: Mapping[str, object],
     *,
@@ -278,8 +267,8 @@ def _extract_exact_entity_id(
     if not isinstance(results, list):
         return None
 
-    expected_artist = _match_key(artist)
-    expected_title = _match_key(title)
+    expected_artist = match_key(artist)
+    expected_title = match_key(title)
     for result in results:
         if not isinstance(result, Mapping):
             continue
@@ -289,7 +278,7 @@ def _extract_exact_entity_id(
             continue
         if score < MUSICBRAINZ_MIN_SCORE:
             continue
-        if _match_key(result.get("title")) != expected_title:
+        if match_key(result.get("title")) != expected_title:
             continue
         if expected_artist not in _artist_credit_keys(result.get("artist-credit")):
             continue
@@ -320,9 +309,9 @@ def _artist_credit_keys(value: object) -> set[str]:
         if isinstance(join_phrase, str):
             credited_parts.append(join_phrase)
 
-    keys = {_match_key(name) for name in individual_names}
+    keys = {match_key(name) for name in individual_names}
     if credited_parts:
-        keys.add(_match_key("".join(credited_parts)))
+        keys.add(match_key("".join(credited_parts)))
     return {key for key in keys if key}
 
 
@@ -362,8 +351,8 @@ def _extract_exact_deezer_isrc(
     if not isinstance(results, list):
         return None
 
-    expected_artist = _match_key(artist)
-    expected_title = _match_key(title)
+    expected_artist = match_key(artist)
+    expected_title = match_key(title)
     for result in results:
         if not isinstance(result, Mapping):
             continue
@@ -371,10 +360,10 @@ def _extract_exact_deezer_isrc(
         artist_name = (
             result_artist.get("name") if isinstance(result_artist, Mapping) else None
         )
-        if _match_key(artist_name) != expected_artist:
+        if match_key(artist_name) != expected_artist:
             continue
         result_titles = (result.get("title"), result.get("title_short"))
-        if expected_title not in {_match_key(value) for value in result_titles}:
+        if expected_title not in {match_key(value) for value in result_titles}:
             continue
         isrc = str(result.get("isrc") or "").strip().upper()
         if _ISRC_RE.fullmatch(isrc):
@@ -392,12 +381,12 @@ def _extract_exact_isrc_spotify_url(
     if not isinstance(recordings, list):
         return None
 
-    expected_artist = _match_key(artist)
-    expected_title = _match_key(title)
+    expected_artist = match_key(artist)
+    expected_title = match_key(title)
     for recording in recordings:
         if not isinstance(recording, Mapping):
             continue
-        if _match_key(recording.get("title")) != expected_title:
+        if match_key(recording.get("title")) != expected_title:
             continue
         if expected_artist not in _artist_credit_keys(recording.get("artist-credit")):
             continue

@@ -179,9 +179,7 @@ async def deliver_collection_input(message, context, tracks, *, user_id, lang):
     from dataclasses import asdict
 
     from music_links_bot import bot_lookup_flow as bot
-    from music_links_bot.bot_crate import load_crate_title, replace_crate_item
-    from music_links_bot.bot_ui import render_crate
-    from music_links_bot.sharing import build_crate_share_query
+    from music_links_bot.bot_crate import replace_crate_item
 
     mode = collection_input.get()
     if not mode or mode == "new":
@@ -203,15 +201,8 @@ async def deliver_collection_input(message, context, tracks, *, user_id, lang):
         items = await replace_crate_item(
             context.application.bot_data, user_id, mode, asdict(tracks[0])
         )
-    title = await load_crate_title(context.application.bot_data, user_id)
-    from music_links_bot.bot_crate_handlers import is_publisher
+    from music_links_bot.bot_crate_handlers import load_crate_view
 
-    text, keyboard = render_crate(
-        items,
-        lang=lang,
-        title=title,
-        share_query=build_crate_share_query(items),
-        can_publish=is_publisher(context, user_id),
-    )
+    text, keyboard = await load_crate_view(context, user_id, lang=lang, items=items)
     await message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
     return True

@@ -96,17 +96,6 @@ def overall_service_ok(checks: dict[str, dict], queue: dict) -> bool:
     return overall_ok(checks) and queue_ok
 
 
-def describe_failures(checks: dict[str, dict]) -> list[str]:
-    failures = []
-    for name, check in checks.items():
-        if name in {"redis", "queue_worker"} and not check.get("configured"):
-            continue
-        if not check.get("ok"):
-            failures.append(name)
-
-    return failures
-
-
 def evaluate_provider_metrics(metrics: object) -> dict[str, object]:
     """Turn anonymous runtime counters into a low-noise provider warning."""
     providers = metrics.get("providers") if isinstance(metrics, dict) else None

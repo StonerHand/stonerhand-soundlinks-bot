@@ -7,6 +7,7 @@ import os
 import httpx
 
 from music_links_bot.constants import HTTP_USER_AGENT
+from music_links_bot.kvstore import redis_credentials
 
 LOGGER = logging.getLogger(__name__)
 ALERT_DEDUP_TTL_SECONDS = 3600
@@ -47,16 +48,10 @@ def alert_dedup_digest(key: str) -> str:
 
 
 def _acquire_dedup_slot(digest: str) -> bool:
-    base_url = (
-        os.getenv("UPSTASH_REDIS_REST_URL", "").strip()
-        or os.getenv("KV_REST_API_URL", "").strip()
-    )
-    token = (
-        os.getenv("UPSTASH_REDIS_REST_TOKEN", "").strip()
-        or os.getenv("KV_REST_API_TOKEN", "").strip()
-    )
-    if not base_url or not token:
+    credentials = redis_credentials()
+    if credentials is None:
         return True
+    base_url, token = credentials
 
     try:
         response = httpx.post(

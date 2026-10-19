@@ -9,7 +9,7 @@ from music_links_bot.bot_crate import (
     load_crate,
     load_crate_title,
     move_crate_item,
-    remove_crate_item,
+    pop_crate_item,
     restore_crate_item,
     save_crate_title,
 )
@@ -429,7 +429,7 @@ class BotCrateTests(unittest.IsolatedAsyncioTestCase):
 
         items = await move_crate_item(bot_data, 7, 1, -1)
         self.assertEqual(items[0]["draft_id"], "d2")
-        items = await remove_crate_item(bot_data, 7, 0)
+        items, _ = await pop_crate_item(bot_data, 7, 0)
         self.assertEqual([item["draft_id"] for item in items], ["d1"])
         self.assertEqual(len(await load_crate(bot_data, 7)), 1)
 

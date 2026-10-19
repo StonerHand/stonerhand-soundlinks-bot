@@ -6,7 +6,7 @@ from music_links_bot.cover_style import (
     MAX_BRAND_LABEL_LENGTH,
     set_brand_label_override,
 )
-from music_links_bot.durable_state import read_text, write_text
+from music_links_bot.durable_state import delete_value, read_text, write_text
 
 BRAND_LABEL_KEY = "settings:brand-label:v1"
 BRAND_LABEL_TTL_SECONDS = 10 * 365 * 86400
@@ -31,6 +31,6 @@ async def save_brand_label(kv, value: str) -> str:
                 kv, BRAND_LABEL_KEY, cleaned, ttl_seconds=BRAND_LABEL_TTL_SECONDS
             )
         else:
-            await kv.delete(BRAND_LABEL_KEY)
+            await delete_value(kv, BRAND_LABEL_KEY)
     set_brand_label_override(cleaned or None)
     return cleaned

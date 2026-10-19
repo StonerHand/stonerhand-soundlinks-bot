@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stonerhand-soundlinks-bot"
-version = "2.3.1"
+version = "2.4.0"
 description = "Telegram-native music publishing bot with universal release cards, collections, scheduling and channel delivery."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -87,7 +87,7 @@ branch = true
 source = ["src/music_links_bot", "api"]
 
 [tool.coverage.report]
-fail_under = 72
+fail_under = 80
 show_missing = true
 skip_covered = true
 
@@ -123,6 +123,22 @@ files = [
   "src/music_links_bot/config.py",
   "src/music_links_bot/update_execution.py",
   "src/music_links_bot/qstash_auth.py",
+  "src/music_links_bot/bot.py",
+  "src/music_links_bot/alerts.py",
+  "src/music_links_bot/artist.py",
+  "src/music_links_bot/brand_settings.py",
+  "src/music_links_bot/input_routing.py",
+  "src/music_links_bot/bot_workspace.py",
+  "src/music_links_bot/bot_admin.py",
+  "src/music_links_bot/constants.py",
+  "src/music_links_bot/bot_search_handlers.py",
+  "src/music_links_bot/bot_quick_publish.py",
+  "src/music_links_bot/cover_style.py",
+  "src/music_links_bot/keyboards.py",
+  "src/music_links_bot/formatter.py",
+  "src/music_links_bot/metadata_cleaning.py",
+  "src/music_links_bot/bot_lookup.py",
+  "src/music_links_bot/bot_inline.py",
 ]
 follow_imports = "skip"
 check_untyped_defs = true

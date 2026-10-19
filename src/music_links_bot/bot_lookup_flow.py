@@ -88,7 +88,11 @@ from music_links_bot.channel_templates import (
 )
 from music_links_bot.chat_access import check_publish_access
 from music_links_bot.collection_collage import branded_artwork_preview_url
-from music_links_bot.constants import MAX_LINKS_PER_MESSAGE
+from music_links_bot.constants import (
+    CHANNEL_USERNAME,
+    MAX_LINKS_PER_MESSAGE,
+    channel_target,
+)
 from music_links_bot.draft_model import new_track_draft
 from music_links_bot.editor_view import (
     render_track_draft as _render_track_draft,
@@ -102,7 +106,6 @@ from music_links_bot.formatter import (
 )
 from music_links_bot.i18n import get_text
 from music_links_bot.keyboards import (
-    CHANNEL_USERNAME,
     _build_collection_keyboard,
     _build_link_keyboard,
     _select_preview_url,
@@ -179,10 +182,7 @@ async def _send_track_draft(
     )
     await apply_channel_template(context, f"user:{user_id}", draft)
     if draft["can_publish"]:
-        target = (
-            context.application.bot_data.get("publish_chat_id")
-            or f"@{CHANNEL_USERNAME}"
-        )
+        target = channel_target(context.application.bot_data)
         await apply_channel_template(context, target, draft)
 
     session = await _runtime(context).get_session(user_id, lang=lang)

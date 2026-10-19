@@ -6,7 +6,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from api.health import (
-    describe_failures,
     evaluate_provider_metrics,
     evaluate_webhook_info,
     overall_ok,
@@ -158,12 +157,6 @@ class OverallHealthTests(unittest.TestCase):
         self.assertEqual(release["commit"], "1234567890ab")
         self.assertEqual(release["environment"], "production")
         self.assertRegex(release["version"], r"^\d+\.\d+\.\d+$")
-
-    def test_describe_failures_skips_unconfigured_redis(self) -> None:
-        failures = describe_failures(
-            self._checks(webhook=False, redis_ok=False, redis_conf=False)
-        )
-        self.assertEqual(failures, ["webhook"])
 
     def test_storage_snapshot_without_redis_is_empty(self) -> None:
         import os

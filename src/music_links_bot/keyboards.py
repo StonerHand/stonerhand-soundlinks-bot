@@ -11,7 +11,7 @@ from telegram import (
 )
 from telegram.ext import ContextTypes
 
-from music_links_bot.constants import PLATFORM_LABELS
+from music_links_bot.constants import CHANNEL_USERNAME, PLATFORM_LABELS
 from music_links_bot.i18n import get_text, resolve_lang
 from music_links_bot.models import (
     ArtistMatch,
@@ -35,7 +35,6 @@ from music_links_bot.url_utils import (
     is_platform_destination_url,
 )
 
-CHANNEL_USERNAME = "stonerhand"
 CHANNEL_URL = f"https://t.me/{CHANNEL_USERNAME}"
 CHANNEL_BUTTON_TEXT = "🪨 Открыть канал"
 DEFAULT_UI_MODE = "stonerhand"
@@ -176,7 +175,7 @@ def _build_link_keyboard(
     elif release_hub_url and not has_explicit_selection:
         final_platforms = final_platforms[:MAX_VISIBLE_PLATFORM_BUTTONS]
 
-    buttons = []
+    buttons: list[InlineKeyboardButton] = []
     seen_urls = {cache_key_for_url(release_hub_url)} if release_hub_url else set()
     # Three services fit one row only with short names ("Apple", "YouTube").
     short = len(final_platforms) >= 3
@@ -342,27 +341,36 @@ def _build_artist_keyboard(
     )
 
 
+def _item_button(
+    index: int, title: str, url: str, icon: str = ""
+) -> InlineKeyboardButton:
+    return _url_button(text=_collection_label(index, title, icon), url=url, style=None)
+
+
+def _video_button(index: int, video: VideoMatch) -> InlineKeyboardButton:
+    from music_links_bot.video_kinds import video_kind_emoji
+
+    return _item_button(
+        index, _short_video_title(video.title), video.url, video_kind_emoji(video)
+    )
+
+
+def _items_keyboard(
+    buttons: list[InlineKeyboardButton], include_channel_button: bool
+) -> InlineKeyboardMarkup:
+    return _keyboard_with_optional_channel(
+        _adaptive_collection_rows(buttons), include_channel_button
+    )
+
+
 def _build_youtube_collection_keyboard(
     videos: list[VideoMatch],
     *,
     include_channel_button: bool = False,
 ) -> InlineKeyboardMarkup:
-    from music_links_bot.video_kinds import video_kind_emoji
-
-    buttons: list[InlineKeyboardButton] = []
-    for index, video in enumerate(videos, start=1):
-        buttons.append(
-            _url_button(
-                text=_collection_label(
-                    index, _short_video_title(video.title), video_kind_emoji(video)
-                ),
-                url=video.url,
-                style=None,
-            )
-        )
-
-    return _keyboard_with_optional_channel(
-        _adaptive_collection_rows(buttons), include_channel_button
+    return _items_keyboard(
+        [_video_button(index, video) for index, video in enumerate(videos, start=1)],
+        include_channel_button,
     )
 
 
@@ -371,18 +379,9 @@ def _build_nts_collection_keyboard(
     *,
     include_channel_button: bool = False,
 ) -> InlineKeyboardMarkup:
-    buttons: list[InlineKeyboardButton] = []
-    for index, radio in enumerate(radios, start=1):
-        buttons.append(
-            _url_button(
-                text=_collection_label(index, radio.title),
-                url=radio.url,
-                style=None,
-            )
-        )
-
-    return _keyboard_with_optional_channel(
-        _adaptive_collection_rows(buttons), include_channel_button
+    return _items_keyboard(
+        [_item_button(i, item.title, item.url) for i, item in enumerate(radios, 1)],
+        include_channel_button,
     )
 
 
@@ -391,18 +390,9 @@ def _build_playlist_collection_keyboard(
     *,
     include_channel_button: bool = False,
 ) -> InlineKeyboardMarkup:
-    buttons: list[InlineKeyboardButton] = []
-    for index, playlist in enumerate(playlists, start=1):
-        buttons.append(
-            _url_button(
-                text=_collection_label(index, playlist.title),
-                url=playlist.url,
-                style=None,
-            )
-        )
-
-    return _keyboard_with_optional_channel(
-        _adaptive_collection_rows(buttons), include_channel_button
+    return _items_keyboard(
+        [_item_button(i, item.title, item.url) for i, item in enumerate(playlists, 1)],
+        include_channel_button,
     )
 
 
@@ -411,18 +401,9 @@ def _build_artist_collection_keyboard(
     *,
     include_channel_button: bool = False,
 ) -> InlineKeyboardMarkup:
-    buttons: list[InlineKeyboardButton] = []
-    for index, artist in enumerate(artists, start=1):
-        buttons.append(
-            _url_button(
-                text=_collection_label(index, artist.title),
-                url=artist.url,
-                style=None,
-            )
-        )
-
-    return _keyboard_with_optional_channel(
-        _adaptive_collection_rows(buttons), include_channel_button
+    return _items_keyboard(
+        [_item_button(i, item.title, item.url) for i, item in enumerate(artists, 1)],
+        include_channel_button,
     )
 
 
@@ -468,93 +449,28 @@ def _build_mixed_collection_keyboard(
     playlists = playlists or []
     artists = artists or []
     radios = radios or []
-    is_track_video_pair = (
-        len(tracks) == 1
-        and len(videos) == 1
-        and not playlists
-        and not artists
-        and not radios
-    )
     if len(tracks) == 1 and videos and not playlists and not artists and not radios:
+        # One song with its clips has its own "listen + 🎬 Клип" layout.
         return _build_track_videos_keyboard(
             tracks[0], videos, include_channel_button=include_channel_button
         )
     buttons: list[InlineKeyboardButton] = []
-    index = 1
-
     for track in tracks:
         destination = resolve_release_hub_url(
             track.page_url,
             track.links,
             release_kind=track.kind,
         ) or _select_preview_url(track.links)
-        if not destination:
-            continue
-
-        buttons.append(
-            _url_button(
-                text=(
-                    _label("btn_listen_song")
-                    if is_track_video_pair
-                    else _collection_label(index, compact_release_title(track.title))
-                ),
-                url=destination,
-                style="primary" if is_track_video_pair else None,
+        if destination:
+            buttons.append(
+                _item_button(
+                    len(buttons) + 1, compact_release_title(track.title), destination
+                )
             )
-        )
-        index += 1
-
-    for playlist in playlists:
-        buttons.append(
-            _url_button(
-                text=_collection_label(index, playlist.title),
-                url=playlist.url,
-                style=None,
-            )
-        )
-        index += 1
-
-    for artist in artists:
-        buttons.append(
-            _url_button(
-                text=_collection_label(index, artist.title),
-                url=artist.url,
-                style=None,
-            )
-        )
-        index += 1
-
-    for radio in radios:
-        buttons.append(
-            _url_button(
-                text=_collection_label(index, radio.title),
-                url=radio.url,
-                style=None,
-            )
-        )
-        index += 1
-
-    from music_links_bot.video_kinds import video_kind_emoji
-
-    for video in videos:
-        buttons.append(
-            _url_button(
-                text=(
-                    _label("btn_watch_clip")
-                    if is_track_video_pair
-                    else _collection_label(
-                        index, _short_video_title(video.title), video_kind_emoji(video)
-                    )
-                ),
-                url=video.url,
-                style=None,
-            )
-        )
-        index += 1
-
-    return _keyboard_with_optional_channel(
-        _adaptive_collection_rows(buttons), include_channel_button
-    )
+    for item in (*playlists, *artists, *radios):
+        buttons.append(_item_button(len(buttons) + 1, item.title, item.url))
+    buttons.extend(_video_button(len(buttons) + 1, video) for video in videos)
+    return _items_keyboard(buttons, include_channel_button)
 
 
 def _should_include_channel_button(message: Message) -> bool:

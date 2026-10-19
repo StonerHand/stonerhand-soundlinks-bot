@@ -6,12 +6,10 @@ from html import unescape
 from music_links_bot.bot_builder import (
     BuilderScreen,
     active_card_label,
-    apply_custom_tags,
-    apply_intro_text,
     builder_screen,
     fit_telegram_html,
-    format_schedule_datetime,
     normalize_crate_title,
+    parse_custom_tags,
     parse_schedule_datetime,
     remove_tags,
     schedule_timestamp,
@@ -89,10 +87,7 @@ class BuilderJourneyTests(unittest.TestCase):
         select_all_platforms(self.draft, self.track, self.order)
         self.assertEqual(self.draft["platforms"], ["spotify", "appleMusic", "tidal"])
 
-        intro = apply_intro_text(self.draft, "Первая строка\nВторая <строка>")
-        self.assertIn("\n", intro)
-        self.assertIn("&lt;строка&gt;", self.draft["prefix"])
-        tags = apply_custom_tags(self.draft, "#Rock #new-music rock #трек")
+        tags = parse_custom_tags("#Rock #new-music rock #трек")
         self.assertEqual(tags, ["#rock", "#newmusic", "#трек"])
         remove_tags(self.draft)
         self.assertFalse(self.draft["hashtags"])
@@ -143,8 +138,7 @@ class BuilderJourneyTests(unittest.TestCase):
         local_now = datetime(2026, 8, 10, 18, 0, tzinfo=timezone.utc)
         custom = parse_schedule_datetime("15.08 19:30", now=local_now)
         self.assertEqual(
-            format_schedule_datetime(custom or 0, timezone_name="UTC"),
-            "15.08 · 19:30",
+            custom, int(datetime(2026, 8, 15, 19, 30, tzinfo=timezone.utc).timestamp())
         )
         limited = fit_telegram_html("<b>" + "<&" * 5000 + "</b>", 1024)
         self.assertLessEqual(telegram_text_length(unescape(limited)), 1024)

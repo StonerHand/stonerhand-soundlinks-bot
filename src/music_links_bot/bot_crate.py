@@ -211,10 +211,6 @@ async def pop_crate_item(bot_data, user_id, reference):
     return await edit_crate(bot_data, user_id, remove)
 
 
-async def remove_crate_item(bot_data, user_id, index):
-    return (await pop_crate_item(bot_data, user_id, index))[0]
-
-
 async def restore_crate_item(bot_data, user_id, *, index, entry):
     def restore(items):
         item = entry.get("item") if isinstance(entry, dict) else None

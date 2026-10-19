@@ -7,6 +7,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
+from music_links_bot.constants import channel_target
 from music_links_bot.draft_model import prepare_publication_draft
 from music_links_bot.kvstore import KVStore, KVUnavailableError
 
@@ -549,9 +550,7 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
 
         if outcome == "published" and valid:
             published += 1
-            target = (
-                context.application.bot_data.get("publish_chat_id") or "@stonerhand"
-            )
+            target = channel_target(context.application.bot_data)
             await mark_posted(
                 context,
                 prepared.track,

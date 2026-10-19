@@ -177,7 +177,7 @@ async def _resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBund
     snapshots = bot_data.setdefault("lookup_snapshots", {})
     subscribers = bot_data.setdefault("lookup_subscribers", {})
     if pending is None:
-        snapshot = {}
+        snapshot: dict = {}
 
         async def resolve():
             token = live_sources.set(snapshot)
@@ -447,158 +447,119 @@ def _format_no_url_message(
     return f"{pick_phrase('no_url', seed)}\n\n{hint}"
 
 
-async def _lookup_playlists(
-    client: PlaylistClient,
+async def _lookup_each(
     source_urls: list[str],
-) -> list[PlaylistMatch]:
+    fetch: Callable[[str], Awaitable[Any]],
+    *,
+    kind: type,
+    expected_error: type[Exception],
+    field_name: str,
+    provider: str,
+    label: str,
+    fallback: Callable[[str], Any],
+) -> list[Any]:
+    """Fetch every link at once; a failed one becomes a plain fallback card."""
     results = await asyncio.gather(
         *(
-            observe_source(
-                client.lookup_playlist(url),
-                url,
-                field_name="playlists",
-                provider="playlists",
-            )
+            observe_source(fetch(url), url, field_name=field_name, provider=provider)
             for url in source_urls
         ),
         return_exceptions=True,
     )
 
-    playlists: list[PlaylistMatch] = []
+    items: list[Any] = []
     for source_url, result in zip(source_urls, results, strict=True):
-        if isinstance(result, PlaylistMatch):
-            playlists.append(result)
+        if isinstance(result, kind):
+            items.append(result)
             continue
 
-        if isinstance(result, PlaylistLookupError):
+        if isinstance(result, expected_error):
             LOGGER.info(
-                "Could not fetch playlist metadata source=%s",
+                "Could not fetch %s metadata source=%s",
+                label,
                 _source_log_id(source_url),
             )
         elif isinstance(result, Exception):
             LOGGER.error(
-                "Unexpected error while fetching playlist metadata source=%s",
+                "Unexpected error while fetching %s metadata source=%s",
+                label,
                 _source_log_id(source_url),
                 exc_info=(type(result), result, result.__traceback__),
             )
 
-        playlists.append(build_playlist_fallback(source_url))
+        fallback_item = fallback(source_url)
+        if fallback_item is not None:
+            items.append(fallback_item)
 
-    return playlists
+    return items
+
+
+async def _lookup_playlists(
+    client: PlaylistClient,
+    source_urls: list[str],
+) -> list[PlaylistMatch]:
+    return await _lookup_each(
+        source_urls,
+        client.lookup_playlist,
+        kind=PlaylistMatch,
+        expected_error=PlaylistLookupError,
+        field_name="playlists",
+        provider="playlists",
+        label="playlist",
+        fallback=build_playlist_fallback,
+    )
 
 
 async def _lookup_artists(
     client: ArtistClient,
     source_urls: list[str],
 ) -> list[ArtistMatch]:
-    results = await asyncio.gather(
-        *(
-            observe_source(
-                client.lookup_artist(url), url, field_name="artists", provider="artists"
-            )
-            for url in source_urls
+    return await _lookup_each(
+        source_urls,
+        client.lookup_artist,
+        kind=ArtistMatch,
+        expected_error=ArtistLookupError,
+        field_name="artists",
+        provider="artists",
+        label="artist",
+        fallback=lambda url: ArtistMatch(
+            title="Spotify artist", platform="Spotify", url=url
         ),
-        return_exceptions=True,
     )
-
-    artists: list[ArtistMatch] = []
-    for source_url, result in zip(source_urls, results, strict=True):
-        if isinstance(result, ArtistMatch):
-            artists.append(result)
-            continue
-
-        if isinstance(result, ArtistLookupError):
-            LOGGER.info(
-                "Could not fetch artist metadata source=%s", _source_log_id(source_url)
-            )
-        elif isinstance(result, Exception):
-            LOGGER.error(
-                "Unexpected error while fetching artist metadata source=%s",
-                _source_log_id(source_url),
-                exc_info=(type(result), result, result.__traceback__),
-            )
-
-        artists.append(
-            ArtistMatch(title="Spotify artist", platform="Spotify", url=source_url)
-        )
-
-    return artists
 
 
 async def _lookup_youtube_videos(
     client: YouTubeClient,
     source_urls: list[str],
 ) -> list[VideoMatch]:
-    results = await asyncio.gather(
-        *(
-            observe_source(
-                client.lookup_video(url), url, field_name="videos", provider="youtube"
-            )
-            for url in source_urls
+    return await _lookup_each(
+        source_urls,
+        client.lookup_video,
+        kind=VideoMatch,
+        expected_error=YouTubeLookupError,
+        field_name="videos",
+        provider="youtube",
+        label="YouTube",
+        fallback=lambda url: VideoMatch(
+            title="YouTube video", author="YouTube", url=url
         ),
-        return_exceptions=True,
     )
-
-    videos: list[VideoMatch] = []
-    for source_url, result in zip(source_urls, results, strict=True):
-        if isinstance(result, VideoMatch):
-            videos.append(result)
-            continue
-
-        if isinstance(result, YouTubeLookupError):
-            LOGGER.info(
-                "Could not fetch YouTube metadata source=%s", _source_log_id(source_url)
-            )
-        elif isinstance(result, Exception):
-            LOGGER.error(
-                "Unexpected error while fetching YouTube metadata source=%s",
-                _source_log_id(source_url),
-                exc_info=(type(result), result, result.__traceback__),
-            )
-
-        videos.append(
-            VideoMatch(title="YouTube video", author="YouTube", url=source_url)
-        )
-
-    return videos
 
 
 async def _lookup_nts_radios(
     client: NTSClient,
     source_urls: list[str],
 ) -> list[RadioMatch]:
-    results = await asyncio.gather(
-        *(
-            observe_source(
-                client.lookup_radio(url), url, field_name="radios", provider="nts"
-            )
-            for url in source_urls
-        ),
-        return_exceptions=True,
+    return await _lookup_each(
+        source_urls,
+        client.lookup_radio,
+        kind=RadioMatch,
+        expected_error=NTSLookupError,
+        field_name="radios",
+        provider="nts",
+        label="NTS",
+        fallback=build_nts_fallback,
     )
-
-    radios: list[RadioMatch] = []
-    for source_url, result in zip(source_urls, results, strict=True):
-        if isinstance(result, RadioMatch):
-            radios.append(result)
-            continue
-
-        if isinstance(result, NTSLookupError):
-            LOGGER.info(
-                "Could not fetch NTS metadata source=%s", _source_log_id(source_url)
-            )
-        elif isinstance(result, Exception):
-            LOGGER.error(
-                "Unexpected error while fetching NTS metadata source=%s",
-                _source_log_id(source_url),
-                exc_info=(type(result), result, result.__traceback__),
-            )
-
-        fallback_radio = build_nts_fallback(source_url)
-        if fallback_radio is not None:
-            radios.append(fallback_radio)
-
-    return radios
 
 
 async def _send_youtube_result(

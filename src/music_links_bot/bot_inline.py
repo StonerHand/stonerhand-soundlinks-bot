@@ -62,6 +62,7 @@ from music_links_bot.rich_publications import (
 from music_links_bot.search import (
     SearchClient,
     SearchLookupError,
+    find_release_candidates,
     normalize_search_query,
 )
 from music_links_bot.sharing import (
@@ -463,17 +464,7 @@ async def _search_source_urls(
 
     search_client: SearchClient = context.application.bot_data["search_client"]
     try:
-        if hasattr(search_client, "search_release_candidates"):
-            candidates = await search_client.search_release_candidates(search_query)
-        else:
-            source_url = await search_client.search_release_url(search_query)
-            candidates = [
-                type(
-                    "SearchChoice",
-                    (),
-                    {"url": source_url},
-                )()
-            ]
+        candidates = await find_release_candidates(search_client, search_query)
     except SearchLookupError:
         await _answer_inline_hint(
             inline_query,
@@ -802,7 +793,7 @@ async def _build_inline_collection_result(
     collection_name = None
     if user_id > 0:
         entries = await load_crate(context.application.bot_data, user_id)
-        crate_sources = []
+        crate_sources: list[str | None] = []
         for entry in entries:
             try:
                 item = TrackMatch(**{"links": {}, **entry["item"]})
@@ -813,7 +804,7 @@ async def _build_inline_collection_result(
         if (
             crate_sources
             and all(crate_sources)
-            and [cache_key_for_url(url) for url in crate_sources]
+            and [cache_key_for_url(url or "") for url in crate_sources]
             == [cache_key_for_url(url) for url in source_urls]
         ):
             collection_name = await load_crate_title(

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import unicodedata
 from dataclasses import dataclass
 from urllib.parse import parse_qs, urlparse
 
@@ -10,7 +9,7 @@ import httpx
 
 from music_links_bot.cache import TTLCache
 from music_links_bot.constants import HTTP_USER_AGENT
-from music_links_bot.metadata_cleaning import positive_track_count
+from music_links_bot.metadata_cleaning import match_key, positive_track_count
 from music_links_bot.models import TrackMatch
 from music_links_bot.musicbrainz import MusicBrainzClient, MusicBrainzLookupError
 from music_links_bot.release_hubs import canonical_release_hub_url
@@ -43,6 +42,14 @@ class SearchCandidate:
     artist_url: str | None = None
     duration_ms: int | None = None
     track_count: int | None = None
+
+
+async def find_release_candidates(client: object, query: str) -> list[SearchCandidate]:
+    """Up to a few matches for ``query``; one-URL clients give a single match."""
+    if hasattr(client, "search_release_candidates"):
+        return await client.search_release_candidates(query)
+    url = await client.search_release_url(query)  # type: ignore[attr-defined]
+    return [SearchCandidate(url=url, title=query, artist="")]
 
 
 class SearchClient:
@@ -367,8 +374,8 @@ def _extract_matching_genre(
     if not isinstance(results, list):
         return None
 
-    artist_key = _metadata_match_key(artist)
-    title_key = _metadata_match_key(title)
+    artist_key = match_key(artist)
+    title_key = match_key(title)
     if not artist_key or not title_key:
         return None
 
@@ -378,14 +385,14 @@ def _extract_matching_genre(
     for result in results:
         if not isinstance(result, dict):
             continue
-        if _metadata_match_key(result.get("artistName")) != artist_key:
+        if match_key(result.get("artistName")) != artist_key:
             continue
         candidate_titles = (
             result.get("trackName"),
             result.get("collectionName"),
         )
         if title_key not in {
-            key for value in candidate_titles if (key := _metadata_match_key(value))
+            key for value in candidate_titles if (key := match_key(value))
         }:
             continue
         genre = result.get("primaryGenreName")
@@ -395,18 +402,6 @@ def _extract_matching_genre(
                 matches[normalized] = genre.strip()
 
     return next(iter(matches.values())) if len(matches) == 1 else None
-
-
-def _metadata_match_key(value: object) -> str:
-    """Compare metadata across punctuation and Unicode accent variants."""
-    if not isinstance(value, str):
-        return ""
-    normalized = unicodedata.normalize("NFKD", value).casefold()
-    return "".join(
-        character
-        for character in normalized
-        if character.isalnum() and not unicodedata.combining(character)
-    )
 
 
 def _extract_release_candidates(payload: object) -> list[SearchCandidate]:
