@@ -6,6 +6,7 @@ import logging
 
 from telegram.constants import ParseMode
 
+from music_links_bot.constants import channel_target
 from music_links_bot.i18n import get_text
 
 LOGGER = logging.getLogger(__name__)
@@ -34,12 +35,9 @@ async def try_quick_publish(message, context, *, draft_id, draft, track, user_id
         return False
     from music_links_bot.bot_publish_undo import remember_publication
     from music_links_bot.bot_ui import build_publish_success_keyboard
-    from music_links_bot.keyboards import CHANNEL_USERNAME
     from music_links_bot.publication_state import _message_url
 
-    target = (
-        context.application.bot_data.get("publish_chat_id") or f"@{CHANNEL_USERNAME}"
-    )
+    target = channel_target(context.application.bot_data)
     published = await _publish_draft(context, draft)
     if not published:
         return False

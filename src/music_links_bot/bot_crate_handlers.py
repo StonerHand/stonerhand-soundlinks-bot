@@ -20,6 +20,7 @@ from music_links_bot.bot_menu import runtime_for, safe_edit, update_lang
 from music_links_bot.bot_runtime import CallbackAction, encode_callback
 from music_links_bot.bot_storage import remember_bounded
 from music_links_bot.bot_ui import render_crate
+from music_links_bot.constants import channel_target
 from music_links_bot.i18n import get_text, resolve_lang
 from music_links_bot.models import TrackMatch
 from music_links_bot.release_preferences import release_preference_key
@@ -35,22 +36,33 @@ async def crate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if message is None:
         return
     user_id = update.effective_user.id if update.effective_user else message.chat_id
-    lang = update_lang(update)
-    items = await load_crate(context.application.bot_data, user_id)
-    title = await load_crate_title(context.application.bot_data, user_id)
-    text, keyboard = render_crate(
-        items,
-        lang=lang,
-        title=title,
-        share_query=build_crate_share_query(items),
-        can_publish=is_publisher(context, user_id),
-    )
+    text, keyboard = await load_crate_view(context, user_id, lang=update_lang(update))
     await message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
 
 def is_publisher(context, user_id: int) -> bool:
     admin_chat_id = context.application.bot_data.get("admin_chat_id")
     return admin_chat_id is not None and admin_chat_id == user_id
+
+
+def crate_view(context, user_id: int, items: list, *, lang: str, title, **options):
+    """The collection screen with this user's share and publish buttons."""
+    return render_crate(
+        items,
+        lang=lang,
+        title=title,
+        share_query=build_crate_share_query(items),
+        can_publish=is_publisher(context, user_id),
+        **options,
+    )
+
+
+async def load_crate_view(context, user_id: int, *, lang: str, items=None):
+    bot_data = context.application.bot_data
+    if items is None:
+        items = await load_crate(bot_data, user_id)
+    title = await load_crate_title(bot_data, user_id)
+    return crate_view(context, user_id, items, lang=lang, title=title)
 
 
 async def dispatch_crate_action(query, context, action: CallbackAction) -> None:
@@ -72,12 +84,8 @@ async def dispatch_crate_action(query, context, action: CallbackAction) -> None:
     ):
         # Old positional controls cannot safely identify an item after reordering.
         await query.answer(get_text(lang, "state_conflict"), show_alert=True)
-        text, keyboard = render_crate(
-            current_items,
-            lang=lang,
-            title=title,
-            share_query=build_crate_share_query(current_items),
-            can_publish=is_publisher(context, user_id),
+        text, keyboard = crate_view(
+            context, user_id, current_items, lang=lang, title=title
         )
         await safe_edit(query, text, keyboard)
         return
@@ -234,14 +242,14 @@ async def dispatch_crate_action(query, context, action: CallbackAction) -> None:
         return
 
     await query.answer(notice)
-    text, keyboard = render_crate(
+    text, keyboard = crate_view(
+        context,
+        user_id,
         items,
         lang=lang,
+        title=title,
         selected_index=selected_index,
         can_undo=undo_record is not None,
-        title=title,
-        share_query=build_crate_share_query(items),
-        can_publish=is_publisher(context, user_id),
     )
     await safe_edit(query, text, keyboard)
 
@@ -254,7 +262,7 @@ async def _publish_crate(
 
     from music_links_bot.bot_crate import crate_revision
     from music_links_bot.collection_plan import build_collection_plan, collection_issues
-    from music_links_bot.keyboards import CHANNEL_USERNAME, _build_link_preview_options
+    from music_links_bot.keyboards import _build_link_preview_options
     from music_links_bot.publication_contract import (
         RenderedPublication,
         require_valid_publication,
@@ -293,9 +301,7 @@ async def _publish_crate(
             requested_count=len(tracks),
         )
     )
-    target = (
-        context.application.bot_data.get("publish_chat_id") or f"@{CHANNEL_USERNAME}"
-    )
+    target = channel_target(context.application.bot_data)
     try:
         sent = await context.bot.send_message(
             chat_id=target,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Final
 
 _SPOTIFY_BRAND_SUFFIX: Final = re.compile(
@@ -68,7 +69,19 @@ def positive_track_count(value: object) -> int | None:
     if isinstance(value, bool) or (isinstance(value, float) and not value.is_integer()):
         return None
     try:
-        count = int(value)
+        count = int(value)  # type: ignore[call-overload]
     except (TypeError, ValueError, OverflowError):
         return None
     return count if 0 < count <= 9999 else None
+
+
+def match_key(value: object) -> str:
+    """Compare metadata across punctuation and Unicode accent variants."""
+    if not isinstance(value, str):
+        return ""
+    normalized = unicodedata.normalize("NFKD", value).casefold()
+    return "".join(
+        character
+        for character in normalized
+        if character.isalnum() and not unicodedata.combining(character)
+    )

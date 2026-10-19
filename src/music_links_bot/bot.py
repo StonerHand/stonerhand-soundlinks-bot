@@ -144,6 +144,31 @@ async def bot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await handler(query, context, parsed)
 
 
+async def _rerun_lookup(
+    query,
+    context,
+    value: str,
+    *,
+    search_query: str | None = None,
+    completed: dict | None = None,
+) -> None:
+    """Run the normal lookup from a button, as if ``value`` had been sent."""
+    from music_links_bot.lookup_recovery import completed_sources
+
+    _adopt_progress_message(query.message)
+    tokens = [
+        (_INPUT_OVERRIDE, _INPUT_OVERRIDE.set(value)),
+        (_SEARCH_QUERY_OVERRIDE, _SEARCH_QUERY_OVERRIDE.set(search_query)),
+        (_BYPASS_INTENT_GUARD, _BYPASS_INTENT_GUARD.set(True)),
+        (completed_sources, completed_sources.set(completed)),
+    ]
+    try:
+        await track_lookup_message(Update(update_id=0, callback_query=query), context)
+    finally:
+        for var, token in reversed(tokens):
+            var.reset(token)
+
+
 async def _dispatch_noop_action(query, context, action: CallbackAction) -> None:
     del context, action
     await query.answer()
@@ -176,11 +201,12 @@ async def _dispatch_selection_action(query, context, action: CallbackAction) -> 
         await query.answer()
         return
     selection_id, raw_index = action.payload.rsplit(":", 1)
-    payload = await _load_search_selection(context, selection_id)
+    payload = await _load_search_selection(context, selection_id) or {}
     try:
         index = int(raw_index)
-        urls = payload["urls"] if payload else []
-        source_url = urls[index]
+        if index < 0:
+            raise IndexError(index)
+        source_url = payload["urls"][index]
     except (IndexError, KeyError, TypeError, ValueError):
         await query.answer(get_text(lang, "ed_expired"), show_alert=True)
         return
@@ -191,17 +217,9 @@ async def _dispatch_selection_action(query, context, action: CallbackAction) -> 
     await query.answer(get_text(lang, "progress_links"))
     if query.message is None:
         return
-    _adopt_progress_message(query.message)
-    token = _INPUT_OVERRIDE.set(source_url)
-    search_token = _SEARCH_QUERY_OVERRIDE.set(str(payload.get("query") or ""))
-    guard_token = _BYPASS_INTENT_GUARD.set(True)
-    try:
-        synthetic = Update(update_id=0, callback_query=query)
-        await track_lookup_message(synthetic, context)
-    finally:
-        _BYPASS_INTENT_GUARD.reset(guard_token)
-        _SEARCH_QUERY_OVERRIDE.reset(search_token)
-        _INPUT_OVERRIDE.reset(token)
+    await _rerun_lookup(
+        query, context, source_url, search_query=str(payload.get("query") or "")
+    )
 
 
 async def _dispatch_retry_action(query, context, action: CallbackAction) -> None:
@@ -242,7 +260,7 @@ async def _dispatch_retry_action(query, context, action: CallbackAction) -> None
         await query.answer()
         return
 
-    completed = {}
+    completed: dict = {}
     value = ""
     if action.action == "failed" and action.payload:
         payload = await _load_retry_sources(context, action.payload)
@@ -261,18 +279,7 @@ async def _dispatch_retry_action(query, context, action: CallbackAction) -> None
         await query.answer(get_text(lang, "ed_expired"), show_alert=True)
         return
     await query.answer(get_text(lang, "progress_search"))
-    _adopt_progress_message(query.message)
-    from music_links_bot.lookup_recovery import completed_sources
-
-    recovery_token = completed_sources.set(completed)
-    token = _INPUT_OVERRIDE.set(value)
-    guard_token = _BYPASS_INTENT_GUARD.set(True)
-    try:
-        await track_lookup_message(Update(update_id=0, callback_query=query), context)
-    finally:
-        completed_sources.reset(recovery_token)
-        _BYPASS_INTENT_GUARD.reset(guard_token)
-        _INPUT_OVERRIDE.reset(token)
+    await _rerun_lookup(query, context, value, completed=completed)
 
 
 async def _dispatch_playlist_action(query, context, action: CallbackAction) -> None:
@@ -299,11 +306,4 @@ async def _dispatch_playlist_action(query, context, action: CallbackAction) -> N
         await query.answer(get_text(lang, "ed_expired"), show_alert=True)
         return
     await query.answer(get_text(lang, "playlist_import_started"))
-    _adopt_progress_message(query.message)
-    token = _INPUT_OVERRIDE.set("\n".join(urls))
-    guard_token = _BYPASS_INTENT_GUARD.set(True)
-    try:
-        await track_lookup_message(Update(update_id=0, callback_query=query), context)
-    finally:
-        _BYPASS_INTENT_GUARD.reset(guard_token)
-        _INPUT_OVERRIDE.reset(token)
+    await _rerun_lookup(query, context, "\n".join(urls))

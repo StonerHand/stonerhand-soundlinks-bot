@@ -18,7 +18,7 @@ from music_links_bot.bot_builder import (
     parse_custom_tags,
     parse_schedule_datetime,
 )
-from music_links_bot.bot_crate import load_crate, load_crate_title, save_crate_title
+from music_links_bot.bot_crate import load_crate, save_crate_title
 from music_links_bot.bot_editor_state import draft_owned_by, remember_setting_state
 from music_links_bot.bot_menu import runtime_for, update_lang
 from music_links_bot.bot_stats import message_entities, message_text
@@ -27,7 +27,6 @@ from music_links_bot.bot_storage import (
     load_retry_sources,
     store_draft,
 )
-from music_links_bot.bot_ui import render_crate
 from music_links_bot.editor_view import draft_intro_limit, render_track_draft
 from music_links_bot.i18n import get_text
 from music_links_bot.keyboards import (
@@ -50,7 +49,6 @@ from music_links_bot.release_preferences import (
     release_preference_key,
 )
 from music_links_bot.release_tags import unique_tags
-from music_links_bot.sharing import build_crate_share_query
 from music_links_bot.telegram_text import format_user_note_html, telegram_text_length
 from music_links_bot.url_utils import extract_supported_urls, strip_supported_urls
 
@@ -398,17 +396,9 @@ async def _restore_crate_screen(
     pending: dict,
     saved_key: str,
 ) -> None:
-    items = await load_crate(context.application.bot_data, user_id)
-    title = await load_crate_title(context.application.bot_data, user_id)
-    from music_links_bot.bot_crate_handlers import is_publisher
+    from music_links_bot.bot_crate_handlers import load_crate_view
 
-    text, keyboard = render_crate(
-        items,
-        lang=lang,
-        title=title,
-        share_query=build_crate_share_query(items),
-        can_publish=is_publisher(context, user_id),
-    )
+    text, keyboard = await load_crate_view(context, user_id, lang=lang)
     text = f"<b>{escape(get_text(lang, saved_key))}</b>\n\n{text}"
     restored = await edit_pending_screen(
         context,

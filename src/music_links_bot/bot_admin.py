@@ -9,7 +9,7 @@ from telegram.error import TelegramError
 
 from music_links_bot.bot_runtime import METRICS_KV_KEY
 from music_links_bot.chat_access import check_publish_access
-from music_links_bot.constants import STATS_KV_KEY
+from music_links_bot.constants import STATS_KV_KEY, channel_target
 from music_links_bot.publish_queue import QueueStorageError, load_jobs
 from music_links_bot.stats import format_stats_message, load_stats
 
@@ -101,7 +101,7 @@ async def status_command(update, context) -> None:
 
 async def build_status_text(context) -> str:
     bot_data = context.application.bot_data
-    target = bot_data.get("publish_chat_id") or "@stonerhand"
+    target = channel_target(bot_data)
     runtime = bot_data.get("runtime")
     kv = bot_data.get("kv_store")
 

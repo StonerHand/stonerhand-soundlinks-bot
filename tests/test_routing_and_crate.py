@@ -114,6 +114,76 @@ class CallbackRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(seen, ["https://a.example/1\nhttps://a.example/2"])
         self.assertIsNone(bot._INPUT_OVERRIDE.get())
 
+    async def _rerun(self, data: str, **loaders):
+        seen: list[tuple] = []
+
+        async def lookup(update, context):
+            from music_links_bot.lookup_recovery import completed_sources
+
+            seen.append(
+                (
+                    bot._INPUT_OVERRIDE.get(),
+                    bot._SEARCH_QUERY_OVERRIDE.get(),
+                    bot._BYPASS_INTENT_GUARD.get(),
+                    completed_sources.get(),
+                )
+            )
+
+        patches = [
+            patch.object(bot, name, new=AsyncMock(return_value=value))
+            for name, value in loaders.items()
+        ]
+        with (
+            patch.object(bot, "_adopt_progress_message"),
+            patch.object(bot, "track_lookup_message", new=lookup),
+        ):
+            for item in patches:
+                item.start()
+            try:
+                query = await self._route(data)
+            finally:
+                for item in patches:
+                    item.stop()
+        self.assertIsNone(bot._INPUT_OVERRIDE.get())
+        self.assertFalse(bot._BYPASS_INTENT_GUARD.get())
+        return query, seen
+
+    async def test_search_pick_runs_the_chosen_result(self) -> None:
+        payload = {
+            "user_id": 7,
+            "query": "kyuss",
+            "urls": ["https://a/1", "https://a/2"],
+        }
+        _, seen = await self._rerun(
+            encode_callback("select", "pick", "abc:1"), _load_search_selection=payload
+        )
+        self.assertEqual(seen, [("https://a/2", "kyuss", True, None)])
+
+    async def test_search_pick_refuses_strangers_and_bad_indexes(self) -> None:
+        payload = {"user_id": 99, "query": "kyuss", "urls": ["https://a/1"]}
+        for raw in ("abc:0", "abc:-1", "abc:5"):
+            with self.subTest(raw=raw):
+                query, seen = await self._rerun(
+                    encode_callback("select", "pick", raw),
+                    _load_search_selection=payload,
+                )
+                self.assertEqual(seen, [])
+                self.assertTrue(query.answer.await_args.kwargs.get("show_alert"))
+
+    async def test_retry_after_a_failure_skips_finished_sources(self) -> None:
+        payload = {"user_id": 7, "urls": ["https://a/1"], "completed": {"0": "ok"}}
+        _, seen = await self._rerun(
+            encode_callback("retry", "failed", "abc"), _load_retry_sources=payload
+        )
+        self.assertEqual(seen, [("https://a/1", None, True, {"0": "ok"})])
+
+    async def test_retry_without_a_saved_request_is_expired(self) -> None:
+        query, seen = await self._rerun(
+            encode_callback("retry", "failed", "abc"), _load_retry_sources=None
+        )
+        self.assertEqual(seen, [])
+        self.assertTrue(query.answer.await_args.kwargs.get("show_alert"))
+
 
 def _entry(artist: str, title: str) -> dict:
     return {"item": {"artist": artist, "title": title, "links": {}}}

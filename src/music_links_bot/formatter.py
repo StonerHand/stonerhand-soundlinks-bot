@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from html import escape, unescape
 
 from music_links_bot.bot_builder import fit_telegram_html
@@ -199,18 +200,33 @@ def _collection_item(index: int, icon: str, title: str) -> str:
     )
 
 
+def _single_kind_collection(
+    items: Sequence[ArtistMatch | PlaylistMatch | VideoMatch | RadioMatch],
+    kind: str,
+    icon: str,
+    *,
+    include_hashtags: bool,
+    title: str | None,
+) -> str:
+    lines = _collection_header(icon, title, [count_label(len(items), kind)])
+    for index, item in enumerate(items, start=1):
+        item_icon = video_kind_emoji(item) if isinstance(item, VideoMatch) else icon
+        lines.append(_collection_item(index, item_icon, item.title))
+    return _with_hashtags(
+        lines,
+        f"#stonerhand #collection #{kind}",
+        include_hashtags=include_hashtags,
+    )
+
+
 def format_artist_collection_message(
     artists: list[ArtistMatch],
     *,
     include_hashtags: bool = True,
     title: str | None = None,
 ) -> str:
-    lines = _collection_header("🧬", title, [count_label(len(artists), "artist")])
-    for index, artist in enumerate(artists, start=1):
-        lines.append(_collection_item(index, "🧬", artist.title))
-
-    return _with_hashtags(
-        lines, "#stonerhand #collection #artist", include_hashtags=include_hashtags
+    return _single_kind_collection(
+        artists, "artist", "🧬", include_hashtags=include_hashtags, title=title
     )
 
 
@@ -220,42 +236,24 @@ def format_playlist_collection_message(
     include_hashtags: bool = True,
     title: str | None = None,
 ) -> str:
-    lines = _collection_header("🎛", title, [count_label(len(playlists), "playlist")])
-    for index, playlist in enumerate(playlists, start=1):
-        lines.append(_collection_item(index, "🎛", playlist.title))
-
-    return _with_hashtags(
-        lines, "#stonerhand #collection #playlist", include_hashtags=include_hashtags
+    return _single_kind_collection(
+        playlists, "playlist", "🎛", include_hashtags=include_hashtags, title=title
     )
 
 
 def format_video_collection_message(
-    videos: list[VideoMatch],
-    *,
-    include_hashtags: bool = True,
-    title: str | None = None,
+    videos: list[VideoMatch], *, include_hashtags: bool = True, title: str | None = None
 ) -> str:
-    lines = _collection_header("📺", title, [count_label(len(videos), "video")])
-    for index, video in enumerate(videos, start=1):
-        lines.append(_collection_item(index, video_kind_emoji(video), video.title))
-
-    return _with_hashtags(
-        lines, "#stonerhand #collection #video", include_hashtags=include_hashtags
+    return _single_kind_collection(
+        videos, "video", "📺", include_hashtags=include_hashtags, title=title
     )
 
 
 def format_radio_collection_message(
-    radios: list[RadioMatch],
-    *,
-    include_hashtags: bool = True,
-    title: str | None = None,
+    radios: list[RadioMatch], *, include_hashtags: bool = True, title: str | None = None
 ) -> str:
-    lines = _collection_header("📻", title, [count_label(len(radios), "radio")])
-    for index, radio in enumerate(radios, start=1):
-        lines.append(_collection_item(index, "📻", radio.title))
-
-    return _with_hashtags(
-        lines, "#stonerhand #collection #radio", include_hashtags=include_hashtags
+    return _single_kind_collection(
+        radios, "radio", "📻", include_hashtags=include_hashtags, title=title
     )
 
 
@@ -690,13 +688,13 @@ def release_details(track: TrackMatch) -> str:
             else ru.get(kind, "Альбом")
         )
     else:
-        en, ru = {
+        en_kind, ru_kind = {
             "song": ("Track", "Трек"),
             "audio": ("Audio", "Аудио"),
             "video": ("Video", "Видео"),
             "podcast": ("Podcast", "Подкаст"),
         }.get(track.kind, ("Release", "Релиз"))
-        details.append(en if resolve_lang(None) == "en" else ru)
+        details.append(en_kind if resolve_lang(None) == "en" else ru_kind)
     if track.release_year and re.fullmatch(r"(?:19|20)\d{2}", str(track.release_year)):
         details.append(str(track.release_year))
     if (

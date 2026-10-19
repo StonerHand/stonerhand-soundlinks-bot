@@ -14,6 +14,19 @@ LOGGER = logging.getLogger(__name__)
 MAX_STATS_IDENTITIES = 200
 
 
+def redis_credentials() -> tuple[str, str] | None:
+    """Upstash REST URL and token (Vercel KV names work too), if both are set."""
+    base_url = (
+        os.getenv("UPSTASH_REDIS_REST_URL", "").strip()
+        or os.getenv("KV_REST_API_URL", "").strip()
+    )
+    token = (
+        os.getenv("UPSTASH_REDIS_REST_TOKEN", "").strip()
+        or os.getenv("KV_REST_API_TOKEN", "").strip()
+    )
+    return (base_url, token) if base_url and token else None
+
+
 class KVUnavailableError(RuntimeError):
     """Raised when an operation explicitly requires durable Redis storage."""
 
@@ -40,18 +53,8 @@ class KVStore:
 
     @classmethod
     def from_env(cls) -> KVStore | None:
-        base_url = (
-            os.getenv("UPSTASH_REDIS_REST_URL", "").strip()
-            or os.getenv("KV_REST_API_URL", "").strip()
-        )
-        token = (
-            os.getenv("UPSTASH_REDIS_REST_TOKEN", "").strip()
-            or os.getenv("KV_REST_API_TOKEN", "").strip()
-        )
-        if not base_url or not token:
-            return None
-
-        return cls(base_url, token)
+        credentials = redis_credentials()
+        return cls(*credentials) if credentials else None
 
     async def aclose(self) -> None:
         await self._client.aclose()

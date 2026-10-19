@@ -72,3 +72,10 @@ PLATFORM_ALIASES = {
     "tidal": ("tidal",),
     "yandexMusic": ("yandexMusic", "yandex"),
 }
+
+CHANNEL_USERNAME = "stonerhand"
+
+
+def channel_target(bot_data: dict) -> int | str:
+    """Where channel posts go: the configured chat, else the public channel."""
+    return bot_data.get("publish_chat_id") or f"@{CHANNEL_USERNAME}"

@@ -87,13 +87,13 @@ from music_links_bot.branding import (
 from music_links_bot.channel_templates import (
     apply_template,
 )
+from music_links_bot.constants import CHANNEL_USERNAME, channel_target
 from music_links_bot.editor_view import (
     draft_intro_limit as _draft_intro_limit,
     render_track_draft as _render_track_draft,
 )
 from music_links_bot.i18n import get_text, resolve_lang
 from music_links_bot.keyboards import (
-    CHANNEL_USERNAME,
     _build_link_preview_options,
     _get_platform_order,
 )
@@ -541,10 +541,7 @@ async def _open_editor_publish_confirmation(request: EditorActionRequest) -> boo
             show_alert=True,
         )
         return True
-    target = str(
-        request.context.application.bot_data.get("publish_chat_id")
-        or f"@{CHANNEL_USERNAME}"
-    )
+    target = str(channel_target(request.context.application.bot_data))
     text, keyboard = _build_publish_confirmation(
         request.draft_id,
         request.draft,
@@ -1005,10 +1002,7 @@ async def _delete_duplicate_editor_post(
             show_alert=True,
         )
         return False
-    target = (
-        request.context.application.bot_data.get("publish_chat_id")
-        or f"@{CHANNEL_USERNAME}"
-    )
+    target = channel_target(request.context.application.bot_data)
     try:
         await request.context.bot.delete_message(
             chat_id=target,
@@ -1024,10 +1018,7 @@ async def _delete_duplicate_editor_post(
 
 async def _finish_editor_publish(request: EditorActionRequest, published) -> None:
     if published:
-        target = (
-            request.context.application.bot_data.get("publish_chat_id")
-            or f"@{CHANNEL_USERNAME}"
-        )
+        target = channel_target(request.context.application.bot_data)
         await _schedule_mark_posted(
             request.context,
             request.track,
@@ -1075,10 +1066,7 @@ async def _show_editor_publish_success(
         if isinstance(published_link, str) and published_link.startswith("http")
         else None,
     )
-    target = str(
-        request.context.application.bot_data.get("publish_chat_id")
-        or f"@{CHANNEL_USERNAME}"
-    )
+    target = str(channel_target(request.context.application.bot_data))
     moment = local_time_html(
         time.time(),
         timezone_name=request.context.application.bot_data.get("timezone_name"),
@@ -1181,9 +1169,7 @@ async def _edit_editor_message(
 
 
 async def _publish_draft(context, draft):
-    target = (
-        context.application.bot_data.get("publish_chat_id") or f"@{CHANNEL_USERNAME}"
-    )
+    target = channel_target(context.application.bot_data)
     return await _deliver_draft(context, draft, target=target, channel_style=True)
 
 

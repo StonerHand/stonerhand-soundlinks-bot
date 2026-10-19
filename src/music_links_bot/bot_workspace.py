@@ -10,6 +10,7 @@ from telegram import InlineKeyboardMarkup
 from music_links_bot.bot_editor_state import reset_original
 from music_links_bot.bot_runtime import encode_callback
 from music_links_bot.bot_storage import load_drafts, store_draft, valid_state_id
+from music_links_bot.constants import channel_target
 from music_links_bot.i18n import get_text
 from music_links_bot.publication_view import resolve_draft_hashtags
 from music_links_bot.release_preferences import (
@@ -49,14 +50,12 @@ async def handle_workspace_action(request):
         from music_links_bot.bot_editor import (
             _run_locked_editor_action,
         )
-        from music_links_bot.constants import CHANNEL_USERNAME
         from music_links_bot.delivery_receipts import load_delivery
 
         target = (
             request.user_id
             if action == "retry_self"
-            else request.context.application.bot_data.get("publish_chat_id")
-            or f"@{CHANNEL_USERNAME}"
+            else channel_target(request.context.application.bot_data)
         )
         if action == "retry_review":
             rows = []

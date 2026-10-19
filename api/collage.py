@@ -73,7 +73,9 @@ class handler(BaseHTTPRequestHandler):
             self.end_headers()
             return
 
-        with ThreadPoolExecutor(max_workers=min(2, len(urls))) as executor:
+        # All covers download at once: six sequential-ish fetches made the
+        # first preview slow enough for Telegram to give up on it.
+        with ThreadPoolExecutor(max_workers=len(urls)) as executor:
             fetched = list(executor.map(_fetch_artwork, urls))
         # Keep the ▶ flags attached to their own frame if one download fails.
         flags = collage_play_flags(mode, len(fetched))
