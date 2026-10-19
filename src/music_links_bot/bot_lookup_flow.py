@@ -55,7 +55,6 @@ from music_links_bot.bot_progress import (
     start_progress as _send_loading_placeholder,
     take_progress as _take_placeholder,
     update_progress as _update_loading_placeholder,
-    update_progress_text as _update_progress_text,
 )
 from music_links_bot.bot_runtime import (
     BotErrorCode,
@@ -923,12 +922,8 @@ async def _start_lookup_progress(
         total=max(1, len(request.source_urls)),
     )
     if len(request.source_urls) > 1:
-        await _update_progress_text(
-            get_text(request.lang, "progress_batch_links").format(
-                total=len(request.source_urls)
-            ),
-            stage=2,
-            lang=request.lang,
+        await _update_loading_placeholder(
+            request.lang, "progress_batch_links", total=len(request.source_urls)
         )
     else:
         await _update_loading_placeholder(request.lang, "progress_links")
@@ -940,14 +935,13 @@ async def _update_resolved_progress(request: LookupRequest, bundle) -> None:
     if len(request.source_urls) == 1:
         await _update_loading_placeholder(request.lang, "progress_card")
         return
-    await _update_progress_text(
-        get_text(
-            request.lang,
-            "progress_batch"
-            if bundle.is_complete_for(request.source_urls)
-            else "progress_batch_partial",
-        ).format(done=bundle.item_count, total=len(request.source_urls)),
-        lang=request.lang,
+    await _update_loading_placeholder(
+        request.lang,
+        "progress_batch"
+        if bundle.is_complete_for(request.source_urls)
+        else "progress_batch_partial",
+        done=bundle.item_count,
+        total=len(request.source_urls),
     )
 
 
@@ -964,9 +958,17 @@ async def _track_lookup_message_impl(
     accepted, request_token = await _admit_private_lookup(message, context, request)
     if not accepted:
         return
-    from music_links_bot.reactions import finish_reaction, start_reaction
+    from music_links_bot.reactions import (
+        finish_reaction,
+        should_react,
+        start_reaction,
+    )
 
-    reaction = start_reaction(context.bot, message) if request.is_private else None
+    reaction = (
+        start_reaction(context.bot, message)
+        if should_react(update, is_private=request.is_private)
+        else None
+    )
     delivered = False
     try:
         delivered = await _run_admitted_lookup(message, context, request, request_token)

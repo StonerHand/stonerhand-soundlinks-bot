@@ -29,6 +29,11 @@ async def _set(bot, message, emoji: str | None) -> None:
         LOGGER.debug("Could not set reaction", exc_info=True)
 
 
+def should_react(update, *, is_private: bool) -> bool:
+    """React to the user's own message, never to a bot card behind a button."""
+    return is_private and getattr(update, "callback_query", None) is None
+
+
 def start_reaction(bot, message) -> asyncio.Task:
     """Mark the message as "being worked on" without delaying the lookup."""
     return asyncio.create_task(_set(bot, message, WORKING))

@@ -26,6 +26,7 @@
 - 📝 **Your text, uncut** — a quote above the card of up to ~3,900 characters with bold, italic and links. A long post goes out as a message with the cover large on top.
 - 📣 **Channel publishing** — now, on a schedule ("tomorrow 18:30") or in one tap; 2 minutes to undo. Every reader sees times in their own time zone.
 - 👥 **Groups and channels** — make the bot an admin and a posted link turns into a finished post; `/channel` checks the rights. In groups `/help` and `/channel` answer only you.
+- 🎉 **A lively chat** — 👀 → 🔥 reactions on your link, a progress bar with music-themed status lines, confetti on publish.
 - ⚡ **Inline mode** — `@StonerHandBot artist — track` in any chat.
 - 🌍 **Russian and English** — follows your Telegram language or the one set in settings.
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextvars
+import hashlib
 import logging
 from dataclasses import dataclass
 
@@ -28,17 +29,44 @@ class ProgressState:
     last_text: str = ""
     bot: object | None = None
     draft_id: int = 0
+    seed: str = ""
 
 
-_STAGES = {
-    "progress_search": 1,
-    "progress_links": 2,
-    "progress_card": 3,
+# key -> (stage, percent, phrase pool, shows its own status line)
+_STEPS = {
+    "progress_search": (1, 20, "progress_fun_search", False),
+    "progress_links": (2, 55, "progress_fun_links", False),
+    "progress_card": (3, 85, "progress_fun_card", False),
+    "progress_batch_start": (1, 10, "progress_fun_search", True),
+    "progress_batch_links": (2, 40, "progress_fun_links", True),
+    "progress_batch": (3, 85, "progress_fun_card", True),
+    "progress_batch_partial": (3, 85, "progress_fun_card", True),
 }
 _PLACEHOLDER: contextvars.ContextVar[ProgressState | None] = contextvars.ContextVar(
     "bot_progress_message",
     default=None,
 )
+
+
+def progress_text(lang: str, key: str, *, seed: str = "", **values) -> str:
+    """A ten-step bar, a count for collections and a phrase for the mood.
+
+    The phrase is picked from the request seed, so one lookup keeps a
+    consistent voice while the next one sounds different.
+    """
+    _stage, percent, pool, with_status = _STEPS[key]
+    filled = percent // 10
+    lines = [f"{'▰' * filled}{'▱' * (10 - filled)} {percent}%"]
+    if with_status:
+        lines.append(get_text(lang, key).format(**values))
+    phrases = get_text(lang, pool).splitlines()
+    digest = hashlib.sha256(f"{seed}:{pool}".encode()).digest()
+    lines.append(phrases[digest[0] % len(phrases)])
+    return "\n".join(lines)
+
+
+def _seed(message) -> str:
+    return f"{getattr(message, 'chat_id', '')}:{getattr(message, 'message_id', '')}"
 
 
 def _stop_callback():
@@ -114,7 +142,9 @@ async def _edit_progress_message(message: Message, text: str, lang: str) -> None
 def adopt_progress_message(message: Message | None) -> None:
     """Reuse an existing bot message when a callback starts a new action."""
     _PLACEHOLDER.set(
-        ProgressState(message, chat_id=message.chat_id) if message is not None else None
+        ProgressState(message, chat_id=message.chat_id, seed=_seed(message))
+        if message is not None
+        else None
     )
 
 
@@ -128,10 +158,11 @@ async def start_progress(
     if _PLACEHOLDER.get() is not None:
         return
     try:
+        seed = _seed(message)
         text = (
-            get_text(lang, "progress_batch_start").format(total=total)
+            progress_text(lang, "progress_batch_start", seed=seed, total=total)
             if total > 1
-            else get_text(lang, "progress_search")
+            else progress_text(lang, "progress_search", seed=seed)
         )
         chat = getattr(message, "chat", None)
         get_bot = getattr(message, "get_bot", None)
@@ -162,6 +193,7 @@ async def start_progress(
                     last_text=text,
                     bot=bot,
                     draft_id=draft_id,
+                    seed=seed,
                 )
             )
             return
@@ -175,19 +207,20 @@ async def start_progress(
             chat_id=message.chat_id,
             stage=1,
             last_text=text,
+            seed=seed,
         )
     )
 
 
-async def update_progress(lang: str, key: str) -> None:
+async def update_progress(lang: str, key: str, **values) -> None:
     state = _PLACEHOLDER.get()
     if state is None:
         return
-    next_stage = _STAGES.get(key, state.stage)
+    next_stage = _STEPS[key][0] if key in _STEPS else state.stage
     if next_stage <= state.stage:
         return
     try:
-        text = get_text(lang, key)
+        text = progress_text(lang, key, seed=state.seed, **values)
         if text == state.last_text:
             state.stage = next_stage
             return
@@ -205,30 +238,6 @@ async def update_progress(lang: str, key: str) -> None:
         state.last_text = text
     except TelegramError:
         LOGGER.debug("Could not update progress message", exc_info=True)
-
-
-async def update_progress_text(text: str, *, stage: int = 3, lang: str = "ru") -> None:
-    state = _PLACEHOLDER.get()
-    if state is None or stage <= state.stage:
-        return
-    try:
-        if text == state.last_text:
-            state.stage = stage
-            return
-        if state.message is not None:
-            await _edit_progress_message(state.message, text, lang)
-        elif state.bot is not None:
-            await send_rich_progress_draft(
-                state.bot,
-                chat_id=state.chat_id,
-                draft_id=state.draft_id,
-                text=text,
-                can_stop=current_control.get() is not None,
-            )
-        state.stage = stage
-        state.last_text = text
-    except TelegramError:
-        LOGGER.debug("Could not update custom progress message", exc_info=True)
 
 
 def take_progress(chat_id: int) -> Message | None:

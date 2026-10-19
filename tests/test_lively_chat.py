@@ -1,0 +1,177 @@
+"""Live progress, confetti on publish and reactions only on the user's message."""
+
+import unittest
+import unittest.mock
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
+
+from telegram.error import BadRequest, TelegramError
+
+from music_links_bot.bot_progress import progress_text
+from music_links_bot.i18n import get_text
+from music_links_bot.message_effects import CELEBRATE, celebrate
+from music_links_bot.reactions import should_react
+
+
+class ProgressTextTests(unittest.TestCase):
+    def test_single_lookup_shows_a_bar_and_a_phrase(self) -> None:
+        text = progress_text("ru", "progress_links", seed="7:1")
+        bar, phrase = text.splitlines()
+
+        self.assertEqual(bar, "▰▰▰▰▰▱▱▱▱▱ 55%")
+        self.assertIn(phrase, get_text("ru", "progress_fun_links").splitlines())
+
+    def test_collections_add_a_count_line(self) -> None:
+        text = progress_text(
+            "en", "progress_batch_partial", seed="7:1", done=3, total=5
+        )
+
+        self.assertEqual(text.splitlines()[:2], ["▰▰▰▰▰▰▰▰▱▱ 85%", "⚠️ 3 of 5 opened"])
+
+    def test_one_request_keeps_its_voice_and_requests_differ(self) -> None:
+        phrases = {
+            progress_text("ru", "progress_search", seed=f"7:{n}").splitlines()[-1]
+            for n in range(40)
+        }
+
+        self.assertEqual(
+            progress_text("ru", "progress_card", seed="7:1"),
+            progress_text("ru", "progress_card", seed="7:1"),
+        )
+        self.assertGreater(len(phrases), 1)
+
+    def test_every_phrase_pool_matches_between_languages(self) -> None:
+        for pool in ("progress_fun_search", "progress_fun_links", "progress_fun_card"):
+            with self.subTest(pool=pool):
+                ru = get_text("ru", pool).splitlines()
+                en = get_text("en", pool).splitlines()
+                self.assertEqual(len(ru), len(en))
+                self.assertTrue(all(line.endswith("…") for line in ru + en))
+
+
+def _query(chat_type: str = "private"):
+    message = SimpleNamespace(
+        chat=SimpleNamespace(type=chat_type),
+        chat_id=7,
+        delete=AsyncMock(),
+        edit_reply_markup=AsyncMock(),
+    )
+    return SimpleNamespace(message=message)
+
+
+class CelebrateTests(unittest.IsolatedAsyncioTestCase):
+    async def test_private_success_is_resent_with_confetti(self) -> None:
+        bot, query, edit = (
+            SimpleNamespace(send_message=AsyncMock()),
+            _query(),
+            AsyncMock(),
+        )
+
+        self.assertTrue(await celebrate(bot, query, edit=edit, text="✅"))
+
+        bot.send_message.assert_awaited_once_with(
+            message_effect_id=CELEBRATE, chat_id=7, text="✅"
+        )
+        query.message.delete.assert_awaited_once()
+        edit.assert_not_awaited()
+
+    async def test_groups_keep_the_quiet_edit(self) -> None:
+        bot, query, edit = (
+            SimpleNamespace(send_message=AsyncMock()),
+            _query("group"),
+            AsyncMock(),
+        )
+
+        self.assertFalse(await celebrate(bot, query, edit=edit, text="✅"))
+
+        bot.send_message.assert_not_awaited()
+        edit.assert_awaited_once()
+
+    async def test_a_rejected_effect_still_sends_the_screen(self) -> None:
+        send = AsyncMock(side_effect=[BadRequest("Effect_id_invalid"), "sent"])
+        query, edit = _query(), AsyncMock()
+
+        await celebrate(SimpleNamespace(send_message=send), query, edit=edit, text="✅")
+
+        self.assertEqual(send.await_args_list[-1].kwargs, {"chat_id": 7, "text": "✅"})
+        edit.assert_not_awaited()
+
+    async def test_a_failed_send_falls_back_to_editing(self) -> None:
+        send = AsyncMock(side_effect=TelegramError("flood"))
+        query, edit = _query(), AsyncMock()
+
+        self.assertFalse(
+            await celebrate(
+                SimpleNamespace(send_message=send), query, edit=edit, text="✅"
+            )
+        )
+
+        edit.assert_awaited_once()
+        query.message.delete.assert_not_awaited()
+
+    async def test_an_undeletable_old_card_loses_its_buttons(self) -> None:
+        bot, query = SimpleNamespace(send_message=AsyncMock()), _query()
+        query.message.delete.side_effect = TelegramError("too old")
+
+        await celebrate(bot, query, edit=AsyncMock(), text="✅")
+
+        query.message.edit_reply_markup.assert_awaited_once_with(reply_markup=None)
+
+
+class EditorPublishCelebrationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_publishing_from_the_editor_ends_with_confetti(self) -> None:
+        from test_release_119_state import RedisModel, ctx, draft, track
+
+        from music_links_bot import bot_editor
+        from music_links_bot.bot_runtime import BotRuntime
+
+        context = ctx(RedisModel())
+        context.bot = SimpleNamespace(send_message=AsyncMock())
+        context.application.bot_data["runtime"] = BotRuntime(
+            context.application.bot_data["kv_store"]
+        )
+        query = _query()
+        query.from_user = SimpleNamespace(id=7)
+        query.answer = AsyncMock()
+        query.edit_message_text = AsyncMock()
+        request = bot_editor.EditorActionRequest(
+            query=query,
+            context=context,
+            action="pc",
+            draft_id="d1",
+            draft=draft(),
+            lang="ru",
+            track=track(),
+        )
+        published = SimpleNamespace(message_id=42, link="https://t.me/stonerhand/42")
+
+        with (
+            unittest.mock.patch.object(
+                bot_editor, "_schedule_mark_posted", new=AsyncMock()
+            ),
+            unittest.mock.patch.object(bot_editor, "_store_draft", new=AsyncMock()),
+        ):
+            await bot_editor._finish_editor_publish(request, published)
+
+        sent = context.bot.send_message.await_args.kwargs
+        self.assertEqual(sent["message_effect_id"], CELEBRATE)
+        self.assertIn("Опубликовано", sent["text"])
+        self.assertIn("@stonerhand", sent["text"])
+        query.message.delete.assert_awaited_once()
+        query.edit_message_text.assert_not_awaited()
+        self.assertEqual(request.draft["published_message_id"], 42)
+        self.assertIn("🎉", query.answer.await_args.args[0])
+
+
+class ReactionTargetTests(unittest.TestCase):
+    def test_only_the_users_own_message_gets_a_reaction(self) -> None:
+        typed = SimpleNamespace(callback_query=None)
+        tapped = SimpleNamespace(callback_query=object())
+
+        self.assertTrue(should_react(typed, is_private=True))
+        self.assertFalse(should_react(tapped, is_private=True))
+        self.assertFalse(should_react(typed, is_private=False))
+
+
+if __name__ == "__main__":
+    unittest.main()

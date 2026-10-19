@@ -628,20 +628,20 @@
     "en": "🔐 <b>Data and privacy</b>\n\nThe bot keeps your drafts, collection, history, settings and scheduled posts — and deletes them over time on its own.\n\nStatistics are anonymous: which posts are sent most via inline, without users or chats. Kept for up to 31 days.\n\n<blockquote>The button below deletes everything personal at once. Shared release info (artwork, links) is not personal and stays for up to 180 days.</blockquote>"
   },
   "progress_batch": {
-    "en": "✓ Links · {done}/{total}\n✓ Platforms\n🎨 Building the collection",
-    "ru": "✓ Ссылки · {done}/{total}\n✓ Площадки\n🎨 Собираю подборку"
+    "en": "Links · {done}/{total}",
+    "ru": "Ссылки · {done}/{total}"
   },
   "progress_batch_links": {
-    "en": "✓ Links checked\n🔎 Fetching platforms · 0/{total}\n○ Collection",
-    "ru": "✓ Ссылки проверены\n🔎 Получаю площадки · 0/{total}\n○ Подборка"
+    "en": "Platforms · 0/{total}",
+    "ru": "Площадки · 0/{total}"
   },
   "progress_batch_partial": {
-    "en": "✓ Links · {done}/{total}\n⚠️ Some links need attention\n🎨 Building the collection",
-    "ru": "✓ Ссылки · {done}/{total}\n⚠️ Есть проблемные ссылки\n🎨 Собираю подборку"
+    "en": "⚠️ {done} of {total} opened",
+    "ru": "⚠️ Открылось {done} из {total}"
   },
   "progress_batch_start": {
-    "en": "🔎 Checking links · 0/{total}\n○ Platforms\n○ Collection",
-    "ru": "🔎 Проверяю ссылки · 0/{total}\n○ Площадки\n○ Подборка"
+    "en": "Links · 0/{total}",
+    "ru": "Ссылки · 0/{total}"
   },
   "progress_busy": {
     "en": "Working",
@@ -652,16 +652,16 @@
     "ru": "✓ Поиск отменён"
   },
   "progress_card": {
-    "en": "✓ Release\n✓ Platforms\n🎨 Building the post",
-    "ru": "✓ Релиз\n✓ Площадки\n🎨 Собираю пост"
+    "en": "🎨 Building the post…",
+    "ru": "🎨 Собираю пост…"
   },
   "progress_links": {
-    "en": "✓ Release\n🔎 Collecting platforms\n○ Post",
-    "ru": "✓ Релиз\n🔎 Собираю площадки\n○ Пост"
+    "en": "🔎 Collecting platforms…",
+    "ru": "🔎 Собираю площадки…"
   },
   "progress_search": {
-    "en": "🔎 Finding the release\n○ Platforms\n○ Post",
-    "ru": "🔎 Ищу релиз\n○ Площадки\n○ Пост"
+    "en": "🔎 Finding the release…",
+    "ru": "🔎 Ищу релиз…"
   },
   "publish_confirm": {
     "ru": "<b>📣 Публикация в {target}</b>\n\n<blockquote><b>{artist}</b> — {title}</blockquote>",
@@ -1730,5 +1730,17 @@
   "queue_title_empty": {
     "ru": "🕒 <b>Очередь</b>",
     "en": "🕒 <b>Queue</b>"
+  },
+  "progress_fun_search": {
+    "ru": "Роюсь в ящиках с пластинками…\nЛистаю каталоги лейблов…\nИщу этот релиз на полках…\nСверяюсь с базой меломана…",
+    "en": "Digging through the crates…\nFlipping through label catalogs…\nLooking for it on the shelves…\nAsking the record store clerk…"
+  },
+  "progress_fun_links": {
+    "ru": "Обзваниваю стриминги…\nИщу, где ещё это крутят…\nСверяю Spotify, Apple Music и остальных…\nСобираю ссылки со всех площадок…",
+    "en": "Calling every streaming service…\nFinding where else it plays…\nChecking Spotify, Apple Music and the rest…\nCollecting links from every platform…"
+  },
+  "progress_fun_card": {
+    "ru": "Сдуваю пыль с обложки…\nПодписываю обложку…\nРасставляю теги…\nПолирую пост до блеска…",
+    "en": "Dusting off the cover…\nSigning the artwork…\nPicking the tags…\nPolishing the post…"
   }
 }

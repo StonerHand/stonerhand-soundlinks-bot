@@ -332,10 +332,17 @@ async def _publish_crate(
             )
         ]
     )
-    await safe_edit(
+    from music_links_bot.message_effects import celebrate
+
+    text = get_text(lang, "crate_published").format(count=len(tracks))
+    keyboard = InlineKeyboardMarkup(rows)
+    await celebrate(
+        context.bot,
         query,
-        get_text(lang, "crate_published").format(count=len(tracks)),
-        InlineKeyboardMarkup(rows),
+        edit=lambda: safe_edit(query, text, keyboard),
+        text=text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=keyboard,
     )
 
 
