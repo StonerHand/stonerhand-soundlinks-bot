@@ -200,9 +200,8 @@ class ProgressContractTests(unittest.IsolatedAsyncioTestCase):
         await update_progress("ru", "progress_card")
 
         self.assertEqual(len(message.edits), 2)
-        self.assertTrue(message.edits[0].startswith("✓ Релиз"))
-        self.assertTrue(message.edits[1].startswith("✓ Релиз"))
-        self.assertIn("Собираю пост", message.edits[1])
+        self.assertTrue(message.edits[0].startswith("▰▰▰▰▰▱▱▱▱▱ 55%"))
+        self.assertTrue(message.edits[1].startswith("▰▰▰▰▰▰▰▰▱▱ 85%"))
 
 
 if __name__ == "__main__":

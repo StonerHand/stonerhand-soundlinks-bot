@@ -1079,12 +1079,15 @@ async def _show_editor_publish_success(
             target=escape(target), date=moment
         )
     )
-    await _edit_editor_message(
+    from music_links_bot.message_effects import celebrate
+
+    await celebrate(
+        request.context.bot,
         request.query,
-        request.context,
-        request.draft,
-        success_text,
-        keyboard,
+        edit=lambda: _edit_editor_message(
+            request.query, request.context, request.draft, success_text, keyboard
+        ),
+        **_editor_message(request.context, request.draft, success_text, keyboard),
     )
 
 
@@ -1145,24 +1148,26 @@ async def _show_action_busy(query, lang: str) -> None:
             LOGGER.debug("Could not mark editor action busy", exc_info=True)
 
 
+def _editor_message(context, draft: dict, text: str, keyboard) -> dict:
+    from music_links_bot.bot_ui import version_editor_keyboard
+
+    track = TrackMatch(**draft["item"])
+    return {
+        "text": fit_telegram_html(text),
+        "parse_mode": ParseMode.HTML,
+        "link_preview_options": _build_link_preview_options(
+            editor_preview_url(draft, track, context),
+            prefer_large_media=bool(draft.get("large_preview")),
+        ),
+        "reply_markup": version_editor_keyboard(keyboard, draft),
+    }
+
+
 async def _edit_editor_message(
     query, context, draft: dict, text: str, keyboard
 ) -> None:
-    from music_links_bot.bot_ui import version_editor_keyboard
-
-    keyboard = version_editor_keyboard(keyboard, draft)
-    track = TrackMatch(**draft["item"])
-    text = fit_telegram_html(text)
     try:
-        await query.edit_message_text(
-            text=text,
-            parse_mode=ParseMode.HTML,
-            link_preview_options=_build_link_preview_options(
-                editor_preview_url(draft, track, context),
-                prefer_large_media=bool(draft.get("large_preview")),
-            ),
-            reply_markup=keyboard,
-        )
+        await query.edit_message_text(**_editor_message(context, draft, text, keyboard))
     except BadRequest as exc:
         if "Message is not modified" not in str(exc):
             raise
