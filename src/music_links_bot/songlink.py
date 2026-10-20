@@ -23,6 +23,7 @@ from music_links_bot.public_release import (
     release_identity,
 )
 from music_links_bot.release_hubs import canonical_release_hub_url
+from music_links_bot.single_flight import cancel_all, shared
 from music_links_bot.spotify import SpotifyClient, SpotifyLookupError
 from music_links_bot.url_utils import cache_key_for_url, is_platform_destination_url
 
@@ -71,12 +72,7 @@ class SonglinkClient:
         self._inflight: dict[str, asyncio.Task[TrackMatch]] = {}
 
     async def aclose(self) -> None:
-        pending = list(self._inflight.values())
-        for task in pending:
-            task.cancel()
-        if pending:
-            await asyncio.gather(*pending, return_exceptions=True)
-        self._inflight.clear()
+        await cancel_all(self._inflight)
         await self._client.aclose()
         await self._deezer_client.aclose()
         await self._public_release_client.aclose()
@@ -92,20 +88,11 @@ class SonglinkClient:
         if fallback_match is not None:
             return fallback_match
 
-        pending = self._inflight.get(cache_key)
-        if pending is not None:
-            return await asyncio.shield(pending)
-
-        task = asyncio.create_task(self._lookup_and_cache(source_url, cache_key))
-        self._inflight[cache_key] = task
-        task.add_done_callback(
-            lambda completed, key=cache_key: self._finish_inflight(key, completed)
+        return await shared(
+            self._inflight,
+            cache_key,
+            lambda: self._lookup_and_cache(source_url, cache_key),
         )
-        try:
-            return await asyncio.shield(task)
-        finally:
-            if task.done():
-                self._finish_inflight(cache_key, task)
 
     async def lookup_release_metadata(self, source_url: str) -> TrackMatch:
         return await self._spotify_client.lookup_release(source_url)
@@ -116,15 +103,6 @@ class SonglinkClient:
         if release_identity(source_url):
             return await self._public_release_client.lookup_release(source_url)
         return await self._spotify_client.lookup_release(source_url)
-
-    def _finish_inflight(self, cache_key: str, task: asyncio.Task[TrackMatch]) -> None:
-        """Forget completed single-flight tasks even if their waiter timed out."""
-        if self._inflight.get(cache_key) is task:
-            self._inflight.pop(cache_key, None)
-        if task.done() and not task.cancelled():
-            # Retrieve the exception so a caller cancellation cannot leave a
-            # noisy "Task exception was never retrieved" warning behind.
-            task.exception()
 
     async def _lookup_and_cache(self, source_url: str, cache_key: str) -> TrackMatch:
         shared = await self._get_shared_cache(cache_key)

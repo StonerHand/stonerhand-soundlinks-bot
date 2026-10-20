@@ -197,7 +197,7 @@ class ProgressContractTests(unittest.IsolatedAsyncioTestCase):
         await update_progress("ru", "progress_links")
         await update_progress("ru", "progress_search")
         await update_progress("ru", "progress_links")
-        await update_progress("ru", "progress_card")
+        await update_progress("ru", "progress_batch", done=2, total=2)
 
         self.assertEqual(len(message.edits), 2)
         self.assertTrue(message.edits[0].startswith("▰▰▰▰▰▱▱▱▱▱ 55%"))

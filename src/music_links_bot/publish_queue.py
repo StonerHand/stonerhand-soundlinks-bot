@@ -569,6 +569,7 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
                 ):
                     current_draft["published_at"] = current_time()
                     await store_draft(context, editor_id, current_draft)
+            await _celebrate_job(context, draft, delivered, target)
         elif outcome == "exhausted" and failed_draft is not None:
             await _alert_job_failure(context, failed_draft)
         elif outcome == "uncertain":
@@ -581,6 +582,49 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
             ttl_seconds=86400,
         )
     return published
+
+
+async def _celebrate_job(context, draft: dict, delivered, target) -> None:
+    """Tell the author a scheduled post is out, with confetti in private chats."""
+    chat_id = _draft_chat_id({"draft": draft})
+    if chat_id is None or chat_id <= 0:
+        return
+    from html import escape
+
+    from telegram import InlineKeyboardMarkup
+    from telegram.constants import ParseMode
+
+    from music_links_bot.i18n import get_text
+    from music_links_bot.message_effects import send_with_effect
+    from music_links_bot.publication_state import _message_url
+    from music_links_bot.telegram_buttons import button
+
+    lang = str(draft.get("lang") or "ru")
+    item = draft.get("item") or {}
+    link = getattr(delivered, "link", None) or _message_url(
+        target, getattr(delivered, "message_id", None)
+    )
+    keyboard = (
+        InlineKeyboardMarkup(
+            [[button(get_text(lang, "ed_open_publication"), url=link, style="success")]]
+        )
+        if isinstance(link, str) and link.startswith("http")
+        else None
+    )
+    try:
+        await send_with_effect(
+            context.bot.send_message,
+            chat_id=chat_id,
+            text=get_text(lang, "queue_published").format(
+                artist=escape(str(item.get("artist") or "—")),
+                title=escape(str(item.get("title") or "—")),
+            ),
+            parse_mode=ParseMode.HTML,
+            reply_markup=keyboard,
+        )
+    # A thank-you note must never turn a published job into a failed one.
+    except Exception:
+        LOGGER.debug("Scheduled publication notice failed", exc_info=True)
 
 
 async def _alert_job_failure(context, draft: dict) -> None:

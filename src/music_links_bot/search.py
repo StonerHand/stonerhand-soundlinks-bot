@@ -14,6 +14,7 @@ from music_links_bot.models import TrackMatch
 from music_links_bot.musicbrainz import MusicBrainzClient, MusicBrainzLookupError
 from music_links_bot.release_hubs import canonical_release_hub_url
 from music_links_bot.release_metadata import apple_album_url, duration_ms, metadata_url
+from music_links_bot.single_flight import cancel_all, forget
 from music_links_bot.url_utils import cache_key_for_url, normalize_host
 
 LOGGER = logging.getLogger(__name__)
@@ -90,12 +91,7 @@ class SearchClient:
         self._owns_musicbrainz_client = musicbrainz_client is None
 
     async def aclose(self) -> None:
-        pending = list(self._inflight.values())
-        for task in pending:
-            task.cancel()
-        if pending:
-            await asyncio.gather(*pending, return_exceptions=True)
-        self._inflight.clear()
+        await cancel_all(self._inflight)
         await self._client.aclose()
         if self._owns_musicbrainz_client:
             await self._musicbrainz_client.aclose()
@@ -236,7 +232,7 @@ class SearchClient:
             )
             self._inflight[cache_key] = task
             task.add_done_callback(
-                lambda completed, key=cache_key: self._finish_inflight(key, completed)
+                lambda completed: forget(self._inflight, cache_key, completed)
             )
         else:
             task = pending
@@ -253,17 +249,7 @@ class SearchClient:
                     task.cancel()
                     await asyncio.gather(task, return_exceptions=True)
             if task.done():
-                self._finish_inflight(cache_key, task)
-
-    def _finish_inflight(
-        self,
-        cache_key: str,
-        task: asyncio.Task[list[SearchCandidate]],
-    ) -> None:
-        if self._inflight.get(cache_key) is task:
-            self._inflight.pop(cache_key, None)
-        if task.done() and not task.cancelled():
-            task.exception()
+                forget(self._inflight, cache_key, task)
 
     async def _search_and_cache(
         self,

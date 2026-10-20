@@ -28,8 +28,8 @@ from music_links_bot.bot_ui import (
     build_error_keyboard,
     build_publish_confirmation,
     build_start_keyboard,
-    render_crate,
 )
+from music_links_bot.crate_view import render_crate
 from music_links_bot.draft_model import CURRENT_DRAFT_VERSION, new_track_draft
 from music_links_bot.models import TrackMatch
 from music_links_bot.publication_view import build_publication_view

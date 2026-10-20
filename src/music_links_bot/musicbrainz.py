@@ -9,6 +9,7 @@ import httpx
 from music_links_bot.cache import TTLCache
 from music_links_bot.constants import HTTP_USER_AGENT
 from music_links_bot.metadata_cleaning import match_key
+from music_links_bot.single_flight import cancel_all, shared
 from music_links_bot.url_utils import cache_key_for_url, spotify_url_type
 
 MUSICBRAINZ_CACHE_TTL_SECONDS = 7 * 24 * 3600
@@ -52,12 +53,7 @@ class MusicBrainzClient:
         self._last_request_at = 0.0
 
     async def aclose(self) -> None:
-        pending = list(self._inflight.values())
-        for task in pending:
-            task.cancel()
-        if pending:
-            await asyncio.gather(*pending, return_exceptions=True)
-        self._inflight.clear()
+        await cancel_all(self._inflight)
         await asyncio.gather(
             self._client.aclose(),
             self._deezer_client.aclose(),
@@ -84,38 +80,17 @@ class MusicBrainzClient:
         if self._miss_cache.get(cache_key):
             return None
 
-        pending = self._inflight.get(cache_key)
-        if pending is not None:
-            return await asyncio.shield(pending)
-
-        task = asyncio.create_task(
-            self._lookup_and_cache(
+        return await shared(
+            self._inflight,
+            cache_key,
+            lambda: self._lookup_and_cache(
                 cache_key=cache_key,
                 artist=artist,
                 title=title,
                 entity_type=entity_type,
                 expected_spotify_type=expected_spotify_type,
-            )
+            ),
         )
-        self._inflight[cache_key] = task
-        task.add_done_callback(
-            lambda completed, key=cache_key: self._finish_inflight(key, completed)
-        )
-        try:
-            return await asyncio.shield(task)
-        finally:
-            if task.done():
-                self._finish_inflight(cache_key, task)
-
-    def _finish_inflight(
-        self,
-        cache_key: str,
-        task: asyncio.Task[str | None],
-    ) -> None:
-        if self._inflight.get(cache_key) is task:
-            self._inflight.pop(cache_key, None)
-        if task.done() and not task.cancelled():
-            task.exception()
 
     async def _lookup_and_cache(
         self,

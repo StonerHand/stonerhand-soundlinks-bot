@@ -36,7 +36,6 @@ class ProgressState:
 _STEPS = {
     "progress_search": (1, 20, "progress_fun_search", False),
     "progress_links": (2, 55, "progress_fun_links", False),
-    "progress_card": (3, 85, "progress_fun_card", False),
     "progress_batch_start": (1, 10, "progress_fun_search", True),
     "progress_batch_links": (2, 40, "progress_fun_links", True),
     "progress_batch": (3, 85, "progress_fun_card", True),
@@ -153,17 +152,20 @@ async def start_progress(
     lang: str = "ru",
     *,
     total: int = 1,
+    key: str | None = None,
 ) -> None:
-    """Create at most one visible progress message for the active request."""
+    """Create at most one visible progress message for the active request.
+
+    ``key`` lets a lookup that already has its links open at the platform
+    step: every skipped edit is a full round trip to Telegram.
+    """
     if _PLACEHOLDER.get() is not None:
         return
+    key = key or ("progress_batch_start" if total > 1 else "progress_search")
+    stage = _STEPS[key][0]
     try:
         seed = _seed(message)
-        text = (
-            progress_text(lang, "progress_batch_start", seed=seed, total=total)
-            if total > 1
-            else progress_text(lang, "progress_search", seed=seed)
-        )
+        text = progress_text(lang, key, seed=seed, total=total)
         chat = getattr(message, "chat", None)
         get_bot = getattr(message, "get_bot", None)
         try:
@@ -189,7 +191,7 @@ async def start_progress(
                 ProgressState(
                     None,
                     chat_id=message.chat_id,
-                    stage=1,
+                    stage=stage,
                     last_text=text,
                     bot=bot,
                     draft_id=draft_id,
@@ -205,7 +207,7 @@ async def start_progress(
         ProgressState(
             placeholder,
             chat_id=message.chat_id,
-            stage=1,
+            stage=stage,
             last_text=text,
             seed=seed,
         )

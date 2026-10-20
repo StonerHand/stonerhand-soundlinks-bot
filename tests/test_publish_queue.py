@@ -22,6 +22,10 @@ class BotStub:
         return SimpleNamespace(message_id=1)
 
 
+def channel_posts(bot) -> list[dict]:
+    return [sent for sent in bot.sent if sent.get("chat_id") == "@stonerhand"]
+
+
 def make_context() -> SimpleNamespace:
     application = SimpleNamespace(bot_data={}, bot=BotStub())
     return SimpleNamespace(application=application, bot=application.bot)
@@ -112,7 +116,7 @@ class PublishQueueTests(unittest.TestCase):
         self.assertEqual(before, 0)
         self.assertEqual(after, 1)
         self.assertEqual(jobs, [])
-        self.assertEqual(len(context.bot.sent), 1)
+        self.assertEqual(len(channel_posts(context.bot)), 1)
 
     def test_memory_queue_mutations_are_serialized(self) -> None:
         context = make_context()
@@ -339,8 +343,13 @@ class PublishQueueTests(unittest.TestCase):
         self.assertEqual(published, 1)
         self.assertEqual(len(jobs), 1)
         self.assertEqual(jobs[0]["publish_at"], 9_999_999_999)
-        self.assertEqual(len(context.bot.sent), 1)
-        self.assertIn("Dragonaut", context.bot.sent[0]["text"])
+        self.assertEqual(len(channel_posts(context.bot)), 1)
+        self.assertIn("Dragonaut", channel_posts(context.bot)[0]["text"])
+        # The author hears about it once, with confetti.
+        notices = [m for m in context.bot.sent if m not in channel_posts(context.bot)]
+        self.assertEqual(len(notices), 1)
+        self.assertIn("Вышло по расписанию", notices[0]["text"])
+        self.assertIn("message_effect_id", notices[0])
 
     def test_process_due_jobs_noop_when_nothing_due(self) -> None:
         context = make_context()

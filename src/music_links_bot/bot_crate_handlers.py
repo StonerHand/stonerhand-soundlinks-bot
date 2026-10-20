@@ -19,8 +19,8 @@ from music_links_bot.bot_crate import (
 from music_links_bot.bot_menu import runtime_for, safe_edit, update_lang
 from music_links_bot.bot_runtime import CallbackAction, encode_callback
 from music_links_bot.bot_storage import remember_bounded
-from music_links_bot.bot_ui import render_crate
 from music_links_bot.constants import channel_target
+from music_links_bot.crate_view import render_crate
 from music_links_bot.i18n import get_text, resolve_lang
 from music_links_bot.models import TrackMatch
 from music_links_bot.release_preferences import release_preference_key
