@@ -41,27 +41,14 @@ class LookupStopped(Exception):
 
 def observe_result(source_url, item, *, field_name, provider):
     """Retain verified source results before slower siblings finish."""
-    from music_links_bot.lookup_models import SourceStatus, item_label
-    from music_links_bot.models import (
-        ArtistMatch,
-        PlaylistMatch,
-        RadioMatch,
-        TrackMatch,
-        VideoMatch,
-    )
+    from music_links_bot.lookup_models import ITEM_TYPES, SourceStatus, item_label
+    from music_links_bot.models import TrackMatch
     from music_links_bot.url_utils import direct_platform_links
 
-    expected = {
-        "tracks": TrackMatch,
-        "videos": VideoMatch,
-        "radios": RadioMatch,
-        "playlists": PlaylistMatch,
-        "artists": ArtistMatch,
-    }
     sink = live_sources.get()
-    if sink is None or not isinstance(item, expected[field_name]):
+    if sink is None or not isinstance(item, ITEM_TYPES[field_name]):
         return
-    if field_name == "tracks":
+    if isinstance(item, TrackMatch):
         links = direct_platform_links(item.links)
         if not links:
             return

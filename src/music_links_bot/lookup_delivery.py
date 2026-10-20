@@ -19,6 +19,7 @@ from music_links_bot.formatter import (
     format_playlist_message,
     format_radio_collection_message,
     format_radio_message,
+    format_title_message,
     format_video_collection_message,
     format_video_message,
 )
@@ -31,6 +32,7 @@ from music_links_bot.keyboards import (
     _build_nts_keyboard,
     _build_playlist_collection_keyboard,
     _build_playlist_keyboard,
+    _build_title_keyboard,
     _build_youtube_collection_keyboard,
     _build_youtube_keyboard,
     _select_preview_url,
@@ -39,6 +41,7 @@ from music_links_bot.models import (
     ArtistMatch,
     PlaylistMatch,
     RadioMatch,
+    TitleMatch,
     TrackMatch,
     VideoMatch,
 )
@@ -62,6 +65,44 @@ def _with_user_intro(user_prefix: str, body_html: str) -> str:
         body_html=body_html,
     )
     return text
+
+
+async def send_title_result(
+    bot: Bot,
+    message: Message,
+    titles: list[TitleMatch],
+    *,
+    send_track_result: SendTrackResult,
+    user_prefix: str,
+    include_channel_button: bool,
+    include_hashtags: bool,
+    lang: str,
+    allow_share: bool = True,
+) -> None:
+    """One card per film or series; the user's own text tops the first one."""
+    for title in titles:
+        keyboard = _build_title_keyboard(
+            title, include_channel_button=include_channel_button
+        )
+        if allow_share:
+            keyboard = add_share_button(
+                keyboard,
+                share_query=build_share_query([title.url]),
+                label=get_text(lang, "share_post"),
+            )
+        await send_track_result(
+            bot,
+            message,
+            _with_user_intro(
+                user_prefix,
+                format_title_message(title, include_hashtags=include_hashtags),
+            ),
+            preview_url=title.image_url or title.watch_url,
+            reply_markup=keyboard,
+            source_urls=(title.url,),
+            content_kind="title",
+        )
+        user_prefix = ""
 
 
 async def send_youtube_result(

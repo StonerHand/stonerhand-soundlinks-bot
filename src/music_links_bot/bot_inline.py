@@ -28,6 +28,7 @@ from music_links_bot.formatter import (
     format_artist_message,
     format_playlist_message,
     format_radio_message,
+    format_title_message,
     format_track_message,
     format_video_message,
 )
@@ -45,6 +46,7 @@ from music_links_bot.keyboards import (
     _build_link_preview_options,
     _build_nts_keyboard,
     _build_playlist_keyboard,
+    _build_title_keyboard,
     _build_youtube_keyboard,
     _select_preview_url,
 )
@@ -83,6 +85,7 @@ from music_links_bot.url_utils import (
     extract_supported_urls,
     is_apple_music_radio_url,
     is_direct_platform_url,
+    is_netflix_title_url,
     is_nts_url,
     is_playlist_url,
     is_spotify_artist_url,
@@ -657,6 +660,34 @@ async def _build_inline_result(
                 label=share_label,
             ),
             preview_url=video.url,
+            channel_safe=channel_safe,
+        )
+
+    if is_netflix_title_url(source_url):
+        titles = await bot_lookup._lookup_titles(
+            bot_data["netflix_client"], [source_url]
+        )
+        if not titles:
+            return None
+        card = titles[0]
+        kind = (
+            ("Film" if lang == "en" else "Фильм")
+            if card.kind == "film"
+            else ("Series" if lang == "en" else "Сериал")
+        )
+        return _inline_article(
+            source_url,
+            title=card.title,
+            description=_inline_description(
+                f"{kind} · Netflix", lang=lang, history=history
+            ),
+            text=format_title_message(card, include_hashtags=True),
+            keyboard=add_share_button(
+                _build_title_keyboard(card),
+                share_query=share_query,
+                label=share_label,
+            ),
+            preview_url=card.image_url or card.watch_url,
             channel_safe=channel_safe,
         )
 

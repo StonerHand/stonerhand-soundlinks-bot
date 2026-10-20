@@ -37,6 +37,7 @@ from music_links_bot.bot_lookup import (
     _send_mixed_result,
     _send_nts_result,
     _send_playlist_result,
+    _send_title_result,
     _send_youtube_result,
 )
 from music_links_bot.bot_menu import (
@@ -1105,6 +1106,14 @@ async def _deliver_lookup_bundle(
         "include_hashtags": request.include_hashtags,
         "lang": request.lang,
     }
+    if bundle.titles:
+        # Films and series are always their own cards, even beside music.
+        await _send_title_result(
+            context.bot, message, bundle.titles, allow_share=not partial, **common
+        )
+        bundle.titles = []
+        common["user_prefix"] = ""
+        kind = delivery_kind(bundle)
     if kind == "tracks":
         await _send_track_matches(
             message,

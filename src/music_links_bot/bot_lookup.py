@@ -21,6 +21,7 @@ from music_links_bot.lookup_delivery import (
     send_mixed_result as _send_mixed_result_impl,
     send_nts_result as _send_nts_result_impl,
     send_playlist_result as _send_playlist_result_impl,
+    send_title_result as _send_title_result_impl,
     send_youtube_result as _send_youtube_result_impl,
 )
 from music_links_bot.lookup_models import (
@@ -37,9 +38,11 @@ from music_links_bot.models import (
     ArtistMatch,
     PlaylistMatch,
     RadioMatch,
+    TitleMatch,
     TrackMatch,
     VideoMatch,
 )
+from music_links_bot.netflix import NetflixClient, NetflixLookupError
 from music_links_bot.nts import NTSClient, NTSLookupError, build_nts_fallback
 from music_links_bot.phrases import pick_phrase
 from music_links_bot.playlist import (
@@ -235,6 +238,7 @@ async def _resolve_sources_uncached(
     playlist_urls = grouped["playlists"]
     youtube_urls = grouped["youtube"]
     nts_urls = grouped["nts"]
+    netflix_urls = grouped["netflix"]
     apple_radio_urls = grouped["apple_radio"]
     music_urls = grouped["songlink"]
     tasks: list[ProviderTask] = []
@@ -292,6 +296,14 @@ async def _resolve_sources_uncached(
                 [],
             )
         )
+    if netflix_urls:
+        tasks.append(
+            ProviderTask(
+                "netflix",
+                _lookup_titles(bot_data["netflix_client"], netflix_urls),
+                [],
+            )
+        )
     if playlist_urls:
         tasks.append(
             ProviderTask(
@@ -329,6 +341,7 @@ async def _resolve_sources_uncached(
     )
     playlists = _outcome_value(outcomes, "playlists", [])
     artists = _outcome_value(outcomes, "artists", [])
+    titles = _outcome_value(outcomes, "netflix", [])
     tracks, unavailable_urls, track_statuses = lookup_result
     statuses = [
         *track_statuses,
@@ -337,6 +350,7 @@ async def _resolve_sources_uncached(
         *_provider_statuses("apple_radio", apple_radio_urls, radios, outcomes),
         *_provider_statuses("playlists", playlist_urls, playlists, outcomes),
         *_provider_statuses("artists", artist_urls, artists, outcomes),
+        *_provider_statuses("netflix", netflix_urls, titles, outcomes),
     ]
     if unavailable_urls:
         runtime = bot_data.get("runtime")
@@ -356,6 +370,7 @@ async def _resolve_sources_uncached(
         playlists=playlists,
         artists=artists,
         statuses=_sort_statuses(statuses, source_urls),
+        titles=titles,
     )
     bundle = _ensure_source_accounting(bundle, source_urls)
     complete = bundle.is_complete_for(source_urls)
@@ -546,6 +561,23 @@ async def _lookup_youtube_videos(
     )
 
 
+async def _lookup_titles(
+    client: NetflixClient,
+    source_urls: list[str],
+) -> list[TitleMatch]:
+    # No placeholder card: a film without its title or poster says nothing.
+    return await _lookup_each(
+        source_urls,
+        client.lookup_title,
+        kind=TitleMatch,
+        expected_error=NetflixLookupError,
+        field_name="titles",
+        provider="netflix",
+        label="Netflix",
+        fallback=lambda url: None,
+    )
+
+
 async def _lookup_nts_radios(
     client: NTSClient,
     source_urls: list[str],
@@ -585,6 +617,17 @@ async def _send_youtube_result(
         lang=lang,
         allow_share=allow_share,
         requested_count=requested_count,
+    )
+
+
+async def _send_title_result(
+    bot: Bot,
+    message: Message,
+    titles: list[TitleMatch],
+    **kwargs,
+) -> None:
+    await _send_title_result_impl(
+        bot, message, titles, send_track_result=_send_track_result, **kwargs
     )
 
 

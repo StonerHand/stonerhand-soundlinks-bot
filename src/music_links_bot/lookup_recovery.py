@@ -5,13 +5,18 @@ from __future__ import annotations
 from contextvars import ContextVar
 from dataclasses import asdict
 
-from music_links_bot.lookup_models import LookupBundle, SourceStatus, bundle_from_cache
+from music_links_bot.lookup_models import (
+    ITEM_TYPES,
+    LookupBundle,
+    SourceStatus,
+    bundle_from_cache,
+)
 from music_links_bot.url_utils import cache_key_for_url
 
 completed_sources: ContextVar[dict | None] = ContextVar(
     "completed_lookup_sources", default=None
 )
-FIELDS = ("tracks", "videos", "radios", "playlists", "artists")
+FIELDS = tuple(ITEM_TYPES)
 
 
 def capture_sources(bundle):

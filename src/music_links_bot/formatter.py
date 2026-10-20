@@ -10,6 +10,7 @@ from music_links_bot.models import (
     ArtistMatch,
     PlaylistMatch,
     RadioMatch,
+    TitleMatch,
     TrackMatch,
     VideoMatch,
 )
@@ -141,6 +142,66 @@ def format_radio_message(radio: RadioMatch, *, include_hashtags: bool = True) ->
     ]
     return _with_hashtags(
         lines, "#stonerhand #radio", include_hashtags=include_hashtags
+    )
+
+
+# Netflix names genres in English; the common ones read better translated.
+_GENRES_RU = {
+    "action": "Боевик",
+    "action & adventure": "Боевик",
+    "anime": "Аниме",
+    "comedies": "Комедия",
+    "comedy": "Комедия",
+    "crime": "Криминал",
+    "documentaries": "Документальное",
+    "documentary": "Документальное",
+    "drama": "Драма",
+    "dramas": "Драма",
+    "fantasy": "Фэнтези",
+    "horror": "Ужасы",
+    "kids": "Детское",
+    "music & musicals": "Музыка",
+    "reality": "Реалити",
+    "romance": "Мелодрама",
+    "sci-fi": "Фантастика",
+    "sci-fi & fantasy": "Фантастика",
+    "thriller": "Триллер",
+    "thrillers": "Триллер",
+}
+
+
+def format_title_message(title: TitleMatch, *, include_hashtags: bool = True) -> str:
+    """ "📺 Сериал · Netflix · 2 сезона · Аниме · 18+" under the bold title."""
+    english = resolve_lang(None) == "en"
+    film = title.kind == "film"
+    details = [
+        ("Film" if english else "Фильм")
+        if film
+        else ("Series" if english else "Сериал"),
+        "Netflix",
+    ]
+    if title.seasons:
+        details.append(count_label(title.seasons, "season"))
+    if film and title.year:
+        details.append(str(title.year))
+    if title.genre:
+        details.append(
+            title.genre
+            if english
+            else _GENRES_RU.get(title.genre.casefold(), title.genre)
+        )
+    if title.rating:
+        details.append(title.rating)
+    lines = [
+        f"<b>{_display_text(title.title)}</b>",
+        "",
+        ("🎬 " if film else "📺 ")
+        + " · ".join(_display_text(item) for item in details),
+    ]
+    return _with_hashtags(
+        lines,
+        f"#stonerhand #{'film' if film else 'series'} #netflix",
+        include_hashtags=include_hashtags,
     )
 
 
@@ -636,6 +697,7 @@ def count_label(count: int, kind: str) -> str:
             "playlist": "playlist",
             "artist": "artist",
             "radio": "radio show",
+            "season": "season",
         }.get(kind, "release")
         return f"{count} {singular}{'' if count == 1 else 's'}"
     forms = {
@@ -650,6 +712,7 @@ def count_label(count: int, kind: str) -> str:
         "playlist": ("плейлист", "плейлиста", "плейлистов"),
         "artist": ("артист", "артиста", "артистов"),
         "radio": ("радиошоу", "радиошоу", "радиошоу"),
+        "season": ("сезон", "сезона", "сезонов"),
     }.get(kind, ("релиз", "релиза", "релизов"))
     form = (
         0
