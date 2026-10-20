@@ -35,8 +35,8 @@ class ProgressTextTests(unittest.TestCase):
         }
 
         self.assertEqual(
-            progress_text("ru", "progress_card", seed="7:1"),
-            progress_text("ru", "progress_card", seed="7:1"),
+            progress_text("ru", "progress_links", seed="7:1"),
+            progress_text("ru", "progress_links", seed="7:1"),
         )
         self.assertGreater(len(phrases), 1)
 
@@ -175,3 +175,81 @@ class ReactionTargetTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LookupRoundTripTests(unittest.IsolatedAsyncioTestCase):
+    async def test_a_direct_link_costs_one_progress_message_and_one_edit(self) -> None:
+        from test_bot import (
+            ContextStub,
+            EditableReplyStub,
+            PrivateSpotifyTrackMessageStub,
+            UpdateStub,
+        )
+
+        from music_links_bot.bot_lookup_flow import track_lookup_message
+
+        edits: list[str] = []
+        original = EditableReplyStub.edit_text
+
+        async def counting(stub, text, **kwargs):
+            edits.append(text)
+            return await original(stub, text, **kwargs)
+
+        message = PrivateSpotifyTrackMessageStub()
+        with (
+            unittest.mock.patch.object(EditableReplyStub, "edit_text", counting),
+            unittest.mock.patch("music_links_bot.bot_stats.record_matches"),
+        ):
+            await track_lookup_message(UpdateStub(message), ContextStub())
+
+        # The progress opens at the platform step and is edited once: into
+        # the finished card. Every extra edit is a Telegram round trip.
+        self.assertEqual(len(message.replies), 1)
+        self.assertEqual(len(edits), 1)
+        self.assertNotIn("▰", edits[0])
+
+
+def test_a_stale_selection_still_shows_the_crate_hint() -> None:
+    from music_links_bot.crate_view import render_crate
+
+    items = [{"item": {"artist": "Kyuss", "title": "Gardenia", "links": {}}}]
+    text, _ = render_crate(items, lang="ru", selected_index=5)
+
+    assert text.endswith(get_text("ru", "crate_hint"))
+
+
+class ScheduledNoticeTests(unittest.IsolatedAsyncioTestCase):
+    def _draft(self, chat_id: int) -> dict:
+        return {
+            "chat_id": chat_id,
+            "lang": "en",
+            "item": {"artist": "Sleep", "title": "<Holy>"},
+        }
+
+    async def test_the_author_gets_a_link_to_the_scheduled_post(self) -> None:
+        from music_links_bot.publish_queue import _celebrate_job
+
+        send = AsyncMock()
+        context = SimpleNamespace(bot=SimpleNamespace(send_message=send))
+        delivered = SimpleNamespace(message_id=9, link=None)
+
+        await _celebrate_job(context, self._draft(7), delivered, "@stonerhand")
+
+        sent = send.await_args.kwargs
+        self.assertEqual(sent["message_effect_id"], CELEBRATE)
+        self.assertIn("Out on schedule", sent["text"])
+        self.assertIn("&lt;Holy&gt;", sent["text"])
+        url = sent["reply_markup"].inline_keyboard[0][0].url
+        self.assertEqual(url, "https://t.me/stonerhand/9")
+
+    async def test_group_drafts_and_failures_stay_quiet(self) -> None:
+        from music_links_bot.publish_queue import _celebrate_job
+
+        send = AsyncMock(side_effect=TelegramError("blocked"))
+        context = SimpleNamespace(bot=SimpleNamespace(send_message=send))
+
+        await _celebrate_job(context, self._draft(-100), True, "@stonerhand")
+        send.assert_not_awaited()
+        # A blocked bot or a network error never fails the published job.
+        await _celebrate_job(context, self._draft(7), True, "@stonerhand")
+        send.assert_awaited()

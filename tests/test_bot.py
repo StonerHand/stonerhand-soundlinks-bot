@@ -67,9 +67,9 @@ from music_links_bot.bot_ui import (
     build_onboarding_keyboard as _build_onboarding_keyboard,
     build_section_keyboard as _build_section_keyboard,
     build_start_keyboard as _build_start_keyboard,
-    render_crate as _render_bot_crate,
 )
 from music_links_bot.config import Settings
+from music_links_bot.crate_view import render_crate as _render_bot_crate
 from music_links_bot.i18n import get_text
 from music_links_bot.keyboards import (
     _build_artist_keyboard,

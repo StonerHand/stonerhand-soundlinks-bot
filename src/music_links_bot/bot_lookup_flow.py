@@ -916,24 +916,18 @@ async def _start_lookup_progress(
     if not request.is_private:
         await _send_typing_action(context.bot, message)
         return
-    await _send_loading_placeholder(
-        message,
-        request.lang,
-        total=max(1, len(request.source_urls)),
-    )
-    if len(request.source_urls) > 1:
-        await _update_loading_placeholder(
-            request.lang, "progress_batch_links", total=len(request.source_urls)
-        )
-    else:
-        await _update_loading_placeholder(request.lang, "progress_links")
+    total = max(1, len(request.source_urls))
+    key = "progress_batch_links" if total > 1 else "progress_links"
+    # The links are known now: open straight at the platform step. After a
+    # text search the search placeholder already exists and just moves on.
+    await _send_loading_placeholder(message, request.lang, total=total, key=key)
+    await _update_loading_placeholder(request.lang, key, total=total)
 
 
 async def _update_resolved_progress(request: LookupRequest, bundle) -> None:
-    if not request.is_private:
-        return
-    if len(request.source_urls) == 1:
-        await _update_loading_placeholder(request.lang, "progress_card")
+    # A single card replaces the progress message milliseconds later, so an
+    # extra "building the post" edit would only cost a Telegram round trip.
+    if not request.is_private or len(request.source_urls) == 1:
         return
     await _update_loading_placeholder(
         request.lang,

@@ -220,7 +220,7 @@ def _crate_items(*, broken=False):
 
 
 def test_collection_has_one_clear_main_action_for_each_role():
-    from music_links_bot.bot_ui import render_crate
+    from music_links_bot.crate_view import render_crate
 
     _, owner = render_crate(
         _crate_items(), lang="ru", can_publish=True, share_query="sh5|x"
@@ -240,7 +240,7 @@ def test_collection_has_one_clear_main_action_for_each_role():
 
 
 def test_collection_warnings_are_grouped_and_point_to_the_fix():
-    from music_links_bot.bot_ui import render_crate
+    from music_links_bot.crate_view import render_crate
 
     text, keyboard = render_crate(_crate_items(broken=True), lang="ru")
     assert "⚠️ Нет ссылки или данных: №1 — замени." in text

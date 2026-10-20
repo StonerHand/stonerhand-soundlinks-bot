@@ -651,10 +651,6 @@
     "en": "✓ Search cancelled",
     "ru": "✓ Поиск отменён"
   },
-  "progress_card": {
-    "en": "🎨 Building the post…",
-    "ru": "🎨 Собираю пост…"
-  },
   "progress_links": {
     "en": "🔎 Collecting platforms…",
     "ru": "🔎 Собираю площадки…"
@@ -1742,5 +1738,9 @@
   "progress_fun_card": {
     "ru": "Сдуваю пыль с обложки…\nПодписываю обложку…\nРасставляю теги…\nПолирую пост до блеска…",
     "en": "Dusting off the cover…\nSigning the artwork…\nPicking the tags…\nPolishing the post…"
+  },
+  "queue_published": {
+    "ru": "🎉 <b>Вышло по расписанию</b>\n\n<blockquote><b>{artist}</b> — {title}</blockquote>",
+    "en": "🎉 <b>Out on schedule</b>\n\n<blockquote><b>{artist}</b> — {title}</blockquote>"
   }
 }
