@@ -8,6 +8,7 @@ import sys
 from music_links_bot.apple_radio import AppleRadioClient
 from music_links_bot.bot_lookup import _lookup_tracks
 from music_links_bot.musicbrainz import MusicBrainzClient
+from music_links_bot.netflix import NetflixClient
 from music_links_bot.nts import NTSClient
 from music_links_bot.playlist import PlaylistClient
 from music_links_bot.search import SearchClient
@@ -28,6 +29,7 @@ APPLE_PLAYLIST = (
 )
 NTS_PAGE = "https://www.nts.live/shows/guests"
 APPLE_RADIO = "https://music.apple.com/tr/curator/the-alligator-hour/993270307"
+NETFLIX_SERIES = "https://www.netflix.com/title/81054853"
 
 
 async def verify() -> list[str]:
@@ -39,6 +41,7 @@ async def verify() -> list[str]:
     playlist = PlaylistClient(timeout=10)
     nts = NTSClient(timeout=10)
     apple_radio = AppleRadioClient(timeout=10)
+    netflix = NetflixClient(timeout=10)
     musicbrainz = MusicBrainzClient(timeout=10)
     songlink = SonglinkClient(
         user_countries=("US", "GB", "DE"),
@@ -152,6 +155,15 @@ async def verify() -> list[str]:
                 failures.append("NTS metadata fell back to a generic card")
         except Exception as exc:  # noqa: BLE001
             failures.append(f"NTS lookup failed: {type(exc).__name__}")
+
+        try:
+            card = await netflix.lookup_title(NETFLIX_SERIES)
+            if card.title != "Cyberpunk: Edgerunners" or card.kind != "series":
+                failures.append("Netflix title page changed: no title or kind")
+            elif not card.image_url or not card.soundtrack_url:
+                failures.append("Netflix card lost its artwork or soundtrack")
+        except Exception as exc:  # noqa: BLE001
+            failures.append(f"Netflix lookup failed: {type(exc).__name__}")
     finally:
         await asyncio.gather(
             spotify.aclose(),
@@ -163,6 +175,7 @@ async def verify() -> list[str]:
             songlink.aclose(),
             search.aclose(),
             musicbrainz.aclose(),
+            netflix.aclose(),
         )
     return failures
 
@@ -174,7 +187,7 @@ def main() -> int:
         return 1
     print(
         "Provider canary OK: Spotify, Deezer, MusicBrainz, SoundCloud, YouTube, "
-        "Apple Music, NTS"
+        "Apple Music, NTS, Netflix"
     )
     return 0
 

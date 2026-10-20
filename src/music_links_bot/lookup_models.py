@@ -7,11 +7,22 @@ from music_links_bot.models import (
     ArtistMatch,
     PlaylistMatch,
     RadioMatch,
+    TitleMatch,
     TrackMatch,
     VideoMatch,
 )
 from music_links_bot.provider_registry import DEFAULT_PROVIDER_REGISTRY
 from music_links_bot.url_utils import cache_key_for_url
+
+# Every kind of result a lookup can return, keyed by its LookupBundle field.
+ITEM_TYPES: dict[str, type] = {
+    "tracks": TrackMatch,
+    "videos": VideoMatch,
+    "radios": RadioMatch,
+    "playlists": PlaylistMatch,
+    "artists": ArtistMatch,
+    "titles": TitleMatch,
+}
 
 
 @dataclass(slots=True)
@@ -34,32 +45,15 @@ class LookupBundle:
     artists: list[ArtistMatch]
     statuses: list[SourceStatus] = field(default_factory=list)
     source_results: dict = field(default_factory=dict)
+    titles: list[TitleMatch] = field(default_factory=list)
 
     @property
     def item_count(self) -> int:
-        return sum(
-            len(items)
-            for items in (
-                self.tracks,
-                self.videos,
-                self.radios,
-                self.playlists,
-                self.artists,
-            )
-        )
+        return sum(len(getattr(self, name)) for name in ITEM_TYPES)
 
     @property
     def content_type_count(self) -> int:
-        return sum(
-            bool(items)
-            for items in (
-                self.tracks,
-                self.videos,
-                self.radios,
-                self.playlists,
-                self.artists,
-            )
-        )
+        return sum(bool(getattr(self, name)) for name in ITEM_TYPES)
 
     @property
     def successful_source_count(self) -> int:
@@ -101,27 +95,29 @@ def unique_source_urls(source_urls: list[str]) -> list[str]:
 
 def bundle_to_cache(bundle: LookupBundle) -> dict[str, Any]:
     return {
-        "tracks": [asdict(item) for item in bundle.tracks],
+        **{
+            name: [asdict(item) for item in getattr(bundle, name)]
+            for name in ITEM_TYPES
+        },
         "unavailable_urls": list(bundle.unavailable_urls),
-        "videos": [asdict(item) for item in bundle.videos],
-        "radios": [asdict(item) for item in bundle.radios],
-        "playlists": [asdict(item) for item in bundle.playlists],
-        "artists": [asdict(item) for item in bundle.artists],
         "statuses": [asdict(item) for item in bundle.statuses],
     }
 
 
 def bundle_from_cache(payload: dict) -> LookupBundle | None:
     try:
-        return LookupBundle(
-            tracks=[TrackMatch(**item) for item in payload.get("tracks", [])],
-            unavailable_urls=[str(url) for url in payload.get("unavailable_urls", [])],
-            videos=[VideoMatch(**item) for item in payload.get("videos", [])],
-            radios=[RadioMatch(**item) for item in payload.get("radios", [])],
-            playlists=[PlaylistMatch(**item) for item in payload.get("playlists", [])],
-            artists=[ArtistMatch(**item) for item in payload.get("artists", [])],
+        bundle = LookupBundle(
+            [],
+            [str(url) for url in payload.get("unavailable_urls", [])],
+            [],
+            [],
+            [],
+            [],
             statuses=[SourceStatus(**item) for item in payload.get("statuses", [])],
         )
+        for name, kind in ITEM_TYPES.items():
+            setattr(bundle, name, [kind(**item) for item in payload.get(name, [])])
+        return bundle
     except (TypeError, ValueError):
         return None
 

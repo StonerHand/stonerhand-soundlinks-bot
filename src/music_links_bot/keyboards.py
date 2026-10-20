@@ -17,6 +17,7 @@ from music_links_bot.models import (
     ArtistMatch,
     PlaylistMatch,
     RadioMatch,
+    TitleMatch,
     TrackMatch,
     VideoMatch,
 )
@@ -295,6 +296,28 @@ def _build_youtube_keyboard(
         url=url,
         style="primary",
         include_channel_button=include_channel_button,
+    )
+
+
+def _build_title_keyboard(
+    title: TitleMatch,
+    *,
+    include_channel_button: bool = False,
+) -> InlineKeyboardMarkup:
+    """Netflix first; the trailer and soundtrack share the second row."""
+    extras = [
+        _url_button(_label(key), url=url)
+        for key, url in (
+            ("btn_trailer", title.trailer_url),
+            ("btn_soundtrack", title.soundtrack_url),
+        )
+        if url
+    ]
+    rows = [
+        [_url_button(_label("btn_watch_netflix"), url=title.watch_url, style="primary")]
+    ]
+    return _keyboard_with_optional_channel(
+        [*rows, extras] if extras else rows, include_channel_button
     )
 
 

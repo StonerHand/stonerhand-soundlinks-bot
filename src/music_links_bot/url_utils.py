@@ -20,6 +20,8 @@ YOUTUBE_MUSIC_HOST = "music.youtube.com"
 YOUTUBE_VIDEO_HOSTS = {"youtube.com", "m.youtube.com", "youtu.be"}
 SOUNDCLOUD_HOSTS = {"soundcloud.com", "m.soundcloud.com", "on.soundcloud.com"}
 NTS_HOSTS = {"nts.live", "www.nts.live"}
+# netflix.com/title/81054853 or a regional netflix.com/id-en/title/81054853.
+_NETFLIX_TITLE_PATH = re.compile(r"^/(?:[a-z]{2}(?:-[a-z]{2})?/)?title/(\d{5,12})/?$")
 PLATFORM_DESTINATION_HOSTS = {
     "spotify": frozenset({"open.spotify.com", "spotify.com"}),
     "appleMusic": frozenset(
@@ -80,7 +82,7 @@ def is_supported_music_url(url: str) -> bool:
 
     normalized = normalize_host(parsed.hostname)
 
-    if normalized == YOUTUBE_MUSIC_HOST:
+    if normalized == YOUTUBE_MUSIC_HOST or netflix_title_id(url):
         return True
 
     if normalized in YOUTUBE_VIDEO_HOSTS:
@@ -373,6 +375,23 @@ def is_soundcloud_url(url: str) -> bool:
     return normalized_host in SOUNDCLOUD_HOSTS or normalized_host.endswith(
         ".soundcloud.com"
     )
+
+
+def netflix_title_id(url: str) -> str | None:
+    """The numeric id of a Netflix film or series page, else None."""
+    parsed = _parse_url(url)
+    if (
+        parsed is None
+        or parsed.scheme not in {"http", "https"}
+        or normalize_host(parsed.hostname) != "netflix.com"
+    ):
+        return None
+    match = _NETFLIX_TITLE_PATH.match(parsed.path.casefold())
+    return match.group(1) if match else None
+
+
+def is_netflix_title_url(url: str) -> bool:
+    return netflix_title_id(url) is not None
 
 
 def is_nts_url(url: str) -> bool:

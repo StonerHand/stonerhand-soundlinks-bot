@@ -57,6 +57,23 @@ class VideoMatch:
 
 
 @dataclass(slots=True)
+class TitleMatch:
+    """A film or series page on Netflix, shown as its own card."""
+
+    title: str
+    url: str
+    watch_url: str
+    kind: str = "series"
+    year: int | None = None
+    seasons: int | None = None
+    genre: str = ""
+    rating: str = ""
+    image_url: str | None = None
+    trailer_url: str | None = None
+    soundtrack_url: str | None = None
+
+
+@dataclass(slots=True)
 class RadioMatch:
     title: str
     station: str

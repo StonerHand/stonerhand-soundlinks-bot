@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from music_links_bot.url_utils import (
     is_apple_music_radio_url,
+    is_netflix_title_url,
     is_nts_url,
     is_playlist_url,
     is_spotify_artist_url,
@@ -26,6 +27,7 @@ DEFAULT_PROVIDER_ADAPTERS = (
     ProviderAdapter("playlists", is_playlist_url),
     ProviderAdapter("youtube", is_youtube_video_url),
     ProviderAdapter("nts", is_nts_url),
+    ProviderAdapter("netflix", is_netflix_title_url),
     ProviderAdapter("songlink", lambda _url: True),
 )
 
@@ -46,7 +48,7 @@ class ProviderRegistry:
         return self.adapters[-1].name
 
     def group(self, source_urls: Iterable[str]) -> dict[str, list[str]]:
-        grouped = {adapter.name: [] for adapter in self.adapters}
+        grouped: dict[str, list[str]] = {adapter.name: [] for adapter in self.adapters}
         for source_url in source_urls:
             grouped[self.provider_for(source_url)].append(source_url)
         return grouped

@@ -548,8 +548,8 @@
     "ru": "❓ <b>Помощь</b>\n<i>Выбери тему ниже.</i>"
   },
   "menu_platforms": {
-    "en": "🎛 <b>Supported sources</b>\n<i>Send one link — the bot finds the other platforms.</i>\n\n<b>Music and podcasts</b>\n🟢 Spotify · ⚪ Apple Music / Podcasts\n🟠 SoundCloud · 🟦 Deezer\n⚫ Tidal · 🟡 Yandex Music · 🔵 Bandcamp\n\n<b>Video and radio</b>\n🔴 YouTube / YouTube Music · 📻 NTS Radio\n\n<b>Content types</b>\nTracks, albums, playlists, artists, podcasts, videos and radio shows.\n\n<blockquote>✨ The result: artwork, title, tags and buttons for every matched platform.</blockquote>\n\nNo link? Type <code>artist — track</code>.",
-    "ru": "🎛 <b>Поддерживаемые источники</b>\n<i>Пришли ссылку — бот сам найдёт остальные площадки.</i>\n\n<b>Музыка и подкасты</b>\n🟢 Spotify · ⚪ Apple Music / Podcasts\n🟠 SoundCloud · 🟦 Deezer\n⚫ Tidal · 🟡 Яндекс Музыка · 🔵 Bandcamp\n\n<b>Видео и эфиры</b>\n🔴 YouTube / YouTube Music · 📻 NTS Radio\n\n<b>Типы материалов</b>\nТреки, альбомы, плейлисты, артисты, подкасты, видео и радиошоу.\n\n<blockquote>✨ На выходе: обложка, название, теги и кнопки всех найденных площадок.</blockquote>\n\nНет ссылки? Напиши <code>артист — трек</code>."
+    "en": "🎛 <b>Supported sources</b>\n<i>Send one link — the bot finds the other platforms.</i>\n\n<b>Music and podcasts</b>\n🟢 Spotify · ⚪ Apple Music / Podcasts\n🟠 SoundCloud · 🟦 Deezer\n⚫ Tidal · 🟡 Yandex Music · 🔵 Bandcamp\n\n<b>Video, radio and film</b>\n🔴 YouTube / YouTube Music · 📻 NTS Radio\n🎬 Netflix — a film or series card with its trailer and soundtrack\n\n<b>Content types</b>\nTracks, albums, playlists, artists, podcasts, videos, radio shows, films and series.\n\n<blockquote>✨ The result: artwork, title, tags and buttons for every matched platform.</blockquote>\n\nNo link? Type <code>artist — track</code>.",
+    "ru": "🎛 <b>Поддерживаемые источники</b>\n<i>Пришли ссылку — бот сам найдёт остальные площадки.</i>\n\n<b>Музыка и подкасты</b>\n🟢 Spotify · ⚪ Apple Music / Podcasts\n🟠 SoundCloud · 🟦 Deezer\n⚫ Tidal · 🟡 Яндекс Музыка · 🔵 Bandcamp\n\n<b>Видео, эфиры и кино</b>\n🔴 YouTube / YouTube Music · 📻 NTS Radio\n🎬 Netflix — карточка фильма или сериала с трейлером и саундтреком\n\n<b>Типы материалов</b>\nТреки, альбомы, плейлисты, артисты, подкасты, видео, радиошоу, фильмы и сериалы.\n\n<blockquote>✨ На выходе: обложка, название, теги и кнопки всех найденных площадок.</blockquote>\n\nНет ссылки? Напиши <code>артист — трек</code>."
   },
   "menu_start": {
     "ru": "🎧 <b>StonerHand SoundLinks</b>\n\nПришли ссылку или <code>артист — трек</code> — соберу пост с обложкой, тегами и кнопками всех площадок.\n\nНесколько ссылок — подборка. Свой текст над ссылкой станет текстом поста.",
@@ -560,8 +560,8 @@
     "ru": "Дальше →"
   },
   "no_url_hint": {
-    "en": "Send a link to a track, album, playlist, artist, podcast, YouTube video or NTS Radio — or just type a track name",
-    "ru": "Пришли ссылку на трек, альбом, плейлист, артиста, подкаст, YouTube-видео или NTS Radio — или просто название трека"
+    "en": "Send a link to a track, album, playlist, artist, podcast, YouTube video, NTS Radio, Netflix film or series — or just type a track name",
+    "ru": "Пришли ссылку на трек, альбом, плейлист, артиста, подкаст, YouTube-видео, NTS Radio, фильм или сериал на Netflix — или просто название трека"
   },
   "onboarding_1": {
     "en": "🔎 <b>Step 1 of 3 · Send music</b>\n\n<blockquote>A link from any platform or <code>artist — track</code>. Several links, one per line, make a collection.</blockquote>\nIf several releases match, the bot shows the options.",
@@ -1742,5 +1742,17 @@
   "queue_published": {
     "ru": "🎉 <b>Вышло по расписанию</b>\n\n<blockquote><b>{artist}</b> — {title}</blockquote>",
     "en": "🎉 <b>Out on schedule</b>\n\n<blockquote><b>{artist}</b> — {title}</blockquote>"
+  },
+  "btn_watch_netflix": {
+    "ru": "🎬 Смотреть на Netflix",
+    "en": "🎬 Watch on Netflix"
+  },
+  "btn_trailer": {
+    "ru": "▶️ Трейлер",
+    "en": "▶️ Trailer"
+  },
+  "btn_soundtrack": {
+    "ru": "🎧 Саундтрек",
+    "en": "🎧 Soundtrack"
   }
 }

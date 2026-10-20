@@ -119,6 +119,7 @@ def build_application(settings: Settings) -> Application:
     from music_links_bot.artist import ArtistClient
     from music_links_bot.bot_editor import editor_callback
     from music_links_bot.bot_lookup_flow import track_lookup_message
+    from music_links_bot.netflix import NetflixClient
     from music_links_bot.nts import NTSClient
     from music_links_bot.playlist import PlaylistClient
     from music_links_bot.search import SearchClient
@@ -148,6 +149,7 @@ def build_application(settings: Settings) -> Application:
             ),
             "youtube_client": LazyAsyncClient(YouTubeClient),
             "nts_client": LazyAsyncClient(NTSClient),
+            "netflix_client": LazyAsyncClient(NetflixClient),
             "apple_radio_client": LazyAsyncClient(AppleRadioClient),
             "soundcloud_client": LazyAsyncClient(SoundCloudClient),
             "playlist_client": LazyAsyncClient(PlaylistClient),
@@ -275,6 +277,7 @@ async def close_application_resources(application: Application) -> None:
         "songlink_client",
         "youtube_client",
         "nts_client",
+        "netflix_client",
         "apple_radio_client",
         "soundcloud_client",
         "playlist_client",
