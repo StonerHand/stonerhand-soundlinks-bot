@@ -5,10 +5,10 @@ from dataclasses import dataclass
 
 from music_links_bot.url_utils import (
     is_apple_music_radio_url,
-    is_netflix_title_url,
     is_nts_url,
     is_playlist_url,
     is_spotify_artist_url,
+    is_streaming_service_url,
     is_youtube_video_url,
 )
 
@@ -27,7 +27,9 @@ DEFAULT_PROVIDER_ADAPTERS = (
     ProviderAdapter("playlists", is_playlist_url),
     ProviderAdapter("youtube", is_youtube_video_url),
     ProviderAdapter("nts", is_nts_url),
-    ProviderAdapter("netflix", is_netflix_title_url),
+    ProviderAdapter("netflix", is_streaming_service_url("netflix")),
+    ProviderAdapter("appletv", is_streaming_service_url("appletv")),
+    ProviderAdapter("disney", is_streaming_service_url("disney")),
     ProviderAdapter("songlink", lambda _url: True),
 )
 

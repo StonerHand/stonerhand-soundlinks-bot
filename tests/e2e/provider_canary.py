@@ -7,13 +7,13 @@ import sys
 
 from music_links_bot.apple_radio import AppleRadioClient
 from music_links_bot.musicbrainz import MusicBrainzClient
-from music_links_bot.netflix import NetflixClient
 from music_links_bot.nts import NTSClient
 from music_links_bot.playlist import PlaylistClient
 from music_links_bot.search import SearchClient
 from music_links_bot.songlink import SonglinkClient
 from music_links_bot.soundcloud import SoundCloudClient
 from music_links_bot.spotify import SpotifyClient, SpotifyLookupError
+from music_links_bot.titles import TitleClient
 from music_links_bot.track_lookup import (
     _lookup_tracks,
 )
@@ -32,6 +32,12 @@ APPLE_PLAYLIST = (
 NTS_PAGE = "https://www.nts.live/shows/guests"
 APPLE_RADIO = "https://music.apple.com/tr/curator/the-alligator-hour/993270307"
 NETFLIX_SERIES = "https://www.netflix.com/title/81054853"
+APPLE_TV_SERIES = (
+    "https://tv.apple.com/us/show/severance/umc.cmc.1srk2goyh2q2zdxcx605w8vtx"
+)
+DISNEY_FILM = (
+    "https://www.disneyplus.com/browse/entity-e8896bfa-1052-41f7-ae2e-00255d77cf05"
+)
 
 
 async def verify() -> list[str]:
@@ -43,7 +49,7 @@ async def verify() -> list[str]:
     playlist = PlaylistClient(timeout=10)
     nts = NTSClient(timeout=10)
     apple_radio = AppleRadioClient(timeout=10)
-    netflix = NetflixClient(timeout=10)
+    titles = TitleClient(timeout=10)
     musicbrainz = MusicBrainzClient(timeout=10)
     songlink = SonglinkClient(
         user_countries=("US", "GB", "DE"),
@@ -158,14 +164,19 @@ async def verify() -> list[str]:
         except Exception as exc:  # noqa: BLE001
             failures.append(f"NTS lookup failed: {type(exc).__name__}")
 
-        try:
-            card = await netflix.lookup_title(NETFLIX_SERIES)
-            if card.title != "Cyberpunk: Edgerunners" or card.kind != "series":
-                failures.append("Netflix title page changed: no title or kind")
-            elif not card.image_url or not card.soundtrack_url:
-                failures.append("Netflix card lost its artwork or soundtrack")
-        except Exception as exc:  # noqa: BLE001
-            failures.append(f"Netflix lookup failed: {type(exc).__name__}")
+        for url, expected in (
+            (NETFLIX_SERIES, ("Cyberpunk: Edgerunners", "series")),
+            (APPLE_TV_SERIES, ("Severance", "series")),
+            (DISNEY_FILM, ("Moana", "film")),
+        ):
+            try:
+                card = await titles.lookup_title(url)
+                if (card.title, card.kind) != expected:
+                    failures.append(f"{url}: title page changed, got {card.title!r}")
+                elif not card.image_url or not card.soundtrack_url:
+                    failures.append(f"{url}: card lost its artwork or soundtrack")
+            except Exception as exc:  # noqa: BLE001
+                failures.append(f"{url}: lookup failed: {type(exc).__name__}")
     finally:
         await asyncio.gather(
             spotify.aclose(),
@@ -177,7 +188,7 @@ async def verify() -> list[str]:
             songlink.aclose(),
             search.aclose(),
             musicbrainz.aclose(),
-            netflix.aclose(),
+            titles.aclose(),
         )
     return failures
 
@@ -189,7 +200,7 @@ def main() -> int:
         return 1
     print(
         "Provider canary OK: Spotify, Deezer, MusicBrainz, SoundCloud, YouTube, "
-        "Apple Music, NTS, Netflix"
+        "Apple Music, NTS, Netflix, Apple TV+, Disney+"
     )
     return 0
 

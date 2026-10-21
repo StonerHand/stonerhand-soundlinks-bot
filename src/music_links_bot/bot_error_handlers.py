@@ -20,6 +20,8 @@ LOGGER = logging.getLogger(__name__)
 _PROVIDER_LABELS = {
     "apple": "Apple Music",
     "apple_radio": "Apple Music",
+    "appletv": "Apple TV+",
+    "disney": "Disney+",
     "artists": "Spotify",
     "netflix": "Netflix",
     "nts": "NTS Radio",

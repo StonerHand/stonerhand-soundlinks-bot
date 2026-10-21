@@ -1,4 +1,5 @@
-"""Netflix film and series cards: parsing, trailer, soundtrack and delivery."""
+"""Film and series cards (Netflix, Apple TV+, Disney+): parsing, trailer,
+soundtrack and delivery."""
 
 import json
 import unittest
@@ -10,17 +11,17 @@ from music_links_bot.formatter import format_title_message
 from music_links_bot.i18n import language_context
 from music_links_bot.keyboards import _build_title_keyboard
 from music_links_bot.models import TitleMatch
-from music_links_bot.netflix import (
-    NetflixClient,
-    NetflixLookupError,
-    NetflixUnavailableError,
-    parse_title_page,
-    pick_soundtrack,
-    pick_trailer,
-)
 from music_links_bot.publication_contract import (
     RenderedPublication,
     validate_rendered_publication,
+)
+from music_links_bot.titles import (
+    TitleClient,
+    TitleLookupError,
+    TitleUnavailableError,
+    parse_title_page,
+    pick_soundtrack,
+    pick_trailer,
 )
 from music_links_bot.url_utils import extract_supported_urls, netflix_title_id
 
@@ -223,8 +224,8 @@ def _transport(*, netflix_status: int = 200, youtube_ok: bool = True):
 
 
 class ClientTests(unittest.IsolatedAsyncioTestCase):
-    async def _client(self, transport) -> NetflixClient:
-        client = NetflixClient()
+    async def _client(self, transport) -> TitleClient:
+        client = TitleClient()
         await client.aclose()
         client._client = httpx.AsyncClient(transport=transport)
         self.addAsyncCleanup(client.aclose)
@@ -246,14 +247,14 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_a_refusal_is_an_outage_and_a_404_is_a_missing_title(self) -> None:
         for status, error in (
-            (403, NetflixUnavailableError),
-            (404, NetflixLookupError),
+            (403, TitleUnavailableError),
+            (404, TitleLookupError),
         ):
             with self.subTest(status=status):
                 transport, _ = _transport(netflix_status=status)
                 client = await self._client(transport)
 
-                with self.assertRaises(NetflixLookupError) as caught:
+                with self.assertRaises(TitleLookupError) as caught:
                     await client.lookup_title(SERIES_URL)
 
                 self.assertIs(type(caught.exception), error)
@@ -275,7 +276,7 @@ class _NetflixStub:
 
 class _BlockedNetflix:
     async def lookup_title(self, url: str) -> TitleMatch:
-        raise NetflixUnavailableError("403")
+        raise TitleUnavailableError("403")
 
 
 class DeliveryTests(unittest.IsolatedAsyncioTestCase):
@@ -290,7 +291,7 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
         NetflixMessage.text = text
         message = NetflixMessage()
         context = ContextStub()
-        context.application.bot_data["netflix_client"] = client
+        context.application.bot_data["title_client"] = client
         with patch("music_links_bot.bot_stats.record_matches"):
             await track_lookup_message(UpdateStub(message), context)
         return message
@@ -320,7 +321,7 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
 
         message = NetflixMessage()
         context = ContextStub()
-        context.application.bot_data["netflix_client"] = _NetflixStub()
+        context.application.bot_data["title_client"] = _NetflixStub()
         with patch("music_links_bot.bot_stats.record_matches"):
             await track_lookup_message(UpdateStub(message), context)
 
@@ -341,13 +342,160 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
         from music_links_bot.bot_inline import _build_inline_result
 
         context = ContextStub()
-        context.application.bot_data["netflix_client"] = _NetflixStub()
+        context.application.bot_data["title_client"] = _NetflixStub()
 
         result = await _build_inline_result(SERIES_URL, context)
 
         assert result is not None
         self.assertEqual(result.title, "Cyberpunk: Edgerunners")
         self.assertIn("Netflix", result.input_message_content.message_text)
+
+
+APPLE_SERIES_URL = (
+    "https://tv.apple.com/us/show/severance/umc.cmc.1srk2goyh2q2zdxcx605w8vtx"
+)
+APPLE_IMAGE = "https://is1-ssl.mzstatic.com/image/thumb/abc/1200x675.jpg"
+DISNEY_FILM_URL = "https://www.disneyplus.com/en-gb/browse/entity-e8896bfa-1052-41f7-ae2e-00255d77cf05"
+DISNEY_IMAGE = "https://disney.images.edge.bamgrid.com/ripcut-delivery/v2/x.jpeg"
+
+
+def _apple_page(kind: str = "TVSeries") -> str:
+    data = {
+        "@type": kind,
+        "name": "Severance",
+        "datePublished": "2022-02-18T00:00:00.000Z",
+        "image": APPLE_IMAGE,
+    }
+    return (
+        '<script type="application/ld+json">{"@type":"Organization"}</script>'
+        f'<script type="application/ld+json">{json.dumps(data)}</script>'
+        '<script>{"genres":["Thriller","Drama"],'
+        '"ariaLabel":"Rated TV-MA","fallbackText":"TV-MA"}</script>'
+    )
+
+
+def _disney_page(*, seasons: str = "") -> str:
+    extra = f'"seasonsAvailable":"{seasons}",' if seasons else '"runtimeMs":6755000,'
+    return (
+        '<meta property="og:title" content="Moana | Watch on Disney+">'
+        f'<meta property="og:image" content="{DISNEY_IMAGE}">'
+        f'<script>{{"releaseYear":"2016",{extra}"genres":["Action and Adventure"]}}'
+        "</script>"
+    )
+
+
+class MoreServicesTests(unittest.TestCase):
+    def test_each_service_link_is_recognised(self) -> None:
+        from music_links_bot.url_utils import streaming_title
+
+        self.assertEqual(streaming_title(APPLE_SERIES_URL)[0], "appletv")
+        self.assertEqual(
+            streaming_title(DISNEY_FILM_URL),
+            ("disney", "entity-e8896bfa-1052-41f7-ae2e-00255d77cf05"),
+        )
+        for url in (
+            "https://www.disneyplus.com/home",
+            "https://tv.apple.com/us/channel/tvs.sbd.4000",
+        ):
+            with self.subTest(url=url):
+                self.assertIsNone(streaming_title(url))
+
+    def test_apple_tv_series_and_film(self) -> None:
+        series = parse_title_page(_apple_page(), APPLE_SERIES_URL)
+        film = parse_title_page(_apple_page("Movie"), APPLE_SERIES_URL + "?ctx=1")
+
+        assert series is not None and film is not None
+        self.assertEqual(
+            (series.title, series.kind, series.year, series.genre, series.rating),
+            ("Severance", "series", 2022, "Thriller", "TV-MA"),
+        )
+        self.assertEqual(series.service, "Apple TV+")
+        self.assertEqual(series.image_url, APPLE_IMAGE)
+        self.assertEqual(film.kind, "film")
+        self.assertEqual(film.watch_url, APPLE_SERIES_URL)
+
+    def test_disney_film_and_series(self) -> None:
+        film = parse_title_page(_disney_page(), DISNEY_FILM_URL)
+        series = parse_title_page(_disney_page(seasons="38 Seasons"), DISNEY_FILM_URL)
+
+        assert film is not None and series is not None
+        self.assertEqual((film.title, film.kind, film.year), ("Moana", "film", 2016))
+        self.assertEqual(film.service, "Disney+")
+        self.assertEqual(
+            film.watch_url,
+            "https://www.disneyplus.com/browse/entity-e8896bfa-1052-41f7-ae2e-00255d77cf05",
+        )
+        self.assertEqual((series.kind, series.seasons), ("series", 38))
+
+    def test_cards_name_their_service(self) -> None:
+        apple = _card(service="Apple TV+", seasons=None, year=2022, genre="Thriller")
+        disney = _card(
+            service="Disney+", kind="film", year=2016, genre="Action and Adventure"
+        )
+        with language_context("ru"):
+            apple_text = format_title_message(apple)
+            disney_text = format_title_message(disney)
+            label = _build_title_keyboard(disney).inline_keyboard[0][0].text
+
+        self.assertIn("📺 Сериал · Apple TV+ · 2022 · Триллер", apple_text)
+        self.assertTrue(apple_text.endswith("#series #appletvplus"))
+        self.assertIn("🎬 Фильм · Disney+ · 2016 · Боевик", disney_text)
+        self.assertEqual(label, "🎬 Смотреть на Disney+")
+
+    def test_trailers_come_from_the_services_own_channels(self) -> None:
+        results = {
+            "contents": [
+                _video("aaaaaaaaaaa", "Moana | Official Trailer", "Netflix"),
+                _video(
+                    "bbbbbbbbbbb", "Moana | Official Trailer", "Walt Disney Studios"
+                ),
+            ]
+        }
+        from music_links_bot.titles import SERVICES
+
+        disney = SERVICES["disney"].channels
+
+        self.assertEqual(
+            pick_trailer(results, "Moana", disney),
+            "https://www.youtube.com/watch?v=bbbbbbbbbbb",
+        )
+
+    def test_the_exactly_named_soundtrack_beats_a_sequel(self) -> None:
+        results = [
+            {"collectionId": 2, "collectionName": "Moana 2 (Original Soundtrack)"},
+            {
+                "collectionId": 1,
+                "collectionName": "Moana (Original Motion Picture Soundtrack)",
+            },
+        ]
+
+        self.assertEqual(pick_soundtrack(results, "Moana"), "https://album.link/i/1")
+        self.assertEqual(
+            pick_soundtrack(results[:1], "Moana"), "https://album.link/i/2"
+        )
+
+
+class _BlockedDisney:
+    async def lookup_title(self, url: str) -> TitleMatch:
+        raise TitleUnavailableError("403")
+
+
+class MoreServicesDeliveryTests(DeliveryTests):
+    async def test_an_apple_tv_link_becomes_its_card(self) -> None:
+        class AppleStub:
+            async def lookup_title(self, url: str) -> TitleMatch:
+                return _card(url=url, service="Apple TV+", title="Severance")
+
+        message = await self._lookup(AppleStub(), APPLE_SERIES_URL)
+
+        self.assertIn("<b>Severance</b>", message.replies[-1])
+        markup = message.reply_kwargs[-1]["reply_markup"]
+        self.assertEqual(markup.inline_keyboard[0][0].text, "🎬 Смотреть на Apple TV+")
+
+    async def test_a_blocked_disney_is_named(self) -> None:
+        message = await self._lookup(_BlockedDisney(), DISNEY_FILM_URL)
+
+        self.assertIn("Disney+", message.replies[-1])
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from urllib.parse import (
     ParseResult,
     parse_qs,
@@ -22,6 +22,19 @@ SOUNDCLOUD_HOSTS = {"soundcloud.com", "m.soundcloud.com", "on.soundcloud.com"}
 NTS_HOSTS = {"nts.live", "www.nts.live"}
 # netflix.com/title/81054853 or a regional netflix.com/id-en/title/81054853.
 _NETFLIX_TITLE_PATH = re.compile(r"^/(?:[a-z]{2}(?:-[a-z]{2})?/)?title/(\d{5,12})/?$")
+# tv.apple.com/us/show/severance/umc.cmc.1srk2goyh2q2zdxcx605w8vtx
+_APPLE_TV_TITLE_PATH = re.compile(
+    r"^/(?:[a-z]{2}/)?(?:show|movie)/[^/]+/(umc\.cmc\.[a-z0-9]+)/?$"
+)
+# disneyplus.com/browse/entity-<uuid> (any locale prefix).
+_DISNEY_TITLE_PATH = re.compile(
+    r"^/(?:[a-z]{2}(?:-[a-z]{2})?/)?browse/(entity-[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})/?$"
+)
+_STREAMING_TITLE_HOSTS = {
+    "netflix.com": ("netflix", _NETFLIX_TITLE_PATH),
+    "tv.apple.com": ("appletv", _APPLE_TV_TITLE_PATH),
+    "disneyplus.com": ("disney", _DISNEY_TITLE_PATH),
+}
 PLATFORM_DESTINATION_HOSTS = {
     "spotify": frozenset({"open.spotify.com", "spotify.com"}),
     "appleMusic": frozenset(
@@ -82,7 +95,7 @@ def is_supported_music_url(url: str) -> bool:
 
     normalized = normalize_host(parsed.hostname)
 
-    if normalized == YOUTUBE_MUSIC_HOST or netflix_title_id(url):
+    if normalized == YOUTUBE_MUSIC_HOST or streaming_title(url):
         return True
 
     if normalized in YOUTUBE_VIDEO_HOSTS:
@@ -377,17 +390,31 @@ def is_soundcloud_url(url: str) -> bool:
     )
 
 
+def streaming_title(url: str) -> tuple[str, str] | None:
+    """("netflix" | "appletv" | "disney", title id) for a film or series page."""
+    parsed = _parse_url(url)
+    if parsed is None or parsed.scheme not in {"http", "https"}:
+        return None
+    service = _STREAMING_TITLE_HOSTS.get(normalize_host(parsed.hostname))
+    if service is None:
+        return None
+    key, path = service
+    match = path.match(parsed.path.casefold())
+    return (key, match.group(1)) if match else None
+
+
 def netflix_title_id(url: str) -> str | None:
     """The numeric id of a Netflix film or series page, else None."""
-    parsed = _parse_url(url)
-    if (
-        parsed is None
-        or parsed.scheme not in {"http", "https"}
-        or normalize_host(parsed.hostname) != "netflix.com"
-    ):
-        return None
-    match = _NETFLIX_TITLE_PATH.match(parsed.path.casefold())
-    return match.group(1) if match else None
+    found = streaming_title(url)
+    return found[1] if found and found[0] == "netflix" else None
+
+
+def is_streaming_service_url(service: str) -> Callable[[str], bool]:
+    def accepts(url: str) -> bool:
+        found = streaming_title(url)
+        return found is not None and found[0] == service
+
+    return accepts
 
 
 def is_netflix_title_url(url: str) -> bool:

@@ -58,7 +58,7 @@ class VideoMatch:
 
 @dataclass(slots=True)
 class TitleMatch:
-    """A film or series page on Netflix, shown as its own card."""
+    """A film or series page on a streaming service, shown as its own card."""
 
     title: str
     url: str
@@ -71,6 +71,7 @@ class TitleMatch:
     image_url: str | None = None
     trailer_url: str | None = None
     soundtrack_url: str | None = None
+    service: str = "Netflix"
 
 
 @dataclass(slots=True)

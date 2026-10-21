@@ -314,7 +314,13 @@ def _build_title_keyboard(
         if url
     ]
     rows = [
-        [_url_button(_label("btn_watch_netflix"), url=title.watch_url, style="primary")]
+        [
+            _url_button(
+                _label("btn_watch_title").format(service=title.service),
+                url=title.watch_url,
+                style="primary",
+            )
+        ]
     ]
     return _keyboard_with_optional_channel(
         [*rows, extras] if extras else rows, include_channel_button
