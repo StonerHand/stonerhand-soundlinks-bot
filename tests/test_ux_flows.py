@@ -397,14 +397,14 @@ def test_quick_publish_posts_right_away_with_undo():
 
     with (
         patch(
-            "music_links_bot.bot_editor._publish_draft",
+            "music_links_bot.editor_delivery._publish_draft",
             new=AsyncMock(return_value=sent),
         ),
         patch(
-            "music_links_bot.bot_editor._find_posted_record",
+            "music_links_bot.publication_state.find_posted_record",
             new=AsyncMock(return_value=None),
         ),
-        patch("music_links_bot.bot_editor._schedule_mark_posted", new=AsyncMock()),
+        patch("music_links_bot.publication_state.mark_posted", new=AsyncMock()),
     ):
         published = asyncio.run(
             try_quick_publish(
@@ -442,9 +442,9 @@ def test_quick_publish_never_reposts_a_release_silently():
     context.application.bot_data.update(runtime=runtime)
     publish = AsyncMock()
     with (
-        patch("music_links_bot.bot_editor._publish_draft", new=publish),
+        patch("music_links_bot.editor_delivery._publish_draft", new=publish),
         patch(
-            "music_links_bot.bot_editor._find_posted_record",
+            "music_links_bot.publication_state.find_posted_record",
             new=AsyncMock(return_value={"date": "01.01.2026"}),
         ),
     ):

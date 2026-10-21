@@ -392,7 +392,7 @@ class ReleaseSettingsTests(unittest.IsolatedAsyncioTestCase):
         with (
             presentation_context(PresentationPreferences(artwork="native")),
             patch(
-                "music_links_bot.bot_inline.bot_lookup._lookup_tracks",
+                "music_links_bot.bot_inline.track_lookup._lookup_tracks",
                 new=AsyncMock(return_value=([item], [])),
             ),
             patch(

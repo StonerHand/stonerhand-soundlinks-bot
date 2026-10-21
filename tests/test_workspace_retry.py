@@ -38,7 +38,7 @@ class DeliveryRetryTests(unittest.IsolatedAsyncioTestCase):
         self.run = AsyncMock()
         for target, new in (
             ("music_links_bot.delivery_receipts.load_delivery", load_delivery),
-            ("music_links_bot.bot_editor._edit_editor_message", self.edit),
+            ("music_links_bot.editor_screen._edit_editor_message", self.edit),
             ("music_links_bot.bot_editor._run_locked_editor_action", self.run),
         ):
             patcher = patch(target, new=new)

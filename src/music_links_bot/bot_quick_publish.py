@@ -20,13 +20,13 @@ async def try_quick_publish(message, context, *, draft_id, draft, track, user_id
     """
     if not draft.get("can_publish"):
         return False
-    from music_links_bot.bot_editor import (
-        _find_posted_record,
-        _publish_draft,
-        _schedule_mark_posted,
-        _store_draft,
-    )
     from music_links_bot.bot_menu import runtime_for as _runtime
+    from music_links_bot.bot_storage import store_draft as _store_draft
+    from music_links_bot.editor_delivery import _publish_draft
+    from music_links_bot.publication_state import (
+        find_posted_record as _find_posted_record,
+        mark_posted as _schedule_mark_posted,
+    )
 
     session = await _runtime(context).get_session(user_id, lang=draft.get("lang"))
     if not session.quick_publish:

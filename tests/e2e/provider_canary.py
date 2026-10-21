@@ -6,7 +6,6 @@ import asyncio
 import sys
 
 from music_links_bot.apple_radio import AppleRadioClient
-from music_links_bot.bot_lookup import _lookup_tracks
 from music_links_bot.musicbrainz import MusicBrainzClient
 from music_links_bot.netflix import NetflixClient
 from music_links_bot.nts import NTSClient
@@ -15,6 +14,9 @@ from music_links_bot.search import SearchClient
 from music_links_bot.songlink import SonglinkClient
 from music_links_bot.soundcloud import SoundCloudClient
 from music_links_bot.spotify import SpotifyClient, SpotifyLookupError
+from music_links_bot.track_lookup import (
+    _lookup_tracks,
+)
 from music_links_bot.youtube import YouTubeClient
 
 SPOTIFY_TRACK = "https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT"

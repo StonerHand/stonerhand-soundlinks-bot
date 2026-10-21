@@ -147,6 +147,10 @@ files = [
   "src/music_links_bot/lookup_recovery.py",
   "src/music_links_bot/lookup_delivery.py",
   "src/music_links_bot/provider_registry.py",
+  "src/music_links_bot/bot_editor.py",
+  "src/music_links_bot/editor_screen.py",
+  "src/music_links_bot/editor_delivery.py",
+  "src/music_links_bot/track_lookup.py",
   "tests/e2e/provider_canary.py",
   "tests/e2e/provider_cards_canary.py",
 ]
