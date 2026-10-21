@@ -39,11 +39,9 @@ def tag_explanation(draft, track, lang):
 
 
 async def handle_workspace_action(request):
-    from music_links_bot.bot_editor import (
-        _edit_editor_message,
-        _handle_editor_navigation,
-    )
+    from music_links_bot.bot_editor import _handle_editor_navigation
     from music_links_bot.bot_menu import runtime_for as _runtime
+    from music_links_bot.editor_screen import _edit_editor_message
 
     action, draft, lang = request.action, request.draft, request.lang
     if action in {"retry_review", "retry_self", "retry_channel"}:

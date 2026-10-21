@@ -67,7 +67,7 @@ def draft():
 
 class FinalReleaseStateTests(unittest.IsolatedAsyncioTestCase):
     async def test_full_crate_does_not_claim_an_eleventh_release_was_added(self):
-        from music_links_bot.bot_editor import (
+        from music_links_bot.editor_delivery import (
             _add_editor_item_to_crate,
         )
 
@@ -86,7 +86,8 @@ class FinalReleaseStateTests(unittest.IsolatedAsyncioTestCase):
             lang="ru",
         )
         with patch(
-            "music_links_bot.bot_editor._restore_editor_card", new_callable=AsyncMock
+            "music_links_bot.editor_delivery._restore_editor_card",
+            new_callable=AsyncMock,
         ):
             await _add_editor_item_to_crate(request)
         self.assertFalse(request.draft.get("in_crate"))

@@ -68,7 +68,7 @@ def test_single_inline_uses_branded_preview_and_preserves_buttons():
         with (
             patch.dict(os.environ, ENV),
             patch(
-                "music_links_bot.bot_inline.bot_lookup._lookup_tracks",
+                "music_links_bot.bot_inline.track_lookup._lookup_tracks",
                 new=AsyncMock(return_value=([track()], [])),
             ),
         ):

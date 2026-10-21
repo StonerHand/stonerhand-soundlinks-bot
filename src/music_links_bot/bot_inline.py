@@ -17,7 +17,7 @@ from telegram.constants import ParseMode
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
-from music_links_bot import bot_lookup
+from music_links_bot import bot_lookup, track_lookup
 from music_links_bot.bot_crate import load_crate, load_crate_title
 from music_links_bot.constants import (
     DRAFT_SHARE_PREFIX,
@@ -726,7 +726,7 @@ async def _build_inline_result(
             channel_safe=channel_safe,
         )
 
-    tracks, _unavailable = await bot_lookup._lookup_tracks(
+    tracks, _unavailable = await track_lookup._lookup_tracks(
         bot_data["songlink_client"],
         [source_url],
         soundcloud_client=bot_data["soundcloud_client"],

@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 from telegram import MessageEntity
 
-from music_links_bot import bot_lookup
+from music_links_bot import bot_lookup, track_lookup
 from music_links_bot.bot_lookup import (
     LookupBundle,
     SourceStatus,
@@ -81,9 +81,9 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
         with (
             # Keep the same ordering/concurrency contract without coupling the
             # assertion to millisecond-level GitHub runner scheduling jitter.
-            patch.object(bot_lookup, "_BATCH_ITEM_TIMEOUT_SECONDS", 0.1),
-            patch.object(bot_lookup, "_BATCH_PROVIDER_WORK_SECONDS", 0.25),
-            patch.object(bot_lookup, "_BATCH_LOOKUP_START_INTERVAL_SECONDS", 0),
+            patch.object(track_lookup, "_BATCH_ITEM_TIMEOUT_SECONDS", 0.1),
+            patch.object(track_lookup, "_BATCH_PROVIDER_WORK_SECONDS", 0.25),
+            patch.object(track_lookup, "_BATCH_LOOKUP_START_INTERVAL_SECONDS", 0),
         ):
             bundle = await bot_lookup.resolve_sources(
                 {
@@ -116,8 +116,8 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
             "soundcloud_client": _UnusedSoundCloud(),
         }
         with (
-            patch.object(bot_lookup, "_BATCH_ITEM_TIMEOUT_SECONDS", 0.02),
-            patch.object(bot_lookup, "_BATCH_LOOKUP_START_INTERVAL_SECONDS", 0),
+            patch.object(track_lookup, "_BATCH_ITEM_TIMEOUT_SECONDS", 0.02),
+            patch.object(track_lookup, "_BATCH_LOOKUP_START_INTERVAL_SECONDS", 0),
         ):
             bundle = await bot_lookup.resolve_sources(bot_data, urls)
 
@@ -146,9 +146,9 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
                 )
 
         with (
-            patch.object(bot_lookup, "_BATCH_LOOKUP_CONCURRENCY", 2),
-            patch.object(bot_lookup, "_BATCH_ITEM_TIMEOUT_SECONDS", 0.02),
-            patch.object(bot_lookup, "_BATCH_LOOKUP_START_INTERVAL_SECONDS", 0),
+            patch.object(track_lookup, "_BATCH_LOOKUP_CONCURRENCY", 2),
+            patch.object(track_lookup, "_BATCH_ITEM_TIMEOUT_SECONDS", 0.02),
+            patch.object(track_lookup, "_BATCH_LOOKUP_START_INTERVAL_SECONDS", 0),
         ):
             bundle = await bot_lookup.resolve_sources(
                 {

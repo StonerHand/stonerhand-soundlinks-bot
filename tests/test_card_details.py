@@ -12,7 +12,6 @@ from test_bot import ContextStub
 from test_release_card import sample
 
 from music_links_bot.bot_inline import _build_inline_result
-from music_links_bot.bot_lookup import _fill_release_metadata, _lookup_tracks
 from music_links_bot.bot_preferences import apply_preferences
 from music_links_bot.bot_runtime import UserSession
 from music_links_bot.draft_model import new_track_draft, normalize_track_draft
@@ -38,6 +37,10 @@ from music_links_bot.spotify import (
     SpotifyClient,
     parse_spotify_embed,
     parse_spotify_page,
+)
+from music_links_bot.track_lookup import (
+    _fill_release_metadata,
+    _lookup_tracks,
 )
 
 TRACK = "https://open.spotify.com/track/dig"
@@ -277,7 +280,9 @@ async def test_slow_metadata_is_cancelled_without_losing_resolved_track():
         lookup_release_metadata=slow_details,
     )
     search = SimpleNamespace(lookup_genre=AsyncMock(return_value=None))
-    with patch("music_links_bot.bot_lookup._RELEASE_ENRICHMENT_TIMEOUT_SECONDS", 0.001):
+    with patch(
+        "music_links_bot.track_lookup._RELEASE_ENRICHMENT_TIMEOUT_SECONDS", 0.001
+    ):
         tracks, unavailable = await _lookup_tracks(
             client, [TRACK], search_client=search
         )
@@ -364,7 +369,7 @@ def test_clean_default_preserves_saved_native_setting_old_drafts_and_longreads()
 async def test_inline_uses_clean_image_but_honors_native_preference():
     ctx = ContextStub()
     with patch(
-        "music_links_bot.bot_lookup._lookup_tracks",
+        "music_links_bot.track_lookup._lookup_tracks",
         AsyncMock(return_value=([sample()], [])),
     ):
         with presentation_context():

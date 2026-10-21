@@ -99,10 +99,8 @@ class Release119Journeys(unittest.IsolatedAsyncioTestCase):
             collection_input.reset(token)
 
     async def test_replace_does_not_delete_existing_post_on_uncertain_send(self):
-        from music_links_bot.bot_editor import (
-            _run_primary_editor_action,
-        )
         from music_links_bot.delivery_receipts import DeliveryBlockedError
+        from music_links_bot.editor_delivery import _run_primary_editor_action
 
         context = ctx(RedisModel())
         context.application.bot_data["admin_chat_id"] = 7
@@ -118,15 +116,16 @@ class Release119Journeys(unittest.IsolatedAsyncioTestCase):
         )
         with (
             patch(
-                "music_links_bot.bot_editor._find_posted_record",
+                "music_links_bot.editor_delivery._find_posted_record",
                 AsyncMock(return_value={"message_id": 1}),
             ),
             patch(
-                "music_links_bot.bot_editor._publish_draft",
+                "music_links_bot.editor_delivery._publish_draft",
                 AsyncMock(side_effect=DeliveryBlockedError({"status": "uncertain"})),
             ),
             patch(
-                "music_links_bot.bot_editor._delete_duplicate_editor_post", AsyncMock()
+                "music_links_bot.editor_delivery._delete_duplicate_editor_post",
+                AsyncMock(),
             ) as remove,
         ):
             with self.assertRaises(DeliveryBlockedError):

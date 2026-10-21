@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 from test_release_119_state import RedisModel, ctx, draft, track
 
-from music_links_bot import bot_editor
+from music_links_bot import bot_editor, editor_delivery, editor_screen
 from music_links_bot.bot_runtime import BotRuntime
 from music_links_bot.i18n import get_text
 
@@ -36,10 +36,13 @@ class _EditorCase(unittest.IsolatedAsyncioTestCase):
             self.mocks[name] = self._patch(name, AsyncMock())
 
     def _patch(self, name: str, value):
-        patcher = patch.object(bot_editor, name, new=value)
-        patched = patcher.start()
-        self.addCleanup(patcher.stop)
-        return patched
+        """Replace a helper wherever the editor modules look it up."""
+        for module in (bot_editor, editor_delivery, editor_screen):
+            if hasattr(module, name):
+                patcher = patch.object(module, name, new=value)
+                patcher.start()
+                self.addCleanup(patcher.stop)
+        return value
 
     def _query(self, user_id: int = OWNER):
         return SimpleNamespace(
@@ -49,7 +52,7 @@ class _EditorCase(unittest.IsolatedAsyncioTestCase):
         )
 
     def _request(self, action: str, *, user_id: int = OWNER):
-        return bot_editor.EditorActionRequest(
+        return editor_screen.EditorActionRequest(
             query=self._query(user_id),
             context=self.context,
             action=action,
@@ -118,7 +121,7 @@ class PrimaryActionTests(_EditorCase):
         publish = self._patch("_publish_draft", AsyncMock())
         request = self._request("pc", user_id=99)
 
-        await bot_editor._run_primary_editor_action(request)
+        await editor_delivery._run_primary_editor_action(request)
 
         publish.assert_not_awaited()
         self.assertTrue(request.query.answer.await_args.kwargs.get("show_alert"))
@@ -128,7 +131,7 @@ class PrimaryActionTests(_EditorCase):
         self._patch("_find_posted_record", AsyncMock(return_value={"id": 1}))
         publish = self._patch("_publish_draft", AsyncMock())
 
-        await bot_editor._run_primary_editor_action(self._request("pc"))
+        await editor_delivery._run_primary_editor_action(self._request("pc"))
 
         publish.assert_not_awaited()
         self.mocks["_show_duplicate_editor_post"].assert_awaited_once()
@@ -138,7 +141,7 @@ class PrimaryActionTests(_EditorCase):
         self._patch("_publish_draft", AsyncMock(return_value=SimpleNamespace()))
         request = self._request("x")
 
-        await bot_editor._run_primary_editor_action(request)
+        await editor_delivery._run_primary_editor_action(request)
 
         self.assertTrue(self.draft["repeat_delivery"])
         self.mocks["_finish_editor_publish"].assert_awaited_once()
@@ -148,7 +151,7 @@ class PrimaryActionTests(_EditorCase):
         self._patch("_deliver_draft", AsyncMock(return_value=SimpleNamespace()))
         request = self._request("s", user_id=42)
 
-        await bot_editor._run_primary_editor_action(request)
+        await editor_delivery._run_primary_editor_action(request)
 
         self.assertIn("sent_at", self.draft)
         self.mocks["_show_editor_delivery_success"].assert_awaited_once_with(request)
@@ -158,7 +161,7 @@ class PrimaryActionTests(_EditorCase):
         self._patch("_deliver_draft", AsyncMock(return_value=None))
         request = self._request("s")
 
-        await bot_editor._run_primary_editor_action(request)
+        await editor_delivery._run_primary_editor_action(request)
 
         self.assertNotIn("sent_at", self.draft)
         self.assertTrue(request.query.answer.await_args.kwargs.get("show_alert"))

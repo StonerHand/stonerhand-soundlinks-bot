@@ -35,11 +35,9 @@ from music_links_bot.bot_inline import (
     _build_inline_result,
 )
 from music_links_bot.bot_lookup import (
-    _build_podcast_fallback,
     _lookup_artists,
     _lookup_nts_radios,
     _lookup_playlists,
-    _lookup_tracks,
     _lookup_youtube_videos,
     _strip_bot_mention,
 )
@@ -109,6 +107,10 @@ from music_links_bot.sharing import (
 from music_links_bot.songlink import SonglinkError, SonglinkLookupError
 from music_links_bot.soundcloud import SoundCloudLookupError
 from music_links_bot.telegram_gateway import reset_capabilities
+from music_links_bot.track_lookup import (
+    _build_podcast_fallback,
+    _lookup_tracks,
+)
 from music_links_bot.youtube import YouTubeLookupError
 
 
@@ -3074,7 +3076,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
         search = SlowGenreSearchStub()
         with patch(
-            "music_links_bot.bot_lookup._RELEASE_ENRICHMENT_TIMEOUT_SECONDS",
+            "music_links_bot.track_lookup._RELEASE_ENRICHMENT_TIMEOUT_SECONDS",
             0.001,
         ):
             tracks, _ = await _lookup_tracks(

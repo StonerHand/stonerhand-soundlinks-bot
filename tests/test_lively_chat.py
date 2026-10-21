@@ -122,7 +122,7 @@ class EditorPublishCelebrationTests(unittest.IsolatedAsyncioTestCase):
     async def test_publishing_from_the_editor_ends_with_confetti(self) -> None:
         from test_release_119_state import RedisModel, ctx, draft, track
 
-        from music_links_bot import bot_editor
+        from music_links_bot import editor_delivery as bot_editor
         from music_links_bot.bot_runtime import BotRuntime
 
         context = ctx(RedisModel())
