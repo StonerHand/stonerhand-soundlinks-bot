@@ -6,7 +6,6 @@ import time
 from collections.abc import Awaitable, Callable
 
 from telegram import (
-    ForceReply,
     InlineQueryResultsButton,
     Update,
 )
@@ -45,6 +44,7 @@ from music_links_bot.bot_storage import (
 )
 from music_links_bot.constants import MAX_LINKS_PER_MESSAGE
 from music_links_bot.i18n import get_text, resolve_lang
+from music_links_bot.input_routing import input_prompt_markup
 
 LOGGER = logging.getLogger(__name__)
 
@@ -246,7 +246,7 @@ async def _dispatch_retry_action(query, context, action: CallbackAction) -> None
         prompt = await query.message.reply_text(
             get_text(lang, "replace_source_prompt").format(index=source_index),
             parse_mode=ParseMode.HTML,
-            reply_markup=ForceReply(selective=True),
+            reply_markup=input_prompt_markup(lang),
         )
         session = await _runtime(context).get_session(query.from_user.id, lang=lang)
         session.pending_input = {

@@ -110,11 +110,47 @@ async def guard_input(update, context, *, text):
     return True
 
 
+def input_prompt_markup(lang: str) -> InlineKeyboardMarkup:
+    """A "send me the text" prompt: reply field open and a way out on it.
+
+    Bot API 10.3 lets one message carry both, so no one has to know /cancel.
+    """
+    return InlineKeyboardMarkup(
+        [
+            [
+                button(
+                    get_text(lang, "cancel"),
+                    callback_data=encode_callback("input", "cancel"),
+                )
+            ]
+        ],
+        api_kwargs={"force_reply": True},
+    )
+
+
+async def _cancel_input(query, context) -> None:
+    from music_links_bot.bot_menu import runtime_for, update_lang
+
+    lang = update_lang(Update(0, callback_query=query))
+    runtime = runtime_for(context)
+    session = await runtime.get_session(query.from_user.id, lang=lang)
+    session.pending_input = {}
+    await runtime.save_session(session)
+    await query.answer(get_text(lang, "input_cancelled"))
+    from music_links_bot.telegram_messages import delete_message_safely
+
+    # Only the prompt goes; the card being edited stays, like /cancel.
+    await delete_message_safely(query.message)
+
+
 async def dispatch_input_action(query, context, action):
     from music_links_bot import bot_lookup_flow as bot
     from music_links_bot.bot_menu import runtime_for, safe_edit, update_lang
     from music_links_bot.bot_storage import valid_state_id
 
+    if action.action == "cancel" and query.from_user and query.message:
+        await _cancel_input(query, context)
+        return
     if (
         query.from_user is None
         or query.message is None

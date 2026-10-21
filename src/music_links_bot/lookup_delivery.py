@@ -82,7 +82,9 @@ async def send_title_result(
     """One card per film or series; the user's own text tops the first one."""
     for title in titles:
         keyboard = _build_title_keyboard(
-            title, include_channel_button=include_channel_button
+            title,
+            include_channel_button=include_channel_button,
+            bot_username=getattr(bot, "username", None),
         )
         if allow_share:
             keyboard = add_share_button(

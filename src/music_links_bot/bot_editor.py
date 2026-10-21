@@ -8,7 +8,6 @@ import time
 from html import escape
 
 from telegram import (
-    ForceReply,
     InlineKeyboardMarkup,
     Update,
 )
@@ -88,6 +87,7 @@ from music_links_bot.editor_view import (
     render_track_draft as _render_track_draft,
 )
 from music_links_bot.i18n import get_text, resolve_lang
+from music_links_bot.input_routing import input_prompt_markup
 from music_links_bot.keyboards import (
     _get_platform_order,
 )
@@ -742,7 +742,7 @@ async def _start_pending_editor_input(
     prompt = await query.message.reply_text(
         prompt_text,
         parse_mode=ParseMode.HTML,
-        reply_markup=ForceReply(selective=True),
+        reply_markup=input_prompt_markup(lang),
     )
     session = await _runtime(context).get_session(query.from_user.id, lang=lang)
     session.pending_input = {

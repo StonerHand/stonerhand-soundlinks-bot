@@ -22,9 +22,9 @@
 - 🖼 **Posts with artwork** — signed cover, title, year, length, smart tags and buttons for every platform.
 - 🎶 **Collections** — up to 10 tracks, albums and videos in one post: a shared collage, a `01 · Artist — Title` list and short buttons.
 - 🎬 **Song + videos** — a track with its music videos, live and lyric videos in one post.
-- 🍿 **Netflix, Apple TV+ and Disney+ films and series** — a title link becomes a card with a still, seasons or year, genre and "Watch on …", "Trailer" and "Soundtrack" buttons.
-- ✏️ **In-chat editor** — your own text, tags, look and buttons.
-- 📝 **Your text, uncut** — a quote above the card of up to ~3,900 characters with bold, italic and links. A long post goes out as a message with the cover large on top.
+- 🍿 **Netflix, Apple TV+ and Disney+ films and series** — a title link becomes a card with a still, seasons or year, genre and "Watch on …", "Trailer" and "Soundtrack" buttons; the soundtrack opens as an album card right in the bot.
+- ✏️ **In-chat editor** — your own text, tags, look and buttons; every input prompt has "✕ Cancel".
+- 📝 **Your text, uncut** — a quote above the card of up to ~3,900 characters with bold, italic and links; a long one folds to its first lines with "show more". A long post goes out as a message with the cover large on top.
 - 📣 **Channel publishing** — now, on a schedule ("tomorrow 18:30") or in one tap; 2 minutes to undo. Every reader sees times in their own time zone.
 - 👥 **Groups and channels** — make the bot an admin and a posted link turns into a finished post; `/channel` checks the rights. In groups `/help` and `/channel` answer only you.
 - 🎉 **A lively chat** — 👀 → 🔥 reactions on your link, a progress bar with music-themed status lines, confetti on publish and a note when a scheduled post goes out.

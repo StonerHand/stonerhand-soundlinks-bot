@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 
-from telegram import ForceReply, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
@@ -22,6 +22,7 @@ from music_links_bot.bot_storage import remember_bounded
 from music_links_bot.constants import channel_target
 from music_links_bot.crate_view import render_crate
 from music_links_bot.i18n import get_text, resolve_lang
+from music_links_bot.input_routing import input_prompt_markup
 from music_links_bot.models import TrackMatch
 from music_links_bot.release_preferences import release_preference_key
 from music_links_bot.sharing import add_share_button, build_crate_share_query
@@ -148,7 +149,7 @@ async def dispatch_crate_action(query, context, action: CallbackAction) -> None:
             return
         prompt = await query.message.reply_text(
             get_text(lang, "crate_" + action.action + "_prompt"),
-            reply_markup=ForceReply(selective=True),
+            reply_markup=input_prompt_markup(lang),
         )
         runtime = runtime_for(context)
         session = await runtime.get_session(user_id, lang=lang)
@@ -367,7 +368,7 @@ async def _start_rename(query, context, *, user_id: int, lang: str) -> None:
         return
     prompt = await query.message.reply_text(
         get_text(lang, "crate_name_prompt"),
-        reply_markup=ForceReply(selective=True),
+        reply_markup=input_prompt_markup(lang),
     )
     runtime = runtime_for(context)
     session = await runtime.get_session(user_id, lang=lang)

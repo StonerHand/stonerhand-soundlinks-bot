@@ -126,6 +126,7 @@ ACTION_SPECS = tuple(
         ("input", "new", "new_post", ActionKind.DELIVERY),
         ("input", "add", "add_links", ActionKind.DELIVERY),
         ("input", "back", "continue_input", ActionKind.NAVIGATION),
+        ("input", "cancel", "cancel_input", ActionKind.NAVIGATION),
         ("crate", "add", "add_links", ActionKind.INPUT),
         ("crate", "replace", "replace_item", ActionKind.INPUT),
         ("crate", "open", "open_crate", ActionKind.NAVIGATION),

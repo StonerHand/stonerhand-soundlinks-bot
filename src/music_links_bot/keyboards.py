@@ -303,13 +303,23 @@ def _build_title_keyboard(
     title: TitleMatch,
     *,
     include_channel_button: bool = False,
+    bot_username: str | None = None,
 ) -> InlineKeyboardMarkup:
-    """Netflix first; the trailer and soundtrack share the second row."""
+    """The service first; the trailer and soundtrack share the second row.
+
+    With the bot's username the soundtrack opens as a card in this bot, where
+    it can be edited and published; without it, as an album.link page.
+    """
+    from music_links_bot.release_panel import soundtrack_start_url
+
+    soundtrack = (
+        soundtrack_start_url(bot_username, title.soundtrack_url) or title.soundtrack_url
+    )
     extras = [
         _url_button(_label(key), url=url)
         for key, url in (
             ("btn_trailer", title.trailer_url),
-            ("btn_soundtrack", title.soundtrack_url),
+            ("btn_soundtrack", soundtrack),
         )
         if url
     ]

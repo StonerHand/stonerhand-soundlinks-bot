@@ -84,6 +84,9 @@ def message_source_urls(message: Message, *, text: str | None = None) -> list[st
 
 
 def build_user_prefix(message: Message, *, bot_username: str | None = None) -> str:
+    # "/start sound_123" opened a card from a button; a command is never a note.
+    if (message_text(message) or "").lstrip().startswith("/"):
+        return ""
     body_html = format_user_note_html(
         message_text(message),
         message_entities(message),

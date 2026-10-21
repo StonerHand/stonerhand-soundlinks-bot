@@ -500,3 +500,63 @@ class MoreServicesDeliveryTests(DeliveryTests):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SoundtrackInTelegramTests(unittest.IsolatedAsyncioTestCase):
+    def test_the_button_opens_the_album_card_in_the_bot(self) -> None:
+        card = _card(soundtrack_url="https://album.link/i/1711647903")
+        with language_context("ru"):
+            here = _build_title_keyboard(card, bot_username="StonerHandBot")
+            elsewhere = _build_title_keyboard(card)
+
+        self.assertEqual(
+            here.inline_keyboard[1][1].url,
+            "https://t.me/StonerHandBot?start=sound_1711647903",
+        )
+        self.assertEqual(
+            elsewhere.inline_keyboard[1][1].url, "https://album.link/i/1711647903"
+        )
+
+    async def _start(self, payload: str, chat_type: str = "private"):
+        from types import SimpleNamespace
+
+        from music_links_bot import bot_lookup_flow
+        from music_links_bot.release_panel import start_soundtrack
+
+        seen: list[str | None] = []
+
+        async def lookup(update, context):
+            seen.append(bot_lookup_flow._INPUT_OVERRIDE.get())
+
+        update = SimpleNamespace(
+            effective_message=SimpleNamespace(chat=SimpleNamespace(type=chat_type))
+        )
+        with patch.object(bot_lookup_flow, "track_lookup_message", new=lookup):
+            handled = await start_soundtrack(update, SimpleNamespace(args=[payload]))
+        return handled, seen
+
+    async def test_start_sound_runs_the_normal_album_lookup(self) -> None:
+        from music_links_bot import bot_lookup_flow
+
+        handled, seen = await self._start("sound_1711647903")
+
+        self.assertTrue(handled)
+        self.assertEqual(seen, ["https://music.apple.com/us/album/1711647903"])
+        self.assertIsNone(bot_lookup_flow._INPUT_OVERRIDE.get())
+
+    async def test_other_payloads_and_groups_are_not_soundtracks(self) -> None:
+        for payload, chat in (("release_abc", "private"), ("sound_1", "group")):
+            with self.subTest(payload=payload, chat=chat):
+                handled, seen = await self._start(payload, chat)
+                self.assertFalse(handled)
+                self.assertEqual(seen, [])
+
+    def test_a_command_is_never_a_post_note(self) -> None:
+        from types import SimpleNamespace
+
+        from music_links_bot.bot_stats import build_user_prefix
+
+        message = SimpleNamespace(
+            text="/start sound_1711647903", caption=None, entities=(), from_user=None
+        )
+        self.assertEqual(build_user_prefix(message), "")

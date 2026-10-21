@@ -123,6 +123,22 @@ class InputRoutingTests(unittest.IsolatedAsyncioTestCase):
         query = await self._tap("new", "../etc")
         query.answer.assert_awaited_once_with()
 
+    async def test_the_cancel_button_on_a_prompt_ends_the_input(self) -> None:
+        from music_links_bot.i18n import get_text
+        from music_links_bot.input_routing import input_prompt_markup
+
+        await self._pending(kind="intro", draft_id="d")
+        markup = input_prompt_markup("ru")
+        query = _query(markup.inline_keyboard[0][0].callback_data)
+        query.message.delete = AsyncMock()
+
+        await dispatch_input_action(query, self.context, decode_callback(query.data))
+
+        self.assertEqual(markup.api_kwargs, {"force_reply": True})
+        self.assertFalse((await self.runtime.get_session(7)).pending_input)
+        query.message.delete.assert_awaited_once()
+        query.answer.assert_awaited_once_with(get_text("ru", "input_cancelled"))
+
 
 if __name__ == "__main__":
     unittest.main()

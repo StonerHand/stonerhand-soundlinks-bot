@@ -684,7 +684,9 @@ async def _build_inline_result(
             ),
             text=format_title_message(card, include_hashtags=True),
             keyboard=add_share_button(
-                _build_title_keyboard(card),
+                _build_title_keyboard(
+                    card, bot_username=getattr(context.bot, "username", None)
+                ),
                 share_query=share_query,
                 label=share_label,
             ),
