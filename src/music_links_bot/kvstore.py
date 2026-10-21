@@ -272,7 +272,7 @@ class KVStore:
         for index in range(0, len(result) - 1, 2):
             try:
                 entries.append((str(result[index]), int(float(result[index + 1]))))
-            except (TypeError, ValueError):  # noqa: PERF203 — tolerate malformed remote entries.
+            except (TypeError, ValueError):
                 continue
         return entries
 

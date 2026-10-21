@@ -11,6 +11,9 @@ concurrency:
 
 permissions:
   contents: read
+  # A failing scheduled check opens one issue (GitHub notifies the owner) and
+  # closes it after the next green run, so a broken provider never goes quiet.
+  issues: write
 
 jobs:
   verify:
@@ -37,3 +40,26 @@ jobs:
         env:
           PYTHONPATH: src
         run: python tests/e2e/provider_cards_canary.py --allow-region-unavailable
+      - name: Open an issue when providers break
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          open=$(gh issue list --label provider-canary --state open --json number --jq 'length')
+          if [ "$open" = "0" ]; then
+            gh label create provider-canary --color B60205 \
+              --description "Live provider canary is failing" 2>/dev/null || true
+            gh issue create --label provider-canary \
+              --title "Provider canary is failing" \
+              --body "The scheduled live provider check failed: $RUN_URL. This issue closes itself after the next green run."
+          fi
+      - name: Close the issue once providers recover
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          for number in $(gh issue list --label provider-canary --state open --json number --jq '.[].number'); do
+            gh issue close "$number" --comment "Providers recovered: $RUN_URL"
+          done

@@ -210,14 +210,24 @@ def parse_schedule_datetime(
     now: datetime | None = None,
     timezone_name: str = "Europe/Moscow",
 ) -> int | None:
-    """Parse a compact local date/time without guessing ambiguous formats."""
-    current = now or datetime.now(_timezone(timezone_name))
+    """Parse a compact local date/time without guessing ambiguous formats.
+
+    Every form is read in the bot's time zone, whatever zone ``now`` is in.
+    """
+    zone = _timezone(timezone_name)
+    current = now or datetime.now(zone)
     if current.tzinfo is None:
         current = current.replace(tzinfo=timezone.utc)
+    current = current.astimezone(zone)
+    text = str(value or "")
+    iso = re.fullmatch(r"\s*(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}:\d{2})\s*", text)
+    if iso:
+        year_, month_, day_, clock = iso.groups()
+        text = f"{day_}.{month_}.{year_} {clock}"
     match = re.fullmatch(
         r"\s*(?:(\d{1,2})[./-](\d{1,2})(?:[./-](\d{2,4}))?\s+)?"
         r"([01]?\d|2[0-3]):([0-5]\d)\s*",
-        str(value or ""),
+        text,
     )
     if match is None:
         # Natural phrases: "завтра 18:30", "пт 21:00", "через 2 часа".

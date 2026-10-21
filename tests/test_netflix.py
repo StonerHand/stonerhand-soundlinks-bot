@@ -13,6 +13,7 @@ from music_links_bot.models import TitleMatch
 from music_links_bot.netflix import (
     NetflixClient,
     NetflixLookupError,
+    NetflixUnavailableError,
     parse_title_page,
     pick_soundtrack,
     pick_trailer,
@@ -243,12 +244,19 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(card.soundtrack_url, "https://album.link/i/1711647903")
         self.assertEqual(len(calls), 3)
 
-    async def test_a_blocked_page_is_a_lookup_error(self) -> None:
-        transport, _ = _transport(netflix_status=403)
-        client = await self._client(transport)
+    async def test_a_refusal_is_an_outage_and_a_404_is_a_missing_title(self) -> None:
+        for status, error in (
+            (403, NetflixUnavailableError),
+            (404, NetflixLookupError),
+        ):
+            with self.subTest(status=status):
+                transport, _ = _transport(netflix_status=status)
+                client = await self._client(transport)
 
-        with self.assertRaises(NetflixLookupError):
-            await client.lookup_title(SERIES_URL)
+                with self.assertRaises(NetflixLookupError) as caught:
+                    await client.lookup_title(SERIES_URL)
+
+                self.assertIs(type(caught.exception), error)
 
     async def test_a_broken_youtube_only_drops_the_trailer(self) -> None:
         transport, _ = _transport(youtube_ok=False)
@@ -265,7 +273,43 @@ class _NetflixStub:
         return _card(url=url)
 
 
+class _BlockedNetflix:
+    async def lookup_title(self, url: str) -> TitleMatch:
+        raise NetflixUnavailableError("403")
+
+
 class DeliveryTests(unittest.IsolatedAsyncioTestCase):
+    async def _lookup(self, client, text: str = SERIES_URL):
+        from test_bot import ContextStub, PrivateMessageStub, UpdateStub
+
+        from music_links_bot.bot_lookup_flow import track_lookup_message
+
+        class NetflixMessage(PrivateMessageStub):
+            pass
+
+        NetflixMessage.text = text
+        message = NetflixMessage()
+        context = ContextStub()
+        context.application.bot_data["netflix_client"] = client
+        with patch("music_links_bot.bot_stats.record_matches"):
+            await track_lookup_message(UpdateStub(message), context)
+        return message
+
+    async def test_a_blocked_netflix_is_named_and_retryable(self) -> None:
+        message = await self._lookup(_BlockedNetflix())
+
+        reply = message.replies[-1]
+        self.assertIn("Netflix", reply)
+        self.assertNotIn("Song.link", reply)
+        markup = message.reply_kwargs[-1]["reply_markup"]
+        callbacks = [
+            str(button.callback_data)
+            for row in markup.inline_keyboard
+            for button in row
+            if button.callback_data
+        ]
+        self.assertTrue(any("|retry|" in data or "retry" in data for data in callbacks))
+
     async def test_a_netflix_link_in_chat_becomes_the_card(self) -> None:
         from test_bot import ContextStub, PrivateMessageStub, UpdateStub
 

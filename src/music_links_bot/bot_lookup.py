@@ -42,7 +42,11 @@ from music_links_bot.models import (
     TrackMatch,
     VideoMatch,
 )
-from music_links_bot.netflix import NetflixClient, NetflixLookupError
+from music_links_bot.netflix import (
+    NetflixClient,
+    NetflixLookupError,
+    NetflixUnavailableError,
+)
 from music_links_bot.nts import NTSClient, NTSLookupError, build_nts_fallback
 from music_links_bot.phrases import pick_phrase
 from music_links_bot.playlist import (
@@ -565,10 +569,19 @@ async def _lookup_titles(
     client: NetflixClient,
     source_urls: list[str],
 ) -> list[TitleMatch]:
+    blocked: list[NetflixUnavailableError] = []
+
+    async def fetch(url: str) -> TitleMatch:
+        try:
+            return await client.lookup_title(url)
+        except NetflixUnavailableError as exc:
+            blocked.append(exc)
+            raise
+
     # No placeholder card: a film without its title or poster says nothing.
-    return await _lookup_each(
+    titles = await _lookup_each(
         source_urls,
-        client.lookup_title,
+        fetch,
         kind=TitleMatch,
         expected_error=NetflixLookupError,
         field_name="titles",
@@ -576,6 +589,11 @@ async def _lookup_titles(
         label="Netflix",
         fallback=lambda url: None,
     )
+    if blocked and not titles:
+        # Fail the provider task, so the links read "Netflix is not answering,
+        # retry" instead of a false "not found".
+        raise blocked[0]
+    return titles
 
 
 async def _lookup_nts_radios(

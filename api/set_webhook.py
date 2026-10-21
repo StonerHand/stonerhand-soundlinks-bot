@@ -25,6 +25,7 @@ from music_links_bot.bot_app import (
     PUBLIC_BOT_COMMANDS_EN,
 )
 from music_links_bot.config import Settings
+from music_links_bot.http_json import send_json
 from music_links_bot.logging_config import quiet_transport_logs
 from music_links_bot.telegram_updates import ALLOWED_UPDATES
 from music_links_bot.webhook_secret import secrets_match
@@ -95,14 +96,7 @@ class handler(BaseHTTPRequestHandler):
         payload: dict[str, object],
         status: HTTPStatus = HTTPStatus.OK,
     ) -> None:
-        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        self.send_response(status)
-        self.send_header("content-type", "application/json; charset=utf-8")
-        self.send_header("content-length", str(len(body)))
-        self.send_header("cache-control", "no-store")
-        self.send_header("x-content-type-options", "nosniff")
-        self.end_headers()
-        self.wfile.write(body)
+        send_json(self, payload, status)
 
 
 def _telegram_set_webhook_url(

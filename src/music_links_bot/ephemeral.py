@@ -30,7 +30,7 @@ async def send_ephemeral_message(
     reply_to_message_id: int | None = None,
     callback_query_id: str | None = None,
     replace_callback_query_message: bool = False,
-    timeout: float = 8.0,
+    http_timeout: float = 8.0,
 ) -> bool:
     """Reply in a group so only `receiver_user_id` sees it — Telegram's
     "invisible messages". Only definitive API rejections permit a public
@@ -41,7 +41,7 @@ async def send_ephemeral_message(
 
     try:
         return await TelegramApiGateway(
-            token=bot_token, timeout=timeout
+            token=bot_token, timeout=http_timeout
         ).send_ephemeral_message(
             chat_id=chat_id,
             receiver_user_id=receiver_user_id,

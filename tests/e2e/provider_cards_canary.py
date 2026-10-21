@@ -11,6 +11,7 @@ from music_links_bot.artist import ArtistClient
 from music_links_bot.bot_inline import _build_inline_result
 from music_links_bot.bot_lookup import resolve_sources
 from music_links_bot.draft_model import new_track_draft
+from music_links_bot.netflix import NetflixClient
 from music_links_bot.nts import NTSClient
 from music_links_bot.playlist import PlaylistClient
 from music_links_bot.public_release import PublicReleaseRegionUnavailable
@@ -72,6 +73,10 @@ CASES = {
         "https://music.apple.com/tr/curator/the-alligator-hour/993270307",
         "The Alligator Hour",
     ),
+    "Netflix series": (
+        "https://www.netflix.com/title/81054853",
+        "Cyberpunk: Edgerunners",
+    ),
 }
 
 
@@ -85,6 +90,7 @@ async def verify(*, allow_region_unavailable: bool = False) -> list[str]:
         "artist_client": ArtistClient(),
         "nts_client": NTSClient(),
         "apple_radio_client": AppleRadioClient(),
+        "netflix_client": NetflixClient(),
     }
     context = SimpleNamespace(
         application=SimpleNamespace(bot_data=dict(clients)),
@@ -105,7 +111,7 @@ async def verify(*, allow_region_unavailable: bool = False) -> list[str]:
             for track in bundle.tracks:
                 # The same publication gate that rejected real editor posts.
                 view = build_publication_view(
-                    new_track_draft(track, chat_id=1, lang="ru"),
+                    dict(new_track_draft(track, chat_id=1, lang="ru")),
                     track,
                     context=context,
                     include_channel_button=False,
@@ -113,7 +119,7 @@ async def verify(*, allow_region_unavailable: bool = False) -> list[str]:
                 require_valid_publication(publication_contract_from_view(view, track))
                 if not view.text:
                     raise AssertionError("empty publication")
-            inline = await _build_inline_result(source, context, force_classic=True)
+            inline = await _build_inline_result(source, context)
             if inline is None or expected.casefold() not in inline.title.casefold():
                 raise AssertionError("inline title is missing or incorrect")
             print(f"OK {name}: lookup, card, inline", flush=True)

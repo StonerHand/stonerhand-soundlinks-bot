@@ -37,7 +37,7 @@
 
 ## 🛠 Run your own
 
-Python 3.10+ and a bot token from [@BotFather](https://t.me/BotFather):
+Python 3.11+ and a bot token from [@BotFather](https://t.me/BotFather):
 
 ```bash
 git clone https://github.com/StonerHand/stonerhand-soundlinks-bot.git
