@@ -206,3 +206,61 @@ class ArtistClientTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SoundCloudClientTests(unittest.IsolatedAsyncioTestCase):
+    URL = "https://soundcloud.com/stoner-hand/ethan-kath-dj-set"
+
+    async def _client(self, handler):
+        from music_links_bot.soundcloud import SoundCloudClient
+
+        client = SoundCloudClient()
+        await client.aclose()
+        client._client = httpx.AsyncClient(
+            base_url="https://soundcloud.com", transport=httpx.MockTransport(handler)
+        )
+        self.addAsyncCleanup(client.aclose)
+        return client
+
+    async def test_oembed_card_is_split_and_cached(self) -> None:
+        calls: list[httpx.Request] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls.append(request)
+            return httpx.Response(
+                200,
+                json={
+                    "title": "Ethan Kath DJ set by StonerHand",
+                    "author_name": "StonerHand",
+                    "thumbnail_url": "https://i1.sndcdn.com/artworks-1.jpg",
+                },
+            )
+
+        client = await self._client(handler)
+        track = await client.lookup_track(self.URL)
+        again = await client.lookup_track(self.URL)
+
+        self.assertIs(track, again)
+        self.assertEqual(
+            (track.artist, track.title), ("StonerHand", "Ethan Kath DJ set")
+        )
+        self.assertEqual(track.links, {"soundcloud": self.URL})
+        self.assertEqual(len(calls), 1)
+
+    async def test_bad_answers_and_foreign_links_are_lookup_errors(self) -> None:
+        from music_links_bot.soundcloud import SoundCloudLookupError
+
+        broken = await self._client(lambda request: httpx.Response(500))
+        for url in ("https://example.com/track", self.URL):
+            with self.subTest(url=url), self.assertRaises(SoundCloudLookupError):
+                await broken.lookup_track(url)
+
+    def test_titles_without_an_author_are_guessed_both_ways(self) -> None:
+        from music_links_bot.soundcloud import parse_soundcloud_metadata
+
+        by = parse_soundcloud_metadata(self.URL, {"title": "Song by Band"})
+        dash = parse_soundcloud_metadata(self.URL, {"title": "Band - Song"})
+
+        self.assertEqual((by.artist, by.title), ("Band", "Song"))
+        self.assertEqual((dash.artist, dash.title), ("Band", "Song"))
+        self.assertIsNone(by.thumbnail_url)

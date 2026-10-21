@@ -179,7 +179,8 @@ async def consume_pending_input(
         release_key = str(pending.get("release_key") or "")
         entries = await load_crate(context.application.bot_data, user.id)
         if not any(
-            release_preference_key(TrackMatch(**entry["item"])) == release_key
+            release_preference_key(TrackMatch(**{"links": {}, **entry["item"]}))
+            == release_key
             for entry in entries
             if isinstance(entry.get("item"), dict)
         ):
