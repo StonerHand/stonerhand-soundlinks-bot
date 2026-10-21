@@ -4,17 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stonerhand-soundlinks-bot"
-version = "2.7.0"
+version = "2.8.0"
 description = "Telegram-native music publishing bot with universal release cards, collections, scheduling and channel delivery."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
 keywords = ["telegram", "music", "bot", "songlink", "publishing"]
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
@@ -25,7 +24,7 @@ dependencies = [
   "python-telegram-bot==22.8",
   "httpx==0.28.1",
   "python-dotenv==1.2.4",
-  "Pillow==12.3.0",
+  "Pillow==13.0.0",
 ]
 
 [project.urls]
@@ -44,7 +43,6 @@ dev = [
   "pytest==9.1.1",
   "pyflakes==4.0.3",
   "ruff==0.17.0",
-  "tomli==2.5.0; python_version < '3.11'",
 ]
 
 [tool.setuptools]
@@ -62,7 +60,7 @@ addopts = ["--strict-config", "--strict-markers"]
 xfail_strict = true
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = [
@@ -92,7 +90,7 @@ show_missing = true
 skip_covered = true
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 files = [
   "src/music_links_bot/draft_model.py",
   "src/music_links_bot/bot_storage.py",
@@ -149,6 +147,8 @@ files = [
   "src/music_links_bot/lookup_recovery.py",
   "src/music_links_bot/lookup_delivery.py",
   "src/music_links_bot/provider_registry.py",
+  "tests/e2e/provider_canary.py",
+  "tests/e2e/provider_cards_canary.py",
 ]
 follow_imports = "skip"
 check_untyped_defs = true

@@ -16,6 +16,20 @@ from music_links_bot.i18n import get_text
 LOGGER = logging.getLogger(__name__)
 
 
+# People-facing names; an internal provider id never reaches the chat.
+_PROVIDER_LABELS = {
+    "apple": "Apple Music",
+    "apple_radio": "Apple Music",
+    "artists": "Spotify",
+    "netflix": "Netflix",
+    "nts": "NTS Radio",
+    "songlink": "Song.link",
+    "soundcloud": "SoundCloud",
+    "spotify": "Spotify",
+    "youtube": "YouTube",
+}
+
+
 @dataclass(frozen=True)
 class WorkflowHooks:
     build_error_keyboard: Callable
@@ -78,15 +92,8 @@ async def _reply_with_flow_error(
     detail = get_text(lang, detail_key)
     if error.code == BotErrorCode.RATE_LIMITED:
         detail = detail.format(seconds=escape(error.detail or "60"))
-    if error.code == BotErrorCode.PROVIDER_UNAVAILABLE and error.provider:
-        provider_labels = {
-            "songlink": "Song.link",
-            "youtube": "YouTube",
-            "nts": "NTS Radio",
-            "apple": "Apple Music",
-            "spotify": "Spotify",
-        }
-        provider = provider_labels.get(error.provider.casefold(), error.provider)
+    provider = _PROVIDER_LABELS.get(str(error.provider or "").casefold())
+    if error.code == BotErrorCode.PROVIDER_UNAVAILABLE and provider:
         detail = get_text(lang, "error_provider_named").format(
             provider=escape(provider)
         )

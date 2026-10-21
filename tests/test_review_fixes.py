@@ -77,3 +77,26 @@ def test_relative_times_are_real_durations_across_dst() -> None:
     )
 
     assert result == now + 2 * 3600
+
+
+def test_every_schedule_form_is_read_in_the_bot_time_zone() -> None:
+    from datetime import timezone
+
+    from music_links_bot.bot_builder import parse_schedule_datetime
+
+    now = datetime(2026, 10, 21, 12, 0, tzinfo=timezone.utc)
+
+    def utc(value: str) -> str | None:
+        stamp = parse_schedule_datetime(value, timezone_name="Europe/Moscow", now=now)
+        return (
+            datetime.fromtimestamp(stamp, timezone.utc).strftime("%d.%m %H:%M")
+            if stamp
+            else None
+        )
+
+    # Moscow is UTC+3: a compact time must agree with a natural phrase.
+    assert utc("21:00") == "21.10 18:00"
+    assert utc("25.10 19:30") == "25.10 16:30"
+    assert utc("завтра 18:30") == "22.10 15:30"
+    assert utc("2026-10-25 19:00") == "25.10 16:00"
+    assert utc("31.02 10:00") is None

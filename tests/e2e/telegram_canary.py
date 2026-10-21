@@ -1,7 +1,6 @@
 """Opt-in live send/verify/delete canary. Never run this against a channel."""
 
 # Real network probes prioritize cleanup clarity over micro-optimizing rare loops.
-# ruff: noqa: PERF203
 
 from __future__ import annotations
 

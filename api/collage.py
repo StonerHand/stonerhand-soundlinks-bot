@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import io
-import json
 import os
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -31,6 +30,7 @@ from music_links_bot.cover_style import (
     photo_branding_enabled,
     signature_cache_key,
 )
+from music_links_bot.http_json import send_json
 
 FETCH_TIMEOUT_SECONDS = 6
 _HTTP_CLIENT = httpx.Client(
@@ -115,16 +115,11 @@ class handler(BaseHTTPRequestHandler):
 
     def _send_health(self) -> None:
         payload = _collage_health_payload()
-        body = json.dumps(payload, separators=(",", ":")).encode()
-        self.send_response(
-            HTTPStatus.OK if payload["ok"] else HTTPStatus.SERVICE_UNAVAILABLE
+        send_json(
+            self,
+            payload,
+            HTTPStatus.OK if payload["ok"] else HTTPStatus.SERVICE_UNAVAILABLE,
         )
-        self.send_header("content-type", "application/json; charset=utf-8")
-        self.send_header("content-length", str(len(body)))
-        self.send_header("cache-control", "no-store")
-        self.send_header("x-content-type-options", "nosniff")
-        self.end_headers()
-        self.wfile.write(body)
 
 
 def _collage_health_payload() -> dict[str, object]:

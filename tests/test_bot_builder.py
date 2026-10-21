@@ -136,7 +136,9 @@ class BuilderJourneyTests(unittest.TestCase):
             int(datetime(2026, 8, 11, 17, 0, tzinfo=timezone.utc).timestamp()),
         )
         local_now = datetime(2026, 8, 10, 18, 0, tzinfo=timezone.utc)
-        custom = parse_schedule_datetime("15.08 19:30", now=local_now)
+        custom = parse_schedule_datetime(
+            "15.08 19:30", now=local_now, timezone_name="UTC"
+        )
         self.assertEqual(
             custom, int(datetime(2026, 8, 15, 19, 30, tzinfo=timezone.utc).timestamp())
         )

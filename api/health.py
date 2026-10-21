@@ -17,6 +17,7 @@ if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
 from music_links_bot import __version__
+from music_links_bot.http_json import send_json
 from music_links_bot.logging_config import quiet_transport_logs
 
 LOGGER = logging.getLogger(__name__)
@@ -49,7 +50,8 @@ class handler(BaseHTTPRequestHandler):
         }
         service_healthy = overall_service_ok(checks, queue)
 
-        body = json.dumps(
+        send_json(
+            self,
             {
                 "ok": service_healthy,
                 "checks": checks,
@@ -58,17 +60,8 @@ class handler(BaseHTTPRequestHandler):
                 "release": release_info(),
                 "ts": int(time.time()),
             },
-            ensure_ascii=False,
-        ).encode("utf-8")
-        self.send_response(
-            HTTPStatus.OK if service_healthy else HTTPStatus.SERVICE_UNAVAILABLE
+            HTTPStatus.OK if service_healthy else HTTPStatus.SERVICE_UNAVAILABLE,
         )
-        self.send_header("content-type", "application/json; charset=utf-8")
-        self.send_header("content-length", str(len(body)))
-        self.send_header("cache-control", "no-store")
-        self.send_header("x-content-type-options", "nosniff")
-        self.end_headers()
-        self.wfile.write(body)
 
 
 def overall_ok(checks: dict[str, dict]) -> bool:

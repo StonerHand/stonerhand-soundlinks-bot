@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
 from types import SimpleNamespace
 
 from api.telegram import _ensure_application
+from music_links_bot.http_json import send_json
 from music_links_bot.loop_runner import run_on_loop
 from music_links_bot.publish_queue import QueueStorageError, process_due_jobs
 from music_links_bot.qstash_auth import verify_qstash_signature
@@ -100,11 +100,4 @@ class handler(BaseHTTPRequestHandler):
         payload: dict,
         status: HTTPStatus = HTTPStatus.OK,
     ) -> None:
-        body = json.dumps(payload, ensure_ascii=False).encode()
-        self.send_response(status)
-        self.send_header("content-type", "application/json; charset=utf-8")
-        self.send_header("content-length", str(len(body)))
-        self.send_header("cache-control", "no-store")
-        self.send_header("x-content-type-options", "nosniff")
-        self.end_headers()
-        self.wfile.write(body)
+        send_json(self, payload, status)

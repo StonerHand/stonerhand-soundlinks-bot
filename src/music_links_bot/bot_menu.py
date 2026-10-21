@@ -319,16 +319,16 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
     session.pending_input = {}
     await runtime.save_session(session)
-    for key in ("prompt_message_id", "editor_message_id"):
-        message_id = pending.get(key)
-        if isinstance(message_id, int) and message_id > 0:
-            try:
-                await context.bot.delete_message(
-                    chat_id=int(pending.get("editor_chat_id") or message.chat_id),
-                    message_id=message_id,
-                )
-            except TelegramError:
-                LOGGER.debug("Could not clean up cancelled native input", exc_info=True)
+    # Only the "send me the text" prompt goes; the card being edited stays.
+    message_id = pending.get("prompt_message_id")
+    if isinstance(message_id, int) and message_id > 0:
+        try:
+            await context.bot.delete_message(
+                chat_id=int(pending.get("editor_chat_id") or message.chat_id),
+                message_id=message_id,
+            )
+        except TelegramError:
+            LOGGER.debug("Could not clean up cancelled native input", exc_info=True)
     await message.reply_text(get_text(lang, "input_cancelled"))
 
 

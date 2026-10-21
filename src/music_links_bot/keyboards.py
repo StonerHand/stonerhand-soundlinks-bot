@@ -576,11 +576,6 @@ def _collection_label(index: int, title: str, icon: str = "") -> str:
     return f"{icon} {label}" if icon else label
 
 
-def _button_label(text: str) -> str:
-    """Preserve the complete name; use row layout, not destructive truncation."""
-    return " ".join(text.split())
-
-
 _NUMBERED_LABEL = re.compile(r"^(?:(?P<icon>\S+) )?(?P<number>\d{1,2}) · ")
 KEYPAD_ROW_SIZE = 5
 

@@ -320,7 +320,8 @@ async def test_optional_apple_details_deadline_keeps_a_known_album():
 
     real_wait_for = asyncio.wait_for
 
-    async def short_deadline(awaitable, timeout):
+    # Mirrors asyncio.wait_for's signature, which it stands in for.
+    async def short_deadline(awaitable, timeout):  # noqa: ASYNC109
         return await real_wait_for(awaitable, timeout=0.001)
 
     try:

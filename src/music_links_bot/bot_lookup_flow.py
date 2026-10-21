@@ -485,13 +485,15 @@ async def _handle_empty_lookup(
         return True
 
     if bundle.unavailable_urls:
+        # Name the service only when every failed link points at the same one.
+        failed = {s.provider for s in bundle.statuses if s.state == "unavailable"}
         await _reply_with_flow_error(
             message,
             context,
             BotFlowError(
                 BotErrorCode.PROVIDER_UNAVAILABLE,
                 retryable=True,
-                provider="songlink",
+                provider=failed.pop() if len(failed) == 1 else None,
             ),
             lang=lang,
             source_url=source_urls[0] if source_urls else None,

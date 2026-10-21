@@ -369,7 +369,7 @@ Webhook worker не запускает: пользовательский update 
   lookup Spotify, Deezer/MusicBrainz, SoundCloud, YouTube, Apple Music и NTS; сбой внешней площадки
   виден в Actions, но не запускает ошибочный rollback здорового production;
 - ручной checklist закрывает iOS, Android, Desktop/Web, темы и реальные переходы;
-- CI выполняет тесты на Python 3.10–3.14, полный lint, проверку единого
+- CI выполняет тесты на Python 3.11–3.14, полный lint, проверку единого
   формата, compile, security-аудит зависимостей и контракт `vercel.json`.
 
 ## Хранение и взаимодействие

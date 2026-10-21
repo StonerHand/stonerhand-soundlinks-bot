@@ -1,14 +1,9 @@
 import json
+import tomllib
 import unittest
 from pathlib import Path
 
 import music_links_bot
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10
-    import tomli as tomllib
-
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -75,9 +70,7 @@ class ReleaseReadinessTests(unittest.TestCase):
     def test_ci_enforces_complete_release_gate(self) -> None:
         workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
 
-        self.assertIn(
-            'python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]', workflow
-        )
+        self.assertIn('python-version: ["3.11", "3.12", "3.13", "3.14"]', workflow)
         self.assertIn("python -m pytest -q", workflow)
         self.assertIn("python -m ruff check src api tests", workflow)
         self.assertIn("python -m ruff format --check src api tests", workflow)

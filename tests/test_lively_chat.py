@@ -253,3 +253,42 @@ class ScheduledNoticeTests(unittest.IsolatedAsyncioTestCase):
         # A blocked bot or a network error never fails the published job.
         await _celebrate_job(context, self._draft(7), True, "@stonerhand")
         send.assert_awaited()
+
+
+class ProviderErrorTextTests(unittest.IsolatedAsyncioTestCase):
+    async def _text(self, provider: str | None) -> str:
+        from music_links_bot.bot_error_handlers import (
+            WorkflowHooks,
+            _reply_with_flow_error,
+        )
+        from music_links_bot.bot_runtime import BotErrorCode, BotFlowError
+
+        message = SimpleNamespace(chat_id=7, reply_text=AsyncMock())
+        hooks = WorkflowHooks(
+            build_error_keyboard=lambda *args, **kwargs: None,
+            try_ephemeral_error=AsyncMock(return_value=False),
+            take_placeholder=lambda chat_id: None,
+            try_delete_message=AsyncMock(),
+            ephemeral_group_replies_enabled=lambda: False,
+            send_ephemeral_message=AsyncMock(),
+        )
+        await _reply_with_flow_error(
+            message,
+            SimpleNamespace(bot=SimpleNamespace(username="StonerHandBot")),
+            BotFlowError(
+                BotErrorCode.PROVIDER_UNAVAILABLE, retryable=True, provider=provider
+            ),
+            hooks=hooks,
+            lang="ru",
+        )
+        return message.reply_text.await_args.args[0]
+
+    async def test_known_services_are_named(self) -> None:
+        self.assertIn("<b>SoundCloud</b>", await self._text("soundcloud"))
+
+    async def test_internal_ids_never_reach_the_chat(self) -> None:
+        for provider in ("playlists", None):
+            with self.subTest(provider=provider):
+                text = await self._text(provider)
+                self.assertNotIn("playlists", text)
+                self.assertIn(get_text("ru", "error_provider"), text)

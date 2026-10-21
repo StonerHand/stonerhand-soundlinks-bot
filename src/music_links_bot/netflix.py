@@ -38,6 +38,10 @@ class NetflixLookupError(RuntimeError):
     """Raised when a Netflix title page cannot be read."""
 
 
+class NetflixUnavailableError(NetflixLookupError):
+    """Netflix did not answer or refused us: worth a retry, not "not found"."""
+
+
 def _decode_js(page: str) -> str:
     """Netflix escapes its page data as \\xNN; turn it back into text."""
     return re.sub(r"\\x([0-9A-Fa-f]{2})", lambda m: chr(int(m.group(1), 16)), page)
@@ -177,8 +181,12 @@ class NetflixClient:
     async def _fetch(self, source_url: str, key: str) -> TitleMatch:
         try:
             page = await self._get_text(source_url)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                raise NetflixLookupError("Netflix has no such title.") from exc
+            raise NetflixUnavailableError("Netflix refused the page.") from exc
         except httpx.HTTPError as exc:
-            raise NetflixLookupError("Netflix page is unavailable.") from exc
+            raise NetflixUnavailableError("Netflix page is unavailable.") from exc
         title = parse_title_page(page, source_url)
         if title is None:
             raise NetflixLookupError("Netflix page has no title.")
