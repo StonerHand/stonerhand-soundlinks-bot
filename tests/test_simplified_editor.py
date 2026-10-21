@@ -6,8 +6,6 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
-from telegram import ForceReply
-
 from music_links_bot.bot_editor import (
     _handle_editor_action,
 )
@@ -59,8 +57,11 @@ class SimplifiedEditorJourneys(unittest.IsolatedAsyncioTestCase):
             return_value=SimpleNamespace(message_id=21)
         )
         await _handle_editor_action(query, context, "ti", "post")
-        assert isinstance(
-            query.message.reply_text.call_args.kwargs["reply_markup"], ForceReply
+        prompt_markup = query.message.reply_text.call_args.kwargs["reply_markup"]
+        # One message opens the reply field and offers a way out (Bot API 10.3).
+        assert prompt_markup.api_kwargs == {"force_reply": True}
+        assert prompt_markup.inline_keyboard[0][0].callback_data.endswith(
+            "input|cancel"
         )
         session = await BotRuntime(kv).get_session(7)
         assert session.pending_input["kind"] == "intro"

@@ -11,6 +11,7 @@ from music_links_bot.i18n import (
     preferred_language,
     resolve_lang,
 )
+from music_links_bot.input_routing import input_prompt_markup
 from music_links_bot.kvstore import KVUnavailableError
 from music_links_bot.models import TrackMatch
 from music_links_bot.release_preferences import (
@@ -360,8 +361,6 @@ async def _start_brand_label_input(query, context, runtime, session) -> None:
     """Ask the owner for the cover signature text with a native reply prompt."""
     import time
 
-    from telegram import ForceReply
-
     lang = resolve_lang(query.from_user.language_code)
     if query.message is None:
         await query.answer()
@@ -369,7 +368,7 @@ async def _start_brand_label_input(query, context, runtime, session) -> None:
     prompt = await query.message.reply_text(
         get_text(lang, "pref_brand_label_prompt"),
         parse_mode="HTML",
-        reply_markup=ForceReply(selective=True),
+        reply_markup=input_prompt_markup(lang),
     )
     session.pending_input = {
         "kind": "brand_label",

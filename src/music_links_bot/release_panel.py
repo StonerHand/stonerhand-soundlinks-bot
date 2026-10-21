@@ -140,6 +140,43 @@ def panel_view(track, *, lang, close=False, edit_url=None):
     )
 
 
+SOUNDTRACK_START = re.compile(r"^sound_(\d{1,15})$")
+
+
+def soundtrack_start_url(
+    bot_username: str | None, soundtrack_url: str | None
+) -> str | None:
+    """t.me/<bot>?start=sound_<album id>: the soundtrack opens as a card here."""
+    match = re.fullmatch(r"https://album\.link/i/(\d{1,15})", soundtrack_url or "")
+    if not bot_username or not match:
+        return None
+    return f"https://t.me/{bot_username}?start=sound_{match.group(1)}"
+
+
+async def start_soundtrack(update, context) -> bool:
+    """The film card's soundtrack button: build that album's card in the chat."""
+    message = update.effective_message
+    args = getattr(context, "args", None) or []
+    match = SOUNDTRACK_START.fullmatch(args[0]) if len(args) == 1 else None
+    if message is None or match is None or message.chat.type != "private":
+        return False
+    from music_links_bot.bot_lookup_flow import (
+        _BYPASS_INTENT_GUARD,
+        _INPUT_OVERRIDE,
+        track_lookup_message,
+    )
+
+    album = f"https://music.apple.com/us/album/{match.group(1)}"
+    input_token = _INPUT_OVERRIDE.set(album)
+    guard_token = _BYPASS_INTENT_GUARD.set(True)
+    try:
+        await track_lookup_message(update, context)
+    finally:
+        _BYPASS_INTENT_GUARD.reset(guard_token)
+        _INPUT_OVERRIDE.reset(input_token)
+    return True
+
+
 async def start_release_panel(update, context):
     message = update.effective_message
     if message is None or message.chat.type != "private":

@@ -33,6 +33,7 @@ from music_links_bot.bot_ui import (
 )
 from music_links_bot.constants import channel_target
 from music_links_bot.i18n import get_text, resolve_lang
+from music_links_bot.input_routing import input_prompt_markup
 from music_links_bot.privacy import delete_user_data
 from music_links_bot.telegram_buttons import button as InlineKeyboardButton
 
@@ -174,9 +175,11 @@ async def home_view(query, context, *, lang: str) -> tuple[str, InlineKeyboardMa
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    from music_links_bot.release_panel import start_release_panel
+    from music_links_bot.release_panel import start_release_panel, start_soundtrack
 
-    if await start_release_panel(update, context):
+    if await start_release_panel(update, context) or await start_soundtrack(
+        update, context
+    ):
         return
     message = update.message
     if message is None:
@@ -650,11 +653,9 @@ async def dispatch_menu_action(query, context, action: CallbackAction) -> None:
         user_id = query.from_user.id if query.from_user else 0
         session = await runtime_for(context).get_session(user_id, lang=lang)
         if action.action == "postsearch" and query.message is not None:
-            from telegram import ForceReply
-
             prompt = await query.message.reply_text(
                 get_text(lang, "posts_search_prompt"),
-                reply_markup=ForceReply(selective=True),
+                reply_markup=input_prompt_markup(lang),
             )
             session.pending_input = {
                 "kind": "library_search",
