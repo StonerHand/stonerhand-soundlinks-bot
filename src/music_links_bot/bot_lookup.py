@@ -41,11 +41,6 @@ from music_links_bot.models import (
     TrackMatch,
     VideoMatch,
 )
-from music_links_bot.netflix import (
-    NetflixClient,
-    NetflixLookupError,
-    NetflixUnavailableError,
-)
 from music_links_bot.nts import NTSClient, NTSLookupError, build_nts_fallback
 from music_links_bot.phrases import pick_phrase
 from music_links_bot.playlist import (
@@ -63,6 +58,12 @@ from music_links_bot.provider_runtime import (
     set_cached_negative_lookup,
 )
 from music_links_bot.songlink import SonglinkError
+from music_links_bot.titles import (
+    SERVICES,
+    TitleClient,
+    TitleLookupError,
+    TitleUnavailableError,
+)
 from music_links_bot.track_lookup import (
     _lookup_tracks_detailed,
     _source_log_id,
@@ -228,7 +229,7 @@ async def _resolve_sources_uncached(
     playlist_urls = grouped["playlists"]
     youtube_urls = grouped["youtube"]
     nts_urls = grouped["nts"]
-    netflix_urls = grouped["netflix"]
+    title_urls = {service: grouped[service] for service in SERVICES}
     apple_radio_urls = grouped["apple_radio"]
     music_urls = grouped["songlink"]
     tasks: list[ProviderTask] = []
@@ -286,14 +287,16 @@ async def _resolve_sources_uncached(
                 [],
             )
         )
-    if netflix_urls:
-        tasks.append(
-            ProviderTask(
-                "netflix",
-                _lookup_titles(bot_data["netflix_client"], netflix_urls),
-                [],
-            )
+    tasks.extend(
+        # One task per service, so a refusal names the service that refused.
+        ProviderTask(
+            service,
+            _lookup_titles(bot_data["title_client"], urls, provider=service),
+            [],
         )
+        for service, urls in title_urls.items()
+        if urls
+    )
     if playlist_urls:
         tasks.append(
             ProviderTask(
@@ -331,7 +334,9 @@ async def _resolve_sources_uncached(
     )
     playlists = _outcome_value(outcomes, "playlists", [])
     artists = _outcome_value(outcomes, "artists", [])
-    titles = _outcome_value(outcomes, "netflix", [])
+    titles = [
+        title for service in SERVICES for title in _outcome_value(outcomes, service, [])
+    ]
     tracks, unavailable_urls, track_statuses = lookup_result
     statuses = [
         *track_statuses,
@@ -340,7 +345,11 @@ async def _resolve_sources_uncached(
         *_provider_statuses("apple_radio", apple_radio_urls, radios, outcomes),
         *_provider_statuses("playlists", playlist_urls, playlists, outcomes),
         *_provider_statuses("artists", artist_urls, artists, outcomes),
-        *_provider_statuses("netflix", netflix_urls, titles, outcomes),
+        *(
+            status
+            for service, urls in title_urls.items()
+            for status in _provider_statuses(service, urls, titles, outcomes)
+        ),
     ]
     if unavailable_urls:
         runtime = bot_data.get("runtime")
@@ -552,15 +561,17 @@ async def _lookup_youtube_videos(
 
 
 async def _lookup_titles(
-    client: NetflixClient,
+    client: TitleClient,
     source_urls: list[str],
+    *,
+    provider: str = "netflix",
 ) -> list[TitleMatch]:
-    blocked: list[NetflixUnavailableError] = []
+    blocked: list[TitleUnavailableError] = []
 
     async def fetch(url: str) -> TitleMatch:
         try:
             return await client.lookup_title(url)
-        except NetflixUnavailableError as exc:
+        except TitleUnavailableError as exc:
             blocked.append(exc)
             raise
 
@@ -569,10 +580,10 @@ async def _lookup_titles(
         source_urls,
         fetch,
         kind=TitleMatch,
-        expected_error=NetflixLookupError,
+        expected_error=TitleLookupError,
         field_name="titles",
-        provider="netflix",
-        label="Netflix",
+        provider=provider,
+        label=SERVICES[provider].name,
         fallback=lambda url: None,
     )
     if blocked and not titles:

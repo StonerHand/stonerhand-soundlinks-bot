@@ -149,6 +149,13 @@ def format_radio_message(radio: RadioMatch, *, include_hashtags: bool = True) ->
 _GENRES_RU = {
     "action": "Боевик",
     "action & adventure": "Боевик",
+    "action and adventure": "Боевик",
+    "adventure": "Приключения",
+    "animation": "Анимация",
+    "family": "Семейное",
+    "musicals": "Мюзикл",
+    "mystery": "Детектив",
+    "science fiction": "Фантастика",
     "anime": "Аниме",
     "comedies": "Комедия",
     "comedy": "Комедия",
@@ -170,6 +177,11 @@ _GENRES_RU = {
 }
 
 
+def _service_tag(service: str) -> str:
+    """ "Disney+" -> "disneyplus", "Apple TV+" -> "appletvplus"."""
+    return re.sub(r"[^a-z0-9]", "", service.casefold().replace("+", "plus"))
+
+
 def format_title_message(title: TitleMatch, *, include_hashtags: bool = True) -> str:
     """ "📺 Сериал · Netflix · 2 сезона · Аниме · 18+" under the bold title."""
     english = resolve_lang(None) == "en"
@@ -178,11 +190,12 @@ def format_title_message(title: TitleMatch, *, include_hashtags: bool = True) ->
         ("Film" if english else "Фильм")
         if film
         else ("Series" if english else "Сериал"),
-        "Netflix",
+        title.service,
     ]
-    if title.seasons:
+    if title.seasons and not film:
         details.append(count_label(title.seasons, "season"))
-    if film and title.year:
+    # A series shows its seasons; without them the start year still helps.
+    if title.year and (film or not title.seasons):
         details.append(str(title.year))
     if title.genre:
         details.append(
@@ -200,7 +213,7 @@ def format_title_message(title: TitleMatch, *, include_hashtags: bool = True) ->
     ]
     return _with_hashtags(
         lines,
-        f"#stonerhand #{'film' if film else 'series'} #netflix",
+        f"#stonerhand #{'film' if film else 'series'} #{_service_tag(title.service)}",
         include_hashtags=include_hashtags,
     )
 

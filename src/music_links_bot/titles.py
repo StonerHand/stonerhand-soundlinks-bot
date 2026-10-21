@@ -1,10 +1,13 @@
-"""Netflix film and series cards: the title page, its trailer and soundtrack."""
+"""Film and series cards: Netflix, Apple TV+ and Disney+ title pages, the
+official trailer and the official soundtrack."""
 
 from __future__ import annotations
 
 import asyncio
 import json
 import re
+from collections.abc import Callable
+from dataclasses import dataclass
 from html import unescape
 
 import httpx
@@ -16,11 +19,11 @@ from music_links_bot.single_flight import shared
 from music_links_bot.url_utils import (
     cache_key_for_url,
     is_direct_platform_url,
-    netflix_title_id,
+    streaming_title,
 )
 
-# Netflix and YouTube serve a bare shell to unknown clients, so these pages
-# are requested the way a desktop browser would.
+# Streaming sites and YouTube serve a bare shell to unknown clients, so these
+# pages are requested the way a desktop browser would.
 _BROWSER_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -34,12 +37,12 @@ _SOUNDTRACK = re.compile(r"\b(soundtrack|score|music from)\b", re.IGNORECASE)
 _TRAILER = re.compile(r"\b(trailer|teaser)\b", re.IGNORECASE)
 
 
-class NetflixLookupError(RuntimeError):
-    """Raised when a Netflix title page cannot be read."""
+class TitleLookupError(RuntimeError):
+    """Raised when a title page cannot be read."""
 
 
-class NetflixUnavailableError(NetflixLookupError):
-    """Netflix did not answer or refused us: worth a retry, not "not found"."""
+class TitleUnavailableError(TitleLookupError):
+    """The service did not answer or refused us: worth a retry, not "not found"."""
 
 
 def _decode_js(page: str) -> str:
@@ -59,11 +62,20 @@ def _first(pattern: str, page: str) -> str | None:
     return match.group(1) if match else None
 
 
-def parse_title_page(page: str, source_url: str) -> TitleMatch | None:
-    """Read the card fields from a public title page; None when it has none."""
-    title_id = netflix_title_id(source_url)
-    if not title_id:
-        return None
+def _meta(page: str, name: str) -> str:
+    raw = _first(rf'<meta[^>]+property="og:{name}"[^>]+content="([^"]*)"', page)
+    return " ".join(unescape(raw or "").split())
+
+
+def _image(url: str | None) -> str | None:
+    return url if url and is_direct_platform_url(url) else None
+
+
+def _year(value: str | None) -> int | None:
+    return int(value) if value and value.isdigit() else None
+
+
+def _parse_netflix(page: str, source_url: str, title_id: str) -> TitleMatch | None:
     page = _decode_js(page)
     heading = _first(r"<h1[^>]*>(.*?)</h1>", page)
     title = " ".join(unescape(re.sub(r"<[^>]+>", "", heading or "")).split())
@@ -72,29 +84,120 @@ def parse_title_page(page: str, source_url: str) -> TitleMatch | None:
         title = _json_string(raw) if raw else ""
     if not title:
         return None
-
     kind = _first(rf'"type":"(Show|Movie)","videoId":{title_id}\b', page)
     seasons = _first(r'"numSeasonsLabel":"(\d+)', page)
-    year = _first(r'"latestYear":(\d{4})\b', page)
     genre = _first(rf'"primaryGenres":\{{.{{0,200}}?"name":{_STRING}', page)
-    rating = _first(r'"certificationValue":"([^"]{1,8})"', page)
-    image = _first(r'"heroImage":\{"url":"(https://[^"]+)"', page)
     return TitleMatch(
         title=title,
         url=source_url,
         watch_url=f"https://www.netflix.com/title/{title_id}",
         kind="film" if kind == "Movie" else "series",
-        year=int(year) if year else None,
+        year=_year(_first(r'"latestYear":(\d{4})\b', page)),
         seasons=int(seasons) if seasons and kind != "Movie" else None,
         genre=_json_string(genre) if genre else "",
-        rating=rating or "",
-        image_url=image if image and is_direct_platform_url(image) else None,
+        rating=_first(r'"certificationValue":"([^"]{1,8})"', page) or "",
+        image_url=_image(_first(r'"heroImage":\{"url":"(https://[^"]+)"', page)),
+        service="Netflix",
     )
 
 
+def _parse_apple_tv(page: str, source_url: str, title_id: str) -> TitleMatch | None:
+    del title_id
+    for block in re.findall(
+        r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>', page, re.S
+    ):
+        try:
+            data = json.loads(block)
+        except ValueError:
+            continue
+        if not isinstance(data, dict) or data.get("@type") not in {"TVSeries", "Movie"}:
+            continue
+        title = " ".join(str(data.get("name") or "").split())
+        if not title:
+            return None
+        genre = _first(rf'"genres":\[{_STRING}', page)
+        return TitleMatch(
+            title=title,
+            url=source_url,
+            watch_url=source_url.split("?", 1)[0],
+            kind="film" if data["@type"] == "Movie" else "series",
+            year=_year(str(data.get("datePublished") or "")[:4]),
+            genre=_json_string(genre) if genre else "",
+            rating=_first(
+                r'"ariaLabel":"Rated [^"]+","fallbackText":"([^"]{1,8})"', page
+            )
+            or "",
+            image_url=_image(str(data.get("image") or "")),
+            service="Apple TV+",
+        )
+    return None
+
+
+def _parse_disney(page: str, source_url: str, title_id: str) -> TitleMatch | None:
+    title = _meta(page, "title").split(" | ", 1)[0].strip()
+    if not title:
+        return None
+    seasons = _first(r'"seasonsAvailable":"(\d+)', page)
+    genre = _first(rf'"genres":\[{_STRING}', page)
+    entity = title_id if title_id.startswith("entity-") else ""
+    return TitleMatch(
+        title=title,
+        url=source_url,
+        watch_url=f"https://www.disneyplus.com/browse/{entity}"
+        if entity
+        else source_url.split("?", 1)[0],
+        kind="series" if seasons else "film",
+        year=_year(_first(r'"releaseYear":"(\d{4})', page)),
+        seasons=int(seasons) if seasons else None,
+        genre=_json_string(genre) if genre else "",
+        image_url=_image(_meta(page, "image")),
+        service="Disney+",
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class Service:
+    name: str
+    # Official YouTube channels whose trailers we trust, as name prefixes.
+    channels: tuple[str, ...]
+    parse: Callable[[str, str, str], TitleMatch | None]
+
+
+SERVICES = {
+    "netflix": Service("Netflix", ("netflix",), _parse_netflix),
+    "appletv": Service("Apple TV+", ("apple tv",), _parse_apple_tv),
+    "disney": Service(
+        "Disney+",
+        (
+            "disney",
+            "walt disney",
+            "marvel",
+            "pixar",
+            "star wars",
+            "national geographic",
+        ),
+        _parse_disney,
+    ),
+}
+
+
+def parse_title_page(page: str, source_url: str) -> TitleMatch | None:
+    """Read the card fields from a public title page; None when it has none."""
+    found = streaming_title(source_url)
+    if found is None:
+        return None
+    key, title_id = found
+    return SERVICES[key].parse(page, source_url, title_id)
+
+
 def pick_soundtrack(results: object, title: str) -> str | None:
-    """The official soundtrack album from an iTunes search, never a cover."""
+    """The official soundtrack album from an iTunes search, never a cover.
+
+    "Title (Original Soundtrack)" wins over "Title 2 (…)": the album named
+    exactly like the film or series comes first, whatever iTunes' order.
+    """
     wanted = match_key(title)
+    found: list[tuple[int, str]] = []
     for item in results if isinstance(results, list) else []:
         name = str(item.get("collectionName") or "") if isinstance(item, dict) else ""
         album_id = item.get("collectionId") if isinstance(item, dict) else None
@@ -104,12 +207,17 @@ def pick_soundtrack(results: object, title: str) -> str | None:
             and _SOUNDTRACK.search(name)
             and isinstance(album_id, int)
         ):
-            return f"https://album.link/i/{album_id}"
-    return None
+            base = re.split(r"\s*[(\[–—]|\s-\s", name, maxsplit=1)[0]
+            exact = 0 if match_key(base) == wanted else 1
+            found.append((exact, f"https://album.link/i/{album_id}"))
+    found.sort(key=lambda candidate: candidate[0])
+    return found[0][1] if found else None
 
 
-def pick_trailer(initial_data: object, title: str) -> str | None:
-    """The first trailer from an official Netflix channel in YouTube results."""
+def pick_trailer(
+    initial_data: object, title: str, channels: tuple[str, ...] = ("netflix",)
+) -> str | None:
+    """The first trailer from an official channel in YouTube results."""
     wanted = match_key(title)
     found: list[tuple[int, str]] = []
 
@@ -117,7 +225,7 @@ def pick_trailer(initial_data: object, title: str) -> str | None:
         if isinstance(node, dict):
             video = node.get("videoRenderer")
             if isinstance(video, dict):
-                found.extend(_trailer_candidate(video, wanted))
+                found.extend(_trailer_candidate(video, wanted, channels))
             for value in node.values():
                 walk(value)
         elif isinstance(node, list):
@@ -131,7 +239,9 @@ def pick_trailer(initial_data: object, title: str) -> str | None:
     return found[0][1] if found else None
 
 
-def _trailer_candidate(video: dict, wanted: str) -> list[tuple[int, str]]:
+def _trailer_candidate(
+    video: dict, wanted: str, channels: tuple[str, ...]
+) -> list[tuple[int, str]]:
     def runs(field: str) -> str:
         value = video.get(field)
         parts = value.get("runs", []) if isinstance(value, dict) else []
@@ -143,7 +253,7 @@ def _trailer_candidate(video: dict, wanted: str) -> list[tuple[int, str]]:
     if (
         not isinstance(video_id, str)
         or not re.fullmatch(r"[\w-]{11}", video_id)
-        or not runs("ownerText").casefold().startswith("netflix")
+        or not runs("ownerText").casefold().startswith(channels)
         or not kind
         or not wanted
         or wanted not in match_key(name)
@@ -155,7 +265,7 @@ def _trailer_candidate(video: dict, wanted: str) -> list[tuple[int, str]]:
     return [(rank, f"https://www.youtube.com/watch?v={video_id}")]
 
 
-class NetflixClient:
+class TitleClient:
     def __init__(self, *, timeout: float = 6.0) -> None:
         self._client = httpx.AsyncClient(
             follow_redirects=True,
@@ -170,44 +280,50 @@ class NetflixClient:
         await self._client.aclose()
 
     async def lookup_title(self, source_url: str) -> TitleMatch:
-        if not netflix_title_id(source_url):
-            raise NetflixLookupError("Unsupported Netflix URL.")
+        found = streaming_title(source_url)
+        if found is None:
+            raise TitleLookupError("Unsupported title URL.")
         key = cache_key_for_url(source_url)
         cached = self._cache.get(key)
         if cached is not None:
             return cached
-        return await shared(self._inflight, key, lambda: self._fetch(source_url, key))
+        service = SERVICES[found[0]]
+        return await shared(
+            self._inflight, key, lambda: self._fetch(source_url, key, service)
+        )
 
-    async def _fetch(self, source_url: str, key: str) -> TitleMatch:
+    async def _fetch(self, source_url: str, key: str, service: Service) -> TitleMatch:
         try:
             page = await self._get_text(source_url)
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 404:
-                raise NetflixLookupError("Netflix has no such title.") from exc
-            raise NetflixUnavailableError("Netflix refused the page.") from exc
+                raise TitleLookupError(f"{service.name} has no such title.") from exc
+            raise TitleUnavailableError(f"{service.name} refused the page.") from exc
         except httpx.HTTPError as exc:
-            raise NetflixUnavailableError("Netflix page is unavailable.") from exc
+            raise TitleUnavailableError(f"{service.name} is unavailable.") from exc
         title = parse_title_page(page, source_url)
         if title is None:
-            raise NetflixLookupError("Netflix page has no title.")
+            raise TitleLookupError(f"{service.name} page has no title.")
         trailer, soundtrack = await asyncio.gather(
-            self._trailer(title.title), self._soundtrack(title.title)
+            self._trailer(title.title, service), self._soundtrack(title.title)
         )
         title.trailer_url, title.soundtrack_url = trailer, soundtrack
         self._cache.set(key, title)
         return title
 
-    async def _trailer(self, title: str) -> str | None:
+    async def _trailer(self, title: str, service: Service) -> str | None:
         try:
             page = await self._get_text(
                 "https://www.youtube.com/results",
-                params={"search_query": f"{title} official trailer netflix"},
+                params={"search_query": f"{title} official trailer {service.name}"},
             )
             raw = _first(r"var ytInitialData = (\{.*?\});</script>", page)
-            return pick_trailer(json.loads(raw), title) if raw else None
+            return (
+                pick_trailer(json.loads(raw), title, service.channels) if raw else None
+            )
         # The trailer is a bonus button: a slow or changed YouTube page only
         # means the card goes out without it.
-        except (httpx.HTTPError, ValueError, NetflixLookupError):
+        except (httpx.HTTPError, ValueError, TitleLookupError):
             return None
 
     async def _soundtrack(self, title: str) -> str | None:
@@ -235,5 +351,5 @@ class NetflixClient:
             async for chunk in response.aiter_bytes():
                 body.extend(chunk)
                 if len(body) > MAX_PAGE_BYTES:
-                    raise NetflixLookupError("Page is too large.")
+                    raise TitleLookupError("Page is too large.")
             return body.decode(response.encoding or "utf-8", errors="replace")

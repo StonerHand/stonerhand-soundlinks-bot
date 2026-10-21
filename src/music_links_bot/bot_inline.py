@@ -85,11 +85,11 @@ from music_links_bot.url_utils import (
     extract_supported_urls,
     is_apple_music_radio_url,
     is_direct_platform_url,
-    is_netflix_title_url,
     is_nts_url,
     is_playlist_url,
     is_spotify_artist_url,
     is_youtube_video_url,
+    streaming_title,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -663,9 +663,10 @@ async def _build_inline_result(
             channel_safe=channel_safe,
         )
 
-    if is_netflix_title_url(source_url):
+    found = streaming_title(source_url)
+    if found:
         titles = await bot_lookup._lookup_titles(
-            bot_data["netflix_client"], [source_url]
+            bot_data["title_client"], [source_url], provider=found[0]
         )
         if not titles:
             return None
@@ -679,7 +680,7 @@ async def _build_inline_result(
             source_url,
             title=card.title,
             description=_inline_description(
-                f"{kind} · Netflix", lang=lang, history=history
+                f"{kind} · {card.service}", lang=lang, history=history
             ),
             text=format_title_message(card, include_hashtags=True),
             keyboard=add_share_button(

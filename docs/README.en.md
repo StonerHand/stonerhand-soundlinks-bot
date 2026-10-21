@@ -18,11 +18,11 @@
 
 ## ✨ Features
 
-- 🔗 **Any link or query** — Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, Bandcamp, Yandex Music, NTS, Netflix, or just `artist — track`.
+- 🔗 **Any link or query** — Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, Bandcamp, Yandex Music, NTS, Netflix, Apple TV+, Disney+, or just `artist — track`.
 - 🖼 **Posts with artwork** — signed cover, title, year, length, smart tags and buttons for every platform.
 - 🎶 **Collections** — up to 10 tracks, albums and videos in one post: a shared collage, a `01 · Artist — Title` list and short buttons.
 - 🎬 **Song + videos** — a track with its music videos, live and lyric videos in one post.
-- 🍿 **Netflix films and series** — a title link becomes a card with a still, seasons, genre and "Watch on Netflix", "Trailer" and "Soundtrack" buttons.
+- 🍿 **Netflix, Apple TV+ and Disney+ films and series** — a title link becomes a card with a still, seasons or year, genre and "Watch on …", "Trailer" and "Soundtrack" buttons.
 - ✏️ **In-chat editor** — your own text, tags, look and buttons.
 - 📝 **Your text, uncut** — a quote above the card of up to ~3,900 characters with bold, italic and links. A long post goes out as a message with the cover large on top.
 - 📣 **Channel publishing** — now, on a schedule ("tomorrow 18:30") or in one tap; 2 minutes to undo. Every reader sees times in their own time zone.

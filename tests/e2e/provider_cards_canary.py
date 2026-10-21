@@ -11,7 +11,6 @@ from music_links_bot.artist import ArtistClient
 from music_links_bot.bot_inline import _build_inline_result
 from music_links_bot.bot_lookup import resolve_sources
 from music_links_bot.draft_model import new_track_draft
-from music_links_bot.netflix import NetflixClient
 from music_links_bot.nts import NTSClient
 from music_links_bot.playlist import PlaylistClient
 from music_links_bot.public_release import PublicReleaseRegionUnavailable
@@ -23,6 +22,7 @@ from music_links_bot.publication_view import (
 from music_links_bot.search import SearchClient
 from music_links_bot.songlink import SonglinkClient
 from music_links_bot.soundcloud import SoundCloudClient
+from music_links_bot.titles import TitleClient
 from music_links_bot.youtube import YouTubeClient
 
 CASES = {
@@ -77,6 +77,14 @@ CASES = {
         "https://www.netflix.com/title/81054853",
         "Cyberpunk: Edgerunners",
     ),
+    "Apple TV+ series": (
+        "https://tv.apple.com/us/show/severance/umc.cmc.1srk2goyh2q2zdxcx605w8vtx",
+        "Severance",
+    ),
+    "Disney+ film": (
+        "https://www.disneyplus.com/browse/entity-e8896bfa-1052-41f7-ae2e-00255d77cf05",
+        "Moana",
+    ),
 }
 
 
@@ -90,7 +98,7 @@ async def verify(*, allow_region_unavailable: bool = False) -> list[str]:
         "artist_client": ArtistClient(),
         "nts_client": NTSClient(),
         "apple_radio_client": AppleRadioClient(),
-        "netflix_client": NetflixClient(),
+        "title_client": TitleClient(),
     }
     context = SimpleNamespace(
         application=SimpleNamespace(bot_data=dict(clients)),
