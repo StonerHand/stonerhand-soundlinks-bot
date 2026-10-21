@@ -8,6 +8,7 @@ from music_links_bot import bot
 from music_links_bot.bot_crate import crate_item_key, load_crate, save_crate
 from music_links_bot.bot_crate_handlers import dispatch_crate_action
 from music_links_bot.bot_runtime import decode_callback, encode_callback
+from music_links_bot.i18n import get_text
 
 
 def _query(data: str, *, user_id: int = 7, query_id: str = "q1"):
@@ -237,6 +238,114 @@ class CrateActionTests(unittest.IsolatedAsyncioTestCase):
         text = self.edits[-1][0]
         self.assertIn("<code>01</code> · <b>Kyuss</b> — Green Machine", text)
         self.assertIn("<code>02</code> · <b>Sleep</b> — Dragonaut", text)
+
+    async def _pending(self) -> dict:
+        from music_links_bot.bot_menu import runtime_for
+
+        return (await runtime_for(self.context).get_session(7)).pending_input
+
+    def _key(self, title: str) -> str:
+        from music_links_bot.models import TrackMatch
+        from music_links_bot.release_preferences import release_preference_key
+
+        entry = next(e for e in self.items if e["item"]["title"] == title)
+        return release_preference_key(TrackMatch(**{"links": {}, **entry["item"]}))
+
+    async def test_add_waits_for_links_with_a_way_back(self) -> None:
+        await self._act("add")
+
+        self.assertEqual((await self._pending())["kind"], "collection_links")
+        text, keyboard = self.edits[-1]
+        self.assertEqual(text, get_text("ru", "crate_links_prompt"))
+        self.assertEqual(
+            decode_callback(keyboard.inline_keyboard[0][0].callback_data).action,
+            "open",
+        )
+
+    async def test_replacing_a_vanished_item_is_expired(self) -> None:
+        query = await self._act("replace", "no-such-item")
+        self.assertTrue(query.answer.await_args.kwargs.get("show_alert"))
+        self.assertEqual(self.edits, [])
+
+    async def test_note_asks_for_text_about_that_release(self) -> None:
+        query = await self._act("note", self._key("Dragonaut"))
+
+        query.message.reply_text.assert_awaited_once()
+        pending = await self._pending()
+        self.assertEqual(pending["kind"], "crate_note")
+        self.assertEqual(pending["release_key"], self._key("Dragonaut"))
+
+        missing = await self._act("section", "gone")
+        self.assertTrue(missing.answer.await_args.kwargs.get("show_alert"))
+
+    async def test_style_and_more_are_their_own_screens(self) -> None:
+        await self._act("style")
+        self.assertEqual(self.edits[-1][0], get_text("ru", "crate_style_title"))
+        await self._act("more")
+        self.assertEqual(self.edits[-1][0], get_text("ru", "crate_more_title"))
+
+    async def test_clear_asks_first_then_empties_and_can_be_undone(self) -> None:
+        from music_links_bot.bot_crate import crate_revision
+
+        await self._act("clear")
+        self.assertEqual(self.edits[-1][0], get_text("ru", "crate_clear_confirm"))
+        self.assertEqual(len(await self._titles()), 2)
+
+        await self._act("clear_confirm", crate_revision(self.items))
+        self.assertEqual(await self._titles(), [])
+
+        await self._act("undo")
+        self.assertEqual(await self._titles(), ["Green Machine", "Dragonaut"])
+
+    async def test_rename_asks_for_a_name(self) -> None:
+        query = await self._act("rename")
+
+        self.assertEqual(
+            query.message.reply_text.await_args.args[0],
+            get_text("ru", "crate_name_prompt"),
+        )
+        self.assertEqual((await self._pending())["kind"], "crate_title")
+
+    async def test_opening_the_crate_drops_a_half_done_input(self) -> None:
+        await self._act("add")
+        await self._act("open")
+        self.assertEqual(await self._pending(), {})
+
+    async def test_unknown_actions_are_only_answered(self) -> None:
+        query = await self._act("teleport")
+        query.answer.assert_awaited_once_with()
+        self.assertEqual(self.edits, [])
+
+    async def test_preview_shows_the_real_post_with_a_way_back(self) -> None:
+        ready = [
+            {
+                "item": {
+                    "artist": artist,
+                    "title": title,
+                    "links": {"spotify": f"https://open.spotify.com/track/{code}"},
+                }
+            }
+            for artist, title, code in (
+                ("Kyuss", "Green Machine", "1a"),
+                ("Sleep", "Dragonaut", "2b"),
+            )
+        ]
+        await save_crate(self.bot_data, 7, ready)
+
+        await self._act("preview")
+
+        text, keyboard = self.edits[-1]
+        self.assertIn("Green Machine", text)
+        self.assertIn("Dragonaut", text)
+        last = keyboard.inline_keyboard[-1][0]
+        self.assertEqual(decode_callback(last.callback_data).action, "open")
+        self.assertTrue(
+            any(
+                button.switch_inline_query
+                for row in keyboard.inline_keyboard
+                for button in row
+            )
+        )
 
 
 if __name__ == "__main__":

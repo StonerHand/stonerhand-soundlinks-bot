@@ -705,8 +705,6 @@ async def dispatch_menu_action(query, context, action: CallbackAction) -> None:
             "guide": MENU_GUIDE,
             "platforms": MENU_PLATFORMS,
             "demo": MENU_DEMO,
-            "more": MENU_MORE,
-            "privacy": MENU_PRIVACY,
         }.get(action.action, MENU_START)
         user_id = query.from_user.id if query.from_user else 0
         crate_count, _is_admin = await home_state(context, user_id)

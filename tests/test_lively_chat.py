@@ -292,3 +292,91 @@ class ProviderErrorTextTests(unittest.IsolatedAsyncioTestCase):
                 text = await self._text(provider)
                 self.assertNotIn("playlists", text)
                 self.assertIn(get_text("ru", "error_provider"), text)
+
+
+class ErrorDeliveryTests(unittest.IsolatedAsyncioTestCase):
+    def _hooks(self, *, placeholder=None, ephemeral=False, delivered=True):
+        from music_links_bot.bot_error_handlers import WorkflowHooks
+
+        return WorkflowHooks(
+            build_error_keyboard=lambda *args, **kwargs: "keyboard",
+            try_ephemeral_error=AsyncMock(return_value=False),
+            take_placeholder=lambda chat_id: placeholder,
+            try_delete_message=AsyncMock(),
+            ephemeral_group_replies_enabled=lambda: ephemeral,
+            send_ephemeral_message=AsyncMock(return_value=delivered),
+        )
+
+    def _message(self, chat_type: str = "private"):
+        return SimpleNamespace(
+            chat=SimpleNamespace(type=chat_type),
+            chat_id=-5 if chat_type != "private" else 7,
+            message_id=3,
+            from_user=SimpleNamespace(id=7),
+            reply_text=AsyncMock(),
+        )
+
+    def _context(self):
+        return SimpleNamespace(bot=SimpleNamespace(username="StonerHandBot", token="t"))
+
+    async def test_the_progress_message_turns_into_the_error(self) -> None:
+        from music_links_bot.bot_error_handlers import _reply_with_error
+
+        placeholder = SimpleNamespace(edit_text=AsyncMock())
+        message = self._message()
+
+        await _reply_with_error(
+            message, self._context(), "oops", hooks=self._hooks(placeholder=placeholder)
+        )
+
+        placeholder.edit_text.assert_awaited_once_with("oops", reply_markup="keyboard")
+        message.reply_text.assert_not_awaited()
+
+    async def test_an_uneditable_progress_message_is_replaced(self) -> None:
+        from music_links_bot.bot_error_handlers import _reply_with_error
+
+        placeholder = SimpleNamespace(
+            edit_text=AsyncMock(side_effect=TelegramError("gone"))
+        )
+        message = self._message()
+        hooks = self._hooks(placeholder=placeholder)
+
+        await _reply_with_error(message, self._context(), "oops", hooks=hooks)
+
+        hooks.try_delete_message.assert_awaited_once_with(placeholder)
+        message.reply_text.assert_awaited_once_with("oops", reply_markup="keyboard")
+
+    async def test_group_errors_go_privately_to_the_sender(self) -> None:
+        from music_links_bot.bot_error_handlers import _try_ephemeral_error
+
+        placeholder = object()
+        hooks = self._hooks(placeholder=placeholder, ephemeral=True)
+
+        sent = await _try_ephemeral_error(
+            self._message("supergroup"), self._context(), "oops", "kb", hooks=hooks
+        )
+
+        self.assertTrue(sent)
+        self.assertEqual(hooks.send_ephemeral_message.await_args.args[2], 7)
+        hooks.try_delete_message.assert_awaited_once_with(placeholder)
+
+    async def test_private_chats_and_refusals_fall_back_to_a_reply(self) -> None:
+        from music_links_bot.bot_error_handlers import _try_ephemeral_error
+
+        private = await _try_ephemeral_error(
+            self._message(),
+            self._context(),
+            "oops",
+            "kb",
+            hooks=self._hooks(ephemeral=True),
+        )
+        refused = await _try_ephemeral_error(
+            self._message("group"),
+            self._context(),
+            "oops",
+            "kb",
+            hooks=self._hooks(ephemeral=True, delivered=False),
+        )
+
+        self.assertFalse(private)
+        self.assertFalse(refused)
