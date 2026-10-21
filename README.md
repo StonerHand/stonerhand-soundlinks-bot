@@ -27,7 +27,7 @@
 
 ## ✨ Что умеет
 
-- 🔗 **Любая ссылка или запрос.** Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, Bandcamp, Яндекс Музыка, NTS — или просто `артист — трек`.
+- 🔗 **Любая ссылка или запрос.** Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, Bandcamp, Яндекс Музыка, NTS, Netflix — или просто `артист — трек`.
 - 🖼 **Пост с обложкой.** Обложка с подписью канала, название, год, длительность, умные теги и кнопки всех площадок.
 - 🎶 **Подборки.** До 10 треков, альбомов и клипов в одном посте: общий коллаж, список «01 · Артист — Трек» и короткие кнопки.
 - 🎬 **Песня + клипы.** Трек и его клипы, лайвы и lyric-видео — одним постом с кадрами в коллаже.
@@ -42,9 +42,9 @@
 
 ## 📱 Как выглядит
 
-| Пост в канале | Черновик в боте | Подборка с клипами |
-| :---: | :---: | :---: |
-| <img src="docs/assets/post.png" width="260" alt="Пост с обложкой и кнопками площадок"> | <img src="docs/assets/draft.png" width="260" alt="Черновик с кнопками редактора"> | <img src="docs/assets/collection.png" width="260" alt="Подборка с коллажем из обложек и кадров клипов"> |
+| Пост в канале | Черновик в боте | Подборка с клипами | Сериал с Netflix |
+| :---: | :---: | :---: | :---: |
+| <img src="docs/assets/post.png" width="200" alt="Пост с обложкой и кнопками площадок"> | <img src="docs/assets/draft.png" width="200" alt="Черновик с кнопками редактора"> | <img src="docs/assets/collection.png" width="200" alt="Подборка с коллажем из обложек и кадров клипов"> | <img src="docs/assets/netflix.png" width="200" alt="Карточка сериала с кнопками Netflix, трейлера и саундтрека"> |
 
 ## 🚀 Как пользоваться
 
@@ -79,7 +79,7 @@ python -m music_links_bot
 ## 🧩 Как устроено
 
 ```
-Telegram ──▶ Vercel /api/telegram ──▶ поиск релиза (Songlink, iTunes, MusicBrainz, YouTube)
+Telegram ──▶ Vercel /api/telegram ──▶ поиск (Songlink, iTunes, MusicBrainz, YouTube, Netflix)
                                    └─▶ черновик в Upstash Redis ──▶ пост в чат или канал
 QStash каждые 5 мин ──▶ /api/queue_worker ──▶ отложенные публикации
 ```
