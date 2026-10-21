@@ -18,7 +18,7 @@
 
 ## ✨ Features
 
-- 🔗 **Any link or query** — Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, Bandcamp, Yandex Music, NTS, or just `artist — track`.
+- 🔗 **Any link or query** — Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, Bandcamp, Yandex Music, NTS, Netflix, or just `artist — track`.
 - 🖼 **Posts with artwork** — signed cover, title, year, length, smart tags and buttons for every platform.
 - 🎶 **Collections** — up to 10 tracks, albums and videos in one post: a shared collage, a `01 · Artist — Title` list and short buttons.
 - 🎬 **Song + videos** — a track with its music videos, live and lyric videos in one post.
@@ -31,9 +31,9 @@
 - ⚡ **Inline mode** — `@StonerHandBot artist — track` in any chat.
 - 🌍 **Russian and English** — follows your Telegram language or the one set in settings.
 
-| Channel post | Draft in the bot | Collection with videos |
-| :---: | :---: | :---: |
-| <img src="assets/post.png" width="240" alt="Channel post"> | <img src="assets/draft.png" width="240" alt="Draft card"> | <img src="assets/collection.png" width="240" alt="Collection post"> |
+| Channel post | Draft in the bot | Collection with videos | Netflix series |
+| :---: | :---: | :---: | :---: |
+| <img src="assets/post.png" width="200" alt="Channel post"> | <img src="assets/draft.png" width="200" alt="Draft card"> | <img src="assets/collection.png" width="200" alt="Collection post"> | <img src="assets/netflix.png" width="200" alt="Series card with Netflix, trailer and soundtrack buttons"> |
 
 ## 🛠 Run your own
 
