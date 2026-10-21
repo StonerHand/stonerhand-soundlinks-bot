@@ -84,7 +84,7 @@ Telegram ──▶ Vercel /api/telegram ──▶ поиск (Songlink, iTunes, 
 QStash каждые 5 мин ──▶ /api/queue_worker ──▶ отложенные публикации
 ```
 
-Python, [python-telegram-bot](https://python-telegram-bot.org), serverless-функции Vercel, Telegram Bot API 10.3. CI проверяет Python 3.11–3.14: 1000+ тестов с покрытием, типы, стиль, безопасность и аудит зависимостей. Подробности — в [архитектуре](docs/ARCHITECTURE.ru.md), изменения — в [CHANGELOG](CHANGELOG.md) и [релизах](https://github.com/StonerHand/stonerhand-soundlinks-bot/releases).
+Python, [python-telegram-bot](https://python-telegram-bot.org), serverless-функции Vercel, Telegram Bot API 10.3. CI проверяет Python 3.11–3.14: 1200+ тестов с покрытием от 85%, типы, стиль, безопасность и аудит зависимостей; живые проверки провайдеров каждые 6 часов. Подробности — в [архитектуре](docs/ARCHITECTURE.ru.md), изменения — в [CHANGELOG](CHANGELOG.md) и [релизах](https://github.com/StonerHand/stonerhand-soundlinks-bot/releases).
 
 ## 📄 Лицензия
 
