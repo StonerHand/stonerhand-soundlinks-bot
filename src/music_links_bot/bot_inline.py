@@ -98,6 +98,55 @@ INLINE_COLLECTION_RESULT_VERSION = "v6"
 INLINE_TRUNCATION_GUARD_LENGTH = 240
 
 
+async def _inline_sources_without_link(
+    context, inline_query, query_text: str, *, user_id: int, lang: str
+) -> tuple[list[str], bool]:
+    """A text search, or with an empty query the user's recent posts (else one
+    live example). The flag tells the result builder it shows history."""
+    search_query = normalize_search_query(query_text)
+    if search_query is not None:
+        return (
+            await _search_source_urls(context, inline_query, search_query, lang=lang),
+            False,
+        )
+    recent = await load_inline_history(context.application.bot_data, user_id)
+    if recent:
+        return recent[:3], True
+    example = await _search_source_urls(
+        context, inline_query, INLINE_EXAMPLE_QUERY, lang=lang
+    )
+    return example[:1], True
+
+
+async def _page_results(
+    page_urls: list[str], context, *, lang: str, channel_safe: bool, history: bool
+) -> list[InlineQueryResultArticle | InlineQueryResultPhoto]:
+    outcomes = await asyncio.gather(
+        *(
+            _build_inline_result(
+                source_url,
+                context,
+                lang=lang,
+                channel_safe=channel_safe,
+                history=history,
+            )
+            for source_url in page_urls
+        ),
+        return_exceptions=True,
+    )
+    results: list[InlineQueryResultArticle | InlineQueryResultPhoto] = []
+    for source_url, outcome in zip(page_urls, outcomes, strict=True):
+        if isinstance(outcome, (InlineQueryResultArticle, InlineQueryResultPhoto)):
+            results.append(outcome)
+        elif isinstance(outcome, Exception):
+            LOGGER.error(
+                "Inline lookup failed source=%s",
+                hashlib.sha256(source_url.encode()).hexdigest()[:12],
+                exc_info=(type(outcome), outcome, outcome.__traceback__),
+            )
+    return results
+
+
 async def inline_query_handler(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
@@ -171,35 +220,14 @@ async def inline_query_handler(
         return
 
     history_mode = False
-    if not source_urls:
-        search_query = normalize_search_query(query_text)
-        if search_query is None:
-            source_urls = await load_inline_history(
-                context.application.bot_data,
-                user_id,
-            )
-            history_mode = True
-            if not source_urls:
-                source_urls = await _search_source_urls(
-                    context,
-                    inline_query,
-                    INLINE_EXAMPLE_QUERY,
-                    lang=lang,
-                )
-                source_urls = source_urls[:1]
-            else:
-                source_urls = source_urls[:3]
-        else:
-            source_urls = await _search_source_urls(
-                context,
-                inline_query,
-                search_query,
-                lang=lang,
-            )
+    if source_urls:
+        source_urls = source_urls[:1]
+    else:
+        source_urls, history_mode = await _inline_sources_without_link(
+            context, inline_query, query_text, user_id=user_id, lang=lang
+        )
         if not source_urls:
             return
-    else:
-        source_urls = source_urls[:1]
 
     await remember_inline_urls(
         context.application.bot_data,
@@ -213,29 +241,9 @@ async def inline_query_handler(
     page_urls = source_urls[offset : offset + 6]
     next_offset = str(offset + 6) if offset + 6 < len(source_urls) else ""
 
-    outcomes = await asyncio.gather(
-        *(
-            _build_inline_result(
-                source_url,
-                context,
-                lang=lang,
-                channel_safe=channel_safe,
-                history=history_mode,
-            )
-            for source_url in page_urls
-        ),
-        return_exceptions=True,
+    results = await _page_results(
+        page_urls, context, lang=lang, channel_safe=channel_safe, history=history_mode
     )
-    results: list[InlineQueryResultArticle | InlineQueryResultPhoto] = []
-    for source_url, outcome in zip(page_urls, outcomes, strict=True):
-        if isinstance(outcome, (InlineQueryResultArticle, InlineQueryResultPhoto)):
-            results.append(outcome)
-        elif isinstance(outcome, Exception):
-            LOGGER.error(
-                "Inline lookup failed source=%s",
-                hashlib.sha256(source_url.encode()).hexdigest()[:12],
-                exc_info=(type(outcome), outcome, outcome.__traceback__),
-            )
 
     if not results:
         await _answer_inline_hint(
@@ -269,26 +277,14 @@ async def inline_query_handler(
                 exc,
                 unsupported=rich_api_unavailable(exc),
             )
-            classic_outcomes = await asyncio.gather(
-                *(
-                    _build_inline_result(
-                        source_url,
-                        context,
-                        lang=lang,
-                        channel_safe=channel_safe,
-                        history=history_mode,
-                    )
-                    for source_url in page_urls
-                ),
-                return_exceptions=True,
+            # Rich is now marked unavailable, so these come back classic.
+            classic_results = await _page_results(
+                page_urls,
+                context,
+                lang=lang,
+                channel_safe=channel_safe,
+                history=history_mode,
             )
-            classic_results = [
-                outcome
-                for outcome in classic_outcomes
-                if isinstance(
-                    outcome, (InlineQueryResultArticle, InlineQueryResultPhoto)
-                )
-            ]
             if classic_results:
                 await remember_results(context.application.bot_data, classic_results)
                 try:

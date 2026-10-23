@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stonerhand-soundlinks-bot"
-version = "2.10.1"
+version = "2.10.2"
 description = "Telegram-native music publishing bot with universal release cards, collections, scheduling and channel delivery."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -36,13 +36,13 @@ Changelog = "https://github.com/StonerHand/stonerhand-soundlinks-bot/blob/main/C
 [project.optional-dependencies]
 dev = [
   "bandit==1.9.4",
-  "coverage==7.16.2",
-  "fakeredis[lua]==2.39.0",
+  "coverage==7.17.0",
+  "fakeredis[lua]==2.40.0",
   "mypy==2.4.0",
   "pip-audit==2.10.1",
   "pytest==9.1.1",
   "pyflakes==4.0.3",
-  "ruff==0.17.0",
+  "ruff==0.17.2",
 ]
 
 [tool.setuptools]
@@ -151,6 +151,8 @@ files = [
   "src/music_links_bot/editor_screen.py",
   "src/music_links_bot/editor_delivery.py",
   "src/music_links_bot/track_lookup.py",
+  "src/music_links_bot/bot_pending.py",
+  "src/music_links_bot/bot_crate_handlers.py",
   "tests/e2e/provider_canary.py",
   "tests/e2e/provider_cards_canary.py",
 ]

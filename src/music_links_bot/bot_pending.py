@@ -5,6 +5,7 @@ import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from html import escape
+from typing import Any
 
 from telegram import Update
 from telegram.constants import ParseMode
@@ -21,6 +22,7 @@ from music_links_bot.bot_builder import (
 from music_links_bot.bot_crate import load_crate, save_crate_title
 from music_links_bot.bot_editor_state import draft_owned_by, remember_setting_state
 from music_links_bot.bot_menu import runtime_for, update_lang
+from music_links_bot.bot_runtime import BotRuntime, UserSession
 from music_links_bot.bot_stats import message_entities, message_text
 from music_links_bot.bot_storage import (
     load_draft,
@@ -67,6 +69,32 @@ class DraftInputResult:
     clear_pending: bool = False
 
 
+@dataclass(slots=True)
+class _TypedInput:
+    """A message typed in answer to a prompt, with everything it may change."""
+
+    message: Any
+    context: Any
+    user_id: int
+    lang: str
+    runtime: BotRuntime
+    session: UserSession
+    pending: dict
+    kind: str
+    value: str
+    retry_lookup: RetryLookup
+
+
+@dataclass(slots=True, frozen=True)
+class _Saved:
+    """What the input changed, so the right screen comes back with a notice."""
+
+    saved_key: str
+    draft_id: str = ""
+    draft: dict | None = None
+    schedule_label: str | None = None
+
+
 async def consume_pending_input(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
@@ -89,151 +117,188 @@ async def consume_pending_input(
         await _clear_pending(runtime, session)
         return False
 
-    kind = str(pending.get("kind") or "")
-    value = (message_text(message) or "").strip()
-    if not value and kind != "cover":
+    typed = _TypedInput(
+        message=message,
+        context=context,
+        user_id=user.id,
+        lang=lang,
+        runtime=runtime,
+        session=session,
+        pending=pending,
+        kind=str(pending.get("kind") or ""),
+        value=(message_text(message) or "").strip(),
+        retry_lookup=retry_lookup,
+    )
+    if not typed.value and typed.kind != "cover":
         return True
-    if kind == "brand_label":
-        await _clear_pending(runtime, session)
-        admin_chat_id = context.application.bot_data.get("admin_chat_id")
-        if admin_chat_id is None or admin_chat_id != user.id:
-            return True
-        from music_links_bot.bot_preferences import preferences_view
-        from music_links_bot.brand_settings import save_brand_label
-        from music_links_bot.cover_style import brand_label
-
-        await save_brand_label(
-            context.application.bot_data.get("kv_store"),
-            "" if value in {"-", "—"} else value,
-        )
-        text, keyboard = preferences_view(session, lang=lang, is_admin=True)
-        notice = get_text(lang, "pref_brand_label_saved").format(
-            value=escape(brand_label())
-        )
-        await message.reply_text(
-            f"{notice}\n\n{text}", parse_mode=ParseMode.HTML, reply_markup=keyboard
-        )
-        await _delete_prompt(context, message, pending)
-        return True
-    if kind == "library_search":
-        session.draft_query = value[:100]
-        await _clear_pending(runtime, session)
-        from music_links_bot.bot_menu import drafts_view
-
-        text, keyboard = await drafts_view(message, context, lang=lang)
-        await message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
-        await _delete_prompt(context, message, pending)
-        return True
-    if kind == "replace_source":
-        return await _replace_failed_source(
-            message,
-            context,
-            user_id=user.id,
-            lang=lang,
-            pending=pending,
-            value=value,
-            runtime=runtime,
-            session=session,
-            retry_lookup=retry_lookup,
-        )
-
-    draft_id = str(pending.get("draft_id") or "")
-    draft = await load_draft(context, draft_id) if draft_id else None
-    schedule_label: str | None = None
-    if kind in _DRAFT_INPUT_KINDS:
-        if draft is None:
-            await _clear_pending(runtime, session)
-            await message.reply_text(get_text(lang, "ed_expired"))
-            return True
-        if not draft_owned_by(draft, user.id):
-            await _clear_pending(runtime, session)
-            await message.reply_text(get_text(lang, "ed_owner_only"))
-            return True
-        if draft.get("deleted_at"):
-            await _clear_pending(runtime, session)
-            await message.reply_text(get_text(lang, "ed_deleted_recovery"))
-            return True
-        if "draft_revision" in pending and pending["draft_revision"] != int(
-            draft.get("revision") or 0
-        ):
-            await _clear_pending(runtime, session)
-            await message.reply_text(get_text(lang, "state_conflict"))
-            return True
-        result = await _apply_draft_input(
-            message,
-            context,
-            user_id=user.id,
-            kind=kind,
-            value=value,
-            draft=draft,
-            lang=lang,
-        )
-        if result.saved_key is None:
-            if result.clear_pending:
-                await _clear_pending(runtime, session)
-            return True
-        saved_key = result.saved_key
-        schedule_label = result.schedule_label
-        await store_draft(context, draft_id, draft)
-    elif kind in {"crate_note", "crate_section"}:
-        release_key = str(pending.get("release_key") or "")
-        entries = await load_crate(context.application.bot_data, user.id)
-        if not any(
-            release_preference_key(TrackMatch(**{"links": {}, **entry["item"]}))
-            == release_key
-            for entry in entries
-            if isinstance(entry.get("item"), dict)
-        ):
-            await _clear_pending(runtime, session)
-            await message.reply_text(get_text(lang, "ed_expired"))
-            return True
-        field = "note" if kind == "crate_note" else "section"
-        record = dict(session.collection_annotations.pop(release_key, {}))
-        record[field] = (
-            ""
-            if value == "-"
-            else " ".join(value.split())[: 140 if field == "note" else 64]
-        )
-        session.collection_annotations[release_key] = record
-        session.collection_annotations = normalize_annotations(
-            session.collection_annotations
-        )
-        current_presentation.set(preferences_from_session(session))
-        saved_key = "settings_saved"
-    elif kind == "crate_title":
+    own_screen = _OWN_SCREEN_INPUTS.get(typed.kind)
+    if own_screen is not None:
+        return await own_screen(typed)
+    if typed.kind in _DRAFT_INPUT_KINDS:
+        saved = await _consume_draft_input(typed)
+    elif typed.kind in {"crate_note", "crate_section"}:
+        saved = await _consume_annotation(typed)
+    elif typed.kind == "crate_title":
         await save_crate_title(
             context.application.bot_data,
             user.id,
-            normalize_crate_title(value),
+            normalize_crate_title(typed.value),
         )
-        saved_key = "crate_name_saved"
+        saved = _Saved("crate_name_saved")
     else:
         await _clear_pending(runtime, session)
         return False
+    if saved is None:
+        return True
 
     await _clear_pending(runtime, session)
     await _delete_prompt(context, message, pending)
-    if kind in {"crate_title", "crate_note", "crate_section"}:
+    if typed.kind in {"crate_title", "crate_note", "crate_section"}:
         await _restore_crate_screen(
             message,
             context,
             user_id=user.id,
             lang=lang,
             pending=pending,
-            saved_key=saved_key,
+            saved_key=saved.saved_key,
         )
-    elif draft is not None:
+    elif saved.draft is not None:
         await _restore_draft_screen(
             message,
             context,
-            draft_id=draft_id,
-            draft=draft,
+            draft_id=saved.draft_id,
+            draft=saved.draft,
             lang=lang,
             pending=pending,
-            saved_key=saved_key,
-            schedule_label=schedule_label,
+            saved_key=saved.saved_key,
+            schedule_label=saved.schedule_label,
         )
     return True
+
+
+async def _consume_brand_label(typed: _TypedInput) -> bool:
+    await _clear_pending(typed.runtime, typed.session)
+    bot_data = typed.context.application.bot_data
+    admin_chat_id = bot_data.get("admin_chat_id")
+    if admin_chat_id is None or admin_chat_id != typed.user_id:
+        return True
+    from music_links_bot.bot_preferences import preferences_view
+    from music_links_bot.brand_settings import save_brand_label
+    from music_links_bot.cover_style import brand_label
+
+    await save_brand_label(
+        bot_data.get("kv_store"),
+        "" if typed.value in {"-", "—"} else typed.value,
+    )
+    text, keyboard = preferences_view(typed.session, lang=typed.lang, is_admin=True)
+    notice = get_text(typed.lang, "pref_brand_label_saved").format(
+        value=escape(brand_label())
+    )
+    await typed.message.reply_text(
+        f"{notice}\n\n{text}", parse_mode=ParseMode.HTML, reply_markup=keyboard
+    )
+    await _delete_prompt(typed.context, typed.message, typed.pending)
+    return True
+
+
+async def _consume_library_search(typed: _TypedInput) -> bool:
+    typed.session.draft_query = typed.value[:100]
+    await _clear_pending(typed.runtime, typed.session)
+    from music_links_bot.bot_menu import drafts_view
+
+    text, keyboard = await drafts_view(typed.message, typed.context, lang=typed.lang)
+    await typed.message.reply_text(
+        text, parse_mode=ParseMode.HTML, reply_markup=keyboard
+    )
+    await _delete_prompt(typed.context, typed.message, typed.pending)
+    return True
+
+
+async def _consume_replacement(typed: _TypedInput) -> bool:
+    return await _replace_failed_source(
+        typed.message,
+        typed.context,
+        user_id=typed.user_id,
+        lang=typed.lang,
+        pending=typed.pending,
+        value=typed.value,
+        runtime=typed.runtime,
+        session=typed.session,
+        retry_lookup=typed.retry_lookup,
+    )
+
+
+_OWN_SCREEN_INPUTS = {
+    "brand_label": _consume_brand_label,
+    "library_search": _consume_library_search,
+    "replace_source": _consume_replacement,
+}
+
+
+async def _refuse(typed: _TypedInput, key: str) -> None:
+    await _clear_pending(typed.runtime, typed.session)
+    await typed.message.reply_text(get_text(typed.lang, key))
+
+
+async def _consume_draft_input(typed: _TypedInput) -> _Saved | None:
+    draft_id = str(typed.pending.get("draft_id") or "")
+    draft = await load_draft(typed.context, draft_id) if draft_id else None
+    if draft is None:
+        await _refuse(typed, "ed_expired")
+        return None
+    if not draft_owned_by(draft, typed.user_id):
+        await _refuse(typed, "ed_owner_only")
+        return None
+    if draft.get("deleted_at"):
+        await _refuse(typed, "ed_deleted_recovery")
+        return None
+    if "draft_revision" in typed.pending and typed.pending["draft_revision"] != int(
+        draft.get("revision") or 0
+    ):
+        await _refuse(typed, "state_conflict")
+        return None
+    result = await _apply_draft_input(
+        typed.message,
+        typed.context,
+        user_id=typed.user_id,
+        kind=typed.kind,
+        value=typed.value,
+        draft=draft,
+        lang=typed.lang,
+    )
+    if result.saved_key is None:
+        if result.clear_pending:
+            await _clear_pending(typed.runtime, typed.session)
+        return None
+    await store_draft(typed.context, draft_id, draft)
+    return _Saved(result.saved_key, draft_id, draft, result.schedule_label)
+
+
+async def _consume_annotation(typed: _TypedInput) -> _Saved | None:
+    release_key = str(typed.pending.get("release_key") or "")
+    entries = await load_crate(typed.context.application.bot_data, typed.user_id)
+    if not any(
+        release_preference_key(TrackMatch(**{"links": {}, **entry["item"]}))
+        == release_key
+        for entry in entries
+        if isinstance(entry.get("item"), dict)
+    ):
+        await _refuse(typed, "ed_expired")
+        return None
+    field = "note" if typed.kind == "crate_note" else "section"
+    session = typed.session
+    record = dict(session.collection_annotations.pop(release_key, {}))
+    record[field] = (
+        ""
+        if typed.value == "-"
+        else " ".join(typed.value.split())[: 140 if field == "note" else 64]
+    )
+    session.collection_annotations[release_key] = record
+    session.collection_annotations = normalize_annotations(
+        session.collection_annotations
+    )
+    current_presentation.set(preferences_from_session(session))
+    return _Saved("settings_saved")
 
 
 def _pending_expired(pending: dict) -> bool:
