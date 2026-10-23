@@ -17,10 +17,6 @@ _BLOCKQUOTE_OPEN = "<blockquote>"
 _BLOCKQUOTE_CLOSE = "</blockquote>"
 _BLOCKQUOTE_SUFFIX = f"{_BLOCKQUOTE_CLOSE}\n\n"
 _TAG_RE = re.compile(r"<[^>]*>")
-# Past about five phone lines the quote folds to its first lines, with
-# Telegram's own "show more"; a short quote stays fully open.
-EXPANDABLE_QUOTE_AFTER = 280
-_EXPANDABLE_OPEN = "<blockquote expandable>"
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,27 +90,18 @@ def compose_with_intro(
     limit = intro_limit_for_body(draft, body_html)
     used = visible_length(prefix_html)
     if used <= limit:
-        return _foldable(prefix_html) + body_html, IntroBudget(limit=limit, used=used)
+        return prefix_html + body_html, IntroBudget(limit=limit, used=used)
 
     inner = _blockquote_inner(prefix_html)
     if limit <= 0:
         return body_html, IntroBudget(limit=0, used=used, truncated=bool(used))
     fitted = fit_telegram_html(inner, limit)
     prefix = f"{_BLOCKQUOTE_OPEN}{fitted}{_BLOCKQUOTE_SUFFIX}"
-    return _foldable(prefix) + body_html, IntroBudget(
+    return prefix + body_html, IntroBudget(
         limit=limit,
         used=used,
         truncated=True,
     )
-
-
-def _foldable(prefix_html: str) -> str:
-    """Fold a long intro quote; keep its bold, italic and links as they are."""
-    inner = _blockquote_inner(prefix_html)
-    long = visible_length(inner) > EXPANDABLE_QUOTE_AFTER or inner.count("\n") >= 4
-    if long and prefix_html.lstrip().startswith(_BLOCKQUOTE_OPEN):
-        return prefix_html.replace(_BLOCKQUOTE_OPEN, _EXPANDABLE_OPEN, 1)
-    return prefix_html
 
 
 def _blockquote_inner(prefix_html: str) -> str:

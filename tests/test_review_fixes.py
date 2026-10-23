@@ -102,35 +102,24 @@ def test_every_schedule_form_is_read_in_the_bot_time_zone() -> None:
     assert utc("31.02 10:00") is None
 
 
-def test_a_long_intro_folds_and_keeps_its_formatting() -> None:
+def test_the_intro_quote_is_always_shown_in_full() -> None:
+    """The owner wants every reader to see the whole text: never folded."""
     from music_links_bot.publication_budget import compose_with_intro
 
-    body = "<b>Sleep — Dopesmoker</b>\n\n💿 Альбом · 2003"
-    short = "<blockquote>Коротко и <b>жирно</b>.</blockquote>\n\n"
+    body = "<b>HMLTD — Listen to FANGS</b>\n\n💿 Альбом · 2026"
     long = (
-        "<blockquote>Медленно, <b>тяжело</b>, на повторе. "
+        "<blockquote>Вот от кого я совершенно не ожидал <b>сильного</b> альбома. "
         + "Час одного риффа и ни минуты лишней. " * 12
         + "<i>конец</i></blockquote>\n\n"
     )
+    cut = "<blockquote>" + "Очень длинный текст. " * 400 + "</blockquote>\n\n"
 
-    open_text, _ = compose_with_intro(
-        {"quote": True}, prefix_html=short, body_html=body
-    )
-    folded, _ = compose_with_intro({"quote": True}, prefix_html=long, body_html=body)
-
-    assert open_text.startswith("<blockquote>Коротко")
-    assert folded.startswith("<blockquote expandable>Медленно, <b>тяжело</b>")
-    assert "<i>конец</i></blockquote>" in folded
-
-
-def test_a_cut_intro_still_folds() -> None:
-    from music_links_bot.publication_budget import compose_with_intro
-
-    long = "<blockquote>" + "Очень длинный текст. " * 400 + "</blockquote>\n\n"
-    text, budget = compose_with_intro(
-        {"quote": True}, prefix_html=long, body_html="<b>A — B</b>"
+    full, _ = compose_with_intro({"quote": True}, prefix_html=long, body_html=body)
+    trimmed, budget = compose_with_intro(
+        {"quote": True}, prefix_html=cut, body_html=body
     )
 
-    assert budget.truncated
-    assert text.startswith("<blockquote expandable>")
-    assert text.count("</blockquote>") == 1
+    assert full.startswith("<blockquote>Вот от кого")
+    assert "<i>конец</i></blockquote>" in full
+    assert budget.truncated and trimmed.startswith("<blockquote>")
+    assert "expandable" not in full + trimmed
