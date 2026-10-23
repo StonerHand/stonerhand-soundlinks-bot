@@ -152,8 +152,8 @@
     "ru": "Нужна фотография. Отправь изображение без файла-документа."
   },
   "ed_cover_prompt": {
-    "en": "<b>🖼 Own cover</b>\nReply with one photo. It is used for this post only.\n<code>/cancel</code> — cancel",
-    "ru": "<b>🖼 Своя обложка</b>\nОтветь одной фотографией. Она будет только у этого поста.\n<code>/cancel</code> — отменить"
+    "en": "<b>🖼 Own cover</b>\nReply with one photo. It is used for this post only.",
+    "ru": "<b>🖼 Своя обложка</b>\nОтветь одной фотографией. Она будет только у этого поста."
   },
   "ed_cover_reset": {
     "en": "↺ Use release cover",
@@ -232,8 +232,8 @@
     "ru": "✏️ Изменить текст"
   },
   "ed_intro_prompt": {
-    "ru": "<b>✏️ Текст поста</b>\nОтветь одним сообщением, до {limit} символов. Жирный текст, ссылки и другое оформление сохранятся.\n\n<code>/cancel</code> — вернуться без изменений.",
-    "en": "<b>✏️ Post text</b>\nReply with one message, up to {limit} characters. Bold text, links and other formatting are kept.\n\n<code>/cancel</code> — go back without changes."
+    "ru": "<b>✏️ Текст поста</b>\nОтветь одним сообщением, до {limit} символов. Жирный текст, ссылки и другое оформление сохранятся.",
+    "en": "<b>✏️ Post text</b>\nReply with one message, up to {limit} characters. Bold text, links and other formatting are kept."
   },
   "ed_intro_remove": {
     "ru": "🗑 Убрать свой текст",
@@ -344,8 +344,8 @@
     "en": "🚫 No tags"
   },
   "ed_tags_prompt": {
-    "ru": "<b>Добавить теги</b>\nПришли теги через пробел — с # или без. Они добавятся к выбранным; всего до 5.\n\n<code>/cancel</code> — вернуться без изменений.",
-    "en": "<b>Add tags</b>\nSend tags separated by spaces, with or without #. They will be added to your selection, up to 5 in total.\n\n<code>/cancel</code> — go back without changes."
+    "ru": "<b>Добавить теги</b>\nПришли теги через пробел — с # или без. Они добавятся к выбранным; всего до 5.",
+    "en": "<b>Add tags</b>\nSend tags separated by spaces, with or without #. They will be added to your selection, up to 5 in total."
   },
   "ed_tags_saved": {
     "ru": "✓ Теги сохранены",
@@ -364,8 +364,8 @@
     "ru": "🗑 Удалить"
   },
   "ed_template_prompt": {
-    "en": "<b>Template name</b>\nFor example: <code>Album of the week</code> or <code>Minimal</code>.\n<code>/cancel</code> — cancel",
-    "ru": "<b>Название шаблона</b>\nНапример: <code>Альбом недели</code> или <code>Минимал</code>.\n<code>/cancel</code> — отменить"
+    "en": "<b>Template name</b>\nFor example: <code>Album of the week</code> or <code>Minimal</code>.",
+    "ru": "<b>Название шаблона</b>\nНапример: <code>Альбом недели</code> или <code>Минимал</code>."
   },
   "ed_template_save": {
     "ru": "💾 Сохранить как шаблон",
@@ -732,8 +732,8 @@
     "ru": "Нужна ровно одна поддерживаемая музыкальная ссылка."
   },
   "replace_source_prompt": {
-    "en": "<b>Replace link #{index}</b>\nSend one new music link.\n<code>/cancel</code> — cancel",
-    "ru": "<b>Замена ссылки №{index}</b>\nПришли одну новую музыкальную ссылку.\n<code>/cancel</code> — отменить"
+    "en": "<b>Replace link #{index}</b>\nSend one new music link.",
+    "ru": "<b>Замена ссылки №{index}</b>\nПришли одну новую музыкальную ссылку."
   },
   "request_cancel": {
     "en": "✕ Cancel search",
@@ -772,8 +772,8 @@
     "ru": "Не получилось прочитать время. Попробуй так: <code>21:00</code>, <code>завтра 18:30</code>, <code>пт 21:00</code> или <code>через 2 часа</code>."
   },
   "schedule_prompt": {
-    "en": "<b>When to publish?</b>\nType, for example: <code>21:00</code>, <code>tomorrow 18:30</code>, <code>fri 21:00</code>, <code>15.08 19:30</code> or <code>in 2 hours</code>.\n<code>/cancel</code> — cancel",
-    "ru": "<b>Когда опубликовать?</b>\nНапиши, например: <code>21:00</code>, <code>завтра 18:30</code>, <code>пт 21:00</code>, <code>15.08 19:30</code> или <code>через 2 часа</code>.\n<code>/cancel</code> — отменить"
+    "en": "<b>When to publish?</b>\nType, for example: <code>21:00</code>, <code>tomorrow 18:30</code>, <code>fri 21:00</code>, <code>15.08 19:30</code> or <code>in 2 hours</code>.",
+    "ru": "<b>Когда опубликовать?</b>\nНапиши, например: <code>21:00</code>, <code>завтра 18:30</code>, <code>пт 21:00</code>, <code>15.08 19:30</code> или <code>через 2 часа</code>."
   },
   "schedule_title": {
     "ru": "<b>🕒 Когда опубликовать?</b>",
@@ -1264,8 +1264,8 @@
     "en": "🔎 Search"
   },
   "posts_search_prompt": {
-    "ru": "Что найти? Например: <code>Sleep</code>. /cancel — отменить",
-    "en": "What to find? For example: <code>Sleep</code>. /cancel to cancel"
+    "ru": "Что найти? Например: <code>Sleep</code>.",
+    "en": "What to find? For example: <code>Sleep</code>."
   },
   "posts_search_clear": {
     "ru": "✕ Сбросить",
@@ -1296,12 +1296,12 @@
     "en": "no confirmed metadata"
   },
   "crate_links_prompt": {
-    "ru": "Пришли до 10 музыкальных ссылок, каждую с новой строки. Добавлю их в текущую подборку. /cancel — отменить.",
-    "en": "Send up to 10 music links, one per line, to add to your current collection. /cancel to cancel."
+    "ru": "Пришли до 10 музыкальных ссылок, каждую с новой строки. Добавлю их в текущую подборку.",
+    "en": "Send up to 10 music links, one per line, to add to your current collection."
   },
   "crate_replace_prompt": {
-    "ru": "Пришли одну ссылку на трек или альбом для замены выбранной позиции. /cancel — отменить.",
-    "en": "Send one track or album link to replace the selected item. /cancel to cancel."
+    "ru": "Пришли одну ссылку на трек или альбом для замены выбранной позиции.",
+    "en": "Send one track or album link to replace the selected item."
   },
   "crate_add_links": {
     "ru": "➕ Добавить ссылки",
@@ -1624,8 +1624,8 @@
     "en": "← Collections"
   },
   "pref_brand_label_prompt": {
-    "ru": "<b>✍️ Подпись на обложке</b>\nПришли текст до 40 символов, например <code>@stonerhand</code>. «-» вернёт подпись по умолчанию. /cancel — отменить",
-    "en": "<b>✍️ Cover signature</b>\nSend up to 40 characters, e.g. <code>@stonerhand</code>. “-” restores the default. /cancel to cancel"
+    "ru": "<b>✍️ Подпись на обложке</b>\nПришли текст до 40 символов, например <code>@stonerhand</code>. «-» вернёт подпись по умолчанию.",
+    "en": "<b>✍️ Cover signature</b>\nSend up to 40 characters, e.g. <code>@stonerhand</code>. “-” restores the default."
   },
   "pref_brand_label_saved": {
     "ru": "✅ Подпись на обложке: <b>{value}</b>. Новые посты выйдут с ней.",

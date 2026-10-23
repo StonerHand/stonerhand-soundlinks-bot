@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
+from typing import Any
 
 from telegram import InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
@@ -66,193 +68,272 @@ async def load_crate_view(context, user_id: int, *, lang: str, items=None):
     return crate_view(context, user_id, items, lang=lang, title=title)
 
 
+@dataclass(slots=True)
+class _CrateTap:
+    """One button press on the collection screen and what it acts on."""
+
+    query: Any
+    context: Any
+    action: CallbackAction
+    lang: str
+    user_id: int
+    title: str
+    items: list[dict]
+    undo_map: dict
+    undo: dict | None
+
+    @property
+    def bot_data(self) -> dict:
+        return self.context.application.bot_data
+
+    @property
+    def reference(self) -> str:
+        return self.action.payload
+
+
+@dataclass(slots=True)
+class _CrateChange:
+    items: list[dict]
+    selected: int | None = None
+    notice: str | None = None
+    undo: dict | None = None
+
+
 async def dispatch_crate_action(query, context, action: CallbackAction) -> None:
     if query.from_user is None:
         await query.answer()
         return
-    lang = resolve_lang(query.from_user.language_code)
     user_id = query.from_user.id
     bot_data = context.application.bot_data
-    title = await load_crate_title(bot_data, user_id)
     undo_map = bot_data.setdefault("crate_undo", {})
-    undo_record = _active_undo(undo_map, user_id)
-    current_items = await load_crate(bot_data, user_id)
-    reference = action.payload
+    tap = _CrateTap(
+        query=query,
+        context=context,
+        action=action,
+        lang=resolve_lang(query.from_user.language_code),
+        user_id=user_id,
+        title=await load_crate_title(bot_data, user_id),
+        items=await load_crate(bot_data, user_id),
+        undo_map=undo_map,
+        undo=_active_undo(undo_map, user_id),
+    )
     if (
         action.action in {"up", "down", "remove", "select"}
-        and reference.isdigit()
-        and len(reference) < 3
+        and tap.reference.isdigit()
+        and len(tap.reference) < 3
     ):
         # Old positional controls cannot safely identify an item after reordering.
-        await query.answer(get_text(lang, "state_conflict"), show_alert=True)
-        text, keyboard = crate_view(
-            context, user_id, current_items, lang=lang, title=title
-        )
-        await safe_edit(query, text, keyboard)
+        await query.answer(get_text(tap.lang, "state_conflict"), show_alert=True)
+        await _show_list(tap, _CrateChange(tap.items, undo=tap.undo))
         return
-    index = item_index(current_items, reference)
-    selected_index: int | None = None
-    notice: str | None = None
-
-    if action.action in {"add", "replace"}:
-        if action.action == "replace" and index < 0:
-            await query.answer(get_text(lang, "ed_expired"), show_alert=True)
-            return
-        if query.message is None:
-            await query.answer()
-            return
-        runtime = runtime_for(context)
-        session = await runtime.get_session(user_id, lang=lang)
-        session.pending_input = {
-            "kind": "collection_links"
-            if action.action == "add"
-            else "collection_replace",
-            "release_key": reference,
-            "created_at": int(time.time()),
-        }
-        await runtime.save_session(session)
+    screen = _CRATE_SCREENS.get(action.action)
+    if screen is not None:
+        await screen(tap)
+        return
+    change = _CRATE_CHANGES.get(action.action)
+    if change is None:
         await query.answer()
-        await safe_edit(
-            query,
-            get_text(
-                lang,
-                "crate_links_prompt"
-                if action.action == "add"
-                else "crate_replace_prompt",
-            ),
-            InlineKeyboardMarkup(
-                [
-                    [
-                        InlineKeyboardButton(
-                            get_text(lang, "cancel"),
-                            callback_data=encode_callback("crate", "open"),
-                        )
-                    ]
-                ]
-            ),
-        )
         return
-    if action.action == "open":
-        runtime = runtime_for(context)
-        session = await runtime.get_session(user_id, lang=lang)
-        session.pending_input = {}
-        await runtime.save_session(session)
-    if action.action in {"note", "section"}:
-        items = await load_crate(bot_data, user_id)
-        if query.message is None or not any(
-            release_preference_key(TrackMatch(**{"links": {}, **entry["item"]}))
-            == action.payload
-            for entry in items
-            if isinstance(entry.get("item"), dict)
-        ):
-            await query.answer(get_text(lang, "ed_expired"), show_alert=True)
-            return
-        prompt = await query.message.reply_text(
-            get_text(lang, "crate_" + action.action + "_prompt"),
-            reply_markup=input_prompt_markup(lang),
-        )
-        runtime = runtime_for(context)
-        session = await runtime.get_session(user_id, lang=lang)
-        session.pending_input = {
-            "kind": "crate_" + action.action,
-            "release_key": action.payload,
-            "editor_chat_id": query.message.chat_id,
-            "editor_message_id": query.message.message_id,
+    result = await change(tap)
+    await query.answer(result.notice)
+    await _show_list(tap, result)
+
+
+async def _show_list(tap: _CrateTap, change: _CrateChange) -> None:
+    text, keyboard = crate_view(
+        tap.context,
+        tap.user_id,
+        change.items,
+        lang=tap.lang,
+        title=tap.title,
+        selected_index=change.selected,
+        can_undo=change.undo is not None,
+    )
+    await safe_edit(tap.query, text, keyboard)
+
+
+async def _set_pending(tap: _CrateTap, pending: dict) -> None:
+    runtime = runtime_for(tap.context)
+    session = await runtime.get_session(tap.user_id, lang=tap.lang)
+    session.pending_input = pending
+    await runtime.save_session(session)
+
+
+# Screens: actions that answer with a screen of their own.
+
+
+async def _ask_for_links(tap: _CrateTap) -> None:
+    replacing = tap.action.action == "replace"
+    if replacing and item_index(tap.items, tap.reference) < 0:
+        await tap.query.answer(get_text(tap.lang, "ed_expired"), show_alert=True)
+        return
+    if tap.query.message is None:
+        await tap.query.answer()
+        return
+    await _set_pending(
+        tap,
+        {
+            "kind": "collection_replace" if replacing else "collection_links",
+            "release_key": tap.reference,
+            "created_at": int(time.time()),
+        },
+    )
+    await tap.query.answer()
+    back = InlineKeyboardButton(
+        get_text(tap.lang, "cancel"), callback_data=encode_callback("crate", "open")
+    )
+    await safe_edit(
+        tap.query,
+        get_text(
+            tap.lang, "crate_replace_prompt" if replacing else "crate_links_prompt"
+        ),
+        InlineKeyboardMarkup([[back]]),
+    )
+
+
+async def _ask_for_annotation(tap: _CrateTap) -> None:
+    message = tap.query.message
+    if message is None or not any(
+        release_preference_key(TrackMatch(**{"links": {}, **entry["item"]}))
+        == tap.reference
+        for entry in tap.items
+        if isinstance(entry.get("item"), dict)
+    ):
+        await tap.query.answer(get_text(tap.lang, "ed_expired"), show_alert=True)
+        return
+    prompt = await message.reply_text(
+        get_text(tap.lang, f"crate_{tap.action.action}_prompt"),
+        reply_markup=input_prompt_markup(tap.lang),
+    )
+    await _set_pending(
+        tap,
+        {
+            "kind": f"crate_{tap.action.action}",
+            "release_key": tap.reference,
+            "editor_chat_id": message.chat_id,
+            "editor_message_id": message.message_id,
             "prompt_message_id": prompt.message_id,
             "created_at": int(time.time()),
-        }
-        await runtime.save_session(session)
-        await query.answer()
-        return
-    if action.action == "rename":
-        await _start_rename(query, context, user_id=user_id, lang=lang)
-        return
-    if action.action == "preview":
-        await _show_preview(query, context, user_id=user_id, lang=lang, title=title)
-        return
-    if action.action in {"style", "more"}:
-        await query.answer()
-        text, keyboard = render_crate(
-            current_items, lang=lang, title=title, screen=action.action
-        )
-        await safe_edit(query, text, keyboard)
-        return
-    if action.action == "publish":
-        await _publish_crate(
-            query,
-            context,
-            user_id=user_id,
-            lang=lang,
-            title=title,
-            revision=action.payload,
-        )
-        return
-    if action.action == "up":
-        items = await move_crate_item(bot_data, user_id, reference, -1)
-        selected_index = item_index(items, reference)
-        notice = get_text(lang, "crate_order_updated")
-    elif action.action == "down":
-        items = await move_crate_item(bot_data, user_id, reference, 1)
-        selected_index = item_index(items, reference) if items else None
-        notice = get_text(lang, "crate_order_updated")
-    elif action.action == "select":
-        items = await load_crate(bot_data, user_id)
-        selected_index = index
-    elif action.action == "remove":
-        items, undo_record, selected_index, notice = await _remove_item(
-            bot_data,
-            undo_map,
-            user_id=user_id,
-            index=reference,
-            lang=lang,
-        )
-    elif action.action == "undo":
-        items, undo_record, selected_index, notice = await _restore_last(
-            bot_data,
-            undo_map,
-            user_id=user_id,
-            record=undo_record,
-            lang=lang,
-        )
-    elif action.action == "clear":
-        items = await load_crate(bot_data, user_id)
-        await query.answer()
-        text, keyboard = render_crate(items, lang=lang, confirm_clear=True, title=title)
-        await safe_edit(query, text, keyboard)
-        return
-    elif action.action == "clear_confirm":
-        _, previous_items = await clear_crate_items(bot_data, user_id, action.payload)
-        undo_record = {
-            "kind": "clear",
-            "items": previous_items,
-            "index": 0,
-            "expires_at": time.time() + CRATE_UNDO_SECONDS,
-        }
-        remember_bounded(
-            undo_map,
-            user_id,
-            undo_record,
-            max_size=MAX_CRATE_UNDO_RECORDS,
-        )
-        items = []
-        notice = get_text(lang, "crate_cleared")
-    elif action.action in {"clear_cancel", "open"}:
-        items = await load_crate(bot_data, user_id)
-    else:
-        await query.answer()
-        return
-
-    await query.answer(notice)
-    text, keyboard = crate_view(
-        context,
-        user_id,
-        items,
-        lang=lang,
-        title=title,
-        selected_index=selected_index,
-        can_undo=undo_record is not None,
+        },
     )
-    await safe_edit(query, text, keyboard)
+    await tap.query.answer()
+
+
+async def _rename(tap: _CrateTap) -> None:
+    await _start_rename(tap.query, tap.context, user_id=tap.user_id, lang=tap.lang)
+
+
+async def _preview(tap: _CrateTap) -> None:
+    await _show_preview(
+        tap.query, tap.context, user_id=tap.user_id, lang=tap.lang, title=tap.title
+    )
+
+
+async def _side_screen(tap: _CrateTap) -> None:
+    await tap.query.answer()
+    text, keyboard = render_crate(
+        tap.items, lang=tap.lang, title=tap.title, screen=tap.action.action
+    )
+    await safe_edit(tap.query, text, keyboard)
+
+
+async def _confirm_clear(tap: _CrateTap) -> None:
+    await tap.query.answer()
+    text, keyboard = render_crate(
+        tap.items, lang=tap.lang, confirm_clear=True, title=tap.title
+    )
+    await safe_edit(tap.query, text, keyboard)
+
+
+async def _publish(tap: _CrateTap) -> None:
+    await _publish_crate(
+        tap.query,
+        tap.context,
+        user_id=tap.user_id,
+        lang=tap.lang,
+        title=tap.title,
+        revision=tap.reference,
+    )
+
+
+# Changes: actions that edit the collection and redraw the list.
+
+
+async def _move(tap: _CrateTap) -> _CrateChange:
+    step = -1 if tap.action.action == "up" else 1
+    items = await move_crate_item(tap.bot_data, tap.user_id, tap.reference, step)
+    return _CrateChange(
+        items,
+        selected=item_index(items, tap.reference) if items else None,
+        notice=get_text(tap.lang, "crate_order_updated"),
+        undo=tap.undo,
+    )
+
+
+async def _select(tap: _CrateTap) -> _CrateChange:
+    return _CrateChange(
+        tap.items, selected=item_index(tap.items, tap.reference), undo=tap.undo
+    )
+
+
+async def _remove(tap: _CrateTap) -> _CrateChange:
+    items, undo, selected, notice = await _remove_item(
+        tap.bot_data,
+        tap.undo_map,
+        user_id=tap.user_id,
+        index=tap.reference,
+        lang=tap.lang,
+    )
+    return _CrateChange(items, selected=selected, notice=notice, undo=undo)
+
+
+async def _undo(tap: _CrateTap) -> _CrateChange:
+    items, undo, selected, notice = await _restore_last(
+        tap.bot_data, tap.undo_map, user_id=tap.user_id, record=tap.undo, lang=tap.lang
+    )
+    return _CrateChange(items, selected=selected, notice=notice, undo=undo)
+
+
+async def _clear(tap: _CrateTap) -> _CrateChange:
+    _, previous = await clear_crate_items(tap.bot_data, tap.user_id, tap.reference)
+    undo = {
+        "kind": "clear",
+        "items": previous,
+        "index": 0,
+        "expires_at": time.time() + CRATE_UNDO_SECONDS,
+    }
+    remember_bounded(tap.undo_map, tap.user_id, undo, max_size=MAX_CRATE_UNDO_RECORDS)
+    return _CrateChange([], notice=get_text(tap.lang, "crate_cleared"), undo=undo)
+
+
+async def _open(tap: _CrateTap) -> _CrateChange:
+    if tap.action.action == "open":
+        await _set_pending(tap, {})
+    return _CrateChange(tap.items, undo=tap.undo)
+
+
+_CRATE_SCREENS = {
+    "add": _ask_for_links,
+    "replace": _ask_for_links,
+    "note": _ask_for_annotation,
+    "section": _ask_for_annotation,
+    "rename": _rename,
+    "preview": _preview,
+    "style": _side_screen,
+    "more": _side_screen,
+    "clear": _confirm_clear,
+    "publish": _publish,
+}
+_CRATE_CHANGES = {
+    "up": _move,
+    "down": _move,
+    "select": _select,
+    "remove": _remove,
+    "undo": _undo,
+    "clear_confirm": _clear,
+    "clear_cancel": _open,
+    "open": _open,
+}
 
 
 async def _publish_crate(
@@ -441,13 +522,13 @@ async def _remove_item(
     index: str,
     lang: str,
 ) -> tuple[list[dict], dict | None, int | None, str | None]:
-    items, (index, removed) = await pop_crate_item(bot_data, user_id, index)
+    items, (position, removed) = await pop_crate_item(bot_data, user_id, index)
     record = None
     notice = None
     if removed is not None:
         record = {
             "entry": removed,
-            "index": index,
+            "index": position,
             "expires_at": time.time() + CRATE_UNDO_SECONDS,
         }
         remember_bounded(
@@ -457,7 +538,7 @@ async def _remove_item(
             max_size=MAX_CRATE_UNDO_RECORDS,
         )
         notice = get_text(lang, "crate_removed")
-    selected = min(index, len(items) - 1) if items else None
+    selected = min(int(position), len(items) - 1) if items else None
     return items, record, selected, notice
 
 
