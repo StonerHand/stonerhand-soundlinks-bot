@@ -296,3 +296,78 @@ class SpotifyClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(track.artist, "Spotify")
         self.assertEqual(track.thumbnail_url, "https://i.scdn.co/image/cover")
         self.assertEqual(client._client.get.await_count, 3)
+
+
+def _album_page(og_title: str, *, schema_id: str | None = "abc") -> str:
+    """Spotify's 2026 album page: a call to action in og:title, the bare name
+    in its JSON-LD."""
+    schema = (
+        '<script type="application/ld+json">'
+        + json.dumps(
+            {
+                "@type": "MusicAlbum",
+                "@id": f"https://open.spotify.com/album/{schema_id}",
+                "name": "Mad Flowers",
+            }
+        )
+        + "</script>"
+        if schema_id
+        else ""
+    )
+    return (
+        f'<meta property="og:title" content="{og_title}">'
+        '<meta property="og:type" content="music.album">'
+        '<meta property="og:description" content="Victor Jones · album · 2024 · 8 songs">'
+        '<meta property="og:image" content="https://i.scdn.co/image/cover">' + schema
+    )
+
+
+class SpotifyCallToActionTitleTests(unittest.TestCase):
+    URL = "https://open.spotify.com/album/abc?si=x"
+
+    def test_album_title_is_the_release_name_in_any_language(self) -> None:
+        for og_title in (
+            "Listen to Mad Flowers - Album by Victor Jones | Spotify",
+            "Escucha Mad Flowers - Album de Victor Jones | Spotify",
+            "Streame Mad Flowers – Album von Victor Jones | Spotify",
+        ):
+            with self.subTest(og_title=og_title):
+                album = parse_spotify_page(self.URL, _album_page(og_title))
+                self.assertEqual(
+                    (album.artist, album.title), ("Victor Jones", "Mad Flowers")
+                )
+
+    def test_without_structured_data_the_english_call_to_action_is_dropped(
+        self,
+    ) -> None:
+        album = parse_spotify_page(
+            self.URL,
+            _album_page(
+                "Listen to Mad Flowers - Album by Victor Jones | Spotify",
+                schema_id=None,
+            ),
+        )
+        self.assertEqual(album.title, "Mad Flowers")
+
+    def test_structured_data_of_another_release_is_ignored(self) -> None:
+        album = parse_spotify_page(
+            self.URL,
+            _album_page(
+                "Listen to Mad Flowers - Album by Victor Jones | Spotify",
+                schema_id="other",
+            ),
+        )
+        self.assertEqual(album.title, "Mad Flowers")
+
+    def test_a_release_really_named_listen_to_keeps_its_name(self) -> None:
+        from music_links_bot.metadata_cleaning import clean_spotify_metadata_title
+
+        self.assertEqual(
+            clean_spotify_metadata_title("Listen to the Music"), "Listen to the Music"
+        )
+        self.assertEqual(
+            clean_spotify_metadata_title(
+                "Listen to Listen to the Music - Album by The Doobie Brothers | Spotify"
+            ),
+            "Listen to the Music",
+        )
