@@ -134,7 +134,14 @@ def _parse_apple_tv(page: str, source_url: str, title_id: str) -> TitleMatch | N
 
 
 def _parse_disney(page: str, source_url: str, title_id: str) -> TitleMatch | None:
-    title = _meta(page, "title").split(" | ", 1)[0].strip()
+    # og:title wraps the name in a localized call to action ("Watch Moana",
+    # "Vaiana ansehen", "Ver Vaiana"); the page's details block has it bare.
+    details = _first(rf'"_type":"MediaDetails","_id":"[^"]*","title":{_STRING}', page)
+    title = (
+        _json_string(details)
+        if details
+        else _meta(page, "title").split(" | ", 1)[0].strip()
+    ).strip()
     if not title:
         return None
     seasons = _first(r'"seasonsAvailable":"(\d+)', page)

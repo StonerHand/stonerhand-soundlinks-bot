@@ -46,6 +46,9 @@ _ARTWORK_HOST_SUFFIXES = (
     "bcbits.com",
     "music.yandex.net",
     "avatars.yandex.net",
+    # Film and series stills: Netflix, Disney+ (Apple TV+ is on mzstatic).
+    "nflxso.net",
+    "images.edge.bamgrid.com",
 )
 
 
@@ -77,7 +80,8 @@ def collection_collage_preview_url(
 
 VIDEO_MODE = "v"  # every tile is a video frame
 MIX_MODE = "m"  # the first tile is the release cover, the rest are frames
-COLLAGE_MODES = {VIDEO_MODE, MIX_MODE}
+FRAME_MODE = "w"  # one wide still (a film, a series), kept 16:9
+COLLAGE_MODES = {VIDEO_MODE, MIX_MODE, FRAME_MODE}
 
 
 def video_collage_preview_url(
@@ -190,6 +194,23 @@ def branded_artwork_preview_url(
         return None
     return _artwork_preview_url(
         [artwork_url], base_url=base_url, signing_secret=signing_secret
+    )
+
+
+def branded_frame_preview_url(
+    image_url: str | None,
+    *,
+    base_url: str | None = None,
+    signing_secret: str | None = None,
+) -> str | None:
+    """Signed wide still with the cover signature (film and series cards)."""
+    if not photo_branding_enabled() or not image_url or not _safe_source_url(image_url):
+        return None
+    return _artwork_preview_url(
+        [image_url],
+        base_url=base_url,
+        signing_secret=signing_secret,
+        mode=FRAME_MODE,
     )
 
 
@@ -380,6 +401,53 @@ def compose_collection_collage(
             return output.getvalue()
         except (OSError, TypeError, ValueError):
             return None
+
+
+FRAME_SIZE = (1_200, 675)
+
+
+def compose_frame(
+    artwork: bytes,
+    *,
+    label: str | None = None,
+    play: bool = False,
+) -> bytes | None:
+    """One wide still (a film's hero shot, a clip's frame) as a 16:9 JPEG.
+
+    A square crop would cut the cast out of a film still, so a frame keeps the
+    screen's shape and gets the same signature footer as a cover.
+    """
+    try:
+        from PIL import Image, ImageOps
+    except ImportError:
+        return None
+
+    if len(artwork) > MAX_ARTWORK_BYTES:
+        return None
+    try:
+        with ExitStack() as resources:
+            source = resources.enter_context(Image.open(io.BytesIO(artwork)))
+            if source.width * source.height > MAX_ARTWORK_PIXELS:
+                return None
+            source.thumbnail((FRAME_SIZE[0], FRAME_SIZE[0]), Image.Resampling.LANCZOS)
+            image = resources.enter_context(ImageOps.exif_transpose(source))
+            rgb = resources.enter_context(image.convert("RGB"))
+            if play:
+                rgb = resources.enter_context(_trim_letterbox(rgb))
+            frame = resources.enter_context(
+                ImageOps.fit(rgb, FRAME_SIZE, method=Image.Resampling.LANCZOS)
+            )
+            if play:
+                _draw_play_badge(frame)
+            if label is not None:
+                frame = resources.enter_context(
+                    apply_cover_signature(frame, label=label)
+                )
+            output = io.BytesIO()
+            frame.save(output, "JPEG", quality=88, optimize=True)
+            return output.getvalue()
+    except (OSError, TypeError, ValueError, Image.DecompressionBombError):
+        return None
 
 
 def _trim_letterbox(image):
