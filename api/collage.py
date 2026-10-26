@@ -18,9 +18,11 @@ if str(SRC_PATH) not in sys.path:
 
 from music_links_bot.branding import compose_cover
 from music_links_bot.collection_collage import (
+    FRAME_MODE,
     MAX_ARTWORK_BYTES,
     collage_play_flags,
     compose_collection_collage,
+    compose_frame,
     decode_collage_payload,
 )
 from music_links_bot.constants import HTTP_USER_AGENT
@@ -84,7 +86,14 @@ class handler(BaseHTTPRequestHandler):
         ]
         images = [image for image, _flag in pairs]
         label = label_override or brand_label()
-        if len(images) == 1 and photo_branding_enabled():
+        if len(images) == 1 and (mode == FRAME_MODE or pairs[0][1]):
+            # A film still or a lone clip frame keeps the screen's 16:9 shape.
+            collage = compose_frame(
+                images[0],
+                label=label if photo_branding_enabled() else None,
+                play=pairs[0][1],
+            )
+        elif len(images) == 1 and photo_branding_enabled():
             collage = compose_cover(images[0], label=label, size=1200)
         elif len(images) >= 2:
             collage = compose_collection_collage(

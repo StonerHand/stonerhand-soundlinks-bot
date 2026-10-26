@@ -374,12 +374,19 @@ def _apple_page(kind: str = "TVSeries") -> str:
     )
 
 
-def _disney_page(*, seasons: str = "") -> str:
+def _disney_page(*, seasons: str = "", details: bool = True) -> str:
     extra = f'"seasonsAvailable":"{seasons}",' if seasons else '"runtimeMs":6755000,'
+    block = (
+        '{"_type":"MediaDetails","_id":"cu64824pk548ty9d","title":"Moana"},'
+        if details
+        else ""
+    )
     return (
-        '<meta property="og:title" content="Moana | Watch on Disney+">'
+        # The real og:title is a localized call to action around the name.
+        '<meta property="og:title" content="Watch Moana | Disney+">'
         f'<meta property="og:image" content="{DISNEY_IMAGE}">'
-        f'<script>{{"releaseYear":"2016",{extra}"genres":["Action and Adventure"]}}'
+        f'<script>{{"releaseYear":"2016",{extra}"genres":["Action and Adventure"],'
+        f'"items":[{block}{{"_type":"ImageCard","title":"Frozen"}}]}}'
         "</script>"
     )
 
@@ -426,6 +433,15 @@ class MoreServicesTests(unittest.TestCase):
             "https://www.disneyplus.com/browse/entity-e8896bfa-1052-41f7-ae2e-00255d77cf05",
         )
         self.assertEqual((series.kind, series.seasons), ("series", 38))
+
+    def test_disney_title_is_the_bare_name_not_the_call_to_action(self) -> None:
+        card = parse_title_page(_disney_page(), DISNEY_FILM_URL)
+        fallback = parse_title_page(_disney_page(details=False), DISNEY_FILM_URL)
+
+        assert card is not None and fallback is not None
+        self.assertEqual(card.title, "Moana")
+        # A page without the details block still makes a card from og:title.
+        self.assertIn("Moana", fallback.title)
 
     def test_cards_name_their_service(self) -> None:
         apple = _card(service="Apple TV+", seasons=None, year=2022, genre="Thriller")

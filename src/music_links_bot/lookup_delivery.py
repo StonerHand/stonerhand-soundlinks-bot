@@ -8,6 +8,7 @@ from telegram.ext import ContextTypes
 
 from music_links_bot.bot_runtime import encode_callback
 from music_links_bot.collection_collage import (
+    branded_frame_preview_url,
     media_collage_preview_url,
     video_collage_preview_url,
 )
@@ -99,7 +100,9 @@ async def send_title_result(
                 user_prefix,
                 format_title_message(title, include_hashtags=include_hashtags),
             ),
-            preview_url=title.image_url or title.watch_url,
+            preview_url=branded_frame_preview_url(title.image_url)
+            or title.image_url
+            or title.watch_url,
             reply_markup=keyboard,
             source_urls=(title.url,),
             content_kind="title",

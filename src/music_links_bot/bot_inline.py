@@ -661,6 +661,8 @@ async def _build_inline_result(
 
     found = streaming_title(source_url)
     if found:
+        from music_links_bot.collection_collage import branded_frame_preview_url
+
         titles = await bot_lookup._lookup_titles(
             bot_data["title_client"], [source_url], provider=found[0]
         )
@@ -686,7 +688,11 @@ async def _build_inline_result(
                 share_query=share_query,
                 label=share_label,
             ),
-            preview_url=card.image_url or card.watch_url,
+            preview_url=branded_frame_preview_url(card.image_url)
+            or card.image_url
+            or card.watch_url,
+            # The still also marks the result in the inline list.
+            thumbnail_url=card.image_url,
             channel_safe=channel_safe,
         )
 
