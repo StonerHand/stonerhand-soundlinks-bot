@@ -63,20 +63,41 @@ class _PageMetadataParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.values: dict[str, list[str]] = {}
+        self.structured: list[dict] = []
+        self._json_parts: list[str] | None = None
 
     def handle_starttag(
         self,
         tag: str,
         attrs: list[tuple[str, str | None]],
     ) -> None:
+        attributes = dict(attrs)
+        if tag.casefold() == "script":
+            if attributes.get("type") == "application/ld+json":
+                self._json_parts = []
+            return
         if tag.casefold() != "meta":
             return
 
-        attributes = dict(attrs)
         key = str(attributes.get("property") or attributes.get("name") or "")
         value = str(attributes.get("content") or "").strip()
         if key and value:
             self.values.setdefault(key.casefold(), []).append(value)
+
+    def handle_data(self, data: str) -> None:
+        if self._json_parts is not None:
+            self._json_parts.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.casefold() != "script" or self._json_parts is None:
+            return
+        try:
+            value = json.loads("".join(self._json_parts))
+        except ValueError:
+            value = None
+        self._json_parts = None
+        items = value if isinstance(value, list) else [value]
+        self.structured.extend(item for item in items if isinstance(item, dict))
 
     def first(self, key: str) -> str:
         return next(iter(self.values.get(key.casefold(), ())), "")
@@ -194,6 +215,22 @@ class SpotifyClient:
             pass
 
 
+def _structured_name(parser: _PageMetadataParser, source_url: str, kind: str) -> str:
+    wanted = "MusicAlbum" if kind == "album" else "MusicRecording"
+    entity_id = cache_key_for_url(source_url).rstrip("/").rsplit("/", 1)[-1]
+    for item in parser.structured:
+        types = item.get("@type")
+        if wanted not in (types if isinstance(types, list) else [types]):
+            continue
+        item_url = str(item.get("@id") or item.get("url") or "")
+        if cache_key_for_url(item_url).rstrip("/").rsplit("/", 1)[-1] != entity_id:
+            continue
+        name = item.get("name")
+        if isinstance(name, str) and name.strip():
+            return " ".join(name.split())
+    return ""
+
+
 def parse_spotify_page(source_url: str, html: str) -> TrackMatch:
     parser = _PageMetadataParser()
     try:
@@ -201,8 +238,12 @@ def parse_spotify_page(source_url: str, html: str) -> TrackMatch:
     except (TypeError, ValueError) as exc:
         raise SpotifyLookupError("Spotify returned invalid public metadata.") from exc
 
-    title = clean_spotify_metadata_title(parser.first("og:title"))
     kind = spotify_url_type(source_url) or "track"
+    # og:title is a localized call to action ("Listen to X - Album by Y |
+    # Spotify", "Escucha X - Album de Y"); the page's JSON-LD names the release.
+    title = _structured_name(parser, source_url, kind) or clean_spotify_metadata_title(
+        parser.first("og:title")
+    )
     page_type = parser.first("og:type").casefold()
     expected_type = "music.album" if kind == "album" else "music.song"
     # Spotify serves a generic marketing shell with HTTP 200 for unavailable

@@ -14,6 +14,8 @@ _SPOTIFY_ENTITY_SUFFIX: Final = re.compile(
     r"\s+by\s+.+$",
     re.IGNORECASE,
 )
+# Album pages read "Listen to X - Album by Y | Spotify" since 2026.
+_SPOTIFY_CALL_TO_ACTION: Final = re.compile(r"^listen to\s+", re.IGNORECASE)
 
 
 def clean_spotify_metadata_title(
@@ -37,7 +39,10 @@ def clean_spotify_metadata_title(
             ).strip()
         return title
 
-    clean = _SPOTIFY_ENTITY_SUFFIX.sub("", unbranded).strip()
+    clean, entities = _SPOTIFY_ENTITY_SUFFIX.subn("", unbranded)
+    if entities:
+        clean = _SPOTIFY_CALL_TO_ACTION.sub("", clean.strip(), count=1)
+    clean = clean.strip()
     return clean or unbranded.strip()
 
 
