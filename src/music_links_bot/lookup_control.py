@@ -120,7 +120,7 @@ async def _wait_for_stop(control):
             break
         try:
             await asyncio.wait_for(control.stopped.wait(), timeout=0.5)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             pass
 
 

@@ -57,6 +57,127 @@ async def _lookup_tracks(
     return tracks, unavailable_urls
 
 
+async def _attempt_source(
+    client: SonglinkClient,
+    soundcloud_client: SoundCloudClient | None,
+    source_url: str,
+    *,
+    remaining: float,
+    retried: bool,
+) -> TrackMatch | Exception | None:
+    """One provider attempt for one source; None means "worth one more try"."""
+    if soundcloud_client is not None and is_soundcloud_url(source_url):
+        # SoundCloud is authoritative for a direct SoundCloud URL. Asking an
+        # aggregator to infer another service can attach a same-named but
+        # unrelated Spotify release.
+        try:
+            return await asyncio.wait_for(
+                soundcloud_client.lookup_track(source_url), timeout=remaining
+            )
+        except SoundCloudLookupError as exc:
+            return build_soundcloud_fallback(source_url) or exc
+        except Exception as exc:  # noqa: BLE001 — includes the timeout.
+            return exc
+    try:
+        return await asyncio.wait_for(
+            client.lookup_track(source_url), timeout=remaining
+        )
+    except TimeoutError as exc:
+        return exc
+    except SonglinkLookupError as exc:
+        # Song.link throttles bursts: a Spotify release gets one more try.
+        if retried or spotify_url_type(source_url) not in {"track", "album"}:
+            return exc
+    except SonglinkError as exc:
+        if retried:
+            return exc
+    except Exception as exc:  # noqa: BLE001 — provider SDKs vary.
+        return exc
+    return None
+
+
+def _source_outcome(
+    source_url: str,
+    result: TrackMatch | Exception,
+    fallback: object = None,
+) -> tuple[TrackMatch | None, SourceStatus, bool]:
+    """One source's card (if any), its status, and whether it was unavailable."""
+    provider = _track_provider(source_url)
+    if isinstance(result, SonglinkError) and isinstance(fallback, TrackMatch):
+        result = fallback
+    if isinstance(result, TrackMatch):
+        return (
+            result,
+            SourceStatus(
+                source_url=source_url,
+                provider=provider,
+                state="success",
+                label=_item_label(result),
+            ),
+            False,
+        )
+
+    if isinstance(fallback, BaseException):
+        LOGGER.error(
+            "Fallback resolver failed source=%s error=%s",
+            _source_log_id(source_url),
+            type(fallback).__name__,
+            exc_info=(type(fallback), fallback, fallback.__traceback__),
+        )
+    if isinstance(result, SonglinkLookupError):
+        reason = _failure_reason(result)
+        known_failure = reason != "provider_unavailable" or result.__cause__ is not None
+        retryable = (
+            reason not in {"region_unavailable", "release_not_found"}
+            if known_failure
+            else spotify_url_type(source_url) in {"track", "album"}
+        )
+        LOGGER.info(
+            "Song.link could not resolve source=%s retryable=%s",
+            _source_log_id(source_url),
+            retryable,
+        )
+        return (
+            None,
+            SourceStatus(
+                source_url=source_url,
+                provider=provider,
+                state="unavailable"
+                if known_failure and reason != "release_not_found"
+                else "not_found",
+                retryable=retryable,
+                reason=reason if known_failure else "release_not_found",
+            ),
+            False,
+        )
+
+    if isinstance(result, SonglinkError):
+        LOGGER.error(
+            "Song.link request failed source=%s",
+            _source_log_id(source_url),
+            exc_info=(type(result), result, result.__traceback__),
+        )
+    else:
+        timeout = isinstance(result, TimeoutError)
+        (LOGGER.warning if timeout else LOGGER.error)(
+            "Resolver failed source=%s error=%s",
+            _source_log_id(source_url),
+            type(result).__name__,
+            exc_info=None if timeout else (type(result), result, result.__traceback__),
+        )
+    return (
+        None,
+        SourceStatus(
+            source_url=source_url,
+            provider=provider,
+            state="unavailable",
+            retryable=True,
+            reason=_failure_reason(result),
+        ),
+        True,
+    )
+
+
 async def _lookup_tracks_detailed(
     client: SonglinkClient,
     source_urls: list[str],
@@ -89,7 +210,7 @@ async def _lookup_tracks_detailed(
         source_url: str,
     ) -> TrackMatch | Exception:
         item_deadline: float | None = None
-        provider_attempt = 0
+        retried = False
         while True:
             async with semaphore:
                 await pace_provider_start()
@@ -103,42 +224,19 @@ async def _lookup_tracks_detailed(
                 remaining = item_deadline - loop.time()
                 if remaining <= 0:
                     return TimeoutError("source lookup deadline exhausted")
-                if soundcloud_client is not None and is_soundcloud_url(source_url):
-                    # SoundCloud is authoritative for a direct SoundCloud URL.
-                    # Asking an aggregator to infer another service can attach
-                    # a same-named but unrelated Spotify release.
-                    try:
-                        return await asyncio.wait_for(
-                            soundcloud_client.lookup_track(source_url),
-                            timeout=remaining,
-                        )
-                    except SoundCloudLookupError as exc:
-                        return build_soundcloud_fallback(source_url) or exc
-                    except asyncio.TimeoutError as exc:
-                        return exc
-                    except Exception as exc:  # noqa: BLE001
-                        return exc
-                try:
-                    return await asyncio.wait_for(
-                        client.lookup_track(source_url),
-                        timeout=remaining,
-                    )
-                except asyncio.TimeoutError as exc:
-                    return exc
-                except SonglinkLookupError as exc:
-                    can_retry = spotify_url_type(source_url) in {"track", "album"}
-                    if provider_attempt > 0 or not can_retry:
-                        return exc
-                except SonglinkError as exc:
-                    if provider_attempt > 0:
-                        return exc
-                except Exception as exc:  # noqa: BLE001 — provider SDKs vary.
-                    return exc
+                result = await _attempt_source(
+                    client,
+                    soundcloud_client,
+                    source_url,
+                    remaining=remaining,
+                    retried=retried,
+                )
+            if result is not None:
+                return result
 
-            provider_attempt += 1
+            retried = True
             delay = _BATCH_RETRY_DELAY_SECONDS + (index % 3) * 0.05
-            remaining = item_deadline - loop.time()
-            if remaining <= delay:
+            if item_deadline - loop.time() <= delay:
                 return TimeoutError("source lookup deadline exhausted")
             await asyncio.sleep(delay)
 
@@ -154,7 +252,7 @@ async def _lookup_tracks_detailed(
         for index, source_url in enumerate(source_urls)
     ]
     try:
-        done, pending = await asyncio.wait(
+        done, _pending = await asyncio.wait(
             lookup_tasks,
             timeout=_BATCH_PROVIDER_WORK_SECONDS,
         )
@@ -204,111 +302,14 @@ async def _lookup_tracks_detailed(
     for index, (source_url, result) in enumerate(
         zip(source_urls, results, strict=True)
     ):
-        if isinstance(result, TrackMatch):
-            tracks.append(result)
-            statuses.append(
-                SourceStatus(
-                    source_url=source_url,
-                    provider=_track_provider(source_url),
-                    state="success",
-                    label=_item_label(result),
-                )
-            )
-            continue
-
-        if isinstance(result, SonglinkError):
-            fallback_track = fallback_by_index.get(index)
-            if isinstance(fallback_track, TrackMatch):
-                tracks.append(fallback_track)
-                statuses.append(
-                    SourceStatus(
-                        source_url=source_url,
-                        provider=_track_provider(source_url),
-                        state="success",
-                        label=_item_label(fallback_track),
-                    )
-                )
-                continue
-
-            if isinstance(fallback_track, BaseException):
-                LOGGER.error(
-                    "Fallback resolver failed source=%s error=%s",
-                    _source_log_id(source_url),
-                    type(fallback_track).__name__,
-                    exc_info=(
-                        type(fallback_track),
-                        fallback_track,
-                        fallback_track.__traceback__,
-                    ),
-                )
-
-            if isinstance(result, SonglinkLookupError):
-                reason = _failure_reason(result)
-                known_failure = (
-                    reason != "provider_unavailable" or result.__cause__ is not None
-                )
-                retryable = (
-                    reason not in {"region_unavailable", "release_not_found"}
-                    if known_failure
-                    else spotify_url_type(source_url) in {"track", "album"}
-                )
-                LOGGER.info(
-                    "Song.link could not resolve source=%s retryable=%s",
-                    _source_log_id(source_url),
-                    retryable,
-                )
-                statuses.append(
-                    SourceStatus(
-                        source_url=source_url,
-                        provider=_track_provider(source_url),
-                        state="unavailable"
-                        if known_failure and reason != "release_not_found"
-                        else "not_found",
-                        retryable=retryable,
-                        reason=reason if known_failure else "release_not_found",
-                    )
-                )
-                continue
-
-            LOGGER.error(
-                "Song.link request failed source=%s",
-                _source_log_id(source_url),
-                exc_info=(type(result), result, result.__traceback__),
-            )
+        track, status, unavailable = _source_outcome(
+            source_url, result, fallback_by_index.get(index)
+        )
+        if track is not None:
+            tracks.append(track)
+        if unavailable:
             unavailable_urls.append(source_url)
-            statuses.append(
-                SourceStatus(
-                    source_url=source_url,
-                    provider=_track_provider(source_url),
-                    state="unavailable",
-                    retryable=True,
-                    reason=_failure_reason(result),
-                )
-            )
-            continue
-
-        if isinstance(result, Exception):
-            log = LOGGER.warning if isinstance(result, TimeoutError) else LOGGER.error
-            log(
-                "Resolver failed source=%s error=%s",
-                _source_log_id(source_url),
-                type(result).__name__,
-                exc_info=(
-                    (type(result), result, result.__traceback__)
-                    if not isinstance(result, TimeoutError)
-                    else None
-                ),
-            )
-            unavailable_urls.append(source_url)
-            statuses.append(
-                SourceStatus(
-                    source_url=source_url,
-                    provider=_track_provider(source_url),
-                    state="unavailable",
-                    retryable=True,
-                    reason=_failure_reason(result),
-                )
-            )
+        statuses.append(status)
 
     # Provider search pages are suggestions, not verified release matches.
     # Strip any legacy synthetic links before the result reaches cache or UI.
@@ -326,7 +327,7 @@ async def _lookup_tracks_detailed(
                 ),
                 timeout=_RELEASE_ENRICHMENT_TIMEOUT_SECONDS,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             LOGGER.debug("Release metadata enrichment timed out and was cancelled")
 
     return tracks, unavailable_urls, statuses

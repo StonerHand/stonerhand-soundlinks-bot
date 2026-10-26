@@ -584,7 +584,7 @@ async def _lookup_titles(
         field_name="titles",
         provider=provider,
         label=SERVICES[provider].name,
-        fallback=lambda url: None,
+        fallback=lambda _url: None,
     )
     if blocked and not titles:
         # Fail the provider task, so the links read "Netflix is not answering,

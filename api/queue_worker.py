@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
@@ -79,7 +78,7 @@ class handler(BaseHTTPRequestHandler):
                 HTTPStatus.SERVICE_UNAVAILABLE,
             )
             return
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self._send_json(
                 {"ok": False, "error": "timeout", "retryable": True},
                 HTTPStatus.GATEWAY_TIMEOUT,

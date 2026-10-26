@@ -404,7 +404,7 @@ class SonglinkClient:
         if raw_type in {"song", "track"}:
             return "song"
 
-        if raw_type in {"album"}:
+        if raw_type == "album":
             return "album"
 
         if raw_type in {"podcast", "podcastepisode", "episode"}:

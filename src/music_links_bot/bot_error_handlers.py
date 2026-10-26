@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from html import escape
-from typing import Callable
 
 from telegram import InlineKeyboardMarkup, Message
 from telegram.constants import ParseMode

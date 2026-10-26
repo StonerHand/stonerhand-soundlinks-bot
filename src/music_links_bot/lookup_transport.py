@@ -108,7 +108,8 @@ async def send_track_video_pair_result(
     video: VideoMatch,
     reply_markup: InlineKeyboardMarkup | None,
 ) -> bool:
-    source_urls = tuple(track.links.values()) + (video.url,)
+    source_urls = (*track.links.values(), video.url)
+    preview_url = _select_preview_url(track.links) or track.thumbnail_url
     if (
         message.chat.type in {"group", "supergroup"}
         and ephemeral_group_replies_enabled()
@@ -118,7 +119,7 @@ async def send_track_video_pair_result(
             bot,
             message,
             text,
-            preview_url=_select_preview_url(track.links) or track.thumbnail_url,
+            preview_url=preview_url,
             reply_markup=reply_markup,
             found_count=2,
             requested_count=2,
@@ -142,7 +143,7 @@ async def send_track_video_pair_result(
     _validate_transport_contract(
         text,
         reply_markup=channel_keyboard,
-        preview_url=_select_preview_url(track.links) or track.thumbnail_url,
+        preview_url=preview_url,
         found_count=2,
         requested_count=2,
         source_urls=source_urls,
@@ -163,7 +164,7 @@ async def send_track_video_pair_result(
             bot,
             message,
             text,
-            preview_url=_select_preview_url(track.links) or track.thumbnail_url,
+            preview_url=preview_url,
             reply_markup=reply_markup,
             found_count=2,
             requested_count=2,

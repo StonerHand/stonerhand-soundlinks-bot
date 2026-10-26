@@ -356,7 +356,6 @@ def build_error_keyboard(
 
 def build_publish_confirmation(
     draft_id: str,
-    draft: dict,
     track: TrackMatch,
     *,
     target: str,
