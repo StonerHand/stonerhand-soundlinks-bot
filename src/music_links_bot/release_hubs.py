@@ -8,6 +8,7 @@ from music_links_bot.url_utils import (
     is_direct_platform_url,
     normalize_host,
     spotify_url_type,
+    youtube_video_id,
 )
 
 UNIVERSAL_RELEASE_HOSTS = frozenset(
@@ -53,66 +54,76 @@ def canonical_release_hub_url(
     clean_url = cache_key_for_url(source_url)
     if is_universal_release_url(clean_url):
         return clean_url
-
     if not is_direct_platform_url(clean_url):
         return None
+    if video_id := youtube_video_id(clean_url):
+        return f"https://song.link/y/{video_id}"
     parsed = urlparse(clean_url)
-    host = normalize_host(parsed.hostname)
     parts = [part for part in parsed.path.split("/") if part]
+    hub = _HUBS.get(normalize_host(parsed.hostname))
+    return hub(parts, parse_qs(parsed.query), release_kind) if hub and parts else None
 
-    if host == "open.spotify.com" and len(parts) >= 2:
-        provider_kind, provider_id = parts[-2].casefold(), parts[-1]
-        if not _SAFE_PROVIDER_ID.fullmatch(provider_id):
-            return None
-        if provider_kind == "track":
-            return f"https://song.link/s/{provider_id}"
-        if provider_kind == "album":
-            return f"https://album.link/s/{provider_id}"
-        if provider_kind in {"episode", "show"}:
-            return f"https://pods.link/s/{provider_id}"
+
+def _safe(provider_id: str) -> bool:
+    return bool(_SAFE_PROVIDER_ID.fullmatch(provider_id))
+
+
+_SPOTIFY_HUB_DOMAINS = {
+    "track": "song.link",
+    "album": "album.link",
+    "episode": "pods.link",
+    "show": "pods.link",
+}
+
+
+def _spotify_hub(parts: list[str], _query: dict, _kind: str) -> str | None:
+    if len(parts) < 2 or not _safe(parts[-1]):
         return None
+    found = _SPOTIFY_HUB_DOMAINS.get(parts[-2].casefold())
+    return f"https://{found}/s/{parts[-1]}" if found else None
 
-    if host == "music.apple.com" and parts:
-        query_item_id = (parse_qs(parsed.query).get("i") or [""])[0]
-        if query_item_id and _SAFE_PROVIDER_ID.fullmatch(query_item_id):
-            return f"https://song.link/i/{query_item_id}"
-        provider_id = parts[-1]
-        if release_kind == "album" and _SAFE_PROVIDER_ID.fullmatch(provider_id):
-            return f"https://album.link/i/{provider_id}"
-        return None
 
-    if host == "podcasts.apple.com" and parts:
-        provider_id = next(
-            (
-                part.removeprefix("id")
-                for part in reversed(parts)
-                if part.startswith("id") and part[2:]
-            ),
-            "",
-        )
-        if provider_id and _SAFE_PROVIDER_ID.fullmatch(provider_id):
-            return f"https://pods.link/i/{provider_id}"
-
-    if host in {"youtube.com", "m.youtube.com", "youtu.be"}:
-        video_id = parts[0] if host == "youtu.be" and parts else ""
-        if not video_id:
-            video_id = (parse_qs(parsed.query).get("v") or [""])[0]
-        if video_id and _SAFE_PROVIDER_ID.fullmatch(video_id):
-            return f"https://song.link/y/{video_id}"
-
-    if host == "deezer.com" and len(parts) >= 2:
-        provider_kind, provider_id = parts[-2].casefold(), parts[-1]
-        if _SAFE_PROVIDER_ID.fullmatch(provider_id):
-            domain = "album.link" if provider_kind == "album" else "song.link"
-            return f"https://{domain}/d/{provider_id}"
-
-    if host in {"tidal.com", "listen.tidal.com"} and len(parts) >= 2:
-        provider_kind, provider_id = parts[-2].casefold(), parts[-1]
-        if _SAFE_PROVIDER_ID.fullmatch(provider_id):
-            domain = "album.link" if provider_kind == "album" else "song.link"
-            return f"https://{domain}/t/{provider_id}"
-
+def _apple_music_hub(parts: list[str], query: dict, release_kind: str) -> str | None:
+    item_id = (query.get("i") or [""])[0]
+    if item_id and _safe(item_id):
+        return f"https://song.link/i/{item_id}"
+    if release_kind == "album" and _safe(parts[-1]):
+        return f"https://album.link/i/{parts[-1]}"
     return None
+
+
+def _apple_podcasts_hub(parts: list[str], _query: dict, _kind: str) -> str | None:
+    provider_id = next(
+        (
+            part.removeprefix("id")
+            for part in reversed(parts)
+            if part.startswith("id") and part[2:]
+        ),
+        "",
+    )
+    return f"https://pods.link/i/{provider_id}" if _safe(provider_id) else None
+
+
+def _kind_id_hub(letter: str):
+    """Deezer and Tidal: …/album/<id> is an album page, anything else a song."""
+
+    def hub(parts: list[str], _query: dict, _kind: str) -> str | None:
+        if len(parts) < 2 or not _safe(parts[-1]):
+            return None
+        domain = "album.link" if parts[-2].casefold() == "album" else "song.link"
+        return f"https://{domain}/{letter}/{parts[-1]}"
+
+    return hub
+
+
+_HUBS = {
+    "open.spotify.com": _spotify_hub,
+    "music.apple.com": _apple_music_hub,
+    "podcasts.apple.com": _apple_podcasts_hub,
+    "deezer.com": _kind_id_hub("d"),
+    "tidal.com": _kind_id_hub("t"),
+    "listen.tidal.com": _kind_id_hub("t"),
+}
 
 
 def resolve_release_hub_url(

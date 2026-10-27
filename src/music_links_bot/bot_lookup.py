@@ -74,10 +74,6 @@ from music_links_bot.url_utils import (
 from music_links_bot.youtube import YouTubeClient, YouTubeLookupError
 
 LOGGER = logging.getLogger(__name__)
-NOT_FOUND_DETAIL = (
-    "Проверь, что это ссылка на трек, альбом, плейлист, артиста, "
-    "подкаст, YouTube-видео или NTS Radio"
-)
 _track_result_sender: Callable[..., Awaitable[Any]] | None = None
 _track_video_pair_sender: Callable[..., Awaitable[bool]] | None = None
 _LOOKUP_REQUEST_BUDGET_SECONDS = 20.0
@@ -120,14 +116,10 @@ async def resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBundl
 
 
 async def _resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBundle:
-    source_urls = _unique_source_urls(source_urls)
-    from music_links_bot.lookup_recovery import (
-        capture_sources,
-        completed_sources,
-        merge_recovered,
-        restore_source,
-    )
+    """Recovered results first, then the shared cache, then one shared lookup."""
+    from music_links_bot.lookup_recovery import completed_sources, restore_source
 
+    source_urls = _unique_source_urls(source_urls)
     completed = completed_sources.get() or {}
     retained = {
         cache_key_for_url(url): completed[cache_key_for_url(url)]
@@ -135,42 +127,58 @@ async def _resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBund
         if restore_source(completed.get(cache_key_for_url(url)), url)
     }
     if retained:
-        missing = [url for url in source_urls if cache_key_for_url(url) not in retained]
-        token = completed_sources.set({})
-        try:
-            fresh = (
-                await resolve_sources(bot_data, missing)
-                if missing
-                else LookupBundle([], [], [], [], [], [])
-            )
-        finally:
-            completed_sources.reset(token)
-        result = merge_recovered(source_urls, retained, fresh)
-        control = current_control.get()
-        if control is not None:
-            control.completed.update(capture_sources(result))
-        return result
+        return await _resolve_around_retained(bot_data, source_urls, retained)
     cached = await get_cached_lookup(bot_data, source_urls)
-    if cached is not None:
-        restored = _bundle_from_cache(cached)
-        if restored is not None:
-            restored = _ensure_source_accounting(restored, source_urls)
-            if restored.is_complete_for(source_urls) or restored.is_negative_for(
-                source_urls
-            ):
-                control = current_control.get()
-                if control is not None:
-                    control.completed.update(capture_sources(restored))
-                return restored
+    restored = _bundle_from_cache(cached) if cached is not None else None
+    if restored is not None:
+        restored = _ensure_source_accounting(restored, source_urls)
+        if restored.is_complete_for(source_urls) or restored.is_negative_for(
+            source_urls
+        ):
+            return _report_completed(restored)
+    return await _shared_resolution(bot_data, source_urls)
 
+
+def _report_completed(bundle: LookupBundle) -> LookupBundle:
+    """Let a Stop button keep what this lookup has already found."""
+    from music_links_bot.lookup_recovery import capture_sources
+
+    control = current_control.get()
+    if control is not None:
+        control.completed.update(capture_sources(bundle))
+    return bundle
+
+
+async def _resolve_around_retained(
+    bot_data: dict, source_urls: list[str], retained: dict
+) -> LookupBundle:
+    """A retry keeps the sources a stopped lookup found; only the rest run."""
+    from music_links_bot.lookup_recovery import completed_sources, merge_recovered
+
+    missing = [url for url in source_urls if cache_key_for_url(url) not in retained]
+    token = completed_sources.set({})
+    try:
+        fresh = (
+            await resolve_sources(bot_data, missing)
+            if missing
+            else LookupBundle([], [], [], [], [], [])
+        )
+    finally:
+        completed_sources.reset(token)
+    return _report_completed(merge_recovered(source_urls, retained, fresh))
+
+
+async def _shared_resolution(bot_data: dict, source_urls: list[str]) -> LookupBundle:
+    """Equal concurrent lookups share one task; the last waiter to leave
+    cancels it, and every waiter can keep the sources already found."""
     key = lookup_cache_key(source_urls)
     inflight: dict[str, asyncio.Task[LookupBundle]] = bot_data.setdefault(
         "lookup_inflight", {}
     )
-    pending = inflight.get(key)
     snapshots = bot_data.setdefault("lookup_snapshots", {})
     subscribers = bot_data.setdefault("lookup_subscribers", {})
-    if pending is None:
+    task = inflight.get(key)
+    if task is None:
         snapshot: dict = {}
 
         async def resolve():
@@ -184,7 +192,6 @@ async def _resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBund
         inflight[key] = task
         snapshots[task] = snapshot
     else:
-        task = pending
         snapshot = snapshots.get(task, {})
     subscribers[task] = subscribers.get(task, 0) + 1
 
@@ -196,11 +203,7 @@ async def _resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBund
 
     task.add_done_callback(finish)
     try:
-        result = await asyncio.shield(task)
-        control = current_control.get()
-        if control is not None:
-            control.completed.update(capture_sources(result))
-        return result
+        return _report_completed(await asyncio.shield(task))
     finally:
         control = current_control.get()
         if control is not None:

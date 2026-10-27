@@ -6,6 +6,7 @@ import json
 import logging
 import secrets
 import traceback
+from collections import deque
 from copy import deepcopy
 from dataclasses import asdict, dataclass, field, fields
 from math import ceil
@@ -63,6 +64,9 @@ MAX_MEMORY_KEYS = 2_000
 CIRCUIT_FAILURE_THRESHOLD = 3
 CIRCUIT_COOLDOWN_SECONDS = 45
 METRICS_KV_KEY = "runtime:metrics:v1"
+# Transport wrappers every Bot API call passes through: a failure is located
+# at the bot code that made the call, not here.
+_PLUMBING_MODULES = frozenset({"update_execution.py", "telegram_gateway.py"})
 REQUEST_LATENCY_BUCKETS_MS = (250, 500, 1_000, 2_000, 5_000, 10_000, 20_000)
 LOGGER = logging.getLogger(__name__)
 
@@ -389,7 +393,7 @@ class BotRuntime:
             "funnel_published": 0,
         }
         self._metrics_persisted_at = 0.0
-        self.last_failure: dict[str, Any] | None = None
+        self.recent_failures: deque[dict[str, Any]] = deque(maxlen=5)
 
     def session_key(self, user_id: int) -> str:
         """The key a caller may batch-read and hand back via ``prefetched_raw``."""
@@ -888,16 +892,22 @@ class BotRuntime:
         if fallback:
             self.metrics["rich_message_fallbacks"] += 1
 
-    def record_failure(self, error: BaseException) -> None:
-        """Keep what broke the last request, for the health endpoint.
+    @property
+    def last_failure(self) -> dict[str, Any] | None:
+        return self.recent_failures[0] if self.recent_failures else None
 
-        Only the error class, the bot's own code location and Telegram's
-        reason are kept: never user text, links or IDs.
+    def record_failure(self, error: BaseException, *, kind: str = "") -> None:
+        """Keep what broke a request, for /status and the health endpoint.
+
+        Only the update kind, the error class, the bot's own code location,
+        the Bot API method and Telegram's reason are kept: never user text,
+        links or IDs.
         """
         frames = [
             frame
             for frame in traceback.extract_tb(error.__traceback__)
             if "music_links_bot" in frame.filename
+            and PurePath(frame.filename).name not in _PLUMBING_MODULES
         ]
         where = (
             f"{PurePath(frames[-1].filename).name}:{frames[-1].lineno} "
@@ -915,15 +925,18 @@ class BotRuntime:
             ),
             "",
         )
-        self.last_failure = {
-            "type": type(error).__name__,
-            "where": where,
-            "method": method,
-            "detail": str(error.message)[:160]
-            if isinstance(error, TelegramError)
-            else "",
-            "at": int(time()),
-        }
+        self.recent_failures.appendleft(
+            {
+                "kind": kind,
+                "type": type(error).__name__,
+                "where": where,
+                "method": method,
+                "detail": str(error.message)[:160]
+                if isinstance(error, TelegramError)
+                else "",
+                "at": int(time()),
+            }
+        )
 
     def metrics_snapshot(self) -> dict[str, Any]:
         snapshot = dict(self.metrics)
@@ -950,6 +963,7 @@ class BotRuntime:
             else 0.0
         )
         snapshot["last_failure"] = self.last_failure
+        snapshot["recent_failures"] = list(self.recent_failures)
         snapshot["metrics_scope"] = "instance"
         snapshot["updated_at"] = int(time())
         snapshot["providers"] = {

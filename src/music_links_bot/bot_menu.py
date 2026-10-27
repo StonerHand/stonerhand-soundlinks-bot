@@ -3,8 +3,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from html import escape
 from importlib.resources import files
+from typing import Any
 
 from telegram import InlineKeyboardMarkup, Message, Update
 from telegram.constants import ParseMode
@@ -607,152 +610,177 @@ async def safe_edit(query, text: str, keyboard: InlineKeyboardMarkup | None) -> 
             raise
 
 
+@dataclass(frozen=True, slots=True)
+class _MenuTap:
+    query: Any
+    context: Any
+    action: CallbackAction
+    lang: str
+
+    @property
+    def user_id(self) -> int:
+        return self.query.from_user.id if self.query.from_user else 0
+
+    @property
+    def page(self) -> int:
+        try:
+            return max(0, int(self.action.payload or 0))
+        except ValueError:
+            return 0
+
+    async def session(self):
+        return await runtime_for(self.context).get_session(self.user_id, lang=self.lang)
+
+
+Screen = tuple[str, InlineKeyboardMarkup]
+
+
 async def dispatch_menu_action(query, context, action: CallbackAction) -> None:
-    lang = resolve_lang(query.from_user.language_code if query.from_user else None)
-    if action.action.startswith("onboard"):
-        step = action.action.removeprefix("onboard") or "1"
-        if step == "done":
-            session = await runtime_for(context).get_session(
-                query.from_user.id, lang=lang
-            )
-            session.onboarding_seen = True
-            await runtime_for(context).save_session(session)
-            text, keyboard = await home_view(query, context, lang=lang)
-        else:
-            step_number = max(1, min(3, int(step)))
-            text = get_text(lang, f"onboarding_{step_number}")
-            keyboard = build_onboarding_keyboard(step_number, lang)
-        await query.answer()
-        await safe_edit(query, text, keyboard)
+    """Every menu button is one screen builder; a builder that answered the
+    tap itself (an owner-only alert) returns None."""
+    tap = _MenuTap(
+        query,
+        context,
+        action,
+        resolve_lang(query.from_user.language_code if query.from_user else None),
+    )
+    build: Callable[[_MenuTap], Awaitable[Screen | None]] = (
+        _onboarding_screen
+        if action.action.startswith("onboard")
+        else _MENU_SCREENS.get(action.action, _section_screen)
+    )
+    screen = await build(tap)
+    if screen is None:
         return
-    if action.action == "stats":
-        user_id = query.from_user.id if query.from_user else 0
-        crate_count, is_admin = await home_state(context, user_id)
-        if not is_admin:
-            await query.answer(get_text(lang, "ed_admin_only"), show_alert=True)
-            return
-        await query.answer()
-        await safe_edit(
-            query,
-            escape(await stats_text(context, include_private=True)),
-            build_section_keyboard(
-                context.bot.username,
-                lang=lang,
-                crate_count=crate_count,
-                active=None,
-            ),
-        )
-        return
-    try:
-        page = max(0, int(action.payload or 0))
-    except ValueError:
-        page = 0
-    if action.action == "start":
-        text, keyboard = await home_view(query, context, lang=lang)
-    elif action.action in {"library", "postfilter", "postsearch", "postsearch_clear"}:
-        user_id = query.from_user.id if query.from_user else 0
-        session = await runtime_for(context).get_session(user_id, lang=lang)
-        if action.action == "postsearch" and query.message is not None:
-            prompt = await query.message.reply_text(
-                get_text(lang, "posts_search_prompt"),
-                reply_markup=input_prompt_markup(lang),
-            )
-            session.pending_input = {
-                "kind": "library_search",
-                "created_at": int(time.time()),
-                "prompt_message_id": prompt.message_id,
-            }
-            await runtime_for(context).save_session(session)
-            text, keyboard = await render_search_view(
-                context, user_id=user_id, lang=lang
-            )
-            await query.answer()
-            await safe_edit(query, text, keyboard)
-            return
-        if action.action == "postfilter":
-            if action.payload in {"all", "draft", "scheduled", "published", "saved"}:
-                session.draft_filter = action.payload
-        elif action.action == "postsearch_clear":
-            session.draft_query = ""
-        await runtime_for(context).save_session(session)
-        text, keyboard = await drafts_view(query, context, lang=lang)
-    elif action.action == "drafts":
-        text, keyboard = await drafts_view(query, context, lang=lang, page=page)
-    elif action.action == "recent":
-        text, keyboard = await recent_view(query, context, lang=lang, page=page)
-    elif action.action == "create":
-        session = await runtime_for(context).get_session(query.from_user.id, lang=lang)
-        session.pending_input = {}
-        await runtime_for(context).save_session(session)
-        text, keyboard = (
-            get_text(lang, "create_prompt"),
-            build_create_keyboard(lang=lang),
-        )
-    elif action.action == "more":
-        session = await runtime_for(context).get_session(query.from_user.id, lang=lang)
-        text, keyboard = preferences_view(
-            session,
-            lang=lang,
-            is_admin=_is_owner(context, query.from_user.id if query.from_user else 0),
-        )
-    elif action.action == "privacy":
-        text, keyboard = (
-            get_text(lang, "privacy_title"),
-            build_privacy_keyboard(lang=lang),
-        )
-    else:
-        menu_key = {
-            "help": MENU_HELP,
-            "guide": MENU_GUIDE,
-            "platforms": MENU_PLATFORMS,
-            "demo": MENU_DEMO,
-        }.get(action.action, MENU_START)
-        user_id = query.from_user.id if query.from_user else 0
-        crate_count, _is_admin = await home_state(context, user_id)
-        text = menu_text(menu_key, lang=lang)
-        keyboard = build_section_keyboard(
-            context.bot.username,
-            lang=lang,
-            crate_count=crate_count,
-            active=action.action,
-        )
     await query.answer()
-    await safe_edit(query, text, keyboard)
+    await safe_edit(query, *screen)
 
 
 async def legacy_menu_callback(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
+    """Buttons from before versioned callbacks ("menu:help") open the same screens."""
     query = update.callback_query
     if query is None:
         return
-    await query.answer()
-    lang = resolve_lang(query.from_user.language_code if query.from_user else None)
     menu_key = query.data if query.data in MENU_KEYS else MENU_START
-    if menu_key == MENU_START:
-        text, keyboard = await home_view(query, context, lang=lang)
-    elif menu_key == MENU_MORE:
-        session = await runtime_for(context).get_session(query.from_user.id, lang=lang)
-        text, keyboard = preferences_view(
-            session,
-            lang=lang,
-            is_admin=_is_owner(context, query.from_user.id if query.from_user else 0),
-        )
-    elif menu_key == MENU_DRAFTS:
-        text, keyboard = await drafts_view(query, context, lang=lang)
-    elif menu_key == MENU_RECENT:
-        text, keyboard = await recent_view(query, context, lang=lang)
-    else:
-        user_id = query.from_user.id if query.from_user else 0
-        crate_count, _is_admin = await home_state(context, user_id)
-        text = menu_text(menu_key, lang=lang)
-        keyboard = build_section_keyboard(
-            context.bot.username,
-            lang=lang,
+    await dispatch_menu_action(
+        query, context, CallbackAction("menu", menu_key.removeprefix("menu:"))
+    )
+
+
+async def _onboarding_screen(tap: _MenuTap) -> Screen:
+    step = tap.action.action.removeprefix("onboard") or "1"
+    if step == "done":
+        session = await tap.session()
+        session.onboarding_seen = True
+        await runtime_for(tap.context).save_session(session)
+        return await home_view(tap.query, tap.context, lang=tap.lang)
+    step_number = max(1, min(3, int(step)))
+    return (
+        get_text(tap.lang, f"onboarding_{step_number}"),
+        build_onboarding_keyboard(step_number, tap.lang),
+    )
+
+
+async def _stats_screen(tap: _MenuTap) -> Screen | None:
+    crate_count, is_admin = await home_state(tap.context, tap.user_id)
+    if not is_admin:
+        await tap.query.answer(get_text(tap.lang, "ed_admin_only"), show_alert=True)
+        return None
+    return (
+        escape(await stats_text(tap.context, include_private=True)),
+        build_section_keyboard(
+            tap.context.bot.username,
+            lang=tap.lang,
             crate_count=crate_count,
-            active=menu_key.removeprefix("menu:"),
+            active=None,
+        ),
+    )
+
+
+async def _library_screen(tap: _MenuTap) -> Screen:
+    """The post library, its filter and its search."""
+    session = await tap.session()
+    action, message = tap.action, tap.query.message
+    if action.action == "postsearch" and message is not None:
+        prompt = await message.reply_text(
+            get_text(tap.lang, "posts_search_prompt"),
+            reply_markup=input_prompt_markup(tap.lang),
         )
-    await safe_edit(query, text, keyboard)
+        session.pending_input = {
+            "kind": "library_search",
+            "created_at": int(time.time()),
+            "prompt_message_id": prompt.message_id,
+        }
+        await runtime_for(tap.context).save_session(session)
+        return await render_search_view(tap.context, user_id=tap.user_id, lang=tap.lang)
+    if action.action == "postfilter" and action.payload in _POST_FILTERS:
+        session.draft_filter = action.payload
+    elif action.action == "postsearch_clear":
+        session.draft_query = ""
+    await runtime_for(tap.context).save_session(session)
+    return await drafts_view(tap.query, tap.context, lang=tap.lang)
+
+
+async def _create_screen(tap: _MenuTap) -> Screen:
+    session = await tap.session()
+    session.pending_input = {}
+    await runtime_for(tap.context).save_session(session)
+    return get_text(tap.lang, "create_prompt"), build_create_keyboard(lang=tap.lang)
+
+
+async def _more_screen(tap: _MenuTap) -> Screen:
+    return preferences_view(
+        await tap.session(),
+        lang=tap.lang,
+        is_admin=_is_owner(tap.context, tap.user_id),
+    )
+
+
+async def _privacy_screen(tap: _MenuTap) -> Screen:
+    return get_text(tap.lang, "privacy_title"), build_privacy_keyboard(lang=tap.lang)
+
+
+async def _section_screen(tap: _MenuTap) -> Screen:
+    """Help, guide, platforms, demo; anything unknown opens the start text."""
+    menu_key = _SECTION_KEYS.get(tap.action.action, MENU_START)
+    crate_count, _is_admin = await home_state(tap.context, tap.user_id)
+    return (
+        menu_text(menu_key, lang=tap.lang),
+        build_section_keyboard(
+            tap.context.bot.username,
+            lang=tap.lang,
+            crate_count=crate_count,
+            active=tap.action.action,
+        ),
+    )
+
+
+_POST_FILTERS = frozenset({"all", "draft", "scheduled", "published", "saved"})
+_SECTION_KEYS = {
+    "help": MENU_HELP,
+    "guide": MENU_GUIDE,
+    "platforms": MENU_PLATFORMS,
+    "demo": MENU_DEMO,
+}
+_MENU_SCREENS: dict[str, Callable[[_MenuTap], Awaitable[Screen | None]]] = {
+    "start": lambda tap: home_view(tap.query, tap.context, lang=tap.lang),
+    "stats": _stats_screen,
+    "library": _library_screen,
+    "postfilter": _library_screen,
+    "postsearch": _library_screen,
+    "postsearch_clear": _library_screen,
+    "drafts": lambda tap: drafts_view(
+        tap.query, tap.context, lang=tap.lang, page=tap.page
+    ),
+    "recent": lambda tap: recent_view(
+        tap.query, tap.context, lang=tap.lang, page=tap.page
+    ),
+    "create": _create_screen,
+    "more": _more_screen,
+    "privacy": _privacy_screen,
+}
 
 
 async def reply_with_menu(

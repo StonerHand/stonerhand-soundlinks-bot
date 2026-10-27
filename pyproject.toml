@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stonerhand-soundlinks-bot"
-version = "2.14.0"
+version = "2.15.0"
 description = "Telegram-native music publishing bot with universal release cards, collections, scheduling and channel delivery."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -58,6 +58,11 @@ where = ["src"]
 pythonpath = ["src"]
 addopts = ["--strict-config", "--strict-markers"]
 xfail_strict = true
+# PTB 22 warns that RetryAfter.retry_after becomes a timedelta; the bot reads
+# both shapes (lookup_transport._flood_safe).
+filterwarnings = [
+  "ignore:Deprecated since version v22.2:telegram.warnings.PTBDeprecationWarning",
+]
 
 [tool.ruff]
 target-version = "py311"
@@ -153,6 +158,17 @@ files = [
   "src/music_links_bot/track_lookup.py",
   "src/music_links_bot/bot_pending.py",
   "src/music_links_bot/bot_crate_handlers.py",
+  "src/music_links_bot/bot_menu.py",
+  "src/music_links_bot/stats.py",
+  "src/music_links_bot/release_hubs.py",
+  "src/music_links_bot/youtube.py",
+  "src/music_links_bot/lookup_transport.py",
+  "src/music_links_bot/bot_progress.py",
+  "src/music_links_bot/reactions.py",
+  "src/music_links_bot/telegram_gateway.py",
+  "src/music_links_bot/rich_publications.py",
+  "src/music_links_bot/bot_error_handlers.py",
+  "src/music_links_bot/sharing.py",
   "tests/e2e/provider_canary.py",
   "tests/e2e/provider_cards_canary.py",
 ]

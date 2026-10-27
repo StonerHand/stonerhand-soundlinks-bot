@@ -54,7 +54,7 @@ class _KV:
         return []
 
 
-def _context(**bot_data):
+def _context(last_failure=None, **bot_data):
     webhook = SimpleNamespace(
         url="https://bot.example/api/telegram",
         pending_update_count=2,
@@ -63,6 +63,7 @@ def _context(**bot_data):
     runtime = SimpleNamespace(
         metrics_snapshot=lambda: dict(METRICS),
         provider_snapshot=lambda: [dict(PROVIDER)],
+        last_failure=last_failure,
     )
     return SimpleNamespace(
         application=SimpleNamespace(
@@ -86,12 +87,14 @@ class StatusTests(unittest.IsolatedAsyncioTestCase):
 
         reply = update.effective_message.reply_text.await_args.args[0]
         self.assertIn("только владельцу", reply)
+        self.assertIn("ADMIN_CHAT_ID", reply)
+        self.assertIn("<code>5</code>", reply)
 
     async def test_status_summarises_every_subsystem_safely(self) -> None:
         jobs = [{"publish_at": 1}, {"publish_at": 9_999_999_999}]
         with patch.object(bot_admin, "load_jobs", new=AsyncMock(return_value=jobs)):
             text = await bot_admin.build_status_text(
-                _context(last_error={"type": "<Boom>"})
+                _context(last_failure={"type": "<Boom>"})
             )
 
         self.assertIn("✅ <b>Telegram webhook</b> · очередь обновлений: 2", text)
@@ -101,16 +104,22 @@ class StatusTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("⚠️ songlink&lt;x&gt;", text)
         self.assertIn("<code>&lt;Boom&gt;</code>", text)
 
-    async def test_status_shows_what_telegram_said_about_the_last_error(self) -> None:
+    async def test_status_shows_where_the_last_failure_happened(self) -> None:
+        failure = {
+            "kind": "message",
+            "type": "RetryAfter",
+            "method": "sendMessage",
+            "where": "lookup_transport.py:286 _flood_safe",
+            "detail": "Flood control <exceeded>",
+        }
         with patch.object(bot_admin, "load_jobs", new=AsyncMock(return_value=[])):
-            text = await bot_admin.build_status_text(
-                _context(
-                    last_error={"type": "BadRequest", "detail": "Bad Request: <x>"}
-                )
-            )
+            text = await bot_admin.build_status_text(_context(last_failure=failure))
 
         self.assertIn(
-            "<code>BadRequest</code>\n<code>Bad Request: &lt;x&gt;</code>", text
+            "<b>Последняя ошибка</b>\n<code>RetryAfter</code>\n<code>sendMessage</code>\n"
+            "<code>lookup_transport.py:286 _flood_safe</code>\n"
+            "<code>Flood control &lt;exceeded&gt;</code>",
+            text,
         )
 
     async def test_status_reports_a_broken_queue_and_webhook(self) -> None:

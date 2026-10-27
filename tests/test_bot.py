@@ -2310,7 +2310,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateSpotifyTrackMessageStub()
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_matches"):
+        with patch("music_links_bot.bot_stats.record_post"):
             await track_lookup_message(UpdateStub(message), context)
             await track_lookup_message(UpdateStub(message), context)
 
@@ -2321,7 +2321,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message.reply_edit_error = BadRequest("message cannot be edited")
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_matches"):
+        with patch("music_links_bot.bot_stats.record_post"):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(message.replies[0], "<deleted>")
@@ -2438,7 +2438,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = MentionMessageStub()
         context = ContextStub(search_client=search_client)
 
-        with patch("music_links_bot.bot_stats.record_matches"):
+        with patch("music_links_bot.bot_stats.record_post"):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(search_client.queries, ["paranoid"])
@@ -2447,7 +2447,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateMessageStub()
         context = ContextStub(search_client=SuccessfulSearchClientStub())
 
-        with patch("music_links_bot.bot_stats.record_matches"):
+        with patch("music_links_bot.bot_stats.record_post"):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -2471,7 +2471,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateSpotifyTrackMessageStub()
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_matches"):
+        with patch("music_links_bot.bot_stats.record_post"):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -2597,7 +2597,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateYouTubeMessageStub()
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_videos") as record_videos:
+        with patch("music_links_bot.bot_stats.record_post") as record_videos:
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -2620,7 +2620,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateNTSMessageStub()
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_radios") as record_radios:
+        with patch("music_links_bot.bot_stats.record_post") as record_radios:
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -2640,7 +2640,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateSpotifyTrackMessageStub()
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_matches") as record_matches:
+        with patch("music_links_bot.bot_stats.record_post") as record_matches:
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -2669,7 +2669,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = AlbumWithIntroMessage()
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_matches"):
+        with patch("music_links_bot.bot_stats.record_post"):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -2693,7 +2693,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = HiddenSourceMessage()
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_matches"):
+        with patch("music_links_bot.bot_stats.record_post"):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -2705,7 +2705,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateSoundCloudMessageStub()
         context = ContextStub(songlink_client=FailingLookupClient())
 
-        with patch("music_links_bot.bot_stats.record_matches") as record_matches:
+        with patch("music_links_bot.bot_stats.record_post") as record_matches:
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -2726,7 +2726,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateSpotifyPlaylistMessageStub()
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_playlists") as record_playlists:
+        with patch("music_links_bot.bot_stats.record_post") as record_playlists:
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -2759,7 +2759,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.object(PlaylistClientStub, "lookup_playlist", with_tracks),
-            patch("music_links_bot.bot_stats.record_playlists"),
+            patch("music_links_bot.bot_stats.record_post"),
         ):
             await track_lookup_message(UpdateStub(message), context)
 
@@ -2776,7 +2776,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateApplePlaylistMessageStub()
         context = ContextStub(playlist_client=ApplePlaylistClientStub())
 
-        with patch("music_links_bot.bot_stats.record_playlists") as record_playlists:
+        with patch("music_links_bot.bot_stats.record_post") as record_playlists:
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -2791,7 +2791,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateSpotifyArtistMessageStub()
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_artists") as record_artists:
+        with patch("music_links_bot.bot_stats.record_post") as record_artists:
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -2814,7 +2814,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateMixedMessageStub()
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_mixed") as record_mixed:
+        with patch("music_links_bot.bot_stats.record_post") as record_mixed:
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(message.replies, ["<deleted>"])
@@ -2839,7 +2839,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateMixedPlaylistMessageStub()
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_mixed") as record_mixed:
+        with patch("music_links_bot.bot_stats.record_post") as record_mixed:
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -2862,7 +2862,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateMixedNTSMessageStub()
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_mixed") as record_mixed:
+        with patch("music_links_bot.bot_stats.record_post") as record_mixed:
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)

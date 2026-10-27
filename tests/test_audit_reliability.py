@@ -15,7 +15,7 @@ from telegram.ext import Application, TypeHandler
 from api import telegram as webhook
 from music_links_bot import ephemeral, mixed_post, publish_queue
 from music_links_bot.bot_preferences import LocalizedApplication
-from music_links_bot.bot_stats import record_tracks
+from music_links_bot.bot_stats import record_delivered
 from music_links_bot.bot_storage import (
     load_search_selection,
     store_draft,
@@ -376,10 +376,10 @@ class StorageTests(unittest.IsolatedAsyncioTestCase):
             )
 
         await asyncio.gather(
-            record_tracks([track()], message(7), context=context(self.kv)),
-            record_tracks([track()], message(8), context=context(self.kv)),
+            record_delivered(message(7), context=context(self.kv), tracks=[track()]),
+            record_delivered(message(8), context=context(self.kv), tracks=[track()]),
         )
-        await record_tracks([track()], message(7), context=context(self.kv))
+        await record_delivered(message(7), context=context(self.kv), tracks=[track()])
         stats = await self.kv.get_json(STATS_KV_KEY)
         self.assertEqual(stats["posts"], 2)
         self.assertEqual(stats["song"], 2)

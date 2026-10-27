@@ -84,11 +84,12 @@ async def _application_error_handler(
         except TelegramError:
             LOGGER.warning("Could not display storage failure notice")
     if isinstance(error, BaseException):
-        context.application.bot_data["last_error"] = {
-            "type": type(error).__name__,
-            # Telegram's own reason ("Bad Request: …") says what to fix.
-            "detail": str(error)[:200],
-        }
+        runtime = context.application.bot_data.get("runtime")
+        if runtime is not None:
+            runtime.record_failure(error, kind=_update_kind(update))
+            await runtime.persist_metrics(force=True)
+        if not isinstance(error, KVUnavailableError):
+            await _answer_failed_tap(update)
         LOGGER.error(
             "Unhandled Telegram update error",
             exc_info=(type(error), error, error.__traceback__),
@@ -96,6 +97,43 @@ async def _application_error_handler(
         return
 
     LOGGER.error("Unhandled Telegram update error: %r", error)
+
+
+def _update_kind(update: object) -> str:
+    for kind in (
+        "callback_query",
+        "inline_query",
+        "chosen_inline_result",
+        "channel_post",
+        "message",
+        "edited_message",
+    ):
+        if getattr(update, kind, None) is not None:
+            return kind
+    return type(update).__name__
+
+
+async def _answer_failed_tap(update: object) -> None:
+    """A broken button must not just spin, and a broken inline search must
+    not just come back empty: say so (if Telegram still waits for an answer)."""
+    query = getattr(update, "callback_query", None)
+    inline = getattr(update, "inline_query", None)
+    user = getattr(query or inline, "from_user", None)
+    lang = resolve_lang(getattr(user, "language_code", None))
+    try:
+        if query is not None:
+            await query.answer(get_text(lang, "error_tap"), show_alert=True)
+        elif inline is not None:
+            await inline.answer(
+                [],
+                cache_time=0,
+                is_personal=True,
+                button=InlineQueryResultsButton(
+                    text=get_text(lang, "error_inline"), start_parameter="start"
+                ),
+            )
+    except TelegramError:
+        LOGGER.debug("The failed update was already answered")
 
 
 async def bot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

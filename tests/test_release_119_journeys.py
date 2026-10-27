@@ -79,7 +79,7 @@ class Release119Journeys(unittest.IsolatedAsyncioTestCase):
                 patch(
                     "music_links_bot.bot_lookup_flow._send_track_result", AsyncMock()
                 ) as send,
-                patch("music_links_bot.bot_lookup_flow._record_matches_safely"),
+                patch("music_links_bot.bot_lookup_flow._record_delivered"),
             ):
                 await _send_track_matches(
                     q.message,

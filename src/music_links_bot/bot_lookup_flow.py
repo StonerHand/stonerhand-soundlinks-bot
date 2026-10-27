@@ -68,12 +68,7 @@ from music_links_bot.bot_stats import (
     message_entities as _message_entities,
     message_source_urls as _message_source_urls,
     message_text as _message_text,
-    record_artist_items as _record_artists_safely,
-    record_mixed_items as _record_mixed_safely,
-    record_playlist_items as _record_playlists_safely,
-    record_radio_items as _record_radios_safely,
-    record_tracks as _record_matches_safely,
-    record_video_items as _record_videos_safely,
+    record_delivered as _record_delivered,
 )
 from music_links_bot.bot_storage import (
     store_draft as _store_draft,
@@ -428,7 +423,6 @@ async def track_lookup_message(
         if message is not None:
             await _cancel_progress(message.chat_id, _update_lang(update))
     except TelegramError as exc:
-        _runtime(context).record_failure(exc)
         if message is not None and message.chat.type == "private":
             await _cancel_progress(message.chat_id, _update_lang(update))
         if message is not None and message.chat.type == "channel":
@@ -439,8 +433,7 @@ async def track_lookup_message(
                 only_for_channel_message=message,
             )
         raise
-    except Exception as exc:
-        _runtime(context).record_failure(exc)
+    except Exception:
         if message is not None and message.chat.type == "private":
             await _cancel_progress(message.chat_id, _update_lang(update))
         raise
@@ -666,7 +659,7 @@ async def _send_track_matches(
             source_urls=collection_sources,
             content_kind="collection",
         )
-        await _record_matches_safely(tracks, message, context=context)
+        await _record_delivered(message, context=context, tracks=tracks)
         return
 
     track = tracks[0]
@@ -731,7 +724,7 @@ async def _send_track_matches(
             source_urls=tuple(track.links.values()),
             content_kind=track.kind,
         )
-    await _record_matches_safely([track], message, context=context)
+    await _record_delivered(message, context=context, tracks=[track])
 
 
 async def _consume_pending_input(
@@ -1162,7 +1155,7 @@ async def _deliver_lookup_bundle(
             allow_share=not partial,
             **common,
         )
-        await _record_videos_safely(bundle.videos, message, context=context)
+        await _record_delivered(message, context=context, videos=bundle.videos)
     elif kind == "radios":
         await _send_nts_result(
             context.bot,
@@ -1172,7 +1165,7 @@ async def _deliver_lookup_bundle(
             allow_share=not partial,
             **common,
         )
-        await _record_radios_safely(bundle.radios, message, context=context)
+        await _record_delivered(message, context=context, radios=bundle.radios)
     elif kind == "playlists":
         import_id = None
         if (
@@ -1194,7 +1187,7 @@ async def _deliver_lookup_bundle(
             import_id=import_id,
             **common,
         )
-        await _record_playlists_safely(bundle.playlists, message, context=context)
+        await _record_delivered(message, context=context, playlists=bundle.playlists)
     elif kind == "artists":
         await _send_artist_result(
             context.bot,
@@ -1204,7 +1197,7 @@ async def _deliver_lookup_bundle(
             allow_share=not partial,
             **common,
         )
-        await _record_artists_safely(bundle.artists, message, context=context)
+        await _record_delivered(message, context=context, artists=bundle.artists)
     elif kind == "mixed":
         await _send_mixed_result(
             context.bot,
@@ -1219,14 +1212,14 @@ async def _deliver_lookup_bundle(
             allow_share=not partial,
             **common,
         )
-        await _record_mixed_safely(
-            bundle.tracks,
-            bundle.videos,
-            bundle.radios,
-            bundle.playlists,
-            bundle.artists,
+        await _record_delivered(
             message,
             context=context,
+            tracks=bundle.tracks,
+            videos=bundle.videos,
+            radios=bundle.radios,
+            playlists=bundle.playlists,
+            artists=bundle.artists,
         )
     await _send_partial_lookup_status(
         message,

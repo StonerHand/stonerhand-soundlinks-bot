@@ -198,7 +198,7 @@ class LookupRoundTripTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateSpotifyTrackMessageStub()
         with (
             unittest.mock.patch.object(EditableReplyStub, "edit_text", counting),
-            unittest.mock.patch("music_links_bot.bot_stats.record_matches"),
+            unittest.mock.patch("music_links_bot.bot_stats.record_post"),
         ):
             await track_lookup_message(UpdateStub(message), ContextStub())
 

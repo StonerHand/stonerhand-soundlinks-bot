@@ -13,24 +13,6 @@ from music_links_bot.release_presentation import shared_collection_artist
 from music_links_bot.text_utils import normalize_hashtag
 
 MAX_AUTO_TAGS = 5
-STRUCTURAL_TAGS = frozenset(
-    {
-        "#stonerhand",
-        "#collection",
-        "#track",
-        "#album",
-        "#ep",
-        "#single",
-        "#compilation",
-        "#soundtrack",
-        "#video",
-        "#podcast",
-        "#show",
-        "#radio",
-        "#playlist",
-        "#artist",
-    }
-)
 _GENRE_ALIASES = {"hiphoprap": "hiphop", "rhythmandblues": "rnb", "rnb": "rnb"}
 
 

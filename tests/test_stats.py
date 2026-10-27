@@ -15,12 +15,7 @@ from music_links_bot.models import (
 from music_links_bot.stats import (
     format_stats_message,
     load_stats,
-    record_artists,
-    record_matches,
-    record_mixed,
-    record_playlists,
-    record_radios,
-    record_videos,
+    record_post,
     remove_identity,
 )
 
@@ -29,8 +24,8 @@ class StatsTests(unittest.TestCase):
     def test_remove_identity_keeps_anonymous_totals(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "stats.json"
-            before = record_matches(
-                [TrackMatch(title="Song", artist="Artist", links={})],
+            before = record_post(
+                tracks=[TrackMatch(title="Song", artist="Artist", links={})],
                 path=path,
                 user={"id": 7, "label": "listener"},
                 chat={"id": 7, "label": "private"},
@@ -46,8 +41,8 @@ class StatsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "stats.json"
 
-            stats = record_matches(
-                [
+            stats = record_post(
+                tracks=[
                     TrackMatch(title="Song", artist="Artist", links={}, kind="song"),
                     TrackMatch(title="Album", artist="Artist", links={}, kind="album"),
                 ],
@@ -95,8 +90,8 @@ class StatsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "stats.json"
 
-            stats = record_videos(
-                [
+            stats = record_post(
+                videos=[
                     VideoMatch(title="First", author="One", url="https://youtu.be/1"),
                     VideoMatch(title="Second", author="Two", url="https://youtu.be/2"),
                 ],
@@ -123,8 +118,8 @@ class StatsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "stats.json"
 
-            stats = record_radios(
-                [
+            stats = record_post(
+                radios=[
                     RadioMatch(
                         title="Dark Energy",
                         station="NTS Radio",
@@ -143,9 +138,13 @@ class StatsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "stats.json"
 
-            stats = record_mixed(
-                [TrackMatch(title="Song", artist="Artist", links={}, kind="song")],
-                [VideoMatch(title="Live", author="Channel", url="https://youtu.be/1")],
+            stats = record_post(
+                tracks=[
+                    TrackMatch(title="Song", artist="Artist", links={}, kind="song")
+                ],
+                videos=[
+                    VideoMatch(title="Live", author="Channel", url="https://youtu.be/1")
+                ],
                 path=path,
             )
 
@@ -159,10 +158,12 @@ class StatsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "stats.json"
 
-            stats = record_mixed(
-                [],
-                [VideoMatch(title="Live", author="Channel", url="https://youtu.be/1")],
-                [
+            stats = record_post(
+                tracks=[],
+                videos=[
+                    VideoMatch(title="Live", author="Channel", url="https://youtu.be/1")
+                ],
+                playlists=[
                     PlaylistMatch(
                         title="Women of Punk",
                         platform="Spotify",
@@ -181,9 +182,11 @@ class StatsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "stats.json"
 
-            stats = record_mixed(
-                [],
-                [VideoMatch(title="Live", author="Channel", url="https://youtu.be/1")],
+            stats = record_post(
+                tracks=[],
+                videos=[
+                    VideoMatch(title="Live", author="Channel", url="https://youtu.be/1")
+                ],
                 artists=[
                     ArtistMatch(
                         title="1.Kla$",
@@ -203,9 +206,11 @@ class StatsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "stats.json"
 
-            stats = record_mixed(
-                [],
-                [VideoMatch(title="Live", author="Channel", url="https://youtu.be/1")],
+            stats = record_post(
+                tracks=[],
+                videos=[
+                    VideoMatch(title="Live", author="Channel", url="https://youtu.be/1")
+                ],
                 radios=[
                     RadioMatch(
                         title="Dark Energy",
@@ -225,8 +230,8 @@ class StatsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "stats.json"
 
-            stats = record_playlists(
-                [
+            stats = record_post(
+                playlists=[
                     PlaylistMatch(
                         title="Women of Punk",
                         platform="Spotify",
@@ -245,8 +250,8 @@ class StatsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "stats.json"
 
-            stats = record_artists(
-                [
+            stats = record_post(
+                artists=[
                     ArtistMatch(
                         title="1.Kla$",
                         platform="Spotify",
@@ -265,8 +270,8 @@ class StatsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "stats.json"
 
-            stats = record_matches(
-                [
+            stats = record_post(
+                tracks=[
                     TrackMatch(
                         title="Episode",
                         artist="Podcast",

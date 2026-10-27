@@ -114,3 +114,15 @@ class ReleaseHubTests(unittest.TestCase):
         self.assertIsNone(
             canonical_release_hub_url("https://soundcloud.com/artist/track")
         )
+
+
+def test_every_youtube_link_form_gets_its_song_link_page():
+    for url in (
+        "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        "https://youtu.be/dQw4w9WgXcQ?si=share",
+        "https://m.youtube.com/watch?v=dQw4w9WgXcQ",
+        "https://music.youtube.com/watch?v=dQw4w9WgXcQ&si=x",
+        "https://youtube.com/shorts/dQw4w9WgXcQ",
+    ):
+        assert canonical_release_hub_url(url) == "https://song.link/y/dQw4w9WgXcQ"
+    assert canonical_release_hub_url("https://www.youtube.com/watch?v=bad") is None

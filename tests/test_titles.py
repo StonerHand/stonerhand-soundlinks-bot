@@ -292,7 +292,7 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
         message = NetflixMessage()
         context = ContextStub()
         context.application.bot_data["title_client"] = client
-        with patch("music_links_bot.bot_stats.record_matches"):
+        with patch("music_links_bot.bot_stats.record_post"):
             await track_lookup_message(UpdateStub(message), context)
         return message
 
@@ -322,7 +322,7 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
         message = NetflixMessage()
         context = ContextStub()
         context.application.bot_data["title_client"] = _NetflixStub()
-        with patch("music_links_bot.bot_stats.record_matches"):
+        with patch("music_links_bot.bot_stats.record_post"):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)

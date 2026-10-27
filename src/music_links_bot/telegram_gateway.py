@@ -48,7 +48,7 @@ def _telegram_api_error(status_code: int, payload: object) -> TelegramError:
             parameters.get("retry_after") if isinstance(parameters, dict) else 1
         )
         try:
-            delay = max(1, int(retry_after))
+            delay = max(1, int(retry_after or 1))
         except (TypeError, ValueError):
             delay = 1
         # PTB 22.x warns inside the constructor while it transitions this
