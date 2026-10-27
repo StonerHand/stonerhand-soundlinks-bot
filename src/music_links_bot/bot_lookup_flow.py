@@ -112,6 +112,7 @@ from music_links_bot.keyboards import (
     _should_include_channel_button,
     _should_include_hashtags,
 )
+from music_links_bot.kvstore import KVUnavailableError
 from music_links_bot.lookup_transport import (
     reply_with_track as _reply_with_track,
     send_track_result as _send_track_result,
@@ -969,9 +970,28 @@ async def _track_lookup_message_impl(
     delivered = False
     try:
         delivered = await _run_admitted_lookup(message, context, request, request_token)
+    except Exception as exc:
+        if request.is_private and not isinstance(exc, KVUnavailableError):
+            await _report_failed_lookup(message, context, request.lang)
+        raise
     finally:
         if reaction is not None:
             await finish_reaction(reaction, context.bot, message, success=delivered)
+
+
+async def _report_failed_lookup(message, context, lang: str) -> None:
+    """Never leave a private chat on a frozen progress line: say it and offer
+    Retry. The error itself still reaches the error handler and the logs."""
+    await _cancel_progress(message.chat_id, lang)
+    try:
+        await _reply_with_flow_error(
+            message,
+            context,
+            BotFlowError(BotErrorCode.DELIVERY_FAILED, retryable=True),
+            lang=lang,
+        )
+    except TelegramError:
+        LOGGER.warning("Could not report a failed lookup", exc_info=True)
 
 
 async def _run_admitted_lookup(message, context, request, request_token) -> bool:

@@ -90,6 +90,7 @@ async def _reply_with_flow_error(
         BotErrorCode.RELEASE_NOT_FOUND: "error_search",
         BotErrorCode.PROVIDER_UNAVAILABLE: "error_provider",
         BotErrorCode.RATE_LIMITED: "error_rate_limit",
+        BotErrorCode.DELIVERY_FAILED: "error_delivery",
     }.get(error.code, "no_url_hint")
     detail = get_text(lang, detail_key)
     if error.code == BotErrorCode.RATE_LIMITED:
@@ -106,7 +107,7 @@ async def _reply_with_flow_error(
         BotErrorCode.PROVIDER_UNAVAILABLE: "error_title_provider",
         BotErrorCode.RATE_LIMITED: "error_title_rate_limit",
     }.get(error.code, "error_title")
-    text = f"⚠️ <b>{get_text(lang, title_key)}</b>\n{detail}"
+    text = f"<b>{get_text(lang, title_key)}</b>\n{detail}"
     if search_query and error.code in {
         BotErrorCode.SEARCH_NOT_FOUND,
         BotErrorCode.RELEASE_NOT_FOUND,
@@ -119,6 +120,7 @@ async def _reply_with_flow_error(
         BotErrorCode.PROVIDER_UNAVAILABLE: "retry",
         BotErrorCode.RATE_LIMITED: "retry",
         BotErrorCode.LIMIT_EXCEEDED: "crate",
+        BotErrorCode.DELIVERY_FAILED: "retry",
     }.get(error.code, "retry" if error.retryable else "search")
     keyboard = hooks.build_error_keyboard(
         context.bot.username,

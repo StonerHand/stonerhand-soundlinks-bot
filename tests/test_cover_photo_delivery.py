@@ -79,13 +79,9 @@ async def _check_delivery(error):
     with patch.dict(os.environ, ENV):
         if isinstance(error, TimedOut):
             with pytest.raises(TimedOut):
-                await service._send(
-                    {"as_photo": False}, TRACK, target=1, channel_style=False
-                )
+                await service._send({"as_photo": False}, TRACK, target=1)
         else:
-            await service._send(
-                {"as_photo": False}, TRACK, target=1, channel_style=False
-            )
+            await service._send({"as_photo": False}, TRACK, target=1)
     assert bot.send_photo.await_args.kwargs["photo"] == b"branded-jpeg"
     if isinstance(error, BadRequest):
         assert bot.send_message.await_count == 1

@@ -229,6 +229,11 @@ async def build_status_text(context) -> str:
                 "",
                 "<b>Последняя внутренняя ошибка</b>",
                 f"<code>{escape(str(last_error.get('type') or 'unknown'))}</code>",
+                *(
+                    [f"<code>{escape(str(last_error['detail']))}</code>"]
+                    if last_error.get("detail")
+                    else []
+                ),
             ]
         )
     return "\n".join(lines)

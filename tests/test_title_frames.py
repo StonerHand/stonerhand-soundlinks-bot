@@ -96,19 +96,6 @@ def test_a_square_or_tall_still_is_cropped_to_the_screen_shape():
             assert image.size == FRAME_SIZE
 
 
-def test_a_clip_frame_loses_the_letterbox_and_gets_the_play_badge():
-    thumbnail = Image.new("RGB", (480, 360), (0, 0, 0))
-    thumbnail.paste((40, 200, 40), (0, 45, 480, 315))
-    raw = io.BytesIO()
-    thumbnail.save(raw, "JPEG")
-    with Image.open(io.BytesIO(compose_frame(raw.getvalue(), play=True))) as image:
-        rgb = image.convert("RGB")
-        assert rgb.size == FRAME_SIZE
-        top = rgb.getpixel((20, 5))
-        assert top[1] > 150 and top[0] < 100
-        assert min(rgb.getpixel((FRAME_SIZE[0] // 2, FRAME_SIZE[1] // 2))) > 200
-
-
 def test_broken_or_oversized_stills_are_refused():
     assert compose_frame(b"not an image") is None
     assert compose_frame(b"x" * (MAX_ARTWORK_BYTES + 1)) is None
@@ -166,7 +153,9 @@ def test_an_unreadable_still_falls_back_to_the_original_image():
     assert request.headers["location"] == HERO
 
 
-def test_a_lone_clip_frame_from_a_video_collage_stays_wide():
+def test_youtube_frames_never_use_the_wide_film_layout():
+    """Video collages stay as they were before film stills: one surviving
+    frame becomes the usual square signed cover."""
     from music_links_bot.collection_collage import video_collage_preview_url
     from music_links_bot.models import VideoMatch
 
@@ -189,8 +178,7 @@ def test_a_lone_clip_frame_from_a_video_collage_stays_wide():
                 _jpeg((480, 270), (40, 40, 200)) if "/a/" in source else None
             ),
         )
-    assert image.size == FRAME_SIZE
-    assert min(image.getpixel((FRAME_SIZE[0] // 2, FRAME_SIZE[1] // 2))) > 200
+    assert image.size == (1200, 1200)
 
 
 def _title() -> TitleMatch:

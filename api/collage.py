@@ -86,12 +86,10 @@ class handler(BaseHTTPRequestHandler):
         ]
         images = [image for image, _flag in pairs]
         label = label_override or brand_label()
-        if len(images) == 1 and (mode == FRAME_MODE or pairs[0][1]):
-            # A film still or a lone clip frame keeps the screen's 16:9 shape.
+        if len(images) == 1 and mode == FRAME_MODE:
+            # A film or series still keeps the screen's 16:9 shape.
             collage = compose_frame(
-                images[0],
-                label=label if photo_branding_enabled() else None,
-                play=pairs[0][1],
+                images[0], label=label if photo_branding_enabled() else None
             )
         elif len(images) == 1 and photo_branding_enabled():
             collage = compose_cover(images[0], label=label, size=1200)

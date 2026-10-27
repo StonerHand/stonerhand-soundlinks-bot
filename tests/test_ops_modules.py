@@ -101,6 +101,18 @@ class StatusTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("⚠️ songlink&lt;x&gt;", text)
         self.assertIn("<code>&lt;Boom&gt;</code>", text)
 
+    async def test_status_shows_what_telegram_said_about_the_last_error(self) -> None:
+        with patch.object(bot_admin, "load_jobs", new=AsyncMock(return_value=[])):
+            text = await bot_admin.build_status_text(
+                _context(
+                    last_error={"type": "BadRequest", "detail": "Bad Request: <x>"}
+                )
+            )
+
+        self.assertIn(
+            "<code>BadRequest</code>\n<code>Bad Request: &lt;x&gt;</code>", text
+        )
+
     async def test_status_reports_a_broken_queue_and_webhook(self) -> None:
         context = _context(kv_store=_KV(set_ok=False))
         context.bot.get_webhook_info.return_value.last_error_message = "Bad Gateway"

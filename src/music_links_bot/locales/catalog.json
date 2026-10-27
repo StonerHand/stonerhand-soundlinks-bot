@@ -411,6 +411,10 @@
     "en": "🎶 Open collection",
     "ru": "🎶 Открыть подборку"
   },
+  "error_delivery": {
+    "ru": "Что-то сломалось на последнем шаге. Ссылка сохранена — нажми «Повторить».",
+    "en": "Something broke at the last step. Your link is saved — tap Retry."
+  },
   "error_provider": {
     "en": "The music provider is temporarily unavailable. Your link is saved — tap Retry.",
     "ru": "Музыкальный сервис временно не отвечает. Ссылка сохранена — нажми «Повторить»."
