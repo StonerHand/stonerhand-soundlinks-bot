@@ -9,7 +9,11 @@ from music_links_bot.cache import TTLCache
 from music_links_bot.collection_collage import branded_video_frame_url
 from music_links_bot.constants import HTTP_HEADERS
 from music_links_bot.models import VideoMatch
-from music_links_bot.telegram_gateway import feature_enabled
+from music_links_bot.telegram_gateway import (
+    capability_available,
+    feature_enabled,
+    link_preview_capability,
+)
 from music_links_bot.url_utils import cache_key_for_url, youtube_video_id
 
 
@@ -84,16 +88,23 @@ def video_still_url(video: VideoMatch) -> str | None:
 
 
 def video_preview_url(video: VideoMatch) -> str:
-    """What a video card previews: its signed frame, not the YouTube page.
+    """What a video card previews: YouTube's own player, when Telegram can.
 
-    Telegram builds a link preview before it answers the bot. Since October
-    2026 it cannot build one from a YouTube page in time: the send hangs, the
-    next message to the chat hits flood control and the card never arrives.
-    A frame image previews at once; ours is 16:9 with ▶ and the signature,
-    and the card's button opens the video. Without branding it is YouTube's
-    own still. YOUTUBE_PLAYER_PREVIEW_ENABLED=1 brings the inline player back.
+    Telegram builds a link preview before it answers the bot. On 2026-10-27
+    it could not build one from a YouTube page for hours: the send hung and
+    the next send to the chat hit flood control. A card whose player preview
+    fails is resent with video_frame_url (lookup_transport), and the player
+    is skipped for a few minutes. YOUTUBE_PLAYER_PREVIEW_ENABLED=0 always uses
+    the frame.
     """
-    if feature_enabled("YOUTUBE_PLAYER_PREVIEW_ENABLED", default=False):
+    if feature_enabled(
+        "YOUTUBE_PLAYER_PREVIEW_ENABLED", default=True
+    ) and capability_available(link_preview_capability(video.url)):
         return video.url
+    return video_frame_url(video)
+
+
+def video_frame_url(video: VideoMatch) -> str:
+    """The signed 16:9 frame with ▶ and the signature, else YouTube's still."""
     still = video_still_url(video)
     return branded_video_frame_url(still) or still or video.url

@@ -72,6 +72,19 @@ def feature_enabled(name: str, *, default: bool = True) -> bool:
     return raw.strip().casefold() in _TRUE_VALUES
 
 
+# One site behind several hosts shares one preview state.
+_PREVIEW_SITE_ALIASES = {"youtu.be": "youtube.com", "music.youtube.com": "youtube.com"}
+
+
+def link_preview_capability(url: str) -> str:
+    """Whether Telegram currently builds previews for this link's site."""
+    from urllib.parse import urlparse
+
+    host = (urlparse(url).hostname or "").casefold().removeprefix("www.")
+    host = host.removeprefix("m.")
+    return f"link_preview:{_PREVIEW_SITE_ALIASES.get(host, host)}"
+
+
 def capability_available(name: str) -> bool:
     state = _CAPABILITIES.get(name)
     return state is None or state.blocked_until <= monotonic()

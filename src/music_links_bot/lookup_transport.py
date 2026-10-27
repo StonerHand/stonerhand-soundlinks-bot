@@ -28,13 +28,17 @@ from music_links_bot.publication_contract import (
     require_valid_publication,
 )
 from music_links_bot.sharing import make_channel_safe_keyboard
+from music_links_bot.telegram_gateway import (
+    link_preview_capability,
+    record_capability_failure,
+)
 from music_links_bot.telegram_messages import delete_message_safely
 
 LOGGER = logging.getLogger(__name__)
 # Telegram builds a link preview before it answers. A YouTube player can take
 # longer than the client's default five seconds; the waits stay well inside
 # the webhook's 25-second budget even when every fallback is needed.
-_PREVIEW_READ_TIMEOUT_SECONDS = 8.0
+_PREVIEW_READ_TIMEOUT_SECONDS = 6.0
 _STILL_READ_TIMEOUT_SECONDS = 6.0
 # Flood control names its wait; a short one is waited out once.
 _MAX_FLOOD_WAIT_SECONDS = 9.0
@@ -276,6 +280,11 @@ async def _send_card(
                 type(exc).__name__,
                 exc.message,
             )
+            if options.url:
+                # Later cards skip this site's preview for a few minutes.
+                record_capability_failure(
+                    link_preview_capability(options.url), exc, unsupported=True
+                )
     return await _flood_safe(
         send, link_preview_options=LinkPreviewOptions(is_disabled=True), **message
     )

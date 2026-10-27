@@ -15,7 +15,7 @@ from music_links_bot.collection_collage import (
     decode_collage_payload,
 )
 from music_links_bot.models import VideoMatch
-from music_links_bot.youtube import video_preview_url
+from music_links_bot.youtube import video_frame_url
 
 ENV = {"WEBHOOK_BASE_URL": "https://bot.example", "BOT_TOKEN": "1:x"}
 VIDEO = "https://www.youtube.com/watch?v=E3mSkI9uskw"
@@ -36,13 +36,13 @@ def _letterboxed_frame() -> bytes:
     return _jpeg(image)
 
 
-def test_a_video_card_previews_its_signed_frame():
+def test_the_fallback_frame_is_signed_16_9_with_play():
     video = VideoMatch(title="iOS 27.2", author="ProTech", url=VIDEO, thumbnail_url=HQ)
     with patch.dict(os.environ, ENV):
-        preview = video_preview_url(video)
+        frame = video_frame_url(video)
         url = branded_video_frame_url(HQ)
 
-    assert preview == url and preview.startswith("https://bot.example/api/collage?")
+    assert frame == url and frame.startswith("https://bot.example/api/collage?")
     query = parse_qs(urlparse(url).query)
     assert query["m"] == [VIDEO_MODE]
     assert decode_collage_payload(
@@ -52,9 +52,9 @@ def test_a_video_card_previews_its_signed_frame():
         allow_single=True,
         mode=VIDEO_MODE,
     ) == [HQ]
-    # Without branding the card keeps YouTube's plain still.
+    # Without branding the fallback is YouTube's plain still.
     with patch.dict(os.environ, {**ENV, "BRAND_PHOTO_FRAME": "0"}):
-        assert video_preview_url(video) == HQ
+        assert video_frame_url(video) == HQ
 
 
 def test_the_endpoint_draws_a_wide_frame_with_play_and_no_bars():
