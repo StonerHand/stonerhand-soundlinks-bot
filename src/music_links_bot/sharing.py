@@ -420,7 +420,9 @@ def _bundle_preview_url(
     if bundle.radios:
         return bundle.radios[0].url
     if bundle.videos:
-        return bundle.videos[0].url
+        from music_links_bot.youtube import video_preview_url
+
+        return video_preview_url(bundle.videos[0])
     return None
 
 

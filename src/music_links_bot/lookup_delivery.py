@@ -55,6 +55,7 @@ from music_links_bot.sharing import (
     track_share_url,
 )
 from music_links_bot.telegram_buttons import button as InlineKeyboardButton
+from music_links_bot.youtube import video_preview_url, video_still_url
 
 SendTrackResult = Callable[..., Awaitable[Any]]
 SendTrackVideoPairResult = Callable[..., Awaitable[bool]]
@@ -123,8 +124,9 @@ class _Cards:
     # A collage of the frames (▶ on each) shows at a glance that the post
     # holds several videos; one native player preview would hide the rest.
     collage: Callable[[list], str | None] | None = None
-    # A single card's still image, used when Telegram cannot build the
-    # preview from the link itself (a YouTube player that takes too long).
+    # A single card's preview (default: its own link) and a still image to
+    # fall back to when Telegram cannot build that preview.
+    preview: Callable[[Any], str] | None = None
     still: Callable[[Any], str | None] | None = None
 
 
@@ -135,7 +137,8 @@ _VIDEO_CARDS = _Cards(
     format_video_message,
     format_video_collection_message,
     collage=video_collage_preview_url,
-    still=lambda video: video.thumbnail_url,
+    preview=video_preview_url,
+    still=video_still_url,
 )
 _RADIO_CARDS = _Cards(
     "radio",
@@ -192,7 +195,7 @@ async def _send_cards(
             )
         body = cards.message(items[0], include_hashtags=include_hashtags)
         delivery = {
-            "preview_url": urls[0],
+            "preview_url": cards.preview(items[0]) if cards.preview else urls[0],
             "source_urls": (urls[0],),
             "content_kind": cards.kind,
         }
@@ -493,5 +496,5 @@ def select_mixed_preview_url(
     if radios:
         return radios[0].url
     if videos:
-        return videos[0].url
+        return video_preview_url(videos[0])
     return None

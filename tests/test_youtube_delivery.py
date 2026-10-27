@@ -1,14 +1,20 @@
-"""A YouTube card always arrives: without its preview if Telegram refuses the
-preview, and a broken lookup says so instead of freezing the progress line."""
+"""A YouTube card always arrives: it previews the video's frame (Telegram cannot
+build a YouTube page preview in time), survives flood control, falls back to a
+plainer preview, and a broken lookup says so instead of freezing the progress
+line."""
 
 import asyncio
+import os
+from datetime import timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from telegram import LinkPreviewOptions
-from telegram.error import BadRequest, TimedOut
+from telegram.error import BadRequest, RetryAfter, TimedOut
 
 from music_links_bot.lookup_transport import _send_card
+from music_links_bot.models import VideoMatch
+from music_links_bot.youtube import video_preview_url, video_still_url
 
 VIDEO = "https://www.youtube.com/watch?v=j7K6FC_psGc"
 STILL = "https://i.ytimg.com/vi/j7K6FC_psGc/hqdefault.jpg"
@@ -83,10 +89,24 @@ def _lookup(message, context):
         asyncio.run(track_lookup_message(UpdateStub(message), context))
 
 
-def test_a_youtube_card_arrives_even_when_telegram_refuses_its_player():
-    from test_bot import ContextStub, PrivateMessageStub
+def test_video_cards_preview_the_frame_not_the_youtube_page():
+    video = VideoMatch(title="Clip", author="A", url=VIDEO, thumbnail_url=STILL)
+    assert video_preview_url(video) == STILL
+    # Without YouTube's thumbnail, the frame comes from the video id.
+    bare = VideoMatch(title="YouTube video", author="YouTube", url=VIDEO)
+    assert video_still_url(bare) == STILL
+    assert video_preview_url(bare) == STILL
+    unknown = VideoMatch(
+        title="x", author="y", url="https://www.youtube.com/watch?v=bad"
+    )
+    assert video_preview_url(unknown) == unknown.url
+    # The inline player comes back with one switch once Telegram can build it.
+    with patch.dict(os.environ, {"YOUTUBE_PLAYER_PREVIEW_ENABLED": "1"}):
+        assert video_preview_url(video) == VIDEO
 
-    from music_links_bot.models import VideoMatch
+
+def test_a_youtube_card_goes_out_with_the_frame_preview():
+    from test_bot import ContextStub, PrivateMessageStub
 
     class Message(PrivateMessageStub):
         text = f"Вышел из спячки {VIDEO}"
@@ -94,7 +114,7 @@ def test_a_youtube_card_arrives_even_when_telegram_refuses_its_player():
         async def reply_text(self, text, **kwargs):
             options = kwargs.get("link_preview_options")
             if options is not None and options.url == VIDEO:
-                raise BadRequest("Wrong web page url")
+                raise AssertionError("asked Telegram to build a YouTube page")
             return await super().reply_text(text, **kwargs)
 
     youtube = AsyncMock()
@@ -105,15 +125,41 @@ def test_a_youtube_card_arrives_even_when_telegram_refuses_its_player():
         thumbnail_url=STILL,
     )
     message = Message()
-    # Telegram refuses the progress edit with the player as well.
-    message.reply_edit_error = BadRequest("Wrong web page url")
+    # The progress line cannot be edited into the card here.
+    message.reply_edit_error = BadRequest("Message can't be edited")
     _lookup(message, ContextStub(youtube_client=youtube))
 
     live = [reply for reply in message.replies if reply != "<deleted>"]
     assert len(live) == 1
     assert "Lost In The Night" in message.replies[-1]
-    # The video's own still replaces the player.
-    assert message.reply_kwargs[-1]["link_preview_options"].url == STILL
+    options = message.reply_kwargs[-1]["link_preview_options"]
+    assert options.url == STILL and options.prefer_large_media
+    buttons = [
+        button.url
+        for row in message.reply_kwargs[-1]["reply_markup"].inline_keyboard
+        for button in row
+        if button.url
+    ]
+    assert VIDEO in buttons
+
+
+def test_short_flood_control_is_waited_out_once():
+    send = AsyncMock(side_effect=[RetryAfter(timedelta(seconds=3)), "sent"])
+    with patch(
+        "music_links_bot.lookup_transport.asyncio.sleep", new=AsyncMock()
+    ) as sleep:
+        sent = asyncio.run(_send_card(send, link_preview_options=PREVIEW, text="c"))
+
+    assert sent == "sent"
+    sleep.assert_awaited_once_with(3.0)
+    assert send.await_count == 2
+
+
+def test_long_flood_control_is_not_waited_out():
+    send = AsyncMock(side_effect=RetryAfter(timedelta(seconds=60)))
+    with pytest.raises(RetryAfter):
+        asyncio.run(_send_card(send, link_preview_options=PREVIEW, text="c"))
+    assert send.await_count == 1
 
 
 def test_a_broken_lookup_says_so_and_offers_retry():
