@@ -153,9 +153,9 @@ def test_an_unreadable_still_falls_back_to_the_original_image():
     assert request.headers["location"] == HERO
 
 
-def test_youtube_frames_never_use_the_wide_film_layout():
-    """Video collages stay as they were before film stills: one surviving
-    frame becomes the usual square signed cover."""
+def test_a_video_collage_that_lost_frames_stays_a_square_cover():
+    """Only a one-video card is a wide frame; a collage whose other frames
+    failed to download is still the usual square signed cover."""
     from music_links_bot.collection_collage import video_collage_preview_url
     from music_links_bot.models import VideoMatch
 

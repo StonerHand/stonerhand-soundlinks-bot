@@ -6,6 +6,7 @@ from urllib.parse import urlparse, urlunparse
 import httpx
 
 from music_links_bot.cache import TTLCache
+from music_links_bot.collection_collage import branded_video_frame_url
 from music_links_bot.constants import HTTP_HEADERS
 from music_links_bot.models import VideoMatch
 from music_links_bot.telegram_gateway import feature_enabled
@@ -83,14 +84,16 @@ def video_still_url(video: VideoMatch) -> str | None:
 
 
 def video_preview_url(video: VideoMatch) -> str:
-    """What a video card previews: the frame image, not the YouTube page.
+    """What a video card previews: its signed frame, not the YouTube page.
 
     Telegram builds a link preview before it answers the bot. Since October
     2026 it cannot build one from a YouTube page in time: the send hangs, the
     next message to the chat hits flood control and the card never arrives.
-    The frame image previews at once, and the card's button opens the video.
-    YOUTUBE_PLAYER_PREVIEW_ENABLED=1 brings the inline player back.
+    A frame image previews at once; ours is 16:9 with ▶ and the signature,
+    and the card's button opens the video. Without branding it is YouTube's
+    own still. YOUTUBE_PLAYER_PREVIEW_ENABLED=1 brings the inline player back.
     """
     if feature_enabled("YOUTUBE_PLAYER_PREVIEW_ENABLED", default=False):
         return video.url
-    return video_still_url(video) or video.url
+    still = video_still_url(video)
+    return branded_video_frame_url(still) or still or video.url

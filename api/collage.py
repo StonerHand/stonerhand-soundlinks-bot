@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import os
+import re
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from http import HTTPStatus
@@ -20,6 +21,7 @@ from music_links_bot.branding import compose_cover
 from music_links_bot.collection_collage import (
     FRAME_MODE,
     MAX_ARTWORK_BYTES,
+    VIDEO_MODE,
     collage_play_flags,
     compose_collection_collage,
     compose_frame,
@@ -78,7 +80,7 @@ class handler(BaseHTTPRequestHandler):
         # All covers download at once: six sequential-ish fetches made the
         # first preview slow enough for Telegram to give up on it.
         with ThreadPoolExecutor(max_workers=len(urls)) as executor:
-            fetched = list(executor.map(_fetch_artwork, urls))
+            fetched = list(executor.map(_fetch_sharpest, urls))
         # Keep the ▶ flags attached to their own frame if one download fails.
         flags = collage_play_flags(mode, len(fetched))
         pairs = [
@@ -86,10 +88,13 @@ class handler(BaseHTTPRequestHandler):
         ]
         images = [image for image, _flag in pairs]
         label = label_override or brand_label()
-        if len(images) == 1 and mode == FRAME_MODE:
-            # A film or series still keeps the screen's 16:9 shape.
+        if len(urls) == 1 and mode in {FRAME_MODE, VIDEO_MODE}:
+            # A film still or a video frame keeps the screen's 16:9 shape; a
+            # video also gets its ▶ badge.
             collage = compose_frame(
-                images[0], label=label if photo_branding_enabled() else None
+                images[0],
+                label=label if photo_branding_enabled() else None,
+                play=mode == VIDEO_MODE,
             )
         elif len(images) == 1 and photo_branding_enabled():
             collage = compose_cover(images[0], label=label, size=1200)
@@ -149,6 +154,23 @@ def _collage_health_payload() -> dict[str, object]:
         "renderer": renderer,
         "max_artwork_bytes": MAX_ARTWORK_BYTES,
     }
+
+
+_YOUTUBE_HQ_FRAME = re.compile(
+    r"https://i\.ytimg\.com/vi/([A-Za-z0-9_-]{11})/hqdefault\.jpg"
+)
+
+
+def _fetch_sharpest(url: str) -> bytes | None:
+    """YouTube's 480×360 thumbnail has a 1280×720 sibling for most videos."""
+    match = _YOUTUBE_HQ_FRAME.fullmatch(url)
+    if match:
+        sharper = _fetch_artwork(
+            f"https://i.ytimg.com/vi/{match.group(1)}/maxresdefault.jpg"
+        )
+        if sharper:
+            return sharper
+    return _fetch_artwork(url)
 
 
 def _fetch_artwork(url: str) -> bytes | None:

@@ -214,6 +214,23 @@ def branded_frame_preview_url(
     )
 
 
+def branded_video_frame_url(
+    still_url: str | None,
+    *,
+    base_url: str | None = None,
+    signing_secret: str | None = None,
+) -> str | None:
+    """Signed 16:9 video frame with ▶ and the signature (one-video cards)."""
+    if not photo_branding_enabled() or not still_url or not _safe_source_url(still_url):
+        return None
+    return _artwork_preview_url(
+        [still_url],
+        base_url=base_url,
+        signing_secret=signing_secret,
+        mode=VIDEO_MODE,
+    )
+
+
 def signed_cover_url(artwork_url: str | None) -> str | None:
     """The artwork with the cover signature when branding can serve it, else as is."""
     return branded_artwork_preview_url(artwork_url) or artwork_url
@@ -406,8 +423,16 @@ def compose_collection_collage(
 FRAME_SIZE = (1_200, 675)
 
 
-def compose_frame(artwork: bytes, *, label: str | None = None) -> bytes | None:
-    """One wide film or series still as a 16:9 JPEG.
+def compose_frame(
+    artwork: bytes,
+    *,
+    label: str | None = None,
+    play: bool = False,
+) -> bytes | None:
+    """One wide still (a film's hero shot, a clip's frame) as a 16:9 JPEG.
+
+    ``play`` marks a video frame: YouTube's letterbox bars go and a ▶ badge
+    says the card is a video.
 
     A square crop would cut the cast out of a film still, so a frame keeps the
     screen's shape and gets the same signature footer as a cover.
@@ -427,9 +452,13 @@ def compose_frame(artwork: bytes, *, label: str | None = None) -> bytes | None:
             source.thumbnail((FRAME_SIZE[0], FRAME_SIZE[0]), Image.Resampling.LANCZOS)
             image = resources.enter_context(ImageOps.exif_transpose(source))
             rgb = resources.enter_context(image.convert("RGB"))
+            if play:
+                rgb = resources.enter_context(_trim_letterbox(rgb))
             frame = resources.enter_context(
                 ImageOps.fit(rgb, FRAME_SIZE, method=Image.Resampling.LANCZOS)
             )
+            if play:
+                _draw_play_badge(frame)
             if label is not None:
                 frame = resources.enter_context(
                     apply_cover_signature(frame, label=label)
