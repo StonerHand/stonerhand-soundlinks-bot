@@ -123,6 +123,9 @@ class _Cards:
     # A collage of the frames (▶ on each) shows at a glance that the post
     # holds several videos; one native player preview would hide the rest.
     collage: Callable[[list], str | None] | None = None
+    # A single card's still image, used when Telegram cannot build the
+    # preview from the link itself (a YouTube player that takes too long).
+    still: Callable[[Any], str | None] | None = None
 
 
 _VIDEO_CARDS = _Cards(
@@ -132,6 +135,7 @@ _VIDEO_CARDS = _Cards(
     format_video_message,
     format_video_collection_message,
     collage=video_collage_preview_url,
+    still=lambda video: video.thumbnail_url,
 )
 _RADIO_CARDS = _Cards(
     "radio",
@@ -192,6 +196,8 @@ async def _send_cards(
             "source_urls": (urls[0],),
             "content_kind": cards.kind,
         }
+        if cards.still and (still := cards.still(items[0])):
+            delivery["fallback_preview_url"] = still
     else:
         keyboard = cards.collection_keyboard(
             items, include_channel_button=include_channel_button

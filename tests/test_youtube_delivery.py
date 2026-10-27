@@ -6,11 +6,12 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from telegram import LinkPreviewOptions
-from telegram.error import BadRequest
+from telegram.error import BadRequest, TimedOut
 
 from music_links_bot.lookup_transport import _send_card
 
 VIDEO = "https://www.youtube.com/watch?v=j7K6FC_psGc"
+STILL = "https://i.ytimg.com/vi/j7K6FC_psGc/hqdefault.jpg"
 PREVIEW = LinkPreviewOptions(is_disabled=False, url=VIDEO, prefer_large_media=True)
 
 
@@ -25,6 +26,38 @@ def test_a_refused_preview_still_delivers_the_card_bare():
     assert first.kwargs["link_preview_options"] is PREVIEW
     assert second.kwargs["link_preview_options"].is_disabled
     assert second.kwargs["text"] == "card"
+
+
+def test_a_slow_player_gets_more_time_then_the_still_image():
+    send = AsyncMock(side_effect=[TimedOut(), "sent"])
+
+    sent = asyncio.run(
+        _send_card(
+            send, link_preview_options=PREVIEW, fallback_preview_url=STILL, text="c"
+        )
+    )
+
+    assert sent == "sent"
+    player, still = send.await_args_list
+    # Telegram builds the player before answering: longer than the 5 s default.
+    assert player.kwargs["read_timeout"] > 5
+    assert player.kwargs["link_preview_options"].url == VIDEO
+    assert still.kwargs["link_preview_options"].url == STILL
+    assert still.kwargs["link_preview_options"].prefer_large_media
+
+
+def test_when_no_preview_works_the_card_still_goes_out():
+    send = AsyncMock(side_effect=[TimedOut(), BadRequest("Wrong file"), "sent"])
+
+    sent = asyncio.run(
+        _send_card(
+            send, link_preview_options=PREVIEW, fallback_preview_url=STILL, text="c"
+        )
+    )
+
+    assert sent == "sent"
+    assert send.await_args_list[-1].kwargs["link_preview_options"].is_disabled
+    assert "read_timeout" not in send.await_args_list[-1].kwargs
 
 
 def test_a_card_refused_without_preview_is_a_real_error():
@@ -69,6 +102,7 @@ def test_a_youtube_card_arrives_even_when_telegram_refuses_its_player():
         title="Dead Man's Bones – Lost In The Night (Official Video)",
         author="Dead Man's Bones",
         url=VIDEO,
+        thumbnail_url=STILL,
     )
     message = Message()
     # Telegram refuses the progress edit with the player as well.
@@ -78,7 +112,8 @@ def test_a_youtube_card_arrives_even_when_telegram_refuses_its_player():
     live = [reply for reply in message.replies if reply != "<deleted>"]
     assert len(live) == 1
     assert "Lost In The Night" in message.replies[-1]
-    assert message.reply_kwargs[-1]["link_preview_options"].is_disabled
+    # The video's own still replaces the player.
+    assert message.reply_kwargs[-1]["link_preview_options"].url == STILL
 
 
 def test_a_broken_lookup_says_so_and_offers_retry():

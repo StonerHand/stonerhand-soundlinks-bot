@@ -6,7 +6,7 @@ from typing import Any
 
 from telegram import Bot, InlineKeyboardMarkup, LinkPreviewOptions, Message
 from telegram.constants import ParseMode
-from telegram.error import BadRequest, TelegramError
+from telegram.error import BadRequest, TelegramError, TimedOut
 
 from music_links_bot.bot_builder import fit_telegram_html
 from music_links_bot.bot_progress import take_progress
@@ -28,6 +28,11 @@ from music_links_bot.sharing import make_channel_safe_keyboard
 from music_links_bot.telegram_messages import delete_message_safely
 
 LOGGER = logging.getLogger(__name__)
+# Telegram builds a link preview before it answers. A YouTube player can take
+# longer than the client's default five seconds; the waits stay well inside
+# the webhook's 25-second budget even when every fallback is needed.
+_PREVIEW_READ_TIMEOUT_SECONDS = 8.0
+_STILL_READ_TIMEOUT_SECONDS = 6.0
 
 
 async def send_track_result(
@@ -42,6 +47,7 @@ async def send_track_result(
     requested_count: int = 1,
     source_urls: tuple[str, ...] = (),
     content_kind: str = "track",
+    fallback_preview_url: str | None = None,
 ) -> None:
     text = fit_telegram_html(text)
     if message.chat.type in {"group", "supergroup", "channel"}:
@@ -81,6 +87,7 @@ async def send_track_result(
         await _send_card(
             bot.send_message,
             link_preview_options=preview_options,
+            fallback_preview_url=fallback_preview_url,
             chat_id=message.chat_id,
             text=text,
             parse_mode=ParseMode.HTML,
@@ -99,6 +106,7 @@ async def send_track_result(
         requested_count=requested_count,
         source_urls=source_urls,
         content_kind=content_kind,
+        fallback_preview_url=fallback_preview_url,
     )
 
 
@@ -192,6 +200,7 @@ async def reply_with_track(
     requested_count: int = 1,
     source_urls: tuple[str, ...] = (),
     content_kind: str = "track",
+    fallback_preview_url: str | None = None,
 ) -> Message:
     text = fit_telegram_html(text)
     _validate_transport_contract(
@@ -223,6 +232,7 @@ async def reply_with_track(
     return await _send_card(
         message.reply_text,
         link_preview_options=link_preview_options,
+        fallback_preview_url=fallback_preview_url,
         text=text,
         parse_mode=ParseMode.HTML,
         reply_markup=reply_markup,
@@ -233,25 +243,37 @@ async def _send_card(
     send: Callable[..., Awaitable[Any]],
     *,
     link_preview_options: LinkPreviewOptions,
+    fallback_preview_url: str | None = None,
     **message: Any,
 ) -> Any:
-    """Send a card; if Telegram refuses it with its link preview, send it bare.
+    """Send a card; if Telegram cannot build its preview, try a plainer one.
 
-    A preview Telegram cannot build (a blocked or age-restricted video, a page
-    that times out) must not cost the user the whole card.
+    The preview is built before Telegram answers. When it is refused or takes
+    too long (a YouTube player can), the card goes out with its still image,
+    then with no preview at all, instead of not at all.
     """
-    try:
+    if link_preview_options.is_disabled:
         return await send(link_preview_options=link_preview_options, **message)
-    except BadRequest as exc:
-        if link_preview_options.is_disabled:
-            raise
-        LOGGER.warning(
-            "Telegram refused a card with its preview, sending it without: %s",
-            exc.message,
+    attempts = [(link_preview_options, _PREVIEW_READ_TIMEOUT_SECONDS)]
+    if fallback_preview_url and fallback_preview_url != link_preview_options.url:
+        still = _build_link_preview_options(
+            fallback_preview_url, prefer_large_media=True
         )
-        return await send(
-            link_preview_options=LinkPreviewOptions(is_disabled=True), **message
-        )
+        attempts.append((still, _STILL_READ_TIMEOUT_SECONDS))
+    for options, read_timeout in attempts:
+        try:
+            return await send(
+                link_preview_options=options, read_timeout=read_timeout, **message
+            )
+        except (BadRequest, TimedOut) as exc:
+            LOGGER.warning(
+                "Telegram could not send a card with its preview (%s): %s",
+                type(exc).__name__,
+                exc.message,
+            )
+    return await send(
+        link_preview_options=LinkPreviewOptions(is_disabled=True), **message
+    )
 
 
 def _validate_transport_contract(
