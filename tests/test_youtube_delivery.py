@@ -181,6 +181,35 @@ def test_a_player_telegram_cannot_build_falls_back_to_the_frame():
     assert not capability_available(link_preview_capability(VIDEO))
 
 
+def test_a_progress_line_that_times_out_on_the_player_becomes_a_frame_card():
+    from test_bot import ContextStub, PrivateMessageStub
+
+    from music_links_bot.telegram_gateway import (
+        capability_available,
+        link_preview_capability,
+    )
+
+    class Message(PrivateMessageStub):
+        text = VIDEO
+
+    youtube = AsyncMock()
+    youtube.lookup_video.return_value = VideoMatch(
+        title="Danzig - Mother 93 Live", author="Danzig", url=VIDEO, thumbnail_url=STILL
+    )
+    message = Message()
+    # Every edit of the progress line times out: Telegram is stuck on the player.
+    message.reply_edit_error = TimedOut()
+    _lookup(message, ContextStub(youtube_client=youtube))
+
+    sent = [
+        kwargs for kwargs in message.reply_kwargs if "link_preview_options" in kwargs
+    ]
+    # The player is not asked for a second time: the card goes out with the still.
+    assert [kwargs["link_preview_options"].url for kwargs in sent] == [STILL]
+    assert "Mother 93 Live" in message.replies[-1]
+    assert not capability_available(link_preview_capability(VIDEO))
+
+
 def test_short_flood_control_is_waited_out_once():
     send = AsyncMock(side_effect=[RetryAfter(timedelta(seconds=3)), "sent"])
     with patch(

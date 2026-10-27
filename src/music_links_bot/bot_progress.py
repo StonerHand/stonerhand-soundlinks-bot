@@ -176,8 +176,13 @@ async def start_progress(
             # works and remains the lossless fallback.
             bot = None
         draft_id = max(1, int(getattr(message, "message_id", 0) or 1))
+        # A draft is a 30-second preview the bot cannot remove: when one card
+        # answers within a second it can reach the chat after the card and
+        # hang below it. Only a batch, slow and with "2 of 5" steps, gets one;
+        # a single link's progress message is edited into its card.
         if (
-            getattr(chat, "type", None) == "private"
+            total > 1
+            and getattr(chat, "type", None) == "private"
             and bot is not None
             and await send_rich_progress_draft(
                 bot,

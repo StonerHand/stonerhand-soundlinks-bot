@@ -233,10 +233,27 @@ async def reply_with_track(
                 parse_mode=ParseMode.HTML,
                 link_preview_options=link_preview_options,
                 reply_markup=reply_markup,
+                read_timeout=_PREVIEW_READ_TIMEOUT_SECONDS,
             )
-        except TelegramError:
+        except TelegramError as exc:
             LOGGER.debug("Could not edit loading placeholder", exc_info=True)
             await delete_message_safely(placeholder)
+            if (
+                isinstance(exc, TimedOut)
+                and link_preview_options.url
+                and fallback_preview_url
+            ):
+                # Telegram did not build the preview in time: the new card
+                # goes out with the still at once instead of waiting again.
+                record_capability_failure(
+                    link_preview_capability(link_preview_options.url),
+                    exc,
+                    unsupported=True,
+                )
+                link_preview_options = _build_link_preview_options(
+                    fallback_preview_url, prefer_large_media=True
+                )
+                fallback_preview_url = None
 
     return await _send_card(
         message.reply_text,
