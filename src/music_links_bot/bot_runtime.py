@@ -5,9 +5,11 @@ import hashlib
 import json
 import logging
 import secrets
+import traceback
 from copy import deepcopy
 from dataclasses import asdict, dataclass, field, fields
 from math import ceil
+from pathlib import PurePath
 from time import monotonic, time
 from typing import Any
 
@@ -387,6 +389,7 @@ class BotRuntime:
             "funnel_published": 0,
         }
         self._metrics_persisted_at = 0.0
+        self.last_failure: dict[str, Any] | None = None
 
     def session_key(self, user_id: int) -> str:
         """The key a caller may batch-read and hand back via ``prefetched_raw``."""
@@ -885,6 +888,34 @@ class BotRuntime:
         if fallback:
             self.metrics["rich_message_fallbacks"] += 1
 
+    def record_failure(self, error: BaseException) -> None:
+        """Keep what broke the last request, for the health endpoint.
+
+        Only the error class, the bot's own code location and Telegram's
+        reason are kept: never user text, links or IDs.
+        """
+        frames = [
+            frame
+            for frame in traceback.extract_tb(error.__traceback__)
+            if "music_links_bot" in frame.filename
+        ]
+        where = (
+            f"{PurePath(frames[-1].filename).name}:{frames[-1].lineno} "
+            f"{frames[-1].name}"
+            if frames
+            else ""
+        )
+        from telegram.error import TelegramError
+
+        self.last_failure = {
+            "type": type(error).__name__,
+            "where": where,
+            "detail": str(error.message)[:160]
+            if isinstance(error, TelegramError)
+            else "",
+            "at": int(time()),
+        }
+
     def metrics_snapshot(self) -> dict[str, Any]:
         snapshot = dict(self.metrics)
         requests = snapshot["requests"]
@@ -909,6 +940,7 @@ class BotRuntime:
             if cache_requests
             else 0.0
         )
+        snapshot["last_failure"] = self.last_failure
         snapshot["metrics_scope"] = "instance"
         snapshot["updated_at"] = int(time())
         snapshot["providers"] = {
@@ -928,9 +960,9 @@ class BotRuntime:
         }
         return snapshot
 
-    async def persist_metrics(self) -> None:
+    async def persist_metrics(self, *, force: bool = False) -> None:
         now = monotonic()
-        if self.kv is None or now - self._metrics_persisted_at < 30:
+        if self.kv is None or (not force and now - self._metrics_persisted_at < 30):
             return
         self._metrics_persisted_at = now
         try:
