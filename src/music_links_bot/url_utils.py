@@ -437,10 +437,6 @@ def is_streaming_service_url(service: str) -> Callable[[str], bool]:
     return accepts
 
 
-def is_netflix_title_url(url: str) -> bool:
-    return netflix_title_id(url) is not None
-
-
 def is_nts_url(url: str) -> bool:
     parsed = _parse_url(url)
     if parsed is None:

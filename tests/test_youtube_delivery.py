@@ -85,7 +85,7 @@ def _lookup(message, context):
 
     from music_links_bot.bot_lookup_flow import track_lookup_message
 
-    with patch("music_links_bot.bot_stats.record_matches"):
+    with patch("music_links_bot.bot_stats.record_post"):
         asyncio.run(track_lookup_message(UpdateStub(message), context))
 
 

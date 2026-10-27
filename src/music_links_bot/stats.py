@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+from collections.abc import Sequence
 from pathlib import Path
 from threading import Lock
 from typing import Any
@@ -66,151 +67,33 @@ def load_stats(path: Path = STATS_PATH) -> StatsData:
     return stats
 
 
-def record_matches(
-    matches: list[TrackMatch],
+def record_post(
     path: Path | None = STATS_PATH,
     *,
+    tracks: Sequence[TrackMatch] = (),
+    videos: Sequence[VideoMatch] = (),
+    radios: Sequence[RadioMatch] = (),
+    playlists: Sequence[PlaylistMatch] = (),
+    artists: Sequence[ArtistMatch] = (),
     user: dict[str, object] | None = None,
     chat: dict[str, object] | None = None,
 ) -> StatsData:
-    return _record_activity(
-        path,
-        matches=matches,
-        video_count=0,
-        radio_count=0,
-        playlist_count=0,
-        artist_count=0,
-        user=user,
-        chat=chat,
-    )
-
-
-def record_videos(
-    videos: list[VideoMatch],
-    path: Path | None = STATS_PATH,
-    *,
-    user: dict[str, object] | None = None,
-    chat: dict[str, object] | None = None,
-) -> StatsData:
-    return _record_activity(
-        path,
-        matches=[],
-        video_count=len(videos),
-        radio_count=0,
-        playlist_count=0,
-        artist_count=0,
-        user=user,
-        chat=chat,
-    )
-
-
-def record_radios(
-    radios: list[RadioMatch],
-    path: Path | None = STATS_PATH,
-    *,
-    user: dict[str, object] | None = None,
-    chat: dict[str, object] | None = None,
-) -> StatsData:
-    return _record_activity(
-        path,
-        matches=[],
-        video_count=0,
-        radio_count=len(radios),
-        playlist_count=0,
-        artist_count=0,
-        user=user,
-        chat=chat,
-    )
-
-
-def record_playlists(
-    playlists: list[PlaylistMatch],
-    path: Path | None = STATS_PATH,
-    *,
-    user: dict[str, object] | None = None,
-    chat: dict[str, object] | None = None,
-) -> StatsData:
-    return _record_activity(
-        path,
-        matches=[],
-        video_count=0,
-        radio_count=0,
-        playlist_count=len(playlists),
-        artist_count=0,
-        user=user,
-        chat=chat,
-    )
-
-
-def record_artists(
-    artists: list[ArtistMatch],
-    path: Path | None = STATS_PATH,
-    *,
-    user: dict[str, object] | None = None,
-    chat: dict[str, object] | None = None,
-) -> StatsData:
-    return _record_activity(
-        path,
-        matches=[],
-        video_count=0,
-        radio_count=0,
-        playlist_count=0,
-        artist_count=len(artists),
-        user=user,
-        chat=chat,
-    )
-
-
-def record_mixed(
-    matches: list[TrackMatch],
-    videos: list[VideoMatch],
-    playlists: list[PlaylistMatch] | None = None,
-    path: Path | None = STATS_PATH,
-    *,
-    artists: list[ArtistMatch] | None = None,
-    radios: list[RadioMatch] | None = None,
-    user: dict[str, object] | None = None,
-    chat: dict[str, object] | None = None,
-) -> StatsData:
-    return _record_activity(
-        path,
-        matches=matches,
-        video_count=len(videos),
-        radio_count=len(radios or []),
-        playlist_count=len(playlists or []),
-        artist_count=len(artists or []),
-        user=user,
-        chat=chat,
-    )
-
-
-def _record_activity(
-    path: Path | None,
-    *,
-    matches: list[TrackMatch],
-    video_count: int,
-    radio_count: int,
-    playlist_count: int,
-    artist_count: int,
-    user: dict[str, object] | None,
-    chat: dict[str, object] | None,
-) -> StatsData:
+    """Count one delivered post: releases by kind, other items by type."""
     with STATS_LOCK:
         stats = load_stats(path) if path is not None else _empty_stats()
         stats["posts"] += 1
-        stats["videos"] += video_count
-        stats["radios"] += radio_count
-        stats["playlists"] += playlist_count
-        stats["artists"] += artist_count
-
+        stats["videos"] += len(videos)
+        stats["radios"] += len(radios)
+        stats["playlists"] += len(playlists)
+        stats["artists"] += len(artists)
         item_count = (
-            len(matches) + video_count + radio_count + playlist_count + artist_count
+            len(tracks) + len(videos) + len(radios) + len(playlists) + len(artists)
         )
         if item_count > 1:
             stats["collections"] += 1
 
-        for match in matches:
-            stats[match.kind if match.kind in SUPPORTED_KINDS else "song"] += 1
+        for track in tracks:
+            stats[track.kind if track.kind in SUPPORTED_KINDS else "song"] += 1
 
         if user:
             _record_counter(stats["users"], user)
@@ -318,7 +201,8 @@ def _record_counter(
             "last_seen": "",
         },
     )
-    current["count"] = int(current.get("count") or 0) + 1
+    count = current.get("count")
+    current["count"] = (count if isinstance(count, int) else 0) + 1
     current["label"] = str(entry.get("label") or current.get("label") or entry_id)
     current["last_seen"] = str(entry.get("last_seen") or current.get("last_seen") or "")
 

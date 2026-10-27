@@ -30,10 +30,6 @@ class PublicationPlan:
     delivery_mode: str
 
 
-# Compatibility name for callers that only consume the rendered text/keyboard.
-PublicationView = PublicationPlan
-
-
 def publication_contract_from_view(
     view: PublicationPlan,
     track: TrackMatch,

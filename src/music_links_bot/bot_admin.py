@@ -92,7 +92,12 @@ async def status_command(update, context) -> None:
         return
     admin_chat_id = context.application.bot_data.get("admin_chat_id")
     if admin_chat_id is None or user.id != admin_chat_id:
-        await message.reply_text("Эта диагностика доступна только владельцу бота.")
+        # The owner is whoever ADMIN_CHAT_ID names; show the ID to put there.
+        await message.reply_text(
+            "Эта диагностика доступна только владельцу бота "
+            f"(ADMIN_CHAT_ID). Твой ID: <code>{user.id}</code>.",
+            parse_mode=ParseMode.HTML,
+        )
         return
 
     text = await build_status_text(context)
@@ -222,18 +227,19 @@ async def build_status_text(context) -> str:
                 f"{marker} {escape(str(item['provider']))} · <code>{escape(detail)}</code>"
             )
 
-    last_error = bot_data.get("last_error")
-    if isinstance(last_error, dict):
+    failure = getattr(runtime, "last_failure", None)
+    if isinstance(failure, dict):
+        facts = [
+            failure.get("type") or "unknown",
+            failure.get("method"),
+            failure.get("where"),
+            failure.get("detail"),
+        ]
         lines.extend(
             [
                 "",
-                "<b>Последняя внутренняя ошибка</b>",
-                f"<code>{escape(str(last_error.get('type') or 'unknown'))}</code>",
-                *(
-                    [f"<code>{escape(str(last_error['detail']))}</code>"]
-                    if last_error.get("detail")
-                    else []
-                ),
+                "<b>Последняя ошибка</b>",
+                *(f"<code>{escape(str(fact))}</code>" for fact in facts if fact),
             ]
         )
     return "\n".join(lines)

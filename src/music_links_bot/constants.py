@@ -50,17 +50,6 @@ PLATFORM_LABELS = {
     "yandexMusic": "Yandex Music",
 }
 
-PLATFORM_BUTTON_STYLES = {
-    "spotify": "success",
-    "appleMusic": "primary",
-    "applePodcasts": "primary",
-    "youtubeMusic": "danger",
-    "soundcloud": "primary",
-    "deezer": "primary",
-    "tidal": "primary",
-    "yandexMusic": "primary",
-}
-
 PLATFORM_ALIASES = {
     "spotify": ("spotify",),
     "appleMusic": ("appleMusic", "itunes"),

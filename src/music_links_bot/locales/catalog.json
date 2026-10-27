@@ -411,6 +411,14 @@
     "en": "🎶 Open collection",
     "ru": "🎶 Открыть подборку"
   },
+  "error_inline": {
+    "ru": "⚠️ Не получилось — открыть бота",
+    "en": "⚠️ That did not work — open the bot"
+  },
+  "error_tap": {
+    "ru": "⚠️ Не получилось. Попробуй ещё раз.",
+    "en": "⚠️ That did not work. Please try again."
+  },
   "error_delivery": {
     "ru": "Что-то сломалось на последнем шаге. Ссылка сохранена — нажми «Повторить».",
     "en": "Something broke at the last step. Your link is saved — tap Retry."

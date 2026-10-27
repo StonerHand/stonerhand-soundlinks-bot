@@ -4,7 +4,7 @@ import asyncio
 import logging
 import re
 import secrets
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import datetime, timezone
 
 from telegram import Message, MessageEntity
@@ -21,15 +21,7 @@ from music_links_bot.models import (
     TrackMatch,
     VideoMatch,
 )
-from music_links_bot.stats import (
-    STATS_PATH,
-    record_artists,
-    record_matches,
-    record_mixed,
-    record_playlists,
-    record_radios,
-    record_videos,
-)
+from music_links_bot.stats import STATS_PATH, record_post
 from music_links_bot.telegram_text import format_user_note_html
 from music_links_bot.url_utils import (
     URL_RE,
@@ -109,132 +101,42 @@ def build_user_prefix(message: Message, *, bot_username: str | None = None) -> s
     return prepend_user_html(body_html, author_label=author_label)
 
 
-async def record_tracks(
-    tracks: list[TrackMatch],
+async def record_delivered(
     message: Message,
     *,
     context: ContextTypes.DEFAULT_TYPE | None = None,
+    tracks: Sequence[TrackMatch] = (),
+    videos: Sequence[VideoMatch] = (),
+    radios: Sequence[RadioMatch] = (),
+    playlists: Sequence[PlaylistMatch] = (),
+    artists: Sequence[ArtistMatch] = (),
 ) -> None:
-    if tracks:
-        await _record(
-            "track",
-            lambda: record_matches(
-                tracks,
-                path=_stats_path(context),
-                user=_user_entry(message),
-                chat=_chat_entry(message),
-            ),
-            context,
-            event_id=_event_id(message),
-        )
-
-
-async def record_video_items(
-    videos: list[VideoMatch],
-    message: Message,
-    *,
-    context: ContextTypes.DEFAULT_TYPE | None = None,
-) -> None:
-    if videos:
-        await _record(
-            "video",
-            lambda: record_videos(
-                videos,
-                path=_stats_path(context),
-                user=_user_entry(message),
-                chat=_chat_entry(message),
-            ),
-            context,
-            event_id=_event_id(message),
-        )
-
-
-async def record_radio_items(
-    radios: list[RadioMatch],
-    message: Message,
-    *,
-    context: ContextTypes.DEFAULT_TYPE | None = None,
-) -> None:
-    if radios:
-        await _record(
-            "radio",
-            lambda: record_radios(
-                radios,
-                path=_stats_path(context),
-                user=_user_entry(message),
-                chat=_chat_entry(message),
-            ),
-            context,
-            event_id=_event_id(message),
-        )
-
-
-async def record_playlist_items(
-    playlists: list[PlaylistMatch],
-    message: Message,
-    *,
-    context: ContextTypes.DEFAULT_TYPE | None = None,
-) -> None:
-    if playlists:
-        await _record(
-            "playlist",
-            lambda: record_playlists(
-                playlists,
-                path=_stats_path(context),
-                user=_user_entry(message),
-                chat=_chat_entry(message),
-            ),
-            context,
-            event_id=_event_id(message),
-        )
-
-
-async def record_artist_items(
-    artists: list[ArtistMatch],
-    message: Message,
-    *,
-    context: ContextTypes.DEFAULT_TYPE | None = None,
-) -> None:
-    if artists:
-        await _record(
-            "artist",
-            lambda: record_artists(
-                artists,
-                path=_stats_path(context),
-                user=_user_entry(message),
-                chat=_chat_entry(message),
-            ),
-            context,
-            event_id=_event_id(message),
-        )
-
-
-async def record_mixed_items(
-    tracks: list[TrackMatch],
-    videos: list[VideoMatch],
-    radios: list[RadioMatch],
-    playlists: list[PlaylistMatch],
-    artists: list[ArtistMatch],
-    message: Message,
-    *,
-    context: ContextTypes.DEFAULT_TYPE | None = None,
-) -> None:
-    if any((tracks, videos, radios, playlists, artists)):
-        await _record(
-            "mixed",
-            lambda: record_mixed(
-                tracks,
-                videos,
-                playlists,
-                artists=artists,
-                radios=radios,
-                path=_stats_path(context),
-                user=_user_entry(message),
-                chat=_chat_entry(message),
-            ),
-            context,
-            event_id=_event_id(message),
-        )
+    """Count a delivered post; stats never fail or delay it."""
+    groups = {
+        "track": tracks,
+        "video": videos,
+        "radio": radios,
+        "playlist": playlists,
+        "artist": artists,
+    }
+    present = [label for label, items in groups.items() if items]
+    if not present:
+        return
+    await _record(
+        present[0] if len(present) == 1 else "mixed",
+        lambda: record_post(
+            _stats_path(context),
+            tracks=tracks,
+            videos=videos,
+            radios=radios,
+            playlists=playlists,
+            artists=artists,
+            user=_user_entry(message),
+            chat=_chat_entry(message),
+        ),
+        context,
+        event_id=_event_id(message),
+    )
 
 
 async def _record(

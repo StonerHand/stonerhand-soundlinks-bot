@@ -7,9 +7,13 @@ import secrets
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
+from typing import TYPE_CHECKING
 
 from music_links_bot.lookup_models import LookupBundle
 from music_links_bot.lookup_recovery import capture_sources, completed_sources
+
+if TYPE_CHECKING:  # bot_progress imports this module at runtime
+    from music_links_bot.bot_progress import ProgressState
 
 CONTROL_TTL = 90
 current_control: ContextVar[SearchControl | None] = ContextVar(
@@ -26,7 +30,7 @@ class SearchControl:
     nonce: str = field(default_factory=lambda: secrets.token_hex(12))
     stopped: asyncio.Event = field(default_factory=asyncio.Event)
     completed: dict = field(default_factory=dict)
-    progress: object = None
+    progress: ProgressState | None = None
 
     @property
     def key(self):

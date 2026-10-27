@@ -298,7 +298,7 @@ class StopTests(unittest.IsolatedAsyncioTestCase):
         msg.message_id = 42
         msg.text = URL
         ctx = ContextStub()
-        with patch("music_links_bot.bot_stats.record_matches"):
+        with patch("music_links_bot.bot_stats.record_post"):
             await track_lookup_message(UpdateStub(msg), ctx)
         self.assertEqual(len(msg.replies), 1)
         self.assertIn("Transitions", msg.replies[0])
@@ -322,7 +322,7 @@ class StopTests(unittest.IsolatedAsyncioTestCase):
         msg.text = URL + "\n" + OTHER_URL
         ctx = ContextStub(songlink_client=SimpleNamespace(lookup_track=lookup))
         ctx.application.bot_data["lookup_cache_namespace"] = self.id()
-        with patch("music_links_bot.bot_stats.record_matches"):
+        with patch("music_links_bot.bot_stats.record_post"):
             job = asyncio.create_task(track_lookup_message(UpdateStub(msg), ctx))
             await asyncio.wait_for(started.wait(), 2)
             self.assertTrue(
