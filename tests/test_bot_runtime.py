@@ -191,6 +191,35 @@ class RuntimeSafetyTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreaterEqual(limited[1], 1)
         self.assertEqual(runtime.metrics_snapshot()["rate_limited"], 1)
 
+    async def test_the_last_failure_names_the_code_not_the_user(self) -> None:
+        from telegram import LinkPreviewOptions
+        from telegram.error import BadRequest
+
+        from music_links_bot.lookup_transport import _send_card
+
+        runtime = BotRuntime()
+        self.assertIsNone(runtime.metrics_snapshot()["last_failure"])
+
+        async def refuse(**_kwargs):
+            raise BadRequest("Message is too long")
+
+        try:
+            await _send_card(
+                refuse,
+                link_preview_options=LinkPreviewOptions(is_disabled=True),
+                text="secret user text https://youtu.be/x",
+            )
+        except BadRequest as exc:
+            runtime.record_failure(exc)
+
+        failure = runtime.metrics_snapshot()["last_failure"]
+        self.assertEqual(failure["type"], "BadRequest")
+        self.assertEqual(failure["detail"], "Message is too long")
+        self.assertRegex(failure["where"], r"^lookup_transport\.py:\d+ _send_card$")
+        self.assertNotIn("secret", str(failure))
+        runtime.record_failure(RuntimeError("user@example.com"))
+        self.assertEqual(runtime.last_failure["detail"], "")
+
     async def test_funnel_metrics_are_anonymous_counters(self) -> None:
         runtime = BotRuntime()
         for stage in ("started", "resolved", "edited"):

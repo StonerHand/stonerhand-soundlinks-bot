@@ -428,6 +428,7 @@ async def track_lookup_message(
         if message is not None:
             await _cancel_progress(message.chat_id, _update_lang(update))
     except TelegramError as exc:
+        _runtime(context).record_failure(exc)
         if message is not None and message.chat.type == "private":
             await _cancel_progress(message.chat_id, _update_lang(update))
         if message is not None and message.chat.type == "channel":
@@ -438,7 +439,8 @@ async def track_lookup_message(
                 only_for_channel_message=message,
             )
         raise
-    except Exception:
+    except Exception as exc:
+        _runtime(context).record_failure(exc)
         if message is not None and message.chat.type == "private":
             await _cancel_progress(message.chat_id, _update_lang(update))
         raise
@@ -449,7 +451,8 @@ async def track_lookup_message(
             latency_ms=int((asyncio.get_running_loop().time() - started) * 1000),
             ok=completed,
         )
-        await runtime.persist_metrics()
+        # A failure is written at once, so health shows what just broke.
+        await runtime.persist_metrics(force=not completed)
         if private_user_id is not None:
             await runtime.finish_request_durable(private_user_id)
 
