@@ -215,10 +215,15 @@ class RuntimeSafetyTests(unittest.IsolatedAsyncioTestCase):
         failure = runtime.metrics_snapshot()["last_failure"]
         self.assertEqual(failure["type"], "BadRequest")
         self.assertEqual(failure["detail"], "Message is too long")
-        self.assertRegex(failure["where"], r"^lookup_transport\.py:\d+ _send_card$")
+        self.assertRegex(failure["where"], r"^lookup_transport\.py:\d+ _flood_safe$")
         self.assertNotIn("secret", str(failure))
         runtime.record_failure(RuntimeError("user@example.com"))
         self.assertEqual(runtime.last_failure["detail"], "")
+
+        flood = BadRequest("Flood")
+        flood.add_note("telegram method: sendMessage")
+        runtime.record_failure(flood)
+        self.assertEqual(runtime.last_failure["method"], "sendMessage")
 
     async def test_funnel_metrics_are_anonymous_counters(self) -> None:
         runtime = BotRuntime()

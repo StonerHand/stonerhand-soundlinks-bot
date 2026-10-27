@@ -632,6 +632,8 @@ async def _build_inline_result(
         )
 
     if is_youtube_video_url(source_url):
+        from music_links_bot.youtube import video_preview_url, video_still_url
+
         videos = await bot_lookup._lookup_youtube_videos(
             bot_data["youtube_client"],
             [source_url],
@@ -655,7 +657,8 @@ async def _build_inline_result(
                 share_query=share_query,
                 label=share_label,
             ),
-            preview_url=video.url,
+            preview_url=video_preview_url(video),
+            thumbnail_url=video_still_url(video),
             channel_safe=channel_safe,
         )
 

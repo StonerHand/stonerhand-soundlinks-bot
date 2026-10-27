@@ -56,4 +56,6 @@ class DeliveryAwareBot(ExtBot):
             return await super()._do_post(endpoint, data, **kwargs)
         except Exception as exc:
             reject_send(execution, exc)
+            # Which Bot API method failed, for the last-failure diagnostics.
+            exc.add_note(f"telegram method: {endpoint}")
             raise

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+import warnings
 from collections.abc import Awaitable, Callable
+from datetime import timedelta
 from typing import Any
 
 from telegram import Bot, InlineKeyboardMarkup, LinkPreviewOptions, Message
 from telegram.constants import ParseMode
-from telegram.error import BadRequest, TelegramError, TimedOut
+from telegram.error import BadRequest, RetryAfter, TelegramError, TimedOut
 
 from music_links_bot.bot_builder import fit_telegram_html
 from music_links_bot.bot_progress import take_progress
@@ -33,6 +36,8 @@ LOGGER = logging.getLogger(__name__)
 # the webhook's 25-second budget even when every fallback is needed.
 _PREVIEW_READ_TIMEOUT_SECONDS = 8.0
 _STILL_READ_TIMEOUT_SECONDS = 6.0
+# Flood control names its wait; a short one is waited out once.
+_MAX_FLOOD_WAIT_SECONDS = 9.0
 
 
 async def send_track_result(
@@ -249,21 +254,21 @@ async def _send_card(
     """Send a card; if Telegram cannot build its preview, try a plainer one.
 
     The preview is built before Telegram answers. When it is refused or takes
-    too long (a YouTube player can), the card goes out with its still image,
-    then with no preview at all, instead of not at all.
+    too long, the card goes out with its still image, then with no preview at
+    all, instead of not at all.
     """
-    if link_preview_options.is_disabled:
-        return await send(link_preview_options=link_preview_options, **message)
-    attempts = [(link_preview_options, _PREVIEW_READ_TIMEOUT_SECONDS)]
-    if fallback_preview_url and fallback_preview_url != link_preview_options.url:
-        still = _build_link_preview_options(
-            fallback_preview_url, prefer_large_media=True
-        )
-        attempts.append((still, _STILL_READ_TIMEOUT_SECONDS))
+    attempts: list[tuple[LinkPreviewOptions, float]] = []
+    if not link_preview_options.is_disabled:
+        attempts.append((link_preview_options, _PREVIEW_READ_TIMEOUT_SECONDS))
+        if fallback_preview_url and fallback_preview_url != link_preview_options.url:
+            still = _build_link_preview_options(
+                fallback_preview_url, prefer_large_media=True
+            )
+            attempts.append((still, _STILL_READ_TIMEOUT_SECONDS))
     for options, read_timeout in attempts:
         try:
-            return await send(
-                link_preview_options=options, read_timeout=read_timeout, **message
+            return await _flood_safe(
+                send, link_preview_options=options, read_timeout=read_timeout, **message
             )
         except (BadRequest, TimedOut) as exc:
             LOGGER.warning(
@@ -271,9 +276,24 @@ async def _send_card(
                 type(exc).__name__,
                 exc.message,
             )
-    return await send(
-        link_preview_options=LinkPreviewOptions(is_disabled=True), **message
+    return await _flood_safe(
+        send, link_preview_options=LinkPreviewOptions(is_disabled=True), **message
     )
+
+
+async def _flood_safe(send: Callable[..., Awaitable[Any]], **kwargs: Any) -> Any:
+    try:
+        return await send(**kwargs)
+    except RetryAfter as exc:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            delay = exc.retry_after
+        wait = delay.total_seconds() if isinstance(delay, timedelta) else float(delay)
+        if wait > _MAX_FLOOD_WAIT_SECONDS:
+            raise
+        LOGGER.warning("Telegram flood control: resending a card in %.0f s", wait)
+        await asyncio.sleep(wait)
+        return await send(**kwargs)
 
 
 def _validate_transport_contract(

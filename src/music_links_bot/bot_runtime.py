@@ -907,9 +907,18 @@ class BotRuntime:
         )
         from telegram.error import TelegramError
 
+        method = next(
+            (
+                note.removeprefix("telegram method: ")
+                for note in getattr(error, "__notes__", ())
+                if note.startswith("telegram method: ")
+            ),
+            "",
+        )
         self.last_failure = {
             "type": type(error).__name__,
             "where": where,
+            "method": method,
             "detail": str(error.message)[:160]
             if isinstance(error, TelegramError)
             else "",

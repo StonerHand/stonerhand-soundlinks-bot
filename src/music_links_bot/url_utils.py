@@ -377,6 +377,26 @@ def is_youtube_video_url(url: str) -> bool:
     return parts[0] in {"shorts", "live", "embed"} and len(parts) >= 2
 
 
+_YOUTUBE_VIDEO_ID = re.compile(r"[A-Za-z0-9_-]{11}")
+
+
+def youtube_video_id(url: str) -> str | None:
+    """The 11-character id of a YouTube watch, youtu.be, shorts, live or embed link."""
+    if not is_youtube_video_url(url):
+        return None
+    parsed = _parse_url(url)
+    if parsed is None:
+        return None
+    parts = [part for part in parsed.path.split("/") if part]
+    if normalize_host(parsed.hostname) == "youtu.be":
+        candidate = parts[0]
+    elif parts[0].lower() == "watch":
+        candidate = parse_qs(parsed.query).get("v", [""])[0]
+    else:
+        candidate = parts[1]
+    return candidate if _YOUTUBE_VIDEO_ID.fullmatch(candidate) else None
+
+
 def is_soundcloud_url(url: str) -> bool:
     parsed = _parse_url(url)
     if parsed is None:
