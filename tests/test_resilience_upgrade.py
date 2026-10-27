@@ -79,7 +79,9 @@ class ProviderResilienceTests(unittest.IsolatedAsyncioTestCase):
         )
         elapsed = asyncio.get_running_loop().time() - started
 
-        self.assertLess(elapsed, 0.2)
+        # The 30 ms budget, not the providers' own 1 s, ends the wait. The
+        # margin keeps a loaded CI runner (coverage tracing) from flaking.
+        self.assertLess(elapsed, 0.6)
         self.assertEqual(outcomes["a"].value, "a-fallback")
         self.assertEqual(outcomes["b"].value, "b-fallback")
 

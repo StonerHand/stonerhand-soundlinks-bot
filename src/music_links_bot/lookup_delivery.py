@@ -55,7 +55,7 @@ from music_links_bot.sharing import (
     track_share_url,
 )
 from music_links_bot.telegram_buttons import button as InlineKeyboardButton
-from music_links_bot.youtube import video_preview_url, video_still_url
+from music_links_bot.youtube import video_frame_url, video_preview_url
 
 SendTrackResult = Callable[..., Awaitable[Any]]
 SendTrackVideoPairResult = Callable[..., Awaitable[bool]]
@@ -138,7 +138,7 @@ _VIDEO_CARDS = _Cards(
     format_video_collection_message,
     collage=video_collage_preview_url,
     preview=video_preview_url,
-    still=video_still_url,
+    still=video_frame_url,
 )
 _RADIO_CARDS = _Cards(
     "radio",

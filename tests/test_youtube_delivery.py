@@ -14,7 +14,7 @@ from telegram.error import BadRequest, RetryAfter, TimedOut
 
 from music_links_bot.lookup_transport import _send_card
 from music_links_bot.models import VideoMatch
-from music_links_bot.youtube import video_preview_url, video_still_url
+from music_links_bot.youtube import video_frame_url, video_preview_url, video_still_url
 
 VIDEO = "https://www.youtube.com/watch?v=j7K6FC_psGc"
 STILL = "https://i.ytimg.com/vi/j7K6FC_psGc/hqdefault.jpg"
@@ -89,24 +89,60 @@ def _lookup(message, context):
         asyncio.run(track_lookup_message(UpdateStub(message), context))
 
 
-def test_video_cards_preview_the_frame_not_the_youtube_page():
+def test_video_cards_try_the_player_first_and_pause_it_after_a_failure():
+    from music_links_bot.telegram_gateway import (
+        link_preview_capability,
+        record_capability_failure,
+    )
+
     video = VideoMatch(title="Clip", author="A", url=VIDEO, thumbnail_url=STILL)
+    # YouTube's own preview: title, description and the inline player.
+    assert video_preview_url(video) == VIDEO
+    # Telegram could not build it: the next cards use the frame for a while.
+    record_capability_failure(
+        link_preview_capability(VIDEO), TimedOut(), unsupported=True
+    )
     assert video_preview_url(video) == STILL
-    # Without YouTube's thumbnail, the frame comes from the video id.
+    # One switch turns the player off for good.
+    with patch.dict(os.environ, {"YOUTUBE_PLAYER_PREVIEW_ENABLED": "0"}):
+        from music_links_bot.telegram_gateway import reset_capabilities
+
+        reset_capabilities()
+        assert video_preview_url(video) == STILL
+
+
+def test_every_youtube_host_shares_one_player_state():
+    from music_links_bot.telegram_gateway import link_preview_capability
+
+    keys = {
+        link_preview_capability(url)
+        for url in (
+            VIDEO,
+            "https://youtu.be/j7K6FC_psGc",
+            "https://m.youtube.com/watch?v=j7K6FC_psGc",
+            "https://music.youtube.com/watch?v=j7K6FC_psGc",
+        )
+    }
+    assert keys == {"link_preview:youtube.com"}
+
+
+def test_the_frame_comes_from_the_video_id_when_youtube_sent_no_still():
     bare = VideoMatch(title="YouTube video", author="YouTube", url=VIDEO)
     assert video_still_url(bare) == STILL
-    assert video_preview_url(bare) == STILL
+    assert video_frame_url(bare) == STILL
     unknown = VideoMatch(
         title="x", author="y", url="https://www.youtube.com/watch?v=bad"
     )
-    assert video_preview_url(unknown) == unknown.url
-    # The inline player comes back with one switch once Telegram can build it.
-    with patch.dict(os.environ, {"YOUTUBE_PLAYER_PREVIEW_ENABLED": "1"}):
-        assert video_preview_url(video) == VIDEO
+    assert video_frame_url(unknown) == unknown.url
 
 
-def test_a_youtube_card_goes_out_with_the_frame_preview():
+def test_a_player_telegram_cannot_build_falls_back_to_the_frame():
     from test_bot import ContextStub, PrivateMessageStub
+
+    from music_links_bot.telegram_gateway import (
+        capability_available,
+        link_preview_capability,
+    )
 
     class Message(PrivateMessageStub):
         text = f"Вышел из спячки {VIDEO}"
@@ -114,7 +150,7 @@ def test_a_youtube_card_goes_out_with_the_frame_preview():
         async def reply_text(self, text, **kwargs):
             options = kwargs.get("link_preview_options")
             if options is not None and options.url == VIDEO:
-                raise AssertionError("asked Telegram to build a YouTube page")
+                raise TimedOut()
             return await super().reply_text(text, **kwargs)
 
     youtube = AsyncMock()
@@ -141,6 +177,8 @@ def test_a_youtube_card_goes_out_with_the_frame_preview():
         if button.url
     ]
     assert VIDEO in buttons
+    # The next YouTube cards skip the player for a while.
+    assert not capability_available(link_preview_capability(VIDEO))
 
 
 def test_short_flood_control_is_waited_out_once():
