@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
+from dataclasses import dataclass
 from typing import Any
 
 from telegram import Bot, InlineKeyboardMarkup, Message
@@ -110,6 +111,120 @@ async def send_title_result(
         user_prefix = ""
 
 
+@dataclass(frozen=True, slots=True)
+class _Cards:
+    """How one kind of link becomes a single card or a collection post."""
+
+    kind: str  # a single card's content kind and the collection's item kind
+    keyboard: Callable[..., InlineKeyboardMarkup]
+    collection_keyboard: Callable[..., InlineKeyboardMarkup]
+    message: Callable[..., str]
+    collection_message: Callable[..., str]
+    # A collage of the frames (▶ on each) shows at a glance that the post
+    # holds several videos; one native player preview would hide the rest.
+    collage: Callable[[list], str | None] | None = None
+
+
+_VIDEO_CARDS = _Cards(
+    "video",
+    _build_youtube_keyboard,
+    _build_youtube_collection_keyboard,
+    format_video_message,
+    format_video_collection_message,
+    collage=video_collage_preview_url,
+)
+_RADIO_CARDS = _Cards(
+    "radio",
+    _build_nts_keyboard,
+    _build_nts_collection_keyboard,
+    format_radio_message,
+    format_radio_collection_message,
+)
+_PLAYLIST_CARDS = _Cards(
+    "playlist",
+    _build_playlist_keyboard,
+    _build_playlist_collection_keyboard,
+    format_playlist_message,
+    format_playlist_collection_message,
+)
+_ARTIST_CARDS = _Cards(
+    "artist",
+    _build_artist_keyboard,
+    _build_artist_collection_keyboard,
+    format_artist_message,
+    format_artist_collection_message,
+)
+
+
+async def _send_cards(
+    bot: Bot,
+    message: Message,
+    items: Sequence[Any],
+    cards: _Cards,
+    *,
+    send_track_result: SendTrackResult,
+    user_prefix: str,
+    include_channel_button: bool,
+    include_hashtags: bool,
+    lang: str,
+    allow_share: bool,
+    requested_count: int | None,
+    extra_single_row: list[InlineKeyboardButton] | None = None,
+) -> None:
+    """One card for one link, else one collection post with all of them."""
+    if not items:
+        return
+
+    urls = [item.url for item in items]
+    total = max(len(items), int(requested_count or len(items)))
+    delivery: dict[str, Any]
+    if total == 1:
+        keyboard = cards.keyboard(
+            urls[0], include_channel_button=include_channel_button
+        )
+        if extra_single_row:
+            keyboard = InlineKeyboardMarkup(
+                [*[list(row) for row in keyboard.inline_keyboard], extra_single_row]
+            )
+        body = cards.message(items[0], include_hashtags=include_hashtags)
+        delivery = {
+            "preview_url": urls[0],
+            "source_urls": (urls[0],),
+            "content_kind": cards.kind,
+        }
+    else:
+        keyboard = cards.collection_keyboard(
+            items, include_channel_button=include_channel_button
+        )
+        body = cards.collection_message(
+            items,
+            include_hashtags=include_hashtags,
+            title=collection_result_title(
+                lang, found=len(items), total=total, item_kind=cards.kind
+            ),
+        )
+        delivery = {
+            "preview_url": (cards.collage and cards.collage(list(items))) or urls[0],
+            "found_count": len(items),
+            "requested_count": total,
+            "source_urls": tuple(urls),
+            "content_kind": "collection",
+        }
+    if allow_share:
+        keyboard = add_share_button(
+            keyboard,
+            share_query=build_share_query(urls),
+            label=get_text(lang, "share_post"),
+        )
+    await send_track_result(
+        bot,
+        message,
+        _with_user_intro(user_prefix, body),
+        reply_markup=keyboard,
+        **delivery,
+    )
+
+
 async def send_youtube_result(
     bot: Bot,
     message: Message,
@@ -123,67 +238,18 @@ async def send_youtube_result(
     allow_share: bool = True,
     requested_count: int | None = None,
 ) -> None:
-    if not videos:
-        return
-
-    total = max(len(videos), int(requested_count or len(videos)))
-    if total == 1:
-        video = videos[0]
-        keyboard = _build_youtube_keyboard(
-            video.url,
-            include_channel_button=include_channel_button,
-        )
-        if allow_share:
-            keyboard = add_share_button(
-                keyboard,
-                share_query=build_share_query([video.url]),
-                label=get_text(lang, "share_post"),
-            )
-        await send_track_result(
-            bot,
-            message,
-            _with_user_intro(
-                user_prefix,
-                format_video_message(video, include_hashtags=include_hashtags),
-            ),
-            preview_url=video.url,
-            reply_markup=keyboard,
-            source_urls=(video.url,),
-            content_kind="video",
-        )
-        return
-
-    collection_keyboard = _build_youtube_collection_keyboard(
-        videos,
-        include_channel_button=include_channel_button,
-    )
-    if allow_share:
-        collection_keyboard = add_share_button(
-            collection_keyboard,
-            share_query=build_share_query([video.url for video in videos]),
-            label=get_text(lang, "share_post"),
-        )
-    await send_track_result(
+    await _send_cards(
         bot,
         message,
-        _with_user_intro(
-            user_prefix,
-            format_video_collection_message(
-                videos,
-                include_hashtags=include_hashtags,
-                title=collection_result_title(
-                    lang, found=len(videos), total=total, item_kind="video"
-                ),
-            ),
-        ),
-        # A collage of the frames (▶ on each) shows at a glance that the post
-        # holds several videos; one native player preview would hide the rest.
-        preview_url=video_collage_preview_url(videos) or videos[0].url,
-        reply_markup=collection_keyboard,
-        found_count=len(videos),
-        requested_count=total,
-        source_urls=tuple(video.url for video in videos),
-        content_kind="collection",
+        videos,
+        _VIDEO_CARDS,
+        send_track_result=send_track_result,
+        user_prefix=user_prefix,
+        include_channel_button=include_channel_button,
+        include_hashtags=include_hashtags,
+        lang=lang,
+        allow_share=allow_share,
+        requested_count=requested_count,
     )
 
 
@@ -200,65 +266,18 @@ async def send_nts_result(
     allow_share: bool = True,
     requested_count: int | None = None,
 ) -> None:
-    if not radios:
-        return
-
-    total = max(len(radios), int(requested_count or len(radios)))
-    if total == 1:
-        radio = radios[0]
-        keyboard = _build_nts_keyboard(
-            radio.url,
-            include_channel_button=include_channel_button,
-        )
-        if allow_share:
-            keyboard = add_share_button(
-                keyboard,
-                share_query=build_share_query([radio.url]),
-                label=get_text(lang, "share_post"),
-            )
-        await send_track_result(
-            bot,
-            message,
-            _with_user_intro(
-                user_prefix,
-                format_radio_message(radio, include_hashtags=include_hashtags),
-            ),
-            preview_url=radio.url,
-            reply_markup=keyboard,
-            source_urls=(radio.url,),
-            content_kind="radio",
-        )
-        return
-
-    collection_keyboard = _build_nts_collection_keyboard(
-        radios,
-        include_channel_button=include_channel_button,
-    )
-    if allow_share:
-        collection_keyboard = add_share_button(
-            collection_keyboard,
-            share_query=build_share_query([radio.url for radio in radios]),
-            label=get_text(lang, "share_post"),
-        )
-    await send_track_result(
+    await _send_cards(
         bot,
         message,
-        _with_user_intro(
-            user_prefix,
-            format_radio_collection_message(
-                radios,
-                include_hashtags=include_hashtags,
-                title=collection_result_title(
-                    lang, found=len(radios), total=total, item_kind="radio"
-                ),
-            ),
-        ),
-        preview_url=radios[0].url,
-        reply_markup=collection_keyboard,
-        found_count=len(radios),
-        requested_count=total,
-        source_urls=tuple(radio.url for radio in radios),
-        content_kind="collection",
+        radios,
+        _RADIO_CARDS,
+        send_track_result=send_track_result,
+        user_prefix=user_prefix,
+        include_channel_button=include_channel_button,
+        include_hashtags=include_hashtags,
+        lang=lang,
+        allow_share=allow_share,
+        requested_count=requested_count,
     )
 
 
@@ -276,83 +295,27 @@ async def send_playlist_result(
     requested_count: int | None = None,
     import_id: str | None = None,
 ) -> None:
-    if not playlists:
-        return
-
-    total = max(len(playlists), int(requested_count or len(playlists)))
-    if total == 1:
-        playlist = playlists[0]
-        keyboard = _build_playlist_keyboard(
-            playlist.url,
-            include_channel_button=include_channel_button,
-        )
-        if import_id:
-            keyboard = InlineKeyboardMarkup(
-                [
-                    *[list(row) for row in keyboard.inline_keyboard],
-                    [
-                        InlineKeyboardButton(
-                            get_text(lang, "playlist_import"),
-                            callback_data=encode_callback(
-                                "playlist", "import", import_id
-                            ),
-                            style="success",
-                        )
-                    ],
-                ]
-            )
-        if allow_share:
-            keyboard = add_share_button(
-                keyboard,
-                share_query=build_share_query([playlist.url]),
-                label=get_text(lang, "share_post"),
-            )
-        await send_track_result(
-            bot,
-            message,
-            _with_user_intro(
-                user_prefix,
-                format_playlist_message(
-                    playlist,
-                    include_hashtags=include_hashtags,
-                ),
-            ),
-            preview_url=playlist.url,
-            reply_markup=keyboard,
-            source_urls=(playlist.url,),
-            content_kind="playlist",
-        )
-        return
-
-    collection_keyboard = _build_playlist_collection_keyboard(
-        playlists,
-        include_channel_button=include_channel_button,
-    )
-    if allow_share:
-        collection_keyboard = add_share_button(
-            collection_keyboard,
-            share_query=build_share_query([playlist.url for playlist in playlists]),
-            label=get_text(lang, "share_post"),
-        )
-    await send_track_result(
+    await _send_cards(
         bot,
         message,
-        _with_user_intro(
-            user_prefix,
-            format_playlist_collection_message(
-                playlists,
-                include_hashtags=include_hashtags,
-                title=collection_result_title(
-                    lang, found=len(playlists), total=total, item_kind="playlist"
-                ),
-            ),
-        ),
-        preview_url=playlists[0].url,
-        reply_markup=collection_keyboard,
-        found_count=len(playlists),
-        requested_count=total,
-        source_urls=tuple(playlist.url for playlist in playlists),
-        content_kind="collection",
+        playlists,
+        _PLAYLIST_CARDS,
+        send_track_result=send_track_result,
+        user_prefix=user_prefix,
+        include_channel_button=include_channel_button,
+        include_hashtags=include_hashtags,
+        lang=lang,
+        allow_share=allow_share,
+        requested_count=requested_count,
+        extra_single_row=[
+            InlineKeyboardButton(
+                get_text(lang, "playlist_import"),
+                callback_data=encode_callback("playlist", "import", import_id),
+                style="success",
+            )
+        ]
+        if import_id
+        else None,
     )
 
 
@@ -369,65 +332,18 @@ async def send_artist_result(
     allow_share: bool = True,
     requested_count: int | None = None,
 ) -> None:
-    if not artists:
-        return
-
-    total = max(len(artists), int(requested_count or len(artists)))
-    if total == 1:
-        artist = artists[0]
-        keyboard = _build_artist_keyboard(
-            artist.url,
-            include_channel_button=include_channel_button,
-        )
-        if allow_share:
-            keyboard = add_share_button(
-                keyboard,
-                share_query=build_share_query([artist.url]),
-                label=get_text(lang, "share_post"),
-            )
-        await send_track_result(
-            bot,
-            message,
-            _with_user_intro(
-                user_prefix,
-                format_artist_message(artist, include_hashtags=include_hashtags),
-            ),
-            preview_url=artist.url,
-            reply_markup=keyboard,
-            source_urls=(artist.url,),
-            content_kind="artist",
-        )
-        return
-
-    collection_keyboard = _build_artist_collection_keyboard(
-        artists,
-        include_channel_button=include_channel_button,
-    )
-    if allow_share:
-        collection_keyboard = add_share_button(
-            collection_keyboard,
-            share_query=build_share_query([artist.url for artist in artists]),
-            label=get_text(lang, "share_post"),
-        )
-    await send_track_result(
+    await _send_cards(
         bot,
         message,
-        _with_user_intro(
-            user_prefix,
-            format_artist_collection_message(
-                artists,
-                include_hashtags=include_hashtags,
-                title=collection_result_title(
-                    lang, found=len(artists), total=total, item_kind="artist"
-                ),
-            ),
-        ),
-        preview_url=artists[0].url,
-        reply_markup=collection_keyboard,
-        found_count=len(artists),
-        requested_count=total,
-        source_urls=tuple(artist.url for artist in artists),
-        content_kind="collection",
+        artists,
+        _ARTIST_CARDS,
+        send_track_result=send_track_result,
+        user_prefix=user_prefix,
+        include_channel_button=include_channel_button,
+        include_hashtags=include_hashtags,
+        lang=lang,
+        allow_share=allow_share,
+        requested_count=requested_count,
     )
 
 
@@ -543,14 +459,12 @@ async def send_mixed_result(
         reply_markup=keyboard,
         found_count=found_count,
         requested_count=total,
-        source_urls=tuple(
-            [
-                *[url for track in tracks for url in track.links.values()],
-                *[playlist.url for playlist in playlists],
-                *[artist.url for artist in artists],
-                *[radio.url for radio in radios],
-                *[video.url for video in videos],
-            ]
+        source_urls=(
+            *[url for track in tracks for url in track.links.values()],
+            *[playlist.url for playlist in playlists],
+            *[artist.url for artist in artists],
+            *[radio.url for radio in radios],
+            *[video.url for video in videos],
         ),
         content_kind="collection",
     )

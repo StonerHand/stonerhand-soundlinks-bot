@@ -156,9 +156,8 @@ class PublicationGoldenTests(unittest.TestCase):
         self.assertEqual(view.delivery_mode, "classic")
 
     def test_publish_confirmation_is_one_clear_primary_action(self) -> None:
-        draft = new_track_draft(_track(), chat_id=7, lang="ru", can_publish=True)
         text, keyboard = build_publish_confirmation(
-            "draft123", draft, _track(), target="@stonerhand", lang="ru"
+            "draft123", _track(), target="@stonerhand", lang="ru"
         )
 
         self.assertIn("Публикация", text)

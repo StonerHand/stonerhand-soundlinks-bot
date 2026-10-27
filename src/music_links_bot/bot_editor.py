@@ -503,7 +503,6 @@ async def _open_editor_publish_confirmation(request: EditorActionRequest) -> boo
     target = str(channel_target(request.context.application.bot_data))
     text, keyboard = _build_publish_confirmation(
         request.draft_id,
-        request.draft,
         request.track,
         target=target,
         lang=request.lang,

@@ -95,7 +95,7 @@ def compose_cover(
             source.thumbnail((MAX_COVER_SIZE, MAX_COVER_SIZE))
             rgb = resources.enter_context(source.convert("RGB"))
             base = resources.enter_context(_square(rgb, size))
-            width, height = base.size
+            width, _height = base.size
             composed = resources.enter_context(apply_cover_signature(base, label=label))
             if logo_bytes and len(logo_bytes) <= MAX_BRANDING_BYTES:
                 try:
@@ -169,7 +169,7 @@ async def _build_branded_cover(
         )
         if artwork_bytes is None:
             return None
-    except (asyncio.TimeoutError, httpx.HTTPError, ValueError):
+    except (TimeoutError, httpx.HTTPError, ValueError):
         LOGGER.debug("Branding fetch failed")
         return None
 

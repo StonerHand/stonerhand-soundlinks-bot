@@ -211,7 +211,7 @@ class SpotifyClient:
 
         try:
             await asyncio.wait_for(complete(), timeout=1.25)
-        except (asyncio.TimeoutError, httpx.HTTPError, SpotifyLookupError):
+        except (TimeoutError, httpx.HTTPError, SpotifyLookupError):
             pass
 
 

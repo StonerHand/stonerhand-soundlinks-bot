@@ -669,7 +669,7 @@ async def dispatch_menu_action(query, context, action: CallbackAction) -> None:
             await query.answer()
             await safe_edit(query, text, keyboard)
             return
-        elif action.action == "postfilter":
+        if action.action == "postfilter":
             if action.payload in {"all", "draft", "scheduled", "published", "saved"}:
                 session.draft_filter = action.payload
         elif action.action == "postsearch_clear":

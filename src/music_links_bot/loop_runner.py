@@ -45,7 +45,7 @@ def run_on_loop(
         return future.result(timeout=timeout)
     except concurrent.futures.TimeoutError as exc:
         future.cancel()
-        raise asyncio.TimeoutError from exc
+        raise TimeoutError from exc
 
 
 def stop_background_loop(

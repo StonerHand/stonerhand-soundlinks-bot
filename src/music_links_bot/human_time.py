@@ -180,7 +180,7 @@ def parse_human_datetime(
         return candidate.timestamp() if candidate > current else None
     if day_part in {"завтра", "tomorrow"}:
         return at(current + timedelta(days=1)).timestamp()
-    if day_part in {"послезавтра"}:
+    if day_part == "послезавтра":
         return at(current + timedelta(days=2)).timestamp()
     weekday = _WEEKDAY_INPUT.get(re.sub(r"^(в|во|on)\s+", "", day_part))
     if weekday is not None:

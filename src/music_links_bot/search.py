@@ -129,7 +129,7 @@ class SearchClient:
                 ),
                 timeout=SPOTIFY_ENRICHMENT_TIMEOUT_SECONDS,
             )
-        except (MusicBrainzLookupError, asyncio.TimeoutError):
+        except (TimeoutError, MusicBrainzLookupError):
             LOGGER.debug(
                 "Exact Spotify relation lookup failed for %s — %s",
                 candidate.artist,
@@ -168,7 +168,7 @@ class SearchClient:
                 self._lookup_apple_candidate(source_url, include_tracks=True),
                 timeout=1.25,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return None
         if candidate is not None:
             self._details_cache.set(key, candidate)
