@@ -94,7 +94,7 @@ class CallbackContractTests(unittest.TestCase):
 
 
 class RuntimeSafetyTests(unittest.IsolatedAsyncioTestCase):
-    async def test_private_progress_can_use_rich_streaming_draft(self) -> None:
+    async def test_a_private_batch_streams_its_progress_as_a_rich_draft(self) -> None:
         rich = AsyncMock(return_value=True)
 
         class Incoming:
@@ -109,11 +109,37 @@ class RuntimeSafetyTests(unittest.IsolatedAsyncioTestCase):
             "music_links_bot.bot_progress.send_rich_progress_draft",
             rich,
         ):
-            await start_progress(Incoming())
-            await update_progress("ru", "progress_links")
+            await start_progress(Incoming(), total=3)
+            await update_progress("ru", "progress_batch_links", done=1, total=3)
 
         self.assertEqual(rich.await_count, 2)
         self.assertIsNone(take_progress(17))
+
+    async def test_a_single_link_progress_is_a_message_the_card_replaces(self) -> None:
+        """A draft cannot be removed: after a one-second answer it could hang
+        below the card for 30 s. A message is edited into the card instead."""
+        rich = AsyncMock(return_value=True)
+        progress = SimpleNamespace(chat_id=17)
+
+        class Incoming:
+            chat_id = 17
+            message_id = 23
+            chat = SimpleNamespace(type="private")
+
+            def get_bot(self):
+                return object()
+
+            async def reply_text(self, text, **kwargs):
+                return progress
+
+        with patch(
+            "music_links_bot.bot_progress.send_rich_progress_draft",
+            rich,
+        ):
+            await start_progress(Incoming(), key="progress_links")
+
+        rich.assert_not_awaited()
+        self.assertIs(take_progress(17), progress)
 
     async def test_cancelled_lookup_retires_progress_message(self) -> None:
         class ProgressMessage:
