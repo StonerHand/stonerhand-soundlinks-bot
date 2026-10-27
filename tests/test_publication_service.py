@@ -30,13 +30,12 @@ class PublicationServiceTests(unittest.IsolatedAsyncioTestCase):
             "preset": "cover",
             "as_photo": False,
         }
-        for target, channel_style in ((7, False), ("@stonerhand", True)):
+        for target in (7, "@stonerhand"):
             with self.subTest(target=target):
                 result = await service._send(
                     prepare_publication_draft(draft).data,
                     TrackMatch(**draft["item"]),
                     target=target,
-                    channel_style=channel_style,
                 )
                 self.assertIsNotNone(result)
                 payload = bot.send_photo.await_args.kwargs
@@ -79,7 +78,6 @@ class PublicationServiceTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIs(result, sent)
         self.assertEqual(send.await_args.kwargs["target"], 7)
-        self.assertFalse(send.await_args.kwargs["channel_style"])
         self.assertFalse(send.await_args.kwargs["include_channel_button"])
         self.assertFalse(send.await_args.kwargs["record_metrics"])
         runtime.record_publication.assert_not_called()
@@ -249,7 +247,6 @@ class PublicationServiceTests(unittest.IsolatedAsyncioTestCase):
             draft,
             TrackMatch(**draft["item"]),
             target="@stonerhand",
-            channel_style=True,
         )
 
         self.assertIs(result, sent)
@@ -291,7 +288,6 @@ class LongIntroTests(unittest.IsolatedAsyncioTestCase):
             prepare_publication_draft(draft).data,
             TrackMatch(**draft["item"]),
             target=7,
-            channel_style=False,
         )
         return bot
 

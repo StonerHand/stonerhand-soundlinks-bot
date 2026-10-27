@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
+from typing import Any
 
-from telegram import Bot, InlineKeyboardMarkup, Message
+from telegram import Bot, InlineKeyboardMarkup, LinkPreviewOptions, Message
 from telegram.constants import ParseMode
-from telegram.error import TelegramError
+from telegram.error import BadRequest, TelegramError
 
 from music_links_bot.bot_builder import fit_telegram_html
 from music_links_bot.bot_progress import take_progress
@@ -76,11 +78,12 @@ async def send_track_result(
             if delivered:
                 return
 
-        await bot.send_message(
+        await _send_card(
+            bot.send_message,
+            link_preview_options=preview_options,
             chat_id=message.chat_id,
             text=text,
             parse_mode=ParseMode.HTML,
-            link_preview_options=preview_options,
             reply_markup=reply_markup,
         )
         await delete_message_safely(message)
@@ -217,12 +220,38 @@ async def reply_with_track(
             LOGGER.debug("Could not edit loading placeholder", exc_info=True)
             await delete_message_safely(placeholder)
 
-    return await message.reply_text(
+    return await _send_card(
+        message.reply_text,
+        link_preview_options=link_preview_options,
         text=text,
         parse_mode=ParseMode.HTML,
-        link_preview_options=link_preview_options,
         reply_markup=reply_markup,
     )
+
+
+async def _send_card(
+    send: Callable[..., Awaitable[Any]],
+    *,
+    link_preview_options: LinkPreviewOptions,
+    **message: Any,
+) -> Any:
+    """Send a card; if Telegram refuses it with its link preview, send it bare.
+
+    A preview Telegram cannot build (a blocked or age-restricted video, a page
+    that times out) must not cost the user the whole card.
+    """
+    try:
+        return await send(link_preview_options=link_preview_options, **message)
+    except BadRequest as exc:
+        if link_preview_options.is_disabled:
+            raise
+        LOGGER.warning(
+            "Telegram refused a card with its preview, sending it without: %s",
+            exc.message,
+        )
+        return await send(
+            link_preview_options=LinkPreviewOptions(is_disabled=True), **message
+        )
 
 
 def _validate_transport_contract(

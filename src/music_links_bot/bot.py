@@ -86,6 +86,8 @@ async def _application_error_handler(
     if isinstance(error, BaseException):
         context.application.bot_data["last_error"] = {
             "type": type(error).__name__,
+            # Telegram's own reason ("Bad Request: …") says what to fix.
+            "detail": str(error)[:200],
         }
         LOGGER.error(
             "Unhandled Telegram update error",

@@ -10,6 +10,7 @@ class BotErrorCode(str, Enum):
     PROVIDER_UNAVAILABLE = "provider_unavailable"
     RATE_LIMITED = "rate_limited"
     LIMIT_EXCEEDED = "limit_exceeded"
+    DELIVERY_FAILED = "delivery_failed"
 
 
 class BotFlowError(RuntimeError):

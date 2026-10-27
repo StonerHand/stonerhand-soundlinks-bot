@@ -406,13 +406,8 @@ def compose_collection_collage(
 FRAME_SIZE = (1_200, 675)
 
 
-def compose_frame(
-    artwork: bytes,
-    *,
-    label: str | None = None,
-    play: bool = False,
-) -> bytes | None:
-    """One wide still (a film's hero shot, a clip's frame) as a 16:9 JPEG.
+def compose_frame(artwork: bytes, *, label: str | None = None) -> bytes | None:
+    """One wide film or series still as a 16:9 JPEG.
 
     A square crop would cut the cast out of a film still, so a frame keeps the
     screen's shape and gets the same signature footer as a cover.
@@ -432,13 +427,9 @@ def compose_frame(
             source.thumbnail((FRAME_SIZE[0], FRAME_SIZE[0]), Image.Resampling.LANCZOS)
             image = resources.enter_context(ImageOps.exif_transpose(source))
             rgb = resources.enter_context(image.convert("RGB"))
-            if play:
-                rgb = resources.enter_context(_trim_letterbox(rgb))
             frame = resources.enter_context(
                 ImageOps.fit(rgb, FRAME_SIZE, method=Image.Resampling.LANCZOS)
             )
-            if play:
-                _draw_play_badge(frame)
             if label is not None:
                 frame = resources.enter_context(
                     apply_cover_signature(frame, label=label)

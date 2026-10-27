@@ -77,7 +77,6 @@ class PublicationService:
                 prepared.data,
                 prepared.track,
                 target=target,
-                channel_style=False,
                 include_channel_button=False,
                 record_metrics=False,
             )
@@ -125,12 +124,7 @@ class PublicationService:
 
         self.confirmed_not_sent = False
         try:
-            sent = await self._send(
-                draft,
-                track,
-                target=target,
-                channel_style=channel_style,
-            )
+            sent = await self._send(draft, track, target=target)
         except Exception as exc:
             self.failure_code = (
                 "rate_limited"
@@ -181,7 +175,6 @@ class PublicationService:
         track: TrackMatch,
         *,
         target: int | str,
-        channel_style: bool,
         include_channel_button: bool | None = None,
         record_metrics: bool = True,
     ):
