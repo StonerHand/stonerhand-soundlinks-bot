@@ -41,9 +41,9 @@ def render_track_draft(
     lang = resolve_lang(draft.get("lang") or "ru")
     # Legacy settings/back callbacks share the same editor card.
     if draft_id is not None:
-        text = _workspace_header(draft, context, lang=lang, settings=settings) + (
-            "\n\n" + text
-        )
+        header = _workspace_header(draft, context, lang=lang, settings=settings)
+        if header:
+            text = header + "\n\n" + text
         notices = []
         preflight = validate_publication(draft, track)
         if not preflight.ready:
@@ -77,7 +77,8 @@ def render_track_draft(
 
 
 def _workspace_header(draft: dict, context: Any, *, lang: str, settings: bool) -> str:
-    """ "📝 Черновик", "✏️ Редактор" or "✅ Опубликован · сегодня 14:05"."""
+    """ "✏️ Редактор" or "✅ Опубликован · сегодня 14:05"; a plain draft has
+    no header: its Publish button already says what it is."""
     if settings:
         return get_text(lang, "workspace_editing")
     for key, field in (
@@ -98,7 +99,7 @@ def _workspace_header(draft: dict, context: Any, *, lang: str, settings: bool) -
                 lang=lang,
             )
         return header
-    return get_text(lang, "workspace_ready")
+    return ""
 
 
 def draft_intro_limit(draft: dict, context: Any) -> int:

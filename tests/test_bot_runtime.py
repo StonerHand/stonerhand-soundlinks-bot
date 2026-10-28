@@ -121,7 +121,7 @@ class RuntimeSafetyTests(unittest.IsolatedAsyncioTestCase):
             await start_progress(Incoming(), total=total, key=key)
             if total > 1:
                 await update_progress("ru", "progress_batch_links", done=1, total=3)
-                self.assertIn("40%", edits[-1])
+                self.assertTrue(edits[-1].startswith("🔎 Площадки"))
             self.assertIs(take_progress(17), progress)
 
     async def test_cancelled_lookup_retires_progress_message(self) -> None:

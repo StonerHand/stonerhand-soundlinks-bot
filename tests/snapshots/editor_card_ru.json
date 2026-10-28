@@ -1,6 +1,14 @@
 {
-  "text": "📝 <b>Черновик</b>\n\n<b>Sleep — Dopesmoker</b>\n\n🎧 Трек\n\n#stonerhand #track",
+  "text": "<b>Sleep — Dopesmoker</b>\n\n🎧 Трек\n\n#stonerhand #track",
   "rows": [
+    [
+      [
+        "↗️ Поделиться",
+        null,
+        null,
+        "primary"
+      ]
+    ],
     [
       [
         "✏️ Изменить",
@@ -9,16 +17,16 @@
         null
       ],
       [
-        "🎶 В подборку",
-        "v2|editor|c|draft123",
+        "📩 Себе",
+        "v2|editor|s|draft123",
         null,
         null
       ]
     ],
     [
       [
-        "📩 Себе",
-        "v2|editor|s|draft123",
+        "🎶 В подборку",
+        "v2|editor|c|draft123",
         null,
         null
       ],
@@ -27,14 +35,6 @@
         "v2|editor|sv|draft123",
         null,
         null
-      ]
-    ],
-    [
-      [
-        "↗️ Поделиться",
-        null,
-        null,
-        "primary"
       ]
     ]
   ]

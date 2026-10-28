@@ -244,7 +244,9 @@ def test_a_progress_line_stuck_on_the_player_becomes_the_frame_card_in_place():
         title="Danzig - Mother 93 Live", author="Danzig", url=VIDEO, thumbnail_url=STILL
     )
     message = Message()
-    _lookup(message, ContextStub(youtube_client=youtube))
+    # A slow lookup: the progress line is shown at once.
+    with patch("music_links_bot.bot_lookup_flow.PROGRESS_DELAY_SECONDS", 0):
+        _lookup(message, ContextStub(youtube_client=youtube))
 
     assert len(message.replies) == 1  # the progress line, now the card
     assert "Mother 93 Live" in message.replies[0]

@@ -113,28 +113,15 @@ async def remember_fresh_home_message(
     chat_id: int,
     sent: Message,
 ) -> None:
-    """Keep one current navigation message in a private chat."""
+    """Remember the newest menu. Older menus stay in the chat and keep
+    working: deleting them made messages vanish under the user."""
+    del context
     message_id = getattr(sent, "message_id", None)
     if not isinstance(message_id, int) or message_id <= 0:
         return
-    previous_chat_id = session.home_chat_id
-    previous_message_id = session.home_message_id
     session.home_chat_id = chat_id
     session.home_message_id = message_id
     await runtime.save_session(session)
-    if (
-        previous_chat_id != chat_id
-        or not previous_message_id
-        or previous_message_id == message_id
-    ):
-        return
-    try:
-        await context.bot.delete_message(
-            chat_id=previous_chat_id,
-            message_id=previous_message_id,
-        )
-    except TelegramError:
-        LOGGER.debug("Could not retire previous home message", exc_info=True)
 
 
 async def home_view(query, context, *, lang: str) -> tuple[str, InlineKeyboardMarkup]:

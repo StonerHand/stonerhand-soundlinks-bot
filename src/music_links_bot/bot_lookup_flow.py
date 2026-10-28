@@ -53,7 +53,9 @@ from music_links_bot.bot_pending import (
 from music_links_bot.bot_pipeline import LookupRequest, delivery_kind
 from music_links_bot.bot_preferences import apply_preferences
 from music_links_bot.bot_progress import (
+    PROGRESS_DELAY_SECONDS,
     cancel_progress as _cancel_progress,
+    settle_progress,
     start_progress as _send_loading_placeholder,
     take_progress as _take_placeholder,
     update_progress as _update_loading_placeholder,
@@ -441,6 +443,7 @@ async def track_lookup_message(
         raise
     finally:
         collection_input.reset(route_token)
+        settle_progress()
         runtime = _runtime(context)
         runtime.record_request(
             latency_ms=int((asyncio.get_running_loop().time() - started) * 1000),
@@ -956,13 +959,11 @@ async def _start_lookup_progress(
     key = "progress_batch_links" if total > 1 else "progress_links"
     # The links are known now: open straight at the platform step. After a
     # text search the search placeholder already exists and just moves on.
-    await _send_loading_placeholder(message, request.lang, total=total, key=key)
-    await _update_loading_placeholder(request.lang, key, total=total)
-    # The progress line carries Stop: the lookup must be findable by then.
-    # Publishing ran during the Telegram call, so this rarely waits.
-    from music_links_bot.lookup_control import current_control, published
-
-    await published(current_control.get())
+    # A result faster than a second needs no progress line at all: the 👀
+    # reaction already says the bot is on it.
+    await _send_loading_placeholder(
+        message, request.lang, total=total, key=key, delay=PROGRESS_DELAY_SECONDS
+    )
 
 
 async def _update_resolved_progress(request: LookupRequest, bundle) -> None:

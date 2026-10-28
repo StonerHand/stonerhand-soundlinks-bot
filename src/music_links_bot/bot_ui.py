@@ -506,17 +506,19 @@ def editor_rows(
             else cb("ed_add_crate", "c")
         )
         save_button = cb("ed_saved" if draft.get("saved_at") else "ed_save", "sv")
-        rows = [[cb("ed_edit_post", "m"), collection_button]]
+        # The main action comes first, right under the post.
         if draft.get("can_publish"):
             share_button = _draft_share_button(draft_id, lang)
-            rows.append([button for button in (share_button, save_button) if button])
-            rows.append([cb("ed_publish_menu", "p", tone=ButtonTone.PRIMARY)])
+            rows = [
+                [cb("ed_publish_menu", "p", tone=ButtonTone.PRIMARY)],
+                [b for b in (cb("ed_edit_post", "m"), share_button) if b],
+            ]
         else:
             # Without a channel, sharing to a chat is the main way to send.
             share_button = _draft_share_button(draft_id, lang, primary=True)
-            rows.append([cb("ed_send_self_short", "s"), save_button])
-            if share_button is not None:
-                rows.append([share_button])
+            rows = [[share_button]] if share_button is not None else []
+            rows.append([cb("ed_edit_post", "m"), cb("ed_send_self_short", "s")])
+        rows.append([collection_button, save_button])
         return rows
     rows = [[cb("ed_quick_text", "ti"), cb("ed_quick_tags", "hs")]]
     if not draft.get("source_audio_file_id"):

@@ -143,7 +143,8 @@ def test_undo_publish_deletes_the_post_and_restores_the_draft():
     stored = context.application.bot_data["drafts"]["d1"]
     assert "published_at" not in stored
     assert "Публикация отменена" in query.answers[-1][0]
-    assert query.edits[-1]["text"].startswith("📝 <b>Черновик</b>")
+    # Back to a plain draft: no "published" header above the post.
+    assert not query.edits[-1]["text"].startswith("✅")
 
 
 def test_undo_publish_refuses_after_two_minutes():

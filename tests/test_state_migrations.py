@@ -189,7 +189,7 @@ class ProgressContractTests(unittest.IsolatedAsyncioTestCase):
             def __init__(self) -> None:
                 self.edits: list[str] = []
 
-            async def edit_text(self, text: str) -> None:
+            async def edit_text(self, text: str, **kwargs) -> None:
                 self.edits.append(text)
 
         message = Message()
@@ -200,8 +200,8 @@ class ProgressContractTests(unittest.IsolatedAsyncioTestCase):
         await update_progress("ru", "progress_batch", done=2, total=2)
 
         self.assertEqual(len(message.edits), 2)
-        self.assertTrue(message.edits[0].startswith("▰▰▰▰▰▱▱▱▱▱ 55%"))
-        self.assertTrue(message.edits[1].startswith("▰▰▰▰▰▰▰▰▱▱ 85%"))
+        self.assertTrue(message.edits[0].startswith("🔎 "))
+        self.assertTrue(message.edits[1].startswith("🔎 Ссылки · 2/2"))
 
 
 if __name__ == "__main__":

@@ -53,17 +53,18 @@ class PostEditorTests(unittest.TestCase):
         self.assertEqual(
             labels,
             [
-                "✏️ Изменить",
-                "🎶 В подборку",
-                "↗️ Поделиться",
-                "🔖 В избранное",
                 "📣 Опубликовать",
+                "✏️ Изменить",
+                "↗️ Поделиться",
+                "🎶 В подборку",
+                "🔖 В избранное",
             ],
         )
-        self.assertEqual(rows[-1][0].style, "primary")
-        self.assertEqual(rows[-1][0].callback_data, "v2|editor|p|abc123")
+        # The main action comes first, right under the post.
+        self.assertEqual(rows[0][0].style, "primary")
+        self.assertEqual(rows[0][0].callback_data, "v2|editor|p|abc123")
         # Sharing sends this exact edited post, not a fresh lookup of the link.
-        self.assertEqual(rows[1][0].switch_inline_query, "post:abc123")
+        self.assertEqual(rows[1][1].switch_inline_query, "post:abc123")
 
     def test_card_never_offers_a_redundant_preview_button(self) -> None:
         for can_publish in (False, True):
@@ -73,9 +74,9 @@ class PostEditorTests(unittest.TestCase):
 
     def test_editor_rows_turn_added_item_into_crate_shortcut(self) -> None:
         rows = _editor_rows("abc123", self._draft(in_crate=True, crate_count=3))
-        self.assertEqual(rows[0][1].text, "🎶 В подборке · 3")
-        self.assertEqual(rows[0][1].callback_data, "v2|crate|open")
-        self.assertIsNone(rows[0][1].style)
+        self.assertEqual(rows[-1][0].text, "🎶 В подборке · 3")
+        self.assertEqual(rows[-1][0].callback_data, "v2|crate|open")
+        self.assertIsNone(rows[-1][0].style)
 
     def test_more_menu_keeps_only_rare_actions(self) -> None:
         rows = editor_tools_rows("abc123", self._draft())
@@ -140,18 +141,18 @@ class PostEditorTests(unittest.TestCase):
     def test_editor_rows_keep_one_compact_action_row(self) -> None:
         rows = _editor_rows("abc123", self._draft())
 
-        self.assertEqual([len(row) for row in rows], [2, 2, 1])
+        self.assertEqual([len(row) for row in rows], [1, 2, 2])
         self.assertEqual(
             [button.text for row in rows for button in row],
             [
-                "✏️ Изменить",
-                "🎶 В подборку",
-                "📩 Себе",
-                "🔖 В избранное",
                 "↗️ Поделиться",
+                "✏️ Изменить",
+                "📩 Себе",
+                "🎶 В подборку",
+                "🔖 В избранное",
             ],
         )
-        self.assertEqual(rows[-1][0].switch_inline_query, "post:abc123")
+        self.assertEqual(rows[0][0].switch_inline_query, "post:abc123")
 
     def test_render_track_draft_respects_toggles(self) -> None:
         draft = self._draft(
@@ -208,7 +209,7 @@ class PostEditorTests(unittest.TestCase):
         buttons = [button for row in keyboard.inline_keyboard for button in row]
         self.assertEqual(len(buttons), 5)
         self.assertTrue(all(button.url is None for button in buttons))
-        self.assertEqual(buttons[-1].text, "↗️ Поделиться")
+        self.assertEqual(buttons[0].text, "↗️ Поделиться")
 
 
 class PublicationOverrideTests(unittest.TestCase):

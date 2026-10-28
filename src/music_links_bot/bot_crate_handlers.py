@@ -418,14 +418,7 @@ async def _publish_crate(
 
     text = get_text(lang, "crate_published").format(count=len(tracks))
     keyboard = InlineKeyboardMarkup(rows)
-    await celebrate(
-        context.bot,
-        query,
-        edit=lambda: safe_edit(query, text, keyboard),
-        text=text,
-        parse_mode=ParseMode.HTML,
-        reply_markup=keyboard,
-    )
+    await celebrate(context.bot, query, edit=lambda: safe_edit(query, text, keyboard))
 
 
 def _active_undo(undo_map: dict, user_id: int) -> dict | None:

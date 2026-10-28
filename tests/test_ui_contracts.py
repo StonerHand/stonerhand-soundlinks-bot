@@ -56,11 +56,11 @@ class PublicationGoldenTests(unittest.TestCase):
 
         self.assertEqual(
             text,
-            "📝 <b>Черновик</b>\n\n<b>Sleep — Dopesmoker</b>\n\n🎧 Трек\n\n#stonerhand #track",
+            "<b>Sleep — Dopesmoker</b>\n\n🎧 Трек\n\n#stonerhand #track",
         )
         self.assertEqual(draft["v"], CURRENT_DRAFT_VERSION)
         labels = [button.text for row in keyboard.inline_keyboard for button in row]
-        self.assertEqual(labels[:2], ["✏️ Изменить", "🎶 В подборку"])
+        self.assertEqual(labels[:2], ["↗️ Поделиться", "✏️ Изменить"])
         self.assertIn("🔖 В избранное", labels)
 
     def test_editor_card_snapshots_are_stable(self) -> None:
