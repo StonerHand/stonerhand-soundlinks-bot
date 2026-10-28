@@ -11,7 +11,6 @@ from telegram.error import TelegramError
 from music_links_bot.bot_runtime import encode_callback
 from music_links_bot.i18n import get_text
 from music_links_bot.lookup_control import current_control
-from music_links_bot.rich_publications import send_rich_progress_draft
 from music_links_bot.telegram_buttons import (
     ButtonTone,
     callback_button,
@@ -27,8 +26,6 @@ class ProgressState:
     chat_id: int
     stage: int = 0
     last_text: str = ""
-    bot: object | None = None
-    draft_id: int = 0
     seed: str = ""
 
 
@@ -163,47 +160,12 @@ async def start_progress(
         return
     key = key or ("progress_batch_start" if total > 1 else "progress_search")
     stage = _STEPS[key][0]
+    # Always a real message that the result is edited into. A Telegram draft
+    # is a 30-second preview the bot cannot remove: after a quick answer it
+    # could reach the chat after the card and hang below it.
     try:
         seed = _seed(message)
         text = progress_text(lang, key, seed=seed, total=total)
-        chat = getattr(message, "chat", None)
-        get_bot = getattr(message, "get_bot", None)
-        try:
-            bot = get_bot() if callable(get_bot) else None
-        except RuntimeError:
-            # Hand-built Message objects and lightweight test doubles are not
-            # necessarily bound to a Bot. The classic progress message still
-            # works and remains the lossless fallback.
-            bot = None
-        draft_id = max(1, int(getattr(message, "message_id", 0) or 1))
-        # A draft is a 30-second preview the bot cannot remove: when one card
-        # answers within a second it can reach the chat after the card and
-        # hang below it. Only a batch, slow and with "2 of 5" steps, gets one;
-        # a single link's progress message is edited into its card.
-        if (
-            total > 1
-            and getattr(chat, "type", None) == "private"
-            and bot is not None
-            and await send_rich_progress_draft(
-                bot,
-                chat_id=message.chat_id,
-                draft_id=draft_id,
-                text=text,
-                can_stop=current_control.get() is not None,
-            )
-        ):
-            _PLACEHOLDER.set(
-                ProgressState(
-                    None,
-                    chat_id=message.chat_id,
-                    stage=stage,
-                    last_text=text,
-                    bot=bot,
-                    draft_id=draft_id,
-                    seed=seed,
-                )
-            )
-            return
         placeholder = await _send_progress_message(message, text, lang)
     except TelegramError:
         LOGGER.debug("Could not send progress message", exc_info=True)
@@ -233,14 +195,6 @@ async def update_progress(lang: str, key: str, **values) -> None:
             return
         if state.message is not None:
             await _edit_progress_message(state.message, text, lang)
-        elif state.bot is not None:
-            await send_rich_progress_draft(
-                state.bot,
-                chat_id=state.chat_id,
-                draft_id=state.draft_id,
-                text=text,
-                can_stop=current_control.get() is not None,
-            )
         state.stage = next_stage
         state.last_text = text
     except TelegramError:

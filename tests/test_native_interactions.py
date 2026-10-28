@@ -27,6 +27,7 @@ from music_links_bot.keyboards import _build_link_keyboard
 from music_links_bot.lookup_control import (
     LookupStopped,
     interruptible,
+    published,
     search_control,
     stop_lookup,
 )
@@ -194,6 +195,8 @@ class StopTests(unittest.IsolatedAsyncioTestCase):
 
         async with search_control(data, message()) as control:
             task = asyncio.create_task(interruptible(slow()))
+            # Stop lives on the progress line, shown once the lookup is published.
+            await published(control)
             self.assertTrue(
                 await stop_lookup({"kv_store": store}, chat_id=7, draft_id=42)
             )

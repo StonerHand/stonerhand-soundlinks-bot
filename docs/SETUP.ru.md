@@ -161,7 +161,7 @@ curl --fail-with-body --silent --show-error \
 
 - `COLLECTION_COLLAGE_ENABLED=0` отключает коллажи и возвращает превью первого релиза.
 - `BOT_SAFE_MODE=1` отключает расширенные форматы и сохраняет классические карточки.
-- `RICH_MESSAGES_ENABLED`, `RICH_DRAFTS_ENABLED`, `INLINE_RICH_MEDIA_ENABLED`
+- `RICH_MESSAGES_ENABLED`, `INLINE_RICH_MEDIA_ENABLED`
   и `EPHEMERAL_GROUP_REPLIES` позволяют управлять отдельными возможностями.
 - `BRAND_PHOTO_FRAME=0` оставляет исходную обложку без дополнительной рамки.
 

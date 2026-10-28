@@ -213,27 +213,6 @@ class TelegramApiGateway:
             data["reply_markup"] = serialize(reply_markup)
         return await self.request("editMessageText", data)
 
-    async def send_rich_draft(
-        self,
-        *,
-        chat_id: int,
-        draft_id: int,
-        rich_message: dict[str, object],
-        can_stop: bool = False,
-        keep_on_stop: bool = False,
-    ) -> bool:
-        result = await self.request(
-            "sendRichMessageDraft",
-            {
-                "chat_id": chat_id,
-                "draft_id": draft_id,
-                "rich_message": rich_message,
-                "can_stop": can_stop,
-                "keep_on_stop": keep_on_stop,
-            },
-        )
-        return bool(result)
-
     async def send_ephemeral_message(
         self,
         *,

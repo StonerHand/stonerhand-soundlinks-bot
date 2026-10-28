@@ -271,6 +271,10 @@ async def close_application_resources(application: Application) -> None:
     from music_links_bot.branding import close_cover_resources
     from music_links_bot.shared_http import close_shared_clients
 
+    # Lookup cache writes finish after their cards; let them land first.
+    pending = list(application.bot_data.get("cache_writes", ()))
+    if pending:
+        await asyncio.gather(*pending, return_exceptions=True)
     await close_cover_resources()
     await close_shared_clients()
     client_keys = (

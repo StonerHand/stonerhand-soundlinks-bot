@@ -6,8 +6,9 @@ import asyncio
 import contextvars
 import logging
 import secrets
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Coroutine
 from dataclasses import asdict
+from typing import Any, TypeVar
 
 from telegram import (
     Bot,
@@ -139,6 +140,7 @@ from music_links_bot.url_utils import (
 )
 
 LOGGER = logging.getLogger(__name__)
+T = TypeVar("T")
 
 
 _INPUT_OVERRIDE: contextvars.ContextVar[str | None] = contextvars.ContextVar(
@@ -445,9 +447,11 @@ async def track_lookup_message(
             ok=completed,
         )
         # A failure is written at once, so health shows what just broke.
-        await runtime.persist_metrics(force=not completed)
-        if private_user_id is not None:
-            await runtime.finish_request_durable(private_user_id)
+        metrics = runtime.persist_metrics(force=not completed)
+        if private_user_id is None:
+            await metrics
+        else:
+            await _alongside(runtime.finish_request_durable(private_user_id), metrics)
 
 
 async def _handle_empty_lookup(
@@ -818,7 +822,25 @@ async def _admit_private_lookup(
         request.source_urls,
         is_private=True,
     )
-    allowed, retry_after = await runtime.allow_user_request(request.user_id)
+    intent_value = (
+        "\n".join(sorted(cache_key_for_url(url) for url in request.source_urls))
+        if request.source_urls
+        else request.message_text
+    )
+
+    async def fresh_intent() -> bool:
+        if _BYPASS_INTENT_GUARD.get():
+            return True
+        return await runtime.claim_intent(
+            request.user_id, kind=action_kind, value=intent_value
+        )
+
+    # Every Redis call is a network round trip before the card: the
+    # independent ones run together. A claimed intent of a rate-limited
+    # request is harmless (it expires in seconds).
+    (allowed, retry_after), fresh = await asyncio.gather(
+        runtime.allow_user_request(request.user_id), fresh_intent()
+    )
     if not allowed:
         await _reply_with_flow_error(
             message,
@@ -827,32 +849,46 @@ async def _admit_private_lookup(
             lang=request.lang,
         )
         return False, None
-    intent_value = (
-        "\n".join(sorted(cache_key_for_url(url) for url in request.source_urls))
-        if request.source_urls
-        else request.message_text
-    )
-    if not _BYPASS_INTENT_GUARD.get() and not await runtime.claim_intent(
-        request.user_id,
-        kind=action_kind,
-        value=intent_value,
-    ):
+    if not fresh:
         return False, None
     if action_kind == "help":
         await _reply_with_menu(message, context, MENU_HELP, lang=request.lang)
         return False, None
-    request_token = await runtime.begin_request(request.user_id)
-    runtime.record_funnel("started")
     remembered_value = request.search_query or request.message_text
     if not request.search_query and len(request.source_urls) == 1:
         remembered_value = request.source_urls[0]
-    await runtime.remember_action(
-        request.user_id,
-        kind="search" if request.search_query or not request.source_urls else "resolve",
-        value=remembered_value,
-        lang=request.lang,
+    # begin_request registers this handler's task (a newer request cancels
+    # it), so it runs here; remembering the action goes alongside.
+    request_token = await _alongside(
+        runtime.begin_request(request.user_id),
+        runtime.remember_action(
+            request.user_id,
+            kind="search"
+            if request.search_query or not request.source_urls
+            else "resolve",
+            value=remembered_value,
+            lang=request.lang,
+        ),
     )
+    runtime.record_funnel("started")
     return True, request_token
+
+
+async def _alongside(main: Awaitable[T], side: Coroutine[Any, Any, Any]) -> T:
+    """Await ``main`` in this task while ``side`` runs concurrently.
+
+    asyncio.gather would run ``main`` in a task of its own, and the request
+    bookkeeping that recognises this handler by its task would miss it.
+    """
+    side_task = asyncio.create_task(side)
+    try:
+        result = await main
+    except BaseException:
+        side_task.cancel()
+        await asyncio.gather(side_task, return_exceptions=True)
+        raise
+    await side_task
+    return result
 
 
 async def _resolve_request_sources(
@@ -922,6 +958,11 @@ async def _start_lookup_progress(
     # text search the search placeholder already exists and just moves on.
     await _send_loading_placeholder(message, request.lang, total=total, key=key)
     await _update_loading_placeholder(request.lang, key, total=total)
+    # The progress line carries Stop: the lookup must be findable by then.
+    # Publishing ran during the Telegram call, so this rarely waits.
+    from music_links_bot.lookup_control import current_control, published
+
+    await published(current_control.get())
 
 
 async def _update_resolved_progress(request: LookupRequest, bundle) -> None:
