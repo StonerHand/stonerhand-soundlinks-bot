@@ -44,7 +44,6 @@ from music_links_bot.constants import CHANNEL_USERNAME, channel_target
 from music_links_bot.editor_screen import (
     EditorActionRequest,
     _edit_editor_message,
-    _editor_message,
     _editor_success_text,
     _restore_editor_card,
 )
@@ -343,7 +342,6 @@ async def _show_editor_publish_success(
         edit=lambda: _edit_editor_message(
             request.query, request.context, request.draft, success_text, keyboard
         ),
-        **_editor_message(request.context, request.draft, success_text, keyboard),
     )
 
 

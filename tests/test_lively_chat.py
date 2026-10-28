@@ -5,7 +5,7 @@ import unittest.mock
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
-from telegram.error import BadRequest, TelegramError
+from telegram.error import TelegramError
 
 from music_links_bot.bot_progress import progress_text
 from music_links_bot.i18n import get_text
@@ -14,19 +14,22 @@ from music_links_bot.reactions import should_react
 
 
 class ProgressTextTests(unittest.TestCase):
-    def test_single_lookup_shows_a_bar_and_a_phrase(self) -> None:
+    def test_single_lookup_shows_a_phrase_and_no_invented_percentage(self) -> None:
         text = progress_text("ru", "progress_links", seed="7:1")
-        bar, phrase = text.splitlines()
 
-        self.assertEqual(bar, "▰▰▰▰▰▱▱▱▱▱ 55%")
-        self.assertIn(phrase, get_text("ru", "progress_fun_links").splitlines())
+        self.assertTrue(text.startswith("🔎 "))
+        self.assertNotIn("%", text)
+        self.assertIn(text[2:], get_text("ru", "progress_fun_links").splitlines())
 
     def test_collections_add_a_count_line(self) -> None:
         text = progress_text(
             "en", "progress_batch_partial", seed="7:1", done=3, total=5
         )
 
-        self.assertEqual(text.splitlines()[:2], ["▰▰▰▰▰▰▰▰▱▱ 85%", "⚠️ 3 of 5 opened"])
+        # A status with its own sign gets no second one.
+        self.assertEqual(text.splitlines()[0], "⚠️ 3 of 5 opened")
+        found = progress_text("ru", "progress_batch", seed="7:1", done=2, total=5)
+        self.assertEqual(found.splitlines()[0], "🔎 Ссылки · 2/5")
 
     def test_one_request_keeps_its_voice_and_requests_differ(self) -> None:
         phrases = {
@@ -53,6 +56,7 @@ def _query(chat_type: str = "private"):
     message = SimpleNamespace(
         chat=SimpleNamespace(type=chat_type),
         chat_id=7,
+        message_id=42,
         delete=AsyncMock(),
         edit_reply_markup=AsyncMock(),
     )
@@ -60,62 +64,31 @@ def _query(chat_type: str = "private"):
 
 
 class CelebrateTests(unittest.IsolatedAsyncioTestCase):
-    async def test_private_success_is_resent_with_confetti(self) -> None:
+    async def test_success_edits_the_card_in_place_and_reacts(self) -> None:
         bot, query, edit = (
-            SimpleNamespace(send_message=AsyncMock()),
+            SimpleNamespace(set_message_reaction=AsyncMock()),
             _query(),
             AsyncMock(),
         )
 
-        self.assertTrue(await celebrate(bot, query, edit=edit, text="✅"))
+        self.assertTrue(await celebrate(bot, query, edit=edit))
 
-        bot.send_message.assert_awaited_once_with(
-            message_effect_id=CELEBRATE, chat_id=7, text="✅"
-        )
-        query.message.delete.assert_awaited_once()
-        edit.assert_not_awaited()
-
-    async def test_groups_keep_the_quiet_edit(self) -> None:
-        bot, query, edit = (
-            SimpleNamespace(send_message=AsyncMock()),
-            _query("group"),
-            AsyncMock(),
-        )
-
-        self.assertFalse(await celebrate(bot, query, edit=edit, text="✅"))
-
-        bot.send_message.assert_not_awaited()
         edit.assert_awaited_once()
+        query.message.delete.assert_not_awaited()  # nothing disappears
+        reaction = bot.set_message_reaction.await_args.kwargs
+        self.assertEqual((reaction["chat_id"], reaction["message_id"]), (7, 42))
+        self.assertEqual(reaction["reaction"][0].emoji, "🎉")
 
-    async def test_a_rejected_effect_still_sends_the_screen(self) -> None:
-        send = AsyncMock(side_effect=[BadRequest("Effect_id_invalid"), "sent"])
-        query, edit = _query(), AsyncMock()
-
-        await celebrate(SimpleNamespace(send_message=send), query, edit=edit, text="✅")
-
-        self.assertEqual(send.await_args_list[-1].kwargs, {"chat_id": 7, "text": "✅"})
-        edit.assert_not_awaited()
-
-    async def test_a_failed_send_falls_back_to_editing(self) -> None:
-        send = AsyncMock(side_effect=TelegramError("flood"))
-        query, edit = _query(), AsyncMock()
-
-        self.assertFalse(
-            await celebrate(
-                SimpleNamespace(send_message=send), query, edit=edit, text="✅"
-            )
+    async def test_a_refused_reaction_keeps_the_edited_card(self) -> None:
+        bot = SimpleNamespace(
+            set_message_reaction=AsyncMock(side_effect=TelegramError("x"))
         )
+        query, edit = _query(), AsyncMock()
+
+        self.assertFalse(await celebrate(bot, query, edit=edit))
 
         edit.assert_awaited_once()
         query.message.delete.assert_not_awaited()
-
-    async def test_an_undeletable_old_card_loses_its_buttons(self) -> None:
-        bot, query = SimpleNamespace(send_message=AsyncMock()), _query()
-        query.message.delete.side_effect = TelegramError("too old")
-
-        await celebrate(bot, query, edit=AsyncMock(), text="✅")
-
-        query.message.edit_reply_markup.assert_awaited_once_with(reply_markup=None)
 
 
 class EditorPublishCelebrationTests(unittest.IsolatedAsyncioTestCase):
@@ -126,7 +99,9 @@ class EditorPublishCelebrationTests(unittest.IsolatedAsyncioTestCase):
         from music_links_bot.bot_runtime import BotRuntime
 
         context = ctx(RedisModel())
-        context.bot = SimpleNamespace(send_message=AsyncMock())
+        context.bot = SimpleNamespace(
+            send_message=AsyncMock(), set_message_reaction=AsyncMock()
+        )
         context.application.bot_data["runtime"] = BotRuntime(
             context.application.bot_data["kv_store"]
         )
@@ -153,12 +128,14 @@ class EditorPublishCelebrationTests(unittest.IsolatedAsyncioTestCase):
         ):
             await bot_editor._finish_editor_publish(request, published)
 
-        sent = context.bot.send_message.await_args.kwargs
-        self.assertEqual(sent["message_effect_id"], CELEBRATE)
-        self.assertIn("Опубликовано", sent["text"])
-        self.assertIn("@stonerhand", sent["text"])
-        query.message.delete.assert_awaited_once()
-        query.edit_message_text.assert_not_awaited()
+        # The same card becomes the success screen; nothing is deleted or resent.
+        edited = query.edit_message_text.await_args.kwargs
+        self.assertIn("Опубликовано", edited["text"])
+        self.assertIn("@stonerhand", edited["text"])
+        context.bot.send_message.assert_not_awaited()
+        query.message.delete.assert_not_awaited()
+        reaction = context.bot.set_message_reaction.await_args.kwargs
+        self.assertEqual(reaction["reaction"][0].emoji, "🎉")
         self.assertEqual(request.draft["published_message_id"], 42)
         self.assertIn("🎉", query.answer.await_args.args[0])
 
@@ -199,6 +176,10 @@ class LookupRoundTripTests(unittest.IsolatedAsyncioTestCase):
         with (
             unittest.mock.patch.object(EditableReplyStub, "edit_text", counting),
             unittest.mock.patch("music_links_bot.bot_stats.record_post"),
+            # A slow lookup: the progress line is shown at once.
+            unittest.mock.patch(
+                "music_links_bot.bot_lookup_flow.PROGRESS_DELAY_SECONDS", 0
+            ),
         ):
             await track_lookup_message(UpdateStub(message), ContextStub())
 

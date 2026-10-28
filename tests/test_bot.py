@@ -618,7 +618,7 @@ class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(context.bot.deleted_messages, [])
         self.assertIn("Музыка, которой хочется делиться", message.replies[-1])
 
-    async def test_help_sends_visible_reply_and_retires_home(self) -> None:
+    async def test_help_sends_visible_reply_and_keeps_the_old_menu(self) -> None:
         message = PrivateMessageStub()
         update = StartUpdateStub(message)
         context = ContextStub()
@@ -628,7 +628,8 @@ class MenuLifecycleTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(message.replies), 2)
         self.assertEqual(context.bot.edited_messages, [])
-        self.assertEqual(context.bot.deleted_messages[0]["message_id"], 1000)
+        # Older menus stay and keep working: nothing vanishes from the chat.
+        self.assertEqual(context.bot.deleted_messages, [])
         self.assertIn("Как сделать пост", message.replies[-1])
 
     async def test_stale_home_delete_failure_does_not_hide_new_reply(self) -> None:
@@ -2364,6 +2365,10 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 1)
 
     async def test_failed_progress_edit_is_deleted_before_fallback_reply(self) -> None:
+        # A slow lookup: the progress line is shown at once.
+        slow = patch("music_links_bot.bot_lookup_flow.PROGRESS_DELAY_SECONDS", 0)
+        slow.start()
+        self.addCleanup(slow.stop)
         message = PrivateSpotifyTrackMessageStub()
         message.reply_edit_error = BadRequest("message cannot be edited")
         context = ContextStub()
@@ -2694,10 +2699,11 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("<b>Youth Code — Transitions</b>", message.replies[0])
         self.assertIn("#stonerhand #track", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
-        self.assertEqual(keyboard[0][0].text, "✏️ Изменить")
-        self.assertEqual(keyboard[0][1].text, "🎶 В подборку")
-        self.assertEqual(keyboard[1][0].text, "📩 Себе")
-        self.assertEqual(keyboard[-1][0].text, "↗️ Поделиться")
+        # The main action (share, without a channel) comes first.
+        self.assertEqual(keyboard[0][0].text, "↗️ Поделиться")
+        self.assertEqual(keyboard[1][0].text, "✏️ Изменить")
+        self.assertEqual(keyboard[1][1].text, "📩 Себе")
+        self.assertEqual(keyboard[-1][0].text, "🎶 В подборку")
         preview_options = message.reply_kwargs[0]["link_preview_options"]
         self.assertTrue(preview_options.prefer_large_media)
         self.assertFalse(bool(preview_options.prefer_small_media))
@@ -2758,8 +2764,8 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(message.replies), 1)
         self.assertIn("<b>Bondage Fairies — Star Signs</b>", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
-        self.assertEqual(keyboard[0][0].text, "✏️ Изменить")
-        self.assertTrue(keyboard[0][0].callback_data.startswith("v2|editor|m|"))
+        self.assertEqual(keyboard[1][0].text, "✏️ Изменить")
+        self.assertTrue(keyboard[1][0].callback_data.startswith("v2|editor|m|"))
         preview_options = message.reply_kwargs[0]["link_preview_options"]
         self.assertEqual(
             preview_options.url,
@@ -2858,6 +2864,10 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         record_artists.assert_called_once()
 
     async def test_mixed_music_and_youtube_links_use_collection_post(self) -> None:
+        # A slow lookup: the progress line is shown at once.
+        slow = patch("music_links_bot.bot_lookup_flow.PROGRESS_DELAY_SECONDS", 0)
+        slow.start()
+        self.addCleanup(slow.stop)
         message = PrivateMixedMessageStub()
         context = ContextStub()
 
