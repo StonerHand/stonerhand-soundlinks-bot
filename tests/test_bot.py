@@ -2163,6 +2163,53 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(message.deleted)
         self.assertEqual(message.replies, [])
 
+    async def test_a_persons_group_link_is_replaced_publicly_by_default(self) -> None:
+        """Real group messages always have a sender: the card still replaces
+        the link publicly unless invisible cards are switched on."""
+        message = ReplaceableMessageStub()
+        message.from_user = type("U", (), {"id": 777})()
+        bot = BotStub()
+        bot.token = "token123"
+
+        with patch(
+            "music_links_bot.lookup_transport.send_ephemeral_message",
+            AsyncMock(return_value=True),
+        ) as ephemeral:
+            await _send_track_result(
+                bot, message, "готовый пост", preview_url=None, reply_markup=None
+            )
+
+        ephemeral.assert_not_awaited()
+        self.assertEqual(len(bot.sent_messages), 1)
+        self.assertTrue(message.deleted)
+
+    async def test_a_channel_post_in_its_discussion_group_is_never_invisible(
+        self,
+    ) -> None:
+        import os
+
+        message = ReplaceableMessageStub()
+        message.from_user = type("U", (), {"id": 777000})()  # Telegram itself
+        message.sender_chat = type("C", (), {"id": -100777, "type": "channel"})()
+        message.is_automatic_forward = True
+        bot = BotStub()
+        bot.token = "token123"
+
+        with (
+            patch.dict(os.environ, {"EPHEMERAL_GROUP_CARDS": "1"}),
+            patch(
+                "music_links_bot.lookup_transport.send_ephemeral_message",
+                AsyncMock(return_value=True),
+            ) as ephemeral,
+        ):
+            await _send_track_result(
+                bot, message, "готовый пост", preview_url=None, reply_markup=None
+            )
+
+        ephemeral.assert_not_awaited()
+        self.assertEqual(len(bot.sent_messages), 1)
+        self.assertTrue(message.deleted)
+
     async def test_channel_result_keeps_url_buttons_and_drops_inline_share(
         self,
     ) -> None:
@@ -2220,7 +2267,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         with (
             env_patch.dict(
                 os.environ,
-                {"EPHEMERAL_GROUP_REPLIES": "1"},
+                {"EPHEMERAL_GROUP_CARDS": "1"},
                 clear=False,
             ),
             env_patch(
@@ -2251,7 +2298,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         with (
             env_patch.dict(
                 os.environ,
-                {"EPHEMERAL_GROUP_REPLIES": "1"},
+                {"EPHEMERAL_GROUP_CARDS": "1"},
                 clear=False,
             ),
             env_patch(

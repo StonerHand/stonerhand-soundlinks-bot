@@ -18,6 +18,33 @@ def ephemeral_group_replies_enabled() -> bool:
     return feature_enabled("EPHEMERAL_GROUP_REPLIES", default=True)
 
 
+# Telegram's service account: the sender of channel posts auto-forwarded
+# into a linked discussion group.
+_TELEGRAM_SERVICE_USER_ID = 777000
+
+
+def ephemeral_card_receiver(message: object) -> int | None:
+    """The person a group card may be shown to invisibly, if anyone.
+
+    Off by default: in a group a card replaces the link message publicly,
+    as it always has. EPHEMERAL_GROUP_CARDS=1 shows the card to its sender
+    only and keeps their message. A post made as a channel, or forwarded by
+    Telegram from a linked channel, has no person to show it to.
+    """
+    chat = getattr(message, "chat", None)
+    user = getattr(message, "from_user", None)
+    if (
+        getattr(chat, "type", None) not in {"group", "supergroup"}
+        or not feature_enabled("EPHEMERAL_GROUP_CARDS", default=False)
+        or user is None
+        or getattr(user, "id", None) == _TELEGRAM_SERVICE_USER_ID
+        or getattr(message, "sender_chat", None) is not None
+        or getattr(message, "is_automatic_forward", False)
+    ):
+        return None
+    return user.id
+
+
 async def send_ephemeral_message(
     bot_token: str | None,
     chat_id: int | str,

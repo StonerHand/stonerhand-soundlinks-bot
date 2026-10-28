@@ -14,7 +14,7 @@ from telegram.error import BadRequest, RetryAfter, TelegramError, TimedOut
 from music_links_bot.bot_builder import fit_telegram_html
 from music_links_bot.bot_progress import take_progress
 from music_links_bot.ephemeral import (
-    ephemeral_group_replies_enabled,
+    ephemeral_card_receiver,
     send_ephemeral_message,
 )
 from music_links_bot.keyboards import (
@@ -40,6 +40,9 @@ LOGGER = logging.getLogger(__name__)
 # the webhook's 25-second budget even when every fallback is needed.
 _PREVIEW_READ_TIMEOUT_SECONDS = 6.0
 _STILL_READ_TIMEOUT_SECONDS = 6.0
+# A new message cannot be retried after a timeout (it may have landed), so
+# Telegram gets longer to build its preview: a YouTube one embeds the video.
+_SEND_READ_TIMEOUT_SECONDS = 15.0
 # Flood control names its wait; a short one is waited out once.
 _MAX_FLOOD_WAIT_SECONDS = 9.0
 
@@ -75,15 +78,12 @@ async def send_track_result(
             preview_url,
             prefer_large_media=prefer_large_preview,
         )
-        if (
-            message.chat.type in {"group", "supergroup"}
-            and ephemeral_group_replies_enabled()
-            and getattr(message, "from_user", None) is not None
-        ):
+        receiver = ephemeral_card_receiver(message)
+        if receiver is not None:
             delivered = await send_ephemeral_message(
                 getattr(bot, "token", None),
                 message.chat_id,
-                message.from_user.id,
+                receiver,
                 text,
                 parse_mode=ParseMode.HTML,
                 reply_markup=reply_markup,
@@ -130,11 +130,7 @@ async def send_track_video_pair_result(
 ) -> bool:
     source_urls = (*track.links.values(), video.url)
     preview_url = _select_preview_url(track.links) or track.thumbnail_url
-    if (
-        message.chat.type in {"group", "supergroup"}
-        and ephemeral_group_replies_enabled()
-        and getattr(message, "from_user", None) is not None
-    ):
+    if ephemeral_card_receiver(message) is not None:
         await send_track_result(
             bot,
             message,
@@ -236,6 +232,7 @@ async def reply_with_track(
                 placeholder.edit_text,
                 link_preview_options=link_preview_options,
                 fallback_preview_url=fallback_preview_url,
+                idempotent=True,
                 text=text,
                 parse_mode=ParseMode.HTML,
                 reply_markup=reply_markup,
@@ -262,17 +259,22 @@ async def _send_card(
     *,
     link_preview_options: LinkPreviewOptions,
     fallback_preview_url: str | None = None,
+    idempotent: bool = False,
     **message: Any,
 ) -> Any:
-    """Send a card; if Telegram cannot build its preview, try a plainer one.
+    """Send or edit a card; if Telegram cannot build its preview, try a
+    plainer one: the still image, then no preview at all.
 
-    The preview is built before Telegram answers. When it is refused or takes
-    too long, the card goes out with its still image, then with no preview at
-    all, instead of not at all.
+    A refusal (BadRequest) means nothing was sent, so a plainer retry is safe.
+    A timeout is ambiguous: an edit can be repeated, but a new message may
+    already be in the chat, so a send is never retried after one.
     """
     attempts: list[tuple[LinkPreviewOptions, float]] = []
     if not link_preview_options.is_disabled:
-        attempts.append((link_preview_options, _PREVIEW_READ_TIMEOUT_SECONDS))
+        first_wait = (
+            _PREVIEW_READ_TIMEOUT_SECONDS if idempotent else _SEND_READ_TIMEOUT_SECONDS
+        )
+        attempts.append((link_preview_options, first_wait))
         if fallback_preview_url and fallback_preview_url != link_preview_options.url:
             still = _build_link_preview_options(
                 fallback_preview_url, prefer_large_media=True
@@ -294,6 +296,8 @@ async def _send_card(
                 record_capability_failure(
                     link_preview_capability(options.url), exc, unsupported=True
                 )
+            if isinstance(exc, TimedOut) and not idempotent:
+                raise
     return await _flood_safe(
         send, link_preview_options=LinkPreviewOptions(is_disabled=True), **message
     )
