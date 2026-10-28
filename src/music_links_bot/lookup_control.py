@@ -31,6 +31,8 @@ class SearchControl:
     stopped: asyncio.Event = field(default_factory=asyncio.Event)
     completed: dict = field(default_factory=dict)
     progress: ProgressState | None = None
+    # Writing this lookup to Redis, so Stop on another instance can find it.
+    published: asyncio.Task | None = None
 
     @property
     def key(self):
@@ -82,17 +84,31 @@ async def search_control(bot_data, message):
     registry[control.key] = control
     kv = bot_data.get("kv_store")
     token = current_control.set(control)
+    # Another instance learns about this lookup only when Stop is pressed,
+    # half a second at the earliest: publishing it runs beside the lookup
+    # instead of in front of it.
+    if kv is not None:
+        control.published = asyncio.create_task(
+            kv.set(control.key, control.nonce, ttl_seconds=CONTROL_TTL)
+        )
     try:
-        if kv is not None:
-            await kv.set(control.key, control.nonce, ttl_seconds=CONTROL_TTL)
         yield control
     finally:
         current_control.reset(token)
         if registry.get(control.key) is control:
             registry.pop(control.key, None)
         if kv is not None:
-            await kv.delete_if_value(control.key, control.nonce)
-            await kv.delete_if_value(control.key, "stopped:" + control.nonce)
+            await published(control)
+            await asyncio.gather(
+                kv.delete_if_value(control.key, control.nonce),
+                kv.delete_if_value(control.key, "stopped:" + control.nonce),
+            )
+
+
+async def published(control: SearchControl | None) -> None:
+    """Wait until Stop can reach this lookup from any instance."""
+    if control is not None and control.published is not None:
+        await asyncio.gather(control.published, return_exceptions=True)
 
 
 async def stop_lookup(bot_data, *, chat_id, draft_id):
@@ -117,15 +133,19 @@ async def stop_lookup(bot_data, *, chat_id, draft_id):
 
 
 async def _wait_for_stop(control):
+    """Stop from this instance sets the event; from another one, Redis.
+    Nobody can press Stop before the progress line exists, so the first
+    look at Redis waits half a second: fast lookups never make one."""
     kv = control.bot_data.get("kv_store")
     while not control.stopped.is_set():
-        if kv is not None and await kv.get(control.key) == "stopped:" + control.nonce:
-            control.stopped.set()
-            break
         try:
             await asyncio.wait_for(control.stopped.wait(), timeout=0.5)
         except TimeoutError:
             pass
+        else:
+            break
+        if kv is not None and await kv.get(control.key) == "stopped:" + control.nonce:
+            control.stopped.set()
 
 
 async def interruptible(awaitable):

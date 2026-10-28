@@ -228,32 +228,24 @@ async def reply_with_track(
     placeholder = take_progress(message.chat_id)
     if placeholder is not None:
         try:
-            return await placeholder.edit_text(
+            # The progress line becomes the card. An edit is safe to repeat,
+            # so a slow preview is retried on the same message with a plainer
+            # one; a timed-out edit may already be the card and is never
+            # deleted.
+            return await _send_card(
+                placeholder.edit_text,
+                link_preview_options=link_preview_options,
+                fallback_preview_url=fallback_preview_url,
                 text=text,
                 parse_mode=ParseMode.HTML,
-                link_preview_options=link_preview_options,
                 reply_markup=reply_markup,
-                read_timeout=_PREVIEW_READ_TIMEOUT_SECONDS,
             )
-        except TelegramError as exc:
+        except BadRequest as exc:
+            if "not modified" in exc.message.casefold():
+                return placeholder  # an earlier, timed-out edit got through
+            # The progress line is gone or cannot be edited: send anew.
             LOGGER.debug("Could not edit loading placeholder", exc_info=True)
             await delete_message_safely(placeholder)
-            if (
-                isinstance(exc, TimedOut)
-                and link_preview_options.url
-                and fallback_preview_url
-            ):
-                # Telegram did not build the preview in time: the new card
-                # goes out with the still at once instead of waiting again.
-                record_capability_failure(
-                    link_preview_capability(link_preview_options.url),
-                    exc,
-                    unsupported=True,
-                )
-                link_preview_options = _build_link_preview_options(
-                    fallback_preview_url, prefer_large_media=True
-                )
-                fallback_preview_url = None
 
     return await _send_card(
         message.reply_text,

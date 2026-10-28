@@ -6,6 +6,7 @@ line."""
 import asyncio
 import os
 from datetime import timedelta
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -181,7 +182,9 @@ def test_a_player_telegram_cannot_build_falls_back_to_the_frame():
     assert not capability_available(link_preview_capability(VIDEO))
 
 
-def test_a_progress_line_that_times_out_on_the_player_becomes_a_frame_card():
+def test_a_progress_line_stuck_on_the_player_becomes_the_frame_card_in_place():
+    """A timed-out edit may already be the card: the same message is edited
+    again with the still. Nothing is deleted and no second card appears."""
     from test_bot import ContextStub, PrivateMessageStub
 
     from music_links_bot.telegram_gateway import (
@@ -189,25 +192,64 @@ def test_a_progress_line_that_times_out_on_the_player_becomes_a_frame_card():
         link_preview_capability,
     )
 
+    class ProgressLine:
+        def __init__(self, owner, index):
+            self.chat_id, self.message_id = owner.chat_id, 1000 + index
+            self.owner, self.index = owner, index
+
+        async def edit_text(self, text, **kwargs):
+            options = kwargs.get("link_preview_options")
+            if options is not None and options.url == VIDEO:
+                raise TimedOut()  # Telegram is stuck building the player
+            self.owner.replies[self.index] = text
+            self.owner.reply_kwargs[self.index] = kwargs
+            return self
+
+        async def delete(self):
+            raise AssertionError("the progress line must not be deleted")
+
     class Message(PrivateMessageStub):
         text = VIDEO
+
+        async def reply_text(self, text, **kwargs):
+            self.replies.append(text)
+            self.reply_kwargs.append(kwargs)
+            return ProgressLine(self, len(self.replies) - 1)
 
     youtube = AsyncMock()
     youtube.lookup_video.return_value = VideoMatch(
         title="Danzig - Mother 93 Live", author="Danzig", url=VIDEO, thumbnail_url=STILL
     )
     message = Message()
-    # Every edit of the progress line times out: Telegram is stuck on the player.
-    message.reply_edit_error = TimedOut()
     _lookup(message, ContextStub(youtube_client=youtube))
 
-    sent = [
-        kwargs for kwargs in message.reply_kwargs if "link_preview_options" in kwargs
-    ]
-    # The player is not asked for a second time: the card goes out with the still.
-    assert [kwargs["link_preview_options"].url for kwargs in sent] == [STILL]
-    assert "Mother 93 Live" in message.replies[-1]
+    assert len(message.replies) == 1  # the progress line, now the card
+    assert "Mother 93 Live" in message.replies[0]
+    assert message.reply_kwargs[0]["link_preview_options"].url == STILL
     assert not capability_available(link_preview_capability(VIDEO))
+
+
+def test_an_edit_that_already_landed_counts_as_the_card():
+    from music_links_bot.lookup_transport import reply_with_track
+
+    progress = SimpleNamespace(
+        edit_text=AsyncMock(side_effect=BadRequest("Message is not modified"))
+    )
+    message = SimpleNamespace(chat_id=7, reply_text=AsyncMock())
+    with patch("music_links_bot.lookup_transport.take_progress", return_value=progress):
+        sent = asyncio.run(
+            reply_with_track(
+                message,
+                "<b>Card</b>",
+                preview_url=None,
+                reply_markup=None,
+                content_kind="video",
+                source_urls=(VIDEO,),
+            )
+        )
+
+    assert sent is progress
+    message.reply_text.assert_not_awaited()
 
 
 def test_short_flood_control_is_waited_out_once():

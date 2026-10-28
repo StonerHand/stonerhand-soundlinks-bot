@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Coroutine
 from typing import Any
 
 from telegram import Bot, Message
@@ -377,16 +377,36 @@ async def _resolve_sources_uncached(
     bundle = _ensure_source_accounting(bundle, source_urls)
     complete = bundle.is_complete_for(source_urls)
     if bundle.item_count and complete:
-        await set_cached_lookup(bot_data, source_urls, _bundle_to_cache(bundle))
+        _write_behind(
+            bot_data, set_cached_lookup(bot_data, source_urls, _bundle_to_cache(bundle))
+        )
     elif (
         not bundle.item_count
         and bundle.statuses
         and all(status.state == "not_found" for status in bundle.statuses)
     ):
-        await set_cached_negative_lookup(
-            bot_data, source_urls, _bundle_to_cache(bundle)
+        _write_behind(
+            bot_data,
+            set_cached_negative_lookup(bot_data, source_urls, _bundle_to_cache(bundle)),
         )
     return bundle
+
+
+def _write_behind(bot_data: dict, write: Coroutine[Any, Any, None]) -> None:
+    """A cache write must not hold the card back: it finishes right after.
+    The set keeps every write referenced until done; shutdown awaits them."""
+    pending: set[asyncio.Task[None]] = bot_data.setdefault("cache_writes", set())
+    task = asyncio.create_task(write)
+    pending.add(task)
+
+    def done(finished: asyncio.Task[None]) -> None:
+        pending.discard(finished)
+        if not finished.cancelled() and finished.exception() is not None:
+            LOGGER.warning(
+                "Lookup cache write failed: %s", type(finished.exception()).__name__
+            )
+
+    task.add_done_callback(done)
 
 
 def _outcome_value(outcomes: dict, provider: str, fallback):
