@@ -35,22 +35,41 @@ def test_a_refused_preview_still_delivers_the_card_bare():
     assert second.kwargs["text"] == "card"
 
 
-def test_a_slow_player_gets_more_time_then_the_still_image():
+def test_a_slow_preview_edit_is_repeated_with_the_still_image():
     send = AsyncMock(side_effect=[TimedOut(), "sent"])
 
     sent = asyncio.run(
         _send_card(
-            send, link_preview_options=PREVIEW, fallback_preview_url=STILL, text="c"
+            send,
+            link_preview_options=PREVIEW,
+            fallback_preview_url=STILL,
+            idempotent=True,
+            text="c",
         )
     )
 
     assert sent == "sent"
     player, still = send.await_args_list
-    # Telegram builds the player before answering: longer than the 5 s default.
     assert player.kwargs["read_timeout"] > 5
     assert player.kwargs["link_preview_options"].url == VIDEO
     assert still.kwargs["link_preview_options"].url == STILL
     assert still.kwargs["link_preview_options"].prefer_large_media
+
+
+def test_a_new_message_is_never_sent_twice_after_a_timeout():
+    """It may already be in the chat: a second send would be a duplicate."""
+    send = AsyncMock(side_effect=[TimedOut(), "sent"])
+
+    with pytest.raises(TimedOut):
+        asyncio.run(
+            _send_card(
+                send, link_preview_options=PREVIEW, fallback_preview_url=STILL, text="c"
+            )
+        )
+
+    assert send.await_count == 1
+    # Telegram gets longer for a send, since it cannot be repeated.
+    assert send.await_args.kwargs["read_timeout"] >= 15
 
 
 def test_when_no_preview_works_the_card_still_goes_out():
@@ -58,7 +77,11 @@ def test_when_no_preview_works_the_card_still_goes_out():
 
     sent = asyncio.run(
         _send_card(
-            send, link_preview_options=PREVIEW, fallback_preview_url=STILL, text="c"
+            send,
+            link_preview_options=PREVIEW,
+            fallback_preview_url=STILL,
+            idempotent=True,
+            text="c",
         )
     )
 
@@ -137,7 +160,7 @@ def test_the_frame_comes_from_the_video_id_when_youtube_sent_no_still():
     assert video_frame_url(unknown) == unknown.url
 
 
-def test_a_player_telegram_cannot_build_falls_back_to_the_frame():
+def test_a_player_telegram_refuses_falls_back_to_the_frame():
     from test_bot import ContextStub, PrivateMessageStub
 
     from music_links_bot.telegram_gateway import (
@@ -151,7 +174,7 @@ def test_a_player_telegram_cannot_build_falls_back_to_the_frame():
         async def reply_text(self, text, **kwargs):
             options = kwargs.get("link_preview_options")
             if options is not None and options.url == VIDEO:
-                raise TimedOut()
+                raise BadRequest("Wrong web page url")  # refused: nothing sent
             return await super().reply_text(text, **kwargs)
 
     youtube = AsyncMock()
