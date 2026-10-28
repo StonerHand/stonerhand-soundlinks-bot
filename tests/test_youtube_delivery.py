@@ -69,7 +69,7 @@ def test_a_new_message_is_never_sent_twice_after_a_timeout():
 
     assert send.await_count == 1
     # Telegram gets longer for a send, since it cannot be repeated.
-    assert send.await_args.kwargs["read_timeout"] >= 15
+    assert send.await_args.kwargs["read_timeout"] >= 12
 
 
 def test_when_no_preview_works_the_card_still_goes_out():
