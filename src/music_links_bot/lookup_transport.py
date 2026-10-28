@@ -42,7 +42,8 @@ _PREVIEW_READ_TIMEOUT_SECONDS = 6.0
 _STILL_READ_TIMEOUT_SECONDS = 6.0
 # A new message cannot be retried after a timeout (it may have landed), so
 # Telegram gets longer to build its preview: a YouTube one embeds the video.
-_SEND_READ_TIMEOUT_SECONDS = 15.0
+# With a full flood wait before it (9 s) this still ends inside the budget.
+_SEND_READ_TIMEOUT_SECONDS = 12.0
 # Flood control names its wait; a short one is waited out once.
 _MAX_FLOOD_WAIT_SECONDS = 9.0
 
