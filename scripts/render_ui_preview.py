@@ -51,6 +51,16 @@ ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "output/ui-preview"
 
 
+def action(b):
+    if b.callback_data:
+        return b.callback_data
+    if b.api_kwargs.get("disabled") is not None:
+        return "disabled"
+    if b.switch_inline_query_current_chat is not None:
+        return "sample"
+    return "external"
+
+
 def screen(text, keyboard, *, art=False):
     return {
         "text": text,
@@ -59,12 +69,7 @@ def screen(text, keyboard, *, art=False):
             [
                 {
                     "label": b.text,
-                    "action": b.callback_data
-                    or (
-                        "sample"
-                        if b.switch_inline_query_current_chat is not None
-                        else "external"
-                    ),
+                    "action": action(b),
                     "style": b.style or "neutral",
                 }
                 for b in row
@@ -128,9 +133,7 @@ async def main():
             InlineKeyboardMarkup(editor_overflow_rows("demo", draft)),
         ),
         "confirm": screen(
-            *build_publish_confirmation(
-                "demo", draft, track, target="@stonerhand", lang="ru"
-            )
+            *build_publish_confirmation("demo", track, target="@stonerhand", lang="ru")
         ),
         "schedule": screen(
             get_text("ru", "schedule_title")
@@ -174,8 +177,6 @@ async def main():
         "tags",
         "layout",
         "grouping",
-        "artwork",
-        "defaults",
         "collection",
     ):
         screens["pref_" + section] = screen(
@@ -237,11 +238,21 @@ async def main():
         InlineKeyboardMarkup(editor_hashtag_rows("demo", draft)),
     )
     items = [
-        {"item": {"artist": artist, "title": title}}
-        for artist, title in (
-            ("Sleep", "Dopesmoker"),
-            ("Kyuss", "Green Machine"),
-            ("Deftones", "Rickets"),
+        {
+            "item": {
+                "artist": artist,
+                "title": title,
+                "links": {"spotify": f"https://open.spotify.com/track/{index}"},
+                "thumbnail_url": f"https://example.com/artwork-{index}.png",
+            }
+        }
+        for index, (artist, title) in enumerate(
+            (
+                ("Sleep", "Dopesmoker"),
+                ("Kyuss", "Green Machine"),
+                ("Deftones", "Rickets"),
+            ),
+            start=1,
         )
     ]
     screens["collection"] = screen(
