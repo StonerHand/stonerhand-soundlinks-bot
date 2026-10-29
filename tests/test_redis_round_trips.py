@@ -11,14 +11,14 @@ import unittest
 from test_audit_reliability import RedisREST
 from test_bot import ContextStub, PrivateSpotifyTrackMessageStub, UpdateStub
 
-from music_links_bot.bot_lookup_flow import (
+from music_links_bot.lookup.bot_lookup_flow import (
     track_lookup_message,
 )
-from music_links_bot.bot_runtime import BotRuntime
-from music_links_bot.durable_state import state_scope
-from music_links_bot.kvstore import KVUnavailableError
-from music_links_bot.state_mutations import mutate_json, mutate_json_raw
-from music_links_bot.user_state import (
+from music_links_bot.state.bot_runtime import BotRuntime
+from music_links_bot.state.durable_state import state_scope
+from music_links_bot.state.kvstore import KVUnavailableError
+from music_links_bot.state.state_mutations import mutate_json, mutate_json_raw
+from music_links_bot.state.user_state import (
     generation_key,
     register_owned_key,
     user_state_scope,
@@ -165,7 +165,7 @@ class StatsBlobTests(unittest.IsolatedAsyncioTestCase):
         await self.kv.aclose()
 
     async def test_identity_maps_are_capped_keeping_the_most_active(self):
-        from music_links_bot.kvstore import MAX_STATS_IDENTITIES
+        from music_links_bot.state.kvstore import MAX_STATS_IDENTITIES
 
         crowd = {
             str(index): {"count": index + 1, "label": f"u{index}", "last_seen": ""}

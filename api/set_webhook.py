@@ -16,7 +16,7 @@ SRC_PATH = PROJECT_ROOT / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
-from music_links_bot.bot_app import (
+from music_links_bot.chat.bot_app import (
     BOT_DESCRIPTIONS,
     BOT_SHORT_DESCRIPTIONS,
     GROUP_BOT_COMMANDS,
@@ -24,11 +24,11 @@ from music_links_bot.bot_app import (
     PUBLIC_BOT_COMMANDS,
     PUBLIC_BOT_COMMANDS_EN,
 )
-from music_links_bot.config import Settings
-from music_links_bot.http_json import send_json
-from music_links_bot.logging_config import quiet_transport_logs
-from music_links_bot.telegram_updates import ALLOWED_UPDATES
-from music_links_bot.webhook_secret import secrets_match
+from music_links_bot.core.config import Settings
+from music_links_bot.core.http_json import send_json
+from music_links_bot.ops.logging_config import quiet_transport_logs
+from music_links_bot.tg.telegram_updates import ALLOWED_UPDATES
+from music_links_bot.tg.webhook_secret import secrets_match
 
 LOGGER = logging.getLogger(__name__)
 quiet_transport_logs()
@@ -226,7 +226,7 @@ def _setup_secret_is_configured() -> bool:
 
 
 def _telegram_webhook_secret() -> str | None:
-    from music_links_bot.webhook_secret import telegram_webhook_secret
+    from music_links_bot.tg.webhook_secret import telegram_webhook_secret
 
     secret = telegram_webhook_secret()
     if not secret:

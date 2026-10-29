@@ -5,8 +5,12 @@ import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-from music_links_bot.bot_progress import settle_progress, start_progress, take_progress
-from music_links_bot.models import VideoMatch
+from music_links_bot.core.models import VideoMatch
+from music_links_bot.lookup.bot_progress import (
+    settle_progress,
+    start_progress,
+    take_progress,
+)
 
 VIDEO = "https://www.youtube.com/watch?v=E3mSkI9uskw"
 
@@ -23,15 +27,15 @@ class _Video:
 def _lookup(wait: float, delay: float = 0.05):
     from test_bot import ContextStub, PrivateMessageStub, UpdateStub
 
-    from music_links_bot.bot_lookup_flow import track_lookup_message
+    from music_links_bot.lookup.bot_lookup_flow import track_lookup_message
 
     class Message(PrivateMessageStub):
         text = VIDEO
 
     message = Message()
     with (
-        patch("music_links_bot.bot_lookup_flow.PROGRESS_DELAY_SECONDS", delay),
-        patch("music_links_bot.bot_stats.record_post"),
+        patch("music_links_bot.lookup.bot_lookup_flow.PROGRESS_DELAY_SECONDS", delay),
+        patch("music_links_bot.lookup.bot_stats.record_post"),
     ):
         asyncio.run(
             track_lookup_message(

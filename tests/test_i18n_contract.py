@@ -3,7 +3,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from music_links_bot.i18n import STRINGS, validate_catalog
+from music_links_bot.core.i18n import STRINGS, validate_catalog
 
 ROOT = Path(__file__).resolve().parents[1]
 

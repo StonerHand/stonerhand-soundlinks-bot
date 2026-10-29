@@ -1,7 +1,11 @@
 import unittest
 from types import SimpleNamespace
 
-from music_links_bot.bot_storage import load_draft, remember_bounded, valid_state_id
+from music_links_bot.state.bot_storage import (
+    load_draft,
+    remember_bounded,
+    valid_state_id,
+)
 
 
 class BotStorageTests(unittest.IsolatedAsyncioTestCase):

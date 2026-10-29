@@ -8,14 +8,14 @@ from urllib.parse import parse_qs, urlparse
 
 from PIL import Image
 
-from music_links_bot.collection_collage import (
+from music_links_bot.artwork.collection_collage import (
     FRAME_SIZE,
     VIDEO_MODE,
     branded_video_frame_url,
     decode_collage_payload,
 )
-from music_links_bot.models import VideoMatch
-from music_links_bot.youtube import video_frame_url
+from music_links_bot.core.models import VideoMatch
+from music_links_bot.providers.youtube import video_frame_url
 
 ENV = {"WEBHOOK_BASE_URL": "https://bot.example", "BOT_TOKEN": "1:x"}
 VIDEO = "https://www.youtube.com/watch?v=E3mSkI9uskw"

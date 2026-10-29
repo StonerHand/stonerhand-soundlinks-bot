@@ -4,11 +4,11 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-from music_links_bot import bot
-from music_links_bot.bot_crate import crate_item_key, load_crate, save_crate
-from music_links_bot.bot_crate_handlers import dispatch_crate_action
-from music_links_bot.bot_runtime import decode_callback, encode_callback
-from music_links_bot.i18n import get_text
+from music_links_bot.chat import bot
+from music_links_bot.chat.bot_crate import crate_item_key, load_crate, save_crate
+from music_links_bot.chat.bot_crate_handlers import dispatch_crate_action
+from music_links_bot.core.i18n import get_text
+from music_links_bot.state.bot_runtime import decode_callback, encode_callback
 
 
 def _query(data: str, *, user_id: int = 7, query_id: str = "q1"):
@@ -119,7 +119,7 @@ class CallbackRoutingTests(unittest.IsolatedAsyncioTestCase):
         seen: list[tuple] = []
 
         async def lookup(update, context):
-            from music_links_bot.lookup_recovery import completed_sources
+            from music_links_bot.lookup.lookup_recovery import completed_sources
 
             seen.append(
                 (
@@ -205,7 +205,9 @@ class CrateActionTests(unittest.IsolatedAsyncioTestCase):
         async def safe_edit(query, text, keyboard):
             self.edits.append((text, keyboard))
 
-        patcher = patch("music_links_bot.bot_crate_handlers.safe_edit", new=safe_edit)
+        patcher = patch(
+            "music_links_bot.chat.bot_crate_handlers.safe_edit", new=safe_edit
+        )
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -240,13 +242,13 @@ class CrateActionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("<code>02</code> · <b>Sleep</b> — Dragonaut", text)
 
     async def _pending(self) -> dict:
-        from music_links_bot.bot_menu import runtime_for
+        from music_links_bot.chat.bot_menu import runtime_for
 
         return (await runtime_for(self.context).get_session(7)).pending_input
 
     def _key(self, title: str) -> str:
-        from music_links_bot.models import TrackMatch
-        from music_links_bot.release_preferences import release_preference_key
+        from music_links_bot.core.models import TrackMatch
+        from music_links_bot.state.release_preferences import release_preference_key
 
         entry = next(e for e in self.items if e["item"]["title"] == title)
         return release_preference_key(TrackMatch(**{"links": {}, **entry["item"]}))
@@ -285,7 +287,7 @@ class CrateActionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.edits[-1][0], get_text("ru", "crate_more_title"))
 
     async def test_clear_asks_first_then_empties_and_can_be_undone(self) -> None:
-        from music_links_bot.bot_crate import crate_revision
+        from music_links_bot.chat.bot_crate import crate_revision
 
         await self._act("clear")
         self.assertEqual(self.edits[-1][0], get_text("ru", "crate_clear_confirm"))

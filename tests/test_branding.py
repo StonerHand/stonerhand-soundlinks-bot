@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from music_links_bot.branding import (
+from music_links_bot.artwork.branding import (
     brand_label,
     compose_cover,
     photo_branding_enabled,
@@ -63,7 +63,7 @@ class BrandingPublishTests(unittest.TestCase):
         from types import SimpleNamespace
         from unittest.mock import AsyncMock
 
-        from music_links_bot import editor_delivery as bot
+        from music_links_bot.editor import editor_delivery as bot
 
         class _Bot:
             def __init__(self):

@@ -1,7 +1,7 @@
 import unittest
 from types import SimpleNamespace
 
-from music_links_bot.publication_presets import (
+from music_links_bot.publishing.publication_presets import (
     MAX_PRESET_NAME_LENGTH,
     apply_named_preset,
     delete_named_preset,

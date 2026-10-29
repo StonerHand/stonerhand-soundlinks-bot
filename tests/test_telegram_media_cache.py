@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from types import SimpleNamespace
 
-from music_links_bot.telegram_media_cache import (
+from music_links_bot.artwork.telegram_media_cache import (
     get_cached_file_id,
     remember_photo_file_id,
 )

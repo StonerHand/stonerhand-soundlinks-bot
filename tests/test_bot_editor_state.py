@@ -1,7 +1,8 @@
 import unittest
 from types import SimpleNamespace
 
-from music_links_bot.bot_editor_state import (
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.editor.bot_editor_state import (
     cycle_preset,
     draft_owned_by,
     draft_status,
@@ -10,7 +11,6 @@ from music_links_bot.bot_editor_state import (
     restore_setting_state,
     toggle_platform_selection,
 )
-from music_links_bot.models import TrackMatch
 
 
 class BotEditorStateTests(unittest.TestCase):

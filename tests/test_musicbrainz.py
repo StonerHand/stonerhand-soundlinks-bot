@@ -10,7 +10,7 @@ import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from music_links_bot.musicbrainz import (
+from music_links_bot.providers.musicbrainz import (
     MusicBrainzClient,
     _artist_credit_keys,
     _extract_exact_deezer_isrc,
@@ -256,7 +256,7 @@ class MusicBrainzClientTests(unittest.IsolatedAsyncioTestCase):
         client._deezer_client = _DeezerMissStub()
         try:
             with patch(
-                "music_links_bot.musicbrainz.MUSICBRAINZ_REQUEST_INTERVAL_SECONDS",
+                "music_links_bot.providers.musicbrainz.MUSICBRAINZ_REQUEST_INTERVAL_SECONDS",
                 0,
             ):
                 first = await client.lookup_spotify_release("Deftones", "Rickets")
@@ -328,7 +328,7 @@ class MusicBrainzClientTests(unittest.IsolatedAsyncioTestCase):
         client._deezer_client = _DeezerMissStub()
         try:
             with patch(
-                "music_links_bot.musicbrainz.MUSICBRAINZ_REQUEST_INTERVAL_SECONDS",
+                "music_links_bot.providers.musicbrainz.MUSICBRAINZ_REQUEST_INTERVAL_SECONDS",
                 0,
             ):
                 result = await client.lookup_spotify_release("Deftones", "Rickets")
@@ -406,7 +406,7 @@ class MusicBrainzClientTests(unittest.IsolatedAsyncioTestCase):
         client._deezer_client = deezer_http
         try:
             with patch(
-                "music_links_bot.musicbrainz.MUSICBRAINZ_REQUEST_INTERVAL_SECONDS",
+                "music_links_bot.providers.musicbrainz.MUSICBRAINZ_REQUEST_INTERVAL_SECONDS",
                 0,
             ):
                 result = await client.lookup_spotify_release("Deftones", "Rickets")

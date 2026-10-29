@@ -12,44 +12,44 @@ from unittest.mock import AsyncMock, patch
 from telegram import Chat, Message, Update, User
 from telegram.ext import Application
 
-from music_links_bot.bot_editor import (
-    _handle_editor_action,
-)
-from music_links_bot.bot_editor_state import remember_draft
-from music_links_bot.bot_preferences import (
+from music_links_bot.chat.bot_preferences import (
     LocalizedApplication,
     apply_preferences,
     dispatch_preferences,
     preferences_view,
 )
-from music_links_bot.bot_recent import render_drafts_view
-from music_links_bot.bot_runtime import (
-    BotRuntime,
-    CallbackAction,
-    UserSession,
-    decode_callback,
-)
-from music_links_bot.bot_storage import load_draft, store_draft
-from music_links_bot.bot_ui import (
+from music_links_bot.chat.bot_recent import render_drafts_view
+from music_links_bot.chat.bot_ui import (
     editor_more_rows,
     editor_overflow_rows,
     editor_schedule_rows,
 )
-from music_links_bot.draft_model import new_track_draft
-from music_links_bot.human_time import human_datetime
-from music_links_bot.i18n import (
+from music_links_bot.core.human_time import human_datetime
+from music_links_bot.core.i18n import (
     get_text,
     language_context,
     preferred_language,
     resolve_lang,
 )
-from music_links_bot.models import TrackMatch
-from music_links_bot.publish_queue import (
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.editor.bot_editor import (
+    _handle_editor_action,
+)
+from music_links_bot.editor.bot_editor_state import remember_draft
+from music_links_bot.editor.draft_model import new_track_draft
+from music_links_bot.publishing.publish_queue import (
     add_job,
     load_jobs,
     process_due_jobs,
     remove_job,
 )
+from music_links_bot.state.bot_runtime import (
+    BotRuntime,
+    CallbackAction,
+    UserSession,
+    decode_callback,
+)
+from music_links_bot.state.bot_storage import load_draft, store_draft
 
 
 def draft_for(user_id=7):
@@ -256,13 +256,15 @@ class EditorJourneyTests(unittest.IsolatedAsyncioTestCase):
                 timestamp, timezone_name="Europe/Moscow", now=now.timestamp()
             ),
         )
-        with patch("music_links_bot.bot.time.time", return_value=now.timestamp() + 60):
+        with patch(
+            "music_links_bot.chat.bot.time.time", return_value=now.timestamp() + 60
+        ):
             await _handle_editor_action(query, context, parsed.action, parsed.payload)
             await _handle_editor_action(query, context, parsed.action, parsed.payload)
         self.assertEqual(len(await load_jobs(context)), 1)
         self.assertEqual((await load_jobs(context))[0]["publish_at"], timestamp)
         self.assertEqual((await load_draft(context, "card"))["scheduled_at"], timestamp)
-        with patch("music_links_bot.bot.time.time", return_value=timestamp + 1):
+        with patch("music_links_bot.chat.bot.time.time", return_value=timestamp + 1):
             await _handle_editor_action(query, context, parsed.action, parsed.payload)
         self.assertEqual(len(await load_jobs(context)), 1)
         self.assertIn("уже недоступно", query.answer.call_args.args[0])
@@ -363,7 +365,7 @@ class DraftLibraryTests(unittest.IsolatedAsyncioTestCase):
             confirmed_not_sent=False,
         )
         with patch(
-            "music_links_bot.publication_service.PublicationService",
+            "music_links_bot.publishing.publication_service.PublicationService",
             return_value=service,
         ):
             count = await process_due_jobs(context, now=101)
@@ -386,7 +388,7 @@ class DraftLibraryTests(unittest.IsolatedAsyncioTestCase):
                     confirmed_not_sent=False,
                 )
                 with patch(
-                    "music_links_bot.publication_service.PublicationService",
+                    "music_links_bot.publishing.publication_service.PublicationService",
                     return_value=service,
                 ):
                     self.assertEqual(await process_due_jobs(context, now=101), 1)

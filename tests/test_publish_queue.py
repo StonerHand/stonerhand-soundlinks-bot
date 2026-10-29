@@ -9,8 +9,8 @@ from telegram.error import BadRequest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from music_links_bot import publish_queue
-from music_links_bot.draft_model import CURRENT_DRAFT_VERSION
+from music_links_bot.editor.draft_model import CURRENT_DRAFT_VERSION
+from music_links_bot.publishing import publish_queue
 
 
 class BotStub:
@@ -53,7 +53,7 @@ def make_draft() -> dict:
 
 class PublishQueueTests(unittest.TestCase):
     def test_durable_write_failure_never_reports_a_scheduled_job(self) -> None:
-        from music_links_bot.kvstore import KVUnavailableError
+        from music_links_bot.state.kvstore import KVUnavailableError
 
         class FailingDurableKV:
             async def set_required(self, *args, **kwargs):

@@ -1,0 +1,229 @@
+"""Optional branded frame for photo-mode posts.
+
+Opt-in via `BRAND_PHOTO_FRAME=1`. When enabled, the artwork gets a subtle
+bottom gradient with the channel label and, if `BRAND_LOGO_URL` is set, a logo
+in the top-right corner — a consistent house style for photo posts. Every step
+degrades gracefully: any failure (missing Pillow, a bad image, a slow fetch)
+falls back to the plain artwork, so publishing never breaks because of it.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import hashlib
+import io
+import logging
+import os
+from contextlib import ExitStack
+from weakref import WeakKeyDictionary
+
+import httpx
+
+from music_links_bot.artwork.collection_collage import _safe_source_url
+from music_links_bot.artwork.cover_style import (
+    apply_cover_signature,
+    brand_label as brand_label,
+    photo_branding_enabled as photo_branding_enabled,
+)
+from music_links_bot.core.cache import TTLCache
+from music_links_bot.core.shared_http import shared_client
+
+__all__ = [
+    "brand_label",
+    "brand_logo_url",
+    "build_branded_cover",
+    "compose_cover",
+    "photo_branding_enabled",
+]
+
+LOGGER = logging.getLogger(__name__)
+
+MAX_BRANDING_BYTES = 3 * 1024 * 1024
+MAX_BRANDING_PIXELS = 12_000_000
+MAX_COVER_SIZE = 1200
+BRANDING_FETCH_SECONDS = 8.0
+_COMPOSE_LIMITS: WeakKeyDictionary = WeakKeyDictionary()
+_COVER_CACHES: WeakKeyDictionary = WeakKeyDictionary()
+_COVER_TASKS: WeakKeyDictionary = WeakKeyDictionary()
+
+
+def branded_cover_key(
+    artwork_url: str, *, label: str, logo_url: str | None = None
+) -> str:
+    import json
+
+    payload = json.dumps(["cover-v2", artwork_url, label, logo_url], ensure_ascii=False)
+    return "branded:" + hashlib.sha256(payload.encode()).hexdigest()
+
+
+def brand_logo_url() -> str | None:
+    return os.getenv("BRAND_LOGO_URL", "").strip() or None
+
+
+def _square(img, target: int):
+    width, height = img.size
+    side = min(width, height)
+    left = (width - side) // 2
+    top = (height - side) // 2
+    cropped = img.crop((left, top, left + side, top + side))
+    if side == target:
+        return cropped
+    with cropped:
+        return cropped.resize((target, target))
+
+
+def compose_cover(
+    artwork_bytes: bytes,
+    *,
+    label: str,
+    logo_bytes: bytes | None = None,
+    size: int = 1080,
+) -> bytes | None:
+    """Pure-image compositing (no network) so it is easy to test."""
+    try:
+        from PIL import Image
+    except ImportError:
+        return None
+
+    if not 32 <= size <= MAX_COVER_SIZE or len(artwork_bytes) > MAX_BRANDING_BYTES:
+        return None
+    try:
+        with ExitStack() as resources:
+            source = resources.enter_context(Image.open(io.BytesIO(artwork_bytes)))
+            if source.width * source.height > MAX_BRANDING_PIXELS:
+                return None
+            source.thumbnail((MAX_COVER_SIZE, MAX_COVER_SIZE))
+            rgb = resources.enter_context(source.convert("RGB"))
+            base = resources.enter_context(_square(rgb, size))
+            width, _height = base.size
+            composed = resources.enter_context(apply_cover_signature(base, label=label))
+            if logo_bytes and len(logo_bytes) <= MAX_BRANDING_BYTES:
+                try:
+                    with Image.open(io.BytesIO(logo_bytes)) as logo_source:
+                        if (
+                            logo_source.width * logo_source.height
+                            <= MAX_BRANDING_PIXELS
+                        ):
+                            target = max(1, int(width * 0.14))
+                            logo_source.thumbnail((target, target))
+                            with logo_source.convert("RGBA") as logo:
+                                pad = int(width * 0.04)
+                                composed.paste(
+                                    logo, (width - logo.width - pad, pad), logo
+                                )
+                except (OSError, ValueError, Image.DecompressionBombError):
+                    LOGGER.debug("Logo overlay failed")
+            out = io.BytesIO()
+            composed.save(out, "JPEG", quality=88)
+            return out.getvalue()
+    except (OSError, ValueError, Image.DecompressionBombError):
+        LOGGER.debug("Branded cover compositing failed")
+        return None
+
+
+async def _fetch_bytes(client: httpx.AsyncClient, url: str | None) -> bytes | None:
+    if not url:
+        return None
+    try:
+        # Enforce a limit on received bytes, including responses without a
+        # trustworthy Content-Length. Redirects cannot change the destination.
+        async with client.stream("GET", url, follow_redirects=False) as response:
+            if response.status_code != 200:
+                return None
+            if (
+                not response.headers.get("content-type", "")
+                .lower()
+                .startswith("image/")
+            ):
+                return None
+            length = int(response.headers.get("content-length") or 0)
+            if length < 0 or length > MAX_BRANDING_BYTES:
+                return None
+            body = bytearray()
+            async for chunk in response.aiter_bytes(chunk_size=65_536):
+                if len(body) + len(chunk) > MAX_BRANDING_BYTES:
+                    return None
+                body.extend(chunk)
+        return bytes(body)
+    except (httpx.HTTPError, ValueError):
+        # Exception text can contain a signed asset URL. Do not log its query.
+        LOGGER.debug("Branding asset fetch failed")
+        return None
+
+
+async def _build_branded_cover(
+    artwork_url: str | None, *, label: str, logo_url: str | None = None
+) -> bytes | None:
+    """Download the artwork (and logo) and return branded JPEG bytes, or None to
+    signal the caller should fall back to the plain artwork URL."""
+    if not artwork_url or not _safe_source_url(artwork_url):
+        return None
+
+    try:
+        client = shared_client("branding")
+        artwork_bytes, logo_bytes = await asyncio.wait_for(
+            asyncio.gather(
+                _fetch_bytes(client, artwork_url), _fetch_bytes(client, logo_url)
+            ),
+            timeout=BRANDING_FETCH_SECONDS,
+        )
+        if artwork_bytes is None:
+            return None
+    except (TimeoutError, httpx.HTTPError, ValueError):
+        LOGGER.debug("Branding fetch failed")
+        return None
+
+    loop = asyncio.get_running_loop()
+    semaphore = _COMPOSE_LIMITS.setdefault(loop, asyncio.Semaphore(2))
+    async with semaphore:
+        return await asyncio.to_thread(
+            compose_cover, artwork_bytes, label=label, logo_bytes=logo_bytes
+        )
+
+
+async def build_branded_cover(
+    artwork_url: str | None, *, label: str, logo_url: str | None = None
+) -> bytes | None:
+    """Bounded cache and single-flight for repeated artwork transformations."""
+    if not artwork_url or not _safe_source_url(artwork_url):
+        return None
+    loop = asyncio.get_running_loop()
+    cache = _COVER_CACHES.setdefault(loop, TTLCache(ttl_seconds=3600, max_size=16))
+    key = branded_cover_key(artwork_url, label=label, logo_url=logo_url)
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    tasks = _COVER_TASKS.setdefault(loop, {})
+    task = tasks.get(key)
+    if task is None:
+
+        async def build():
+            result = await _build_branded_cover(
+                artwork_url, label=label, logo_url=logo_url
+            )
+            if result is not None and len(result) <= MAX_BRANDING_BYTES:
+                cache.set(key, result)
+            return result
+
+        task = asyncio.create_task(build())
+        tasks[key] = task
+
+        def finish(completed):
+            if tasks.get(key) is completed:
+                tasks.pop(key, None)
+            if not completed.cancelled():
+                completed.exception()
+
+        task.add_done_callback(finish)
+    return await asyncio.shield(task)
+
+
+async def close_cover_resources() -> None:
+    """Finish detached single-flight tasks before closing their HTTP pool."""
+    loop = asyncio.get_running_loop()
+    tasks = list(_COVER_TASKS.pop(loop, {}).values())
+    for task in tasks:
+        task.cancel()
+    await asyncio.gather(*tasks, return_exceptions=True)
+    _COVER_CACHES.pop(loop, None)
+    _COMPOSE_LIMITS.pop(loop, None)

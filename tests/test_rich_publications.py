@@ -5,8 +5,8 @@ import unittest
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import BadRequest
 
-from music_links_bot.models import TrackMatch, VideoMatch
-from music_links_bot.rich_publications import (
+from music_links_bot.core.models import TrackMatch, VideoMatch
+from music_links_bot.publishing.rich_publications import (
     MAX_FALLBACK_TEXT,
     MAX_LONGREAD_BLOCKS,
     MAX_RICH_HTML,
@@ -24,7 +24,7 @@ from music_links_bot.rich_publications import (
     save_prepared_rich_publication,
     send_rich_publication,
 )
-from music_links_bot.telegram_gateway import reset_capabilities
+from music_links_bot.tg.telegram_gateway import reset_capabilities
 
 
 def _track() -> TrackMatch:
@@ -375,7 +375,7 @@ class RichPublicationTransportTests(unittest.IsolatedAsyncioTestCase):
     async def test_bot_delivery_falls_back_to_regular_html(self) -> None:
         from types import SimpleNamespace
 
-        from music_links_bot.editor_delivery import (
+        from music_links_bot.editor.editor_delivery import (
             _deliver_draft,
         )
 

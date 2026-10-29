@@ -11,36 +11,36 @@ from telegram.error import BadRequest, TimedOut
 from test_bot import ContextStub
 from test_release_card import sample
 
-from music_links_bot.bot_inline import _build_inline_result
-from music_links_bot.bot_preferences import apply_preferences
-from music_links_bot.bot_runtime import UserSession
-from music_links_bot.draft_model import new_track_draft, normalize_track_draft
-from music_links_bot.formatter import (
+from music_links_bot.cards.formatter import (
     format_playlist_message,
     format_track_message,
     format_video_message,
 )
-from music_links_bot.i18n import language_context
-from music_links_bot.models import PlaylistMatch, VideoMatch
-from music_links_bot.publication_service import PublicationService
-from music_links_bot.release_metadata import duration_label, metadata_url
-from music_links_bot.release_preferences import (
-    PresentationPreferences,
-    presentation_context,
+from music_links_bot.chat.bot_inline import _build_inline_result
+from music_links_bot.chat.bot_preferences import apply_preferences
+from music_links_bot.core.i18n import language_context
+from music_links_bot.core.models import PlaylistMatch, VideoMatch
+from music_links_bot.editor.draft_model import new_track_draft, normalize_track_draft
+from music_links_bot.lookup.track_lookup import (
+    _fill_release_metadata,
+    _lookup_tracks,
 )
-from music_links_bot.search import (
+from music_links_bot.providers.release_metadata import duration_label, metadata_url
+from music_links_bot.providers.search import (
     SearchClient,
     _complete_album_duration,
     _extract_release_candidates,
 )
-from music_links_bot.spotify import (
+from music_links_bot.providers.spotify import (
     SpotifyClient,
     parse_spotify_embed,
     parse_spotify_page,
 )
-from music_links_bot.track_lookup import (
-    _fill_release_metadata,
-    _lookup_tracks,
+from music_links_bot.publishing.publication_service import PublicationService
+from music_links_bot.state.bot_runtime import UserSession
+from music_links_bot.state.release_preferences import (
+    PresentationPreferences,
+    presentation_context,
 )
 
 TRACK = "https://open.spotify.com/track/dig"
@@ -281,7 +281,7 @@ async def test_slow_metadata_is_cancelled_without_losing_resolved_track():
     )
     search = SimpleNamespace(lookup_genre=AsyncMock(return_value=None))
     with patch(
-        "music_links_bot.track_lookup._RELEASE_ENRICHMENT_TIMEOUT_SECONDS", 0.001
+        "music_links_bot.lookup.track_lookup._RELEASE_ENRICHMENT_TIMEOUT_SECONDS", 0.001
     ):
         tracks, unavailable = await _lookup_tracks(
             client, [TRACK], search_client=search
@@ -332,7 +332,7 @@ async def test_optional_apple_details_deadline_keeps_a_known_album():
     try:
         with (
             patch.object(client, "_lookup_apple_candidate", slow_details),
-            patch("music_links_bot.search.asyncio.wait_for", short_deadline),
+            patch("music_links_bot.providers.search.asyncio.wait_for", short_deadline),
             patch.object(
                 client._musicbrainz_client,
                 "lookup_spotify_release",
@@ -369,7 +369,7 @@ def test_clean_default_preserves_saved_native_setting_old_drafts_and_longreads()
 async def test_inline_uses_clean_image_but_honors_native_preference():
     ctx = ContextStub()
     with patch(
-        "music_links_bot.track_lookup._lookup_tracks",
+        "music_links_bot.lookup.track_lookup._lookup_tracks",
         AsyncMock(return_value=([sample()], [])),
     ):
         with presentation_context():

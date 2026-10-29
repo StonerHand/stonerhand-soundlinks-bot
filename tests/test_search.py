@@ -5,14 +5,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from music_links_bot.kvstore import KVStore, KVUnavailableError
-from music_links_bot.search import (
+from music_links_bot.providers.search import (
     SearchClient,
     SearchLookupError,
     _extract_matching_genre,
     _extract_release_candidates,
     normalize_search_query,
 )
+from music_links_bot.state.kvstore import KVStore, KVUnavailableError
 
 
 class SearchQueryTests(unittest.TestCase):

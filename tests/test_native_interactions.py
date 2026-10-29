@@ -11,38 +11,42 @@ from telegram.error import BadRequest, TimedOut
 from telegram.ext import ApplicationHandlerStop
 from test_bot import ContextStub, PrivateMessageStub, UpdateStub
 
-from music_links_bot import bot_lookup
-from music_links_bot.bot_native import (
+from music_links_bot.cards.keyboards import _build_link_keyboard
+from music_links_bot.chat.bot_native import (
     guest_input,
     guest_message_handler,
     native_update_handler,
 )
-from music_links_bot.bot_progress import _PLACEHOLDER, start_progress, take_progress
-from music_links_bot.inline_feedback import (
+from music_links_bot.chat.inline_feedback import (
     chosen_inline_result_handler,
     feedback_text,
     remember_results,
 )
-from music_links_bot.keyboards import _build_link_keyboard
-from music_links_bot.lookup_control import (
-    LookupStopped,
-    interruptible,
-    published,
-    search_control,
-    stop_lookup,
-)
-from music_links_bot.lookup_models import LookupBundle
-from music_links_bot.lookup_recovery import merge_recovered
-from music_links_bot.models import TrackMatch
-from music_links_bot.release_panel import (
+from music_links_bot.chat.release_panel import (
     add_release_panel,
     copy_rows,
     load_panel,
     release_panel_callback,
     start_release_panel,
 )
-from music_links_bot.search import SearchCandidate, SearchClient
-from music_links_bot.telegram_updates import ALLOWED_UPDATES
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.lookup import bot_lookup
+from music_links_bot.lookup.bot_progress import (
+    _PLACEHOLDER,
+    start_progress,
+    take_progress,
+)
+from music_links_bot.lookup.lookup_control import (
+    LookupStopped,
+    interruptible,
+    published,
+    search_control,
+    stop_lookup,
+)
+from music_links_bot.lookup.lookup_models import LookupBundle
+from music_links_bot.lookup.lookup_recovery import merge_recovered
+from music_links_bot.providers.search import SearchCandidate, SearchClient
+from music_links_bot.tg.telegram_updates import ALLOWED_UPDATES
 
 URL = "https://open.spotify.com/track/one"
 OTHER_URL = "https://open.spotify.com/track/two"
@@ -293,7 +297,7 @@ class StopTests(unittest.IsolatedAsyncioTestCase):
             _PLACEHOLDER.reset(token)
 
     async def test_complete_private_lookup_reuses_progress_and_creates_editor(self):
-        from music_links_bot.bot_lookup_flow import (
+        from music_links_bot.lookup.bot_lookup_flow import (
             track_lookup_message,
         )
 
@@ -301,14 +305,14 @@ class StopTests(unittest.IsolatedAsyncioTestCase):
         msg.message_id = 42
         msg.text = URL
         ctx = ContextStub()
-        with patch("music_links_bot.bot_stats.record_post"):
+        with patch("music_links_bot.lookup.bot_stats.record_post"):
             await track_lookup_message(UpdateStub(msg), ctx)
         self.assertEqual(len(msg.replies), 1)
         self.assertIn("Transitions", msg.replies[0])
         self.assertTrue(ctx.application.bot_data["drafts"])
 
     async def test_full_stop_journey_delivers_found_cards_without_publishing(self):
-        from music_links_bot.bot_lookup_flow import (
+        from music_links_bot.lookup.bot_lookup_flow import (
             track_lookup_message,
         )
 
@@ -325,7 +329,7 @@ class StopTests(unittest.IsolatedAsyncioTestCase):
         msg.text = URL + "\n" + OTHER_URL
         ctx = ContextStub(songlink_client=SimpleNamespace(lookup_track=lookup))
         ctx.application.bot_data["lookup_cache_namespace"] = self.id()
-        with patch("music_links_bot.bot_stats.record_post"):
+        with patch("music_links_bot.lookup.bot_stats.record_post"):
             job = asyncio.create_task(track_lookup_message(UpdateStub(msg), ctx))
             await asyncio.wait_for(started.wait(), 2)
             self.assertTrue(
@@ -377,7 +381,7 @@ class GuestTests(unittest.IsolatedAsyncioTestCase):
         ctx = ContextStub()
         msg = message(text="@StonerHandBot " + URL, guest_query_id="guest-1")
         with patch(
-            "music_links_bot.bot_native.TelegramApiGateway.request",
+            "music_links_bot.chat.bot_native.TelegramApiGateway.request",
             AsyncMock(return_value={}),
         ) as send:
             await guest_message_handler(msg, ctx)
@@ -399,7 +403,7 @@ class GuestTests(unittest.IsolatedAsyncioTestCase):
             )
         )
         with patch(
-            "music_links_bot.bot_native.TelegramApiGateway.request",
+            "music_links_bot.chat.bot_native.TelegramApiGateway.request",
             AsyncMock(return_value={}),
         ) as send:
             await guest_message_handler(
@@ -412,7 +416,7 @@ class GuestTests(unittest.IsolatedAsyncioTestCase):
     async def test_guest_does_not_retry_unknown_send_outcome(self):
         ctx = ContextStub()
         with patch(
-            "music_links_bot.bot_native.TelegramApiGateway.request",
+            "music_links_bot.chat.bot_native.TelegramApiGateway.request",
             AsyncMock(side_effect=TimedOut()),
         ) as send:
             with self.assertRaises(TimedOut):
@@ -425,7 +429,7 @@ class GuestTests(unittest.IsolatedAsyncioTestCase):
             None,
         )
         with patch(
-            "music_links_bot.bot_native.guest_message_handler", AsyncMock()
+            "music_links_bot.chat.bot_native.guest_message_handler", AsyncMock()
         ) as handle:
             with self.assertRaises(ApplicationHandlerStop):
                 await native_update_handler(update, ContextStub())
@@ -465,7 +469,7 @@ class PanelTests(unittest.IsolatedAsyncioTestCase):
             edit_message_text=AsyncMock(),
         )
         with patch(
-            "music_links_bot.release_panel.TelegramApiGateway.request",
+            "music_links_bot.chat.release_panel.TelegramApiGateway.request",
             AsyncMock(return_value=True),
         ) as send:
             await release_panel_callback(SimpleNamespace(callback_query=q), ctx)
@@ -496,7 +500,7 @@ class PanelTests(unittest.IsolatedAsyncioTestCase):
             answer=AsyncMock(),
         )
         with patch(
-            "music_links_bot.release_panel.TelegramApiGateway.request",
+            "music_links_bot.chat.release_panel.TelegramApiGateway.request",
             AsyncMock(return_value=True),
         ) as send:
             await release_panel_callback(SimpleNamespace(callback_query=q), ctx)
@@ -516,7 +520,7 @@ class PanelTests(unittest.IsolatedAsyncioTestCase):
             answer=AsyncMock(),
         )
         with patch(
-            "music_links_bot.release_panel.TelegramApiGateway.request",
+            "music_links_bot.chat.release_panel.TelegramApiGateway.request",
             AsyncMock(side_effect=BadRequest("unsupported")),
         ) as send:
             await release_panel_callback(SimpleNamespace(callback_query=q), ctx)

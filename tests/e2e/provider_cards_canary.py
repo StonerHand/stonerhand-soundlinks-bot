@@ -6,24 +6,24 @@ import argparse
 import asyncio
 from types import SimpleNamespace
 
-from music_links_bot.apple_radio import AppleRadioClient
-from music_links_bot.artist import ArtistClient
-from music_links_bot.bot_inline import _build_inline_result
-from music_links_bot.bot_lookup import resolve_sources
-from music_links_bot.draft_model import new_track_draft
-from music_links_bot.nts import NTSClient
-from music_links_bot.playlist import PlaylistClient
-from music_links_bot.public_release import PublicReleaseRegionUnavailable
-from music_links_bot.publication_contract import require_valid_publication
-from music_links_bot.publication_view import (
+from music_links_bot.chat.bot_inline import _build_inline_result
+from music_links_bot.editor.draft_model import new_track_draft
+from music_links_bot.lookup.bot_lookup import resolve_sources
+from music_links_bot.providers.apple_radio import AppleRadioClient
+from music_links_bot.providers.artist import ArtistClient
+from music_links_bot.providers.nts import NTSClient
+from music_links_bot.providers.playlist import PlaylistClient
+from music_links_bot.providers.public_release import PublicReleaseRegionUnavailable
+from music_links_bot.providers.search import SearchClient
+from music_links_bot.providers.songlink import SonglinkClient
+from music_links_bot.providers.soundcloud import SoundCloudClient
+from music_links_bot.providers.titles import TitleClient
+from music_links_bot.providers.youtube import YouTubeClient
+from music_links_bot.publishing.publication_contract import require_valid_publication
+from music_links_bot.publishing.publication_view import (
     build_publication_view,
     publication_contract_from_view,
 )
-from music_links_bot.search import SearchClient
-from music_links_bot.songlink import SonglinkClient
-from music_links_bot.soundcloud import SoundCloudClient
-from music_links_bot.titles import TitleClient
-from music_links_bot.youtube import YouTubeClient
 
 CASES = {
     "Spotify track": (

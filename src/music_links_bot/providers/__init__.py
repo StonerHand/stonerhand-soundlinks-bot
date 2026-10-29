@@ -1,0 +1,1 @@
+"""External sources, one module per service (Song.link, Spotify, Deezer, SoundCloud, YouTube, MusicBrainz, NTS, Apple radio, playlists, artists, Netflix/Apple TV+/Disney+, search), plus their registry, errors and the provider runtime."""

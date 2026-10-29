@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from music_links_bot.human_time import human_datetime, parse_human_datetime
+from music_links_bot.core.human_time import human_datetime, parse_human_datetime
 
 MSK = ZoneInfo("Europe/Moscow")
 # Wednesday 12 August 2026, 10:00 Moscow time.
@@ -75,7 +75,7 @@ def test_parse_human_datetime_rejects_nonsense_and_the_past(text):
 
 
 def test_schedule_input_accepts_natural_time_but_keeps_the_horizon():
-    from music_links_bot.bot_builder import parse_schedule_datetime
+    from music_links_bot.editor.bot_builder import parse_schedule_datetime
 
     now = datetime.fromtimestamp(NOW, MSK)
     assert parse_schedule_datetime("завтра 18:30", now=now) == int(at(13, 18, 30))
@@ -97,8 +97,8 @@ class FakeQuery:
 
 
 def _published_draft(*, published_at):
-    from music_links_bot.draft_model import new_track_draft
-    from music_links_bot.models import TrackMatch
+    from music_links_bot.core.models import TrackMatch
+    from music_links_bot.editor.draft_model import new_track_draft
 
     draft = new_track_draft(
         TrackMatch(
@@ -128,7 +128,7 @@ def _context(draft):
 
 
 def test_undo_publish_deletes_the_post_and_restores_the_draft():
-    from music_links_bot.bot_editor import (
+    from music_links_bot.editor.bot_editor import (
         _handle_editor_action,
     )
 
@@ -148,7 +148,7 @@ def test_undo_publish_deletes_the_post_and_restores_the_draft():
 
 
 def test_undo_publish_refuses_after_two_minutes():
-    from music_links_bot.bot_editor import (
+    from music_links_bot.editor.bot_editor import (
         _handle_editor_action,
     )
 
@@ -173,8 +173,8 @@ def _inline_update(query_text, user_id=7):
 
 
 def test_share_sends_the_exact_edited_post_to_its_owner():
-    from music_links_bot.bot_inline import inline_query_handler
-    from music_links_bot.bot_storage import store_draft
+    from music_links_bot.chat.bot_inline import inline_query_handler
+    from music_links_bot.state.bot_storage import store_draft
 
     draft = _published_draft(published_at=None)
     draft.update(prefix="<b>Моя подводка</b>\n\n", quote=True, hashtags=False)
@@ -193,8 +193,8 @@ def test_share_sends_the_exact_edited_post_to_its_owner():
 
 
 def test_share_never_exposes_someone_elses_draft():
-    from music_links_bot.bot_inline import inline_query_handler
-    from music_links_bot.bot_storage import store_draft
+    from music_links_bot.chat.bot_inline import inline_query_handler
+    from music_links_bot.state.bot_storage import store_draft
 
     draft = _published_draft(published_at=None)
     context = _context({})
@@ -221,7 +221,7 @@ def _crate_items(*, broken=False):
 
 
 def test_collection_has_one_clear_main_action_for_each_role():
-    from music_links_bot.crate_view import render_crate
+    from music_links_bot.chat.crate_view import render_crate
 
     _, owner = render_crate(
         _crate_items(), lang="ru", can_publish=True, share_query="sh5|x"
@@ -241,7 +241,7 @@ def test_collection_has_one_clear_main_action_for_each_role():
 
 
 def test_collection_warnings_are_grouped_and_point_to_the_fix():
-    from music_links_bot.crate_view import render_crate
+    from music_links_bot.chat.crate_view import render_crate
 
     text, keyboard = render_crate(_crate_items(broken=True), lang="ru")
     assert "⚠️ Нет ссылки или данных: №1 — замени." in text
@@ -257,8 +257,8 @@ def test_owner_publishes_the_collection_to_the_channel():
     import os
     from unittest.mock import patch
 
-    from music_links_bot.bot_crate import crate_revision
-    from music_links_bot.bot_crate_handlers import _publish_crate
+    from music_links_bot.chat.bot_crate import crate_revision
+    from music_links_bot.chat.bot_crate_handlers import _publish_crate
 
     items = _crate_items()
     sent = SimpleNamespace(message_id=77)
@@ -272,10 +272,12 @@ def test_owner_publishes_the_collection_to_the_channel():
     with (
         patch.dict(os.environ, {"BOT_TOKEN": "1:x"}),
         patch(
-            "music_links_bot.bot_crate_handlers.load_crate",
+            "music_links_bot.chat.bot_crate_handlers.load_crate",
             new=AsyncMock(return_value=items),
         ),
-        patch("music_links_bot.bot_crate_handlers.safe_edit", new=AsyncMock()) as edit,
+        patch(
+            "music_links_bot.chat.bot_crate_handlers.safe_edit", new=AsyncMock()
+        ) as edit,
     ):
         asyncio.run(
             _publish_crate(
@@ -294,7 +296,7 @@ def test_owner_publishes_the_collection_to_the_channel():
 
 
 def test_only_the_owner_can_publish_a_collection():
-    from music_links_bot.bot_crate_handlers import _publish_crate
+    from music_links_bot.chat.bot_crate_handlers import _publish_crate
 
     context = SimpleNamespace(
         bot=SimpleNamespace(send_message=AsyncMock()),
@@ -309,8 +311,8 @@ def test_only_the_owner_can_publish_a_collection():
 
 
 def test_settings_are_one_level_and_owner_rows_only_for_the_owner():
-    from music_links_bot.bot_preferences import preferences_view
-    from music_links_bot.bot_runtime import UserSession
+    from music_links_bot.chat.bot_preferences import preferences_view
+    from music_links_bot.state.bot_runtime import UserSession
 
     session = UserSession(user_id=7, quick_publish=True)
     _, guest = preferences_view(session, lang="ru")
@@ -339,11 +341,14 @@ def test_owner_cover_label_travels_signed_to_the_image_function():
     from unittest.mock import patch
     from urllib.parse import parse_qs, urlparse
 
-    from music_links_bot.collection_collage import (
+    from music_links_bot.artwork.collection_collage import (
         branded_artwork_preview_url,
         decode_collage_payload,
     )
-    from music_links_bot.cover_style import brand_label, set_brand_label_override
+    from music_links_bot.artwork.cover_style import (
+        brand_label,
+        set_brand_label_override,
+    )
 
     env = {"WEBHOOK_BASE_URL": "https://bot.example", "BOT_TOKEN": "1:x"}
     try:
@@ -380,8 +385,8 @@ def test_owner_cover_label_travels_signed_to_the_image_function():
 def test_quick_publish_posts_right_away_with_undo():
     from unittest.mock import patch
 
-    from music_links_bot.bot_quick_publish import try_quick_publish
-    from music_links_bot.bot_runtime import BotRuntime
+    from music_links_bot.editor.bot_quick_publish import try_quick_publish
+    from music_links_bot.state.bot_runtime import BotRuntime
 
     draft = _published_draft(published_at=None)
     for key in ("published_at", "published_message_id", "published_target"):
@@ -394,18 +399,20 @@ def test_quick_publish_posts_right_away_with_undo():
     context.application.bot_data.update(runtime=runtime, drafts={})
     message = SimpleNamespace(reply_text=AsyncMock())
     sent = SimpleNamespace(message_id=91, link="https://t.me/stonerhand/91")
-    from music_links_bot.models import TrackMatch
+    from music_links_bot.core.models import TrackMatch
 
     with (
         patch(
-            "music_links_bot.editor_delivery._publish_draft",
+            "music_links_bot.editor.editor_delivery._publish_draft",
             new=AsyncMock(return_value=sent),
         ),
         patch(
-            "music_links_bot.publication_state.find_posted_record",
+            "music_links_bot.publishing.publication_state.find_posted_record",
             new=AsyncMock(return_value=None),
         ),
-        patch("music_links_bot.publication_state.mark_posted", new=AsyncMock()),
+        patch(
+            "music_links_bot.publishing.publication_state.mark_posted", new=AsyncMock()
+        ),
     ):
         published = asyncio.run(
             try_quick_publish(
@@ -430,9 +437,9 @@ def test_quick_publish_posts_right_away_with_undo():
 def test_quick_publish_never_reposts_a_release_silently():
     from unittest.mock import patch
 
-    from music_links_bot.bot_quick_publish import try_quick_publish
-    from music_links_bot.bot_runtime import BotRuntime
-    from music_links_bot.models import TrackMatch
+    from music_links_bot.core.models import TrackMatch
+    from music_links_bot.editor.bot_quick_publish import try_quick_publish
+    from music_links_bot.state.bot_runtime import BotRuntime
 
     draft = _published_draft(published_at=None)
     runtime = BotRuntime()
@@ -443,9 +450,9 @@ def test_quick_publish_never_reposts_a_release_silently():
     context.application.bot_data.update(runtime=runtime)
     publish = AsyncMock()
     with (
-        patch("music_links_bot.editor_delivery._publish_draft", new=publish),
+        patch("music_links_bot.editor.editor_delivery._publish_draft", new=publish),
         patch(
-            "music_links_bot.publication_state.find_posted_record",
+            "music_links_bot.publishing.publication_state.find_posted_record",
             new=AsyncMock(return_value={"date": "01.01.2026"}),
         ),
     ):
@@ -464,7 +471,7 @@ def test_quick_publish_never_reposts_a_release_silently():
 
 
 def test_channel_check_explains_missing_rights_in_plain_words():
-    from music_links_bot.bot_menu import channel_command
+    from music_links_bot.chat.bot_menu import channel_command
 
     member = SimpleNamespace(
         status="administrator", can_post_messages=True, can_delete_messages=False
@@ -492,12 +499,12 @@ def test_edit_in_bot_link_opens_a_private_draft_of_that_release():
 
     from telegram import InlineKeyboardMarkup
 
-    from music_links_bot.models import TrackMatch
-    from music_links_bot.release_panel import (
+    from music_links_bot.chat.release_panel import (
         add_release_panel,
         edit_in_bot_url,
         start_release_panel,
     )
+    from music_links_bot.core.models import TrackMatch
 
     track = TrackMatch(
         artist="Sleep",
@@ -521,7 +528,7 @@ def test_edit_in_bot_link_opens_a_private_draft_of_that_release():
         effective_user=SimpleNamespace(id=7, language_code="ru"),
     )
     with patch(
-        "music_links_bot.bot_lookup_flow._send_track_draft", new=AsyncMock()
+        "music_links_bot.lookup.bot_lookup_flow._send_track_draft", new=AsyncMock()
     ) as send:
         assert asyncio.run(start_release_panel(update, context)) is True
     assert send.await_args.args[2].title == "Dragonaut"
@@ -531,7 +538,7 @@ def test_edit_in_bot_link_opens_a_private_draft_of_that_release():
 def test_message_effect_falls_back_when_telegram_rejects_it():
     from telegram.error import BadRequest
 
-    from music_links_bot.message_effects import CELEBRATE, send_with_effect
+    from music_links_bot.tg.message_effects import CELEBRATE, send_with_effect
 
     calls = []
 
@@ -548,7 +555,7 @@ def test_message_effect_falls_back_when_telegram_rejects_it():
 def test_message_effect_never_retries_other_errors():
     from telegram.error import BadRequest
 
-    from music_links_bot.message_effects import send_with_effect
+    from music_links_bot.tg.message_effects import send_with_effect
 
     send = AsyncMock(side_effect=BadRequest("Chat not found"))
     with pytest.raises(BadRequest):
@@ -557,7 +564,7 @@ def test_message_effect_never_retries_other_errors():
 
 
 def test_reactions_mark_work_and_success_on_the_users_message():
-    from music_links_bot.reactions import finish_reaction, start_reaction
+    from music_links_bot.tg.reactions import finish_reaction, start_reaction
 
     bot = SimpleNamespace(set_message_reaction=AsyncMock())
     message = SimpleNamespace(chat_id=7, message_id=42)
@@ -578,7 +585,7 @@ def test_reactions_mark_work_and_success_on_the_users_message():
 
 
 def test_reactions_never_break_the_lookup():
-    from music_links_bot.reactions import finish_reaction, start_reaction
+    from music_links_bot.tg.reactions import finish_reaction, start_reaction
 
     bot = SimpleNamespace(set_message_reaction=AsyncMock(side_effect=RuntimeError()))
     message = SimpleNamespace(chat_id=7, message_id=42)

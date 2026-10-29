@@ -6,28 +6,28 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
-from music_links_bot.bot_editor import (
+from music_links_bot.chat.bot_menu import dispatch_menu_action
+from music_links_bot.chat.bot_preferences import dispatch_preferences, preferences_view
+from music_links_bot.chat.bot_ui import editor_appearance_rows
+from music_links_bot.core.i18n import STRINGS, language_context
+from music_links_bot.editor.bot_editor import (
     _handle_editor_action,
 )
-from music_links_bot.bot_lookup_flow import (
+from music_links_bot.lookup.bot_lookup_flow import (
     _consume_pending_input,
 )
-from music_links_bot.bot_menu import dispatch_menu_action
-from music_links_bot.bot_preferences import dispatch_preferences, preferences_view
-from music_links_bot.bot_runtime import (
+from music_links_bot.publishing.channel_templates import (
+    load_channel_template,
+    save_channel_template,
+)
+from music_links_bot.state.bot_runtime import (
     BotRuntime,
     CallbackAction,
     UserSession,
     decode_callback,
 )
-from music_links_bot.bot_storage import load_draft, store_draft
-from music_links_bot.bot_ui import editor_appearance_rows
-from music_links_bot.channel_templates import (
-    load_channel_template,
-    save_channel_template,
-)
-from music_links_bot.i18n import STRINGS, language_context
-from music_links_bot.release_preferences import (
+from music_links_bot.state.bot_storage import load_draft, store_draft
+from music_links_bot.state.release_preferences import (
     presentation_context,
 )
 from tests.test_ui_refresh import MemoryKV, context_for, draft_for, query_for

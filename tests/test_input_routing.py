@@ -7,12 +7,16 @@ from unittest.mock import AsyncMock, patch
 
 from test_release_119_state import RedisModel, ctx
 
-from music_links_bot import bot_lookup_flow
-from music_links_bot.bot_runtime import BotRuntime, decode_callback, encode_callback
-from music_links_bot.input_routing import (
+from music_links_bot.lookup import bot_lookup_flow
+from music_links_bot.lookup.input_routing import (
     collection_input,
     dispatch_input_action,
     guard_input,
+)
+from music_links_bot.state.bot_runtime import (
+    BotRuntime,
+    decode_callback,
+    encode_callback,
 )
 
 LINK = "https://open.spotify.com/track/new"
@@ -86,7 +90,7 @@ class InputRoutingTests(unittest.IsolatedAsyncioTestCase):
     async def test_keep_editing_closes_the_choice_once(self) -> None:
         choice_id = await self._choice_id()
 
-        with patch("music_links_bot.bot_menu.safe_edit", new=AsyncMock()) as edit:
+        with patch("music_links_bot.chat.bot_menu.safe_edit", new=AsyncMock()) as edit:
             await self._tap("back", choice_id)
             again = await self._tap("back", choice_id)
 
@@ -124,8 +128,8 @@ class InputRoutingTests(unittest.IsolatedAsyncioTestCase):
         query.answer.assert_awaited_once_with()
 
     async def test_the_cancel_button_on_a_prompt_ends_the_input(self) -> None:
-        from music_links_bot.i18n import get_text
-        from music_links_bot.input_routing import input_prompt_markup
+        from music_links_bot.core.i18n import get_text
+        from music_links_bot.lookup.input_routing import input_prompt_markup
 
         await self._pending(kind="intro", draft_id="d")
         markup = input_prompt_markup("ru")

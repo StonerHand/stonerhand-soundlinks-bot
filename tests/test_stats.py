@@ -5,14 +5,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from music_links_bot.models import (
+from music_links_bot.core.models import (
     ArtistMatch,
     PlaylistMatch,
     RadioMatch,
     TrackMatch,
     VideoMatch,
 )
-from music_links_bot.stats import (
+from music_links_bot.state.stats import (
     format_stats_message,
     load_stats,
     record_post,

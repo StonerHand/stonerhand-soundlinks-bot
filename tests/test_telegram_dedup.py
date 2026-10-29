@@ -55,7 +55,7 @@ class UpdateDedupTests(unittest.TestCase):
 
         app = SimpleNamespace(bot_data={"kv_store": UnavailableKV()})
 
-        from music_links_bot.kvstore import KVUnavailableError
+        from music_links_bot.state.kvstore import KVUnavailableError
 
         with self.assertRaises(KVUnavailableError):
             asyncio.run(tg._claim_update(app, 90003))

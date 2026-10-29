@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from api.smoke import handler
-from music_links_bot.release_smoke import build_release_smoke_report
+from music_links_bot.ops.release_smoke import build_release_smoke_report
 
 SNAPSHOT = Path(__file__).parent / "snapshots" / "release_smoke.json"
 

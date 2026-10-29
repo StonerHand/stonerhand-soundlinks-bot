@@ -5,14 +5,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from music_links_bot.models import TrackMatch
-from music_links_bot.songlink import (
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.providers.songlink import (
     SonglinkClient,
     SonglinkError,
     SonglinkLookupError,
     _is_transient_status,
 )
-from music_links_bot.spotify import SpotifyLookupError
+from music_links_bot.providers.spotify import SpotifyLookupError
 
 
 class FakeSonglinkClient(SonglinkClient):
@@ -468,7 +468,7 @@ class SonglinkClientAsyncTests(unittest.IsolatedAsyncioTestCase):
     ) -> None:
         class FailingSpotifyClient:
             async def lookup_release(self, _source_url: str) -> TrackMatch:
-                from music_links_bot.spotify import SpotifyLookupError
+                from music_links_bot.providers.spotify import SpotifyLookupError
 
                 raise SpotifyLookupError("spotify down")
 

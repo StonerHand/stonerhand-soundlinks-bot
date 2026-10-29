@@ -7,21 +7,27 @@ from unittest.mock import AsyncMock, patch
 from telegram import InlineKeyboardMarkup
 from test_release_119_state import RedisModel, ctx, draft, track
 
-from music_links_bot.bot_editor_state import reset_original, restore_setting_state
-from music_links_bot.bot_recent import render_drafts_view
-from music_links_bot.bot_runtime import BotRuntime, UserSession
-from music_links_bot.bot_storage import load_draft, load_drafts, store_draft
-from music_links_bot.bot_ui import editor_rows, version_editor_keyboard
-from music_links_bot.bot_workspace import handle_workspace_action, tag_explanation
-from music_links_bot.input_routing import collection_input, guard_input
-from music_links_bot.lookup_models import LookupBundle, SourceStatus
-from music_links_bot.lookup_recovery import capture_sources, completed_sources
-from music_links_bot.release_preferences import (
+from music_links_bot.cards.release_tags import build_collection_hashtags
+from music_links_bot.chat.bot_recent import render_drafts_view
+from music_links_bot.chat.bot_ui import editor_rows, version_editor_keyboard
+from music_links_bot.editor.bot_editor_state import (
+    reset_original,
+    restore_setting_state,
+)
+from music_links_bot.editor.bot_workspace import (
+    handle_workspace_action,
+    tag_explanation,
+)
+from music_links_bot.lookup.input_routing import collection_input, guard_input
+from music_links_bot.lookup.lookup_models import LookupBundle, SourceStatus
+from music_links_bot.lookup.lookup_recovery import capture_sources, completed_sources
+from music_links_bot.state.bot_runtime import BotRuntime, UserSession
+from music_links_bot.state.bot_storage import load_draft, load_drafts, store_draft
+from music_links_bot.state.release_preferences import (
     PresentationPreferences,
     presentation_context,
     release_preference_key,
 )
-from music_links_bot.release_tags import build_collection_hashtags
 
 
 def query():
@@ -43,8 +49,8 @@ class Release119Journeys(unittest.IsolatedAsyncioTestCase):
     async def test_long_post_keeps_editor_within_telegram_limit_without_changing_intro(
         self,
     ):
-        from music_links_bot.editor_view import render_track_draft
-        from music_links_bot.publication_budget import visible_length
+        from music_links_bot.editor.editor_view import render_track_draft
+        from music_links_bot.publishing.publication_budget import visible_length
 
         value = draft()
         value["item"].update(title="Long title " * 90, artist="Artist " * 90)
@@ -62,7 +68,7 @@ class Release119Journeys(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(keyboard.inline_keyboard)
 
     async def test_explicit_new_collection_does_not_append_to_existing_crate(self):
-        from music_links_bot.bot_lookup_flow import (
+        from music_links_bot.lookup.bot_lookup_flow import (
             _send_track_matches,
         )
 
@@ -73,13 +79,14 @@ class Release119Journeys(unittest.IsolatedAsyncioTestCase):
         try:
             with (
                 patch(
-                    "music_links_bot.bot_lookup_flow._add_track_drafts_to_crate",
+                    "music_links_bot.lookup.bot_lookup_flow._add_track_drafts_to_crate",
                     AsyncMock(),
                 ) as add,
                 patch(
-                    "music_links_bot.bot_lookup_flow._send_track_result", AsyncMock()
+                    "music_links_bot.lookup.bot_lookup_flow._send_track_result",
+                    AsyncMock(),
                 ) as send,
-                patch("music_links_bot.bot_lookup_flow._record_delivered"),
+                patch("music_links_bot.lookup.bot_lookup_flow._record_delivered"),
             ):
                 await _send_track_matches(
                     q.message,
@@ -99,8 +106,8 @@ class Release119Journeys(unittest.IsolatedAsyncioTestCase):
             collection_input.reset(token)
 
     async def test_replace_does_not_delete_existing_post_on_uncertain_send(self):
-        from music_links_bot.delivery_receipts import DeliveryBlockedError
-        from music_links_bot.editor_delivery import _run_primary_editor_action
+        from music_links_bot.editor.editor_delivery import _run_primary_editor_action
+        from music_links_bot.publishing.delivery_receipts import DeliveryBlockedError
 
         context = ctx(RedisModel())
         context.application.bot_data["admin_chat_id"] = 7
@@ -116,15 +123,15 @@ class Release119Journeys(unittest.IsolatedAsyncioTestCase):
         )
         with (
             patch(
-                "music_links_bot.editor_delivery._find_posted_record",
+                "music_links_bot.editor.editor_delivery._find_posted_record",
                 AsyncMock(return_value={"message_id": 1}),
             ),
             patch(
-                "music_links_bot.editor_delivery._publish_draft",
+                "music_links_bot.editor.editor_delivery._publish_draft",
                 AsyncMock(side_effect=DeliveryBlockedError({"status": "uncertain"})),
             ),
             patch(
-                "music_links_bot.editor_delivery._delete_duplicate_editor_post",
+                "music_links_bot.editor.editor_delivery._delete_duplicate_editor_post",
                 AsyncMock(),
             ) as remove,
         ):
@@ -293,7 +300,7 @@ class Release119Journeys(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(all(len(row) <= 2 for row in keyboard.inline_keyboard[1:]))
 
     async def test_stale_editor_button_refreshes_without_applying_toggle(self):
-        from music_links_bot.bot_editor import (
+        from music_links_bot.editor.bot_editor import (
             _handle_editor_action,
         )
 
@@ -308,7 +315,7 @@ class Release119Journeys(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(q.edit_message_text.called)
 
     async def test_retry_resolves_only_failed_source_and_restores_original_order(self):
-        from music_links_bot.bot_lookup import resolve_sources
+        from music_links_bot.lookup.bot_lookup import resolve_sources
 
         tracks = [track(i) for i in range(3)]
         urls = [t.links["spotify"] for t in tracks]
@@ -338,11 +345,11 @@ class Release119Journeys(unittest.IsolatedAsyncioTestCase):
         try:
             with (
                 patch(
-                    "music_links_bot.bot_lookup.get_cached_lookup",
+                    "music_links_bot.lookup.bot_lookup.get_cached_lookup",
                     AsyncMock(return_value=None),
                 ),
                 patch(
-                    "music_links_bot.bot_lookup._resolve_sources_uncached",
+                    "music_links_bot.lookup.bot_lookup._resolve_sources_uncached",
                     AsyncMock(return_value=fresh),
                 ) as resolver,
             ):

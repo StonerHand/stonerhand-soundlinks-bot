@@ -1,0 +1,495 @@
+from __future__ import annotations
+
+import asyncio
+import json
+import re
+from collections.abc import Mapping
+from html.parser import HTMLParser
+
+import httpx
+
+from music_links_bot.cards.release_hubs import canonical_release_hub_url
+from music_links_bot.core.cache import TTLCache
+from music_links_bot.core.constants import HTTP_USER_AGENT
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.core.url_utils import cache_key_for_url, spotify_url_type
+from music_links_bot.providers.metadata_cleaning import (
+    clean_spotify_metadata_title,
+    infer_release_format,
+    positive_track_count,
+)
+from music_links_bot.providers.release_metadata import (
+    duration_ms,
+    metadata_url,
+    spotify_entity_url,
+)
+
+SPOTIFY_EMBED_BASE_URL = "https://open.spotify.com/embed"
+SPOTIFY_OEMBED_URL = "https://open.spotify.com/oembed"
+
+
+class SpotifyLookupError(RuntimeError):
+    """Raised when Spotify cannot provide public metadata for a release."""
+
+
+class _NextDataParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self._inside_next_data = False
+        self.parts: list[str] = []
+
+    def handle_starttag(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
+        if tag != "script":
+            return
+        attributes = dict(attrs)
+        self._inside_next_data = attributes.get("id") == "__NEXT_DATA__"
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "script":
+            self._inside_next_data = False
+
+    def handle_data(self, data: str) -> None:
+        if self._inside_next_data:
+            self.parts.append(data)
+
+
+class _PageMetadataParser(HTMLParser):
+    """Collect stable public metadata without depending on Spotify's JS state."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.values: dict[str, list[str]] = {}
+        self.structured: list[dict] = []
+        self._json_parts: list[str] | None = None
+
+    def handle_starttag(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
+        attributes = dict(attrs)
+        if tag.casefold() == "script":
+            if attributes.get("type") == "application/ld+json":
+                self._json_parts = []
+            return
+        if tag.casefold() != "meta":
+            return
+
+        key = str(attributes.get("property") or attributes.get("name") or "")
+        value = str(attributes.get("content") or "").strip()
+        if key and value:
+            self.values.setdefault(key.casefold(), []).append(value)
+
+    def handle_data(self, data: str) -> None:
+        if self._json_parts is not None:
+            self._json_parts.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.casefold() != "script" or self._json_parts is None:
+            return
+        try:
+            value = json.loads("".join(self._json_parts))
+        except ValueError:
+            value = None
+        self._json_parts = None
+        items = value if isinstance(value, list) else [value]
+        self.structured.extend(item for item in items if isinstance(item, dict))
+
+    def first(self, key: str) -> str:
+        return next(iter(self.values.get(key.casefold(), ())), "")
+
+
+class SpotifyClient:
+    """Best-effort metadata fallback for Spotify URLs.
+
+    Song.link remains the primary resolver because it supplies cross-platform
+    buttons. This client only prevents a valid Spotify release from silently
+    disappearing when the aggregator cannot resolve it.
+    """
+
+    def __init__(self, *, timeout: float = 6.0) -> None:
+        self._client = httpx.AsyncClient(
+            follow_redirects=True,
+            headers={"User-Agent": HTTP_USER_AGENT},
+            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
+            timeout=httpx.Timeout(timeout, connect=3.0),
+        )
+        self._cache: TTLCache[TrackMatch] = TTLCache(ttl_seconds=24 * 3600)
+
+    async def aclose(self) -> None:
+        await self._client.aclose()
+
+    async def lookup_release(self, source_url: str) -> TrackMatch:
+        kind = spotify_url_type(source_url)
+        if kind not in {"track", "album"}:
+            raise SpotifyLookupError("Unsupported Spotify release type.")
+
+        cache_key = cache_key_for_url(source_url)
+        cached = self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        clean_url = cache_key_for_url(source_url)
+        page_error: SpotifyLookupError | None = None
+        try:
+            response = await self._client.get(clean_url)
+            response.raise_for_status()
+            match = parse_spotify_page(source_url, response.text)
+        except (httpx.HTTPError, SpotifyLookupError) as exc:
+            page_error = (
+                exc
+                if isinstance(exc, SpotifyLookupError)
+                else SpotifyLookupError("Spotify public metadata is unavailable.")
+            )
+        else:
+            await self._complete_metadata(match)
+            self._cache.set(cache_key, match)
+            return match
+
+        # Keep the legacy embed parser as a second independent source. Spotify
+        # changes its rendered pages and embed state on different schedules.
+        embed_error: SpotifyLookupError | None = None
+        try:
+            response = await self._client.get(_spotify_embed_url(source_url, kind))
+            response.raise_for_status()
+            match = parse_spotify_embed(source_url, response.text)
+        except (httpx.HTTPError, SpotifyLookupError) as exc:
+            embed_error = (
+                exc
+                if isinstance(exc, SpotifyLookupError)
+                else SpotifyLookupError("Spotify embed metadata is unavailable.")
+            )
+        else:
+            self._cache.set(cache_key, match)
+            return match
+
+        # Spotify's documented oEmbed API is the final existence check. It no
+        # longer includes artist names, but it reliably supplies the exact
+        # title and artwork and returns 404 for unavailable entities. Prefer an
+        # honest Spotify-only card over a false card built from the marketing
+        # shell served by open.spotify.com.
+        try:
+            response = await self._client.get(
+                SPOTIFY_OEMBED_URL,
+                params={"url": clean_url},
+            )
+            response.raise_for_status()
+            match = parse_spotify_oembed(source_url, response.json())
+        except (httpx.HTTPError, ValueError, SpotifyLookupError) as exc:
+            raise SpotifyLookupError("Spotify metadata is unavailable.") from (
+                page_error or embed_error or exc
+            )
+        self._cache.set(cache_key, match)
+        return match
+
+    async def _complete_metadata(self, match: TrackMatch) -> None:
+        async def complete():
+            if match.kind == "song" and match.album_url and not match.album_title:
+                album = self._cache.get(cache_key_for_url(match.album_url))
+                if album is None:
+                    response = await self._client.get(match.album_url)
+                    response.raise_for_status()
+                    album = parse_spotify_page(match.album_url, response.text)
+                match.album_title = album.title
+            elif (
+                match.kind == "album"
+                and match.duration_ms is None
+                and match.track_count
+            ):
+                url = match.links["spotify"]
+                response = await self._client.get(_spotify_embed_url(url, "album"))
+                response.raise_for_status()
+                details = parse_spotify_embed(
+                    url, response.text, expected_count=match.track_count
+                )
+                match.duration_ms = details.duration_ms
+                match.artist_url = match.artist_url or details.artist_url
+
+        try:
+            await asyncio.wait_for(complete(), timeout=1.25)
+        except (TimeoutError, httpx.HTTPError, SpotifyLookupError):
+            pass
+
+
+def _structured_name(parser: _PageMetadataParser, source_url: str, kind: str) -> str:
+    wanted = "MusicAlbum" if kind == "album" else "MusicRecording"
+    entity_id = cache_key_for_url(source_url).rstrip("/").rsplit("/", 1)[-1]
+    for item in parser.structured:
+        types = item.get("@type")
+        if wanted not in (types if isinstance(types, list) else [types]):
+            continue
+        item_url = str(item.get("@id") or item.get("url") or "")
+        if cache_key_for_url(item_url).rstrip("/").rsplit("/", 1)[-1] != entity_id:
+            continue
+        name = item.get("name")
+        if isinstance(name, str) and name.strip():
+            return " ".join(name.split())
+    return ""
+
+
+def parse_spotify_page(source_url: str, html: str) -> TrackMatch:
+    parser = _PageMetadataParser()
+    try:
+        parser.feed(html)
+    except (TypeError, ValueError) as exc:
+        raise SpotifyLookupError("Spotify returned invalid public metadata.") from exc
+
+    kind = spotify_url_type(source_url) or "track"
+    # og:title is a localized call to action ("Listen to X - Album by Y |
+    # Spotify", "Escucha X - Album de Y"); the page's JSON-LD names the release.
+    title = _structured_name(parser, source_url, kind) or clean_spotify_metadata_title(
+        parser.first("og:title")
+    )
+    page_type = parser.first("og:type").casefold()
+    expected_type = "music.album" if kind == "album" else "music.song"
+    # Spotify serves a generic marketing shell with HTTP 200 for unavailable
+    # or region-blocked releases. Its og:title/description look complete
+    # enough to become a convincing but entirely false music card. Require
+    # release-specific Open Graph metadata and let the independent embed
+    # parser decide whether the URL can still be recovered.
+    if page_type != expected_type:
+        raise SpotifyLookupError("Spotify returned a generic public page.")
+
+    artists = [
+        value.strip()
+        for value in parser.values.get("music:musician_description", ())
+        if value.strip()
+    ]
+    artist = ", ".join(dict.fromkeys(artists))
+    if not artist:
+        description_parts = [
+            part.strip()
+            for part in parser.first("og:description").split("·")
+            if part.strip()
+        ]
+        if description_parts:
+            artist = description_parts[0]
+
+    if not title or not artist:
+        raise SpotifyLookupError("Spotify title or artist is missing.")
+
+    normalized_kind = (
+        "album" if kind == "album" or page_type == "music.album" else "song"
+    )
+    release_year = parser.first("music:release_date")[:4]
+    if not release_year.isdigit():
+        release_year = None
+    thumbnail_url = parser.first("og:image") or None
+    clean_url = cache_key_for_url(source_url)
+    description = parser.first("og:description")
+    parts = [part.strip() for part in description.split("·")]
+    release_format = (
+        infer_release_format(parser.first("og:title"), *parts[1:])
+        if normalized_kind == "album"
+        else None
+    )
+    count_match = re.search(
+        r"(?:^|·)\s*(\d+)\s+(?:songs?|tracks?|трек(?:а|ов)?)\b", description, re.I
+    )
+    if release_year is None:
+        release_year = next(
+            (part for part in parts[1:] if re.fullmatch(r"(?:19|20)\d{2}", part)), None
+        )
+    return TrackMatch(
+        title=title,
+        artist=artist,
+        links={"spotify": clean_url},
+        page_url=canonical_release_hub_url(clean_url),
+        release_year=release_year,
+        kind=normalized_kind,
+        release_format=release_format
+        or ("album" if normalized_kind == "album" else None),
+        track_count=positive_track_count(count_match.group(1)) if count_match else None,
+        thumbnail_url=thumbnail_url,
+        album_title=parser.first("music:album_description") or None,
+        album_url=metadata_url(parser.first("music:album"), "album"),
+        artist_url=metadata_url(parser.first("music:musician"), "artist")
+        if len(set(artists)) == 1
+        else None,
+        duration_ms=duration_ms(parser.first("music:duration") + "000")
+        if parser.first("music:duration").isdigit()
+        else None,
+    )
+
+
+def parse_spotify_embed(
+    source_url: str, html: str, *, expected_count: int | None = None
+) -> TrackMatch:
+    parser = _NextDataParser()
+    parser.feed(html)
+    if not parser.parts:
+        raise SpotifyLookupError("Spotify embed metadata is missing.")
+
+    try:
+        payload = json.loads("".join(parser.parts))
+    except (TypeError, ValueError) as exc:
+        raise SpotifyLookupError("Spotify returned invalid metadata.") from exc
+
+    entity = _find_entity(payload)
+    if entity is None:
+        raise SpotifyLookupError("Spotify release metadata is missing.")
+
+    title = str(entity.get("name") or entity.get("title") or "").strip()
+    artist = _spotify_artist(entity)
+    if not title or not artist:
+        raise SpotifyLookupError("Spotify title or artist is missing.")
+
+    kind = str(entity.get("type") or spotify_url_type(source_url) or "song")
+    normalized_kind = "album" if kind == "album" else "song"
+    release_date = entity.get("releaseDate")
+    if isinstance(release_date, Mapping):
+        release_date = release_date.get("isoString")
+    release_year = str(release_date or "")[:4]
+    if not release_year.isdigit():
+        release_year = None
+
+    count = (
+        positive_track_count(entity.get("trackCount") or entity.get("totalTracks"))
+        or expected_count
+    )
+    duration = duration_ms(entity.get("duration"))
+    if normalized_kind == "album" and duration is None and count:
+        tracks = entity.get("trackList")
+        if (
+            isinstance(tracks, list)
+            and len(tracks) == count
+            and all(isinstance(t, Mapping) for t in tracks)
+        ):
+            durations = [duration_ms(t.get("duration")) for t in tracks]
+            identities = {t.get("uri") for t in tracks if isinstance(t.get("uri"), str)}
+            if len(identities) == count and all(durations):
+                duration = sum(durations)
+    artist_items = entity.get("artists")
+    artist_link = None
+    if (
+        isinstance(artist_items, list)
+        and len(artist_items) == 1
+        and isinstance(artist_items[0], Mapping)
+    ):
+        artist_link = spotify_entity_url(artist_items[0].get("uri"), "artist")
+    elif not artist_items:
+        artist_link = spotify_entity_url(entity.get("relatedEntityUri"), "artist")
+
+    return TrackMatch(
+        title=title,
+        artist=artist,
+        links={"spotify": cache_key_for_url(source_url)},
+        page_url=canonical_release_hub_url(
+            source_url,
+            release_kind=normalized_kind,
+        ),
+        release_year=release_year,
+        kind=normalized_kind,
+        release_format=infer_release_format(title, entity.get("albumType"), "album")
+        if normalized_kind == "album"
+        else None,
+        album_title=str(entity.get("albumName") or "") or None,
+        track_count=count,
+        duration_ms=duration,
+        artist_url=artist_link,
+        album_url=spotify_entity_url(entity.get("albumUri"), "album"),
+        thumbnail_url=_spotify_thumbnail(entity),
+    )
+
+
+def parse_spotify_oembed(
+    source_url: str,
+    payload: object,
+) -> TrackMatch:
+    """Build an honest minimal card from Spotify's documented oEmbed API."""
+    if not isinstance(payload, Mapping):
+        raise SpotifyLookupError("Spotify returned invalid oEmbed metadata.")
+    if str(payload.get("provider_name") or "").casefold() != "spotify":
+        raise SpotifyLookupError("Spotify oEmbed provider is invalid.")
+
+    title = clean_spotify_metadata_title(payload.get("title"))
+    if not title or title.casefold() in {"spotify", "listening is everything"}:
+        raise SpotifyLookupError("Spotify oEmbed title is missing.")
+    thumbnail = payload.get("thumbnail_url")
+    thumbnail_url = (
+        thumbnail.strip()
+        if isinstance(thumbnail, str)
+        and thumbnail.strip().startswith(("http://", "https://"))
+        else None
+    )
+    if thumbnail_url is None:
+        raise SpotifyLookupError("Spotify oEmbed artwork is missing.")
+
+    kind = spotify_url_type(source_url) or "track"
+    normalized_kind = "album" if kind == "album" else "song"
+    clean_url = cache_key_for_url(source_url)
+    return TrackMatch(
+        title=title,
+        # The current oEmbed schema deliberately exposes no artist field.
+        # Keep the provider label explicit instead of guessing from search.
+        artist="Spotify",
+        links={"spotify": clean_url},
+        page_url=canonical_release_hub_url(
+            clean_url,
+            release_kind=normalized_kind,
+        ),
+        kind=normalized_kind,
+        release_format="album" if normalized_kind == "album" else None,
+        thumbnail_url=thumbnail_url,
+    )
+
+
+def _spotify_embed_url(source_url: str, kind: str) -> str:
+    clean = cache_key_for_url(source_url)
+    item_id = clean.rstrip("/").rsplit("/", 1)[-1]
+    return f"{SPOTIFY_EMBED_BASE_URL}/{kind}/{item_id}"
+
+
+def _find_entity(value: object) -> Mapping[str, object] | None:
+    if isinstance(value, Mapping):
+        entity = value.get("entity")
+        if isinstance(entity, Mapping):
+            return entity
+        for child in value.values():
+            found = _find_entity(child)
+            if found is not None:
+                return found
+    elif isinstance(value, list):
+        for child in value:
+            found = _find_entity(child)
+            if found is not None:
+                return found
+    return None
+
+
+def _spotify_artist(entity: Mapping[str, object]) -> str:
+    artists = entity.get("artists")
+    if isinstance(artists, list):
+        names = [
+            str(artist.get("name") or "").strip()
+            for artist in artists
+            if isinstance(artist, Mapping)
+        ]
+        if clean_names := [name for name in names if name]:
+            return ", ".join(clean_names)
+
+    for key in ("artistName", "subtitle", "ownerName"):
+        value = str(entity.get(key) or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _spotify_thumbnail(entity: Mapping[str, object]) -> str | None:
+    for key in ("coverArt", "images", "visualIdentity"):
+        images = entity.get(key)
+        if isinstance(images, Mapping):
+            images = images.get("sources") or images.get("items") or images.get("image")
+        if not isinstance(images, list):
+            continue
+        for image in images:
+            if not isinstance(image, Mapping):
+                continue
+            url = image.get("url")
+            if isinstance(url, str) and url.startswith("http"):
+                return url
+    return None

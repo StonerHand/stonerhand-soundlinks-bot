@@ -9,13 +9,13 @@ import pytest
 from PIL import Image
 
 from api.collage import handler
-from music_links_bot.bot_inline import _build_inline_result
-from music_links_bot.collection_collage import (
+from music_links_bot.artwork.collection_collage import (
     branded_artwork_preview_url,
     decode_collage_payload,
 )
-from music_links_bot.collection_plan import build_collection_plan
-from music_links_bot.models import TrackMatch
+from music_links_bot.cards.collection_plan import build_collection_plan
+from music_links_bot.chat.bot_inline import _build_inline_result
+from music_links_bot.core.models import TrackMatch
 
 ENV = {
     "BOT_TOKEN": "test-signing-secret",
@@ -68,7 +68,7 @@ def test_single_inline_uses_branded_preview_and_preserves_buttons():
         with (
             patch.dict(os.environ, ENV),
             patch(
-                "music_links_bot.bot_inline.track_lookup._lookup_tracks",
+                "music_links_bot.chat.bot_inline.track_lookup._lookup_tracks",
                 new=AsyncMock(return_value=([track()], [])),
             ),
         ):

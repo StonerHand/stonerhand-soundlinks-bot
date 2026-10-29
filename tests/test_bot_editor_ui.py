@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import unittest
 
-from music_links_bot.bot_ui import (
+from music_links_bot.chat.bot_ui import (
     editor_more_rows as _editor_more_rows,
     editor_rows as _editor_rows,
     editor_text_rows,
     editor_tools_rows,
 )
-from music_links_bot.editor_view import render_track_draft as _render_track_draft
-from music_links_bot.models import TrackMatch
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.editor.editor_view import render_track_draft as _render_track_draft
 
 
 class PostEditorTests(unittest.TestCase):
@@ -256,7 +256,7 @@ class PublicationOverrideTests(unittest.TestCase):
         self.assertNotIn("#stonerhand", text)
 
     def test_empty_custom_tags_suppress_hashtags_even_on_publish_path(self) -> None:
-        from music_links_bot.publication_view import resolve_draft_hashtags
+        from music_links_bot.publishing.publication_view import resolve_draft_hashtags
 
         hashtags = resolve_draft_hashtags(
             self._draft(custom_tags=[]),
@@ -266,7 +266,7 @@ class PublicationOverrideTests(unittest.TestCase):
         self.assertIsNone(hashtags)
 
     def test_normalize_hashtag_slugs_and_rejects_junk(self) -> None:
-        from music_links_bot.text_utils import normalize_hashtag
+        from music_links_bot.core.text_utils import normalize_hashtag
 
         self.assertEqual(normalize_hashtag("#Hip-Hop!"), "#hiphop")
         self.assertEqual(normalize_hashtag("Дум метал"), "#думметал")

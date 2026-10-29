@@ -7,11 +7,11 @@ from unittest.mock import AsyncMock, patch
 
 from test_release_119_state import RedisModel, ctx, draft
 
-from music_links_bot import bot_pending
-from music_links_bot.bot_crate import save_crate
-from music_links_bot.bot_runtime import BotRuntime
-from music_links_bot.bot_storage import store_draft
-from music_links_bot.i18n import get_text
+from music_links_bot.chat.bot_crate import save_crate
+from music_links_bot.core.i18n import get_text
+from music_links_bot.editor import bot_pending
+from music_links_bot.state.bot_runtime import BotRuntime
+from music_links_bot.state.bot_storage import store_draft
 
 USER = 7
 
@@ -97,8 +97,8 @@ class PendingInputTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(await self._pending_left(), {})
 
     async def test_crate_note_is_saved_and_the_crate_comes_back(self) -> None:
-        from music_links_bot.models import TrackMatch
-        from music_links_bot.release_preferences import release_preference_key
+        from music_links_bot.core.models import TrackMatch
+        from music_links_bot.state.release_preferences import release_preference_key
 
         item = {"artist": "Sleep", "title": "Dragonaut"}
         await save_crate(self.context.application.bot_data, USER, [{"item": item}])
@@ -131,7 +131,7 @@ class PendingInputTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_only_the_owner_changes_the_cover_signature(self) -> None:
         with patch(
-            "music_links_bot.brand_settings.save_brand_label", new=AsyncMock()
+            "music_links_bot.artwork.brand_settings.save_brand_label", new=AsyncMock()
         ) as save:
             self.context.application.bot_data["admin_chat_id"] = 99
             handled, message = await self._type("@night", kind="brand_label")
@@ -142,7 +142,7 @@ class PendingInputTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_library_search_remembers_the_query(self) -> None:
         with patch(
-            "music_links_bot.bot_menu.drafts_view",
+            "music_links_bot.chat.bot_menu.drafts_view",
             new=AsyncMock(return_value=("Мои посты", None)),
         ):
             await self._type("kyuss", kind="library_search")

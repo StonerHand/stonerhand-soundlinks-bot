@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from api import queue_worker
 from api.queue_worker import is_authorized
-from music_links_bot.webhook_secret import queue_worker_secret
+from music_links_bot.tg.webhook_secret import queue_worker_secret
 
 
 class QueueWorkerAuthTests(unittest.TestCase):
@@ -70,7 +70,7 @@ def sign_qstash(body: bytes, *, key: str, **overrides) -> str:
 
 class QStashSignatureTests(unittest.TestCase):
     def verify(self, token: str, body: bytes = b"tick") -> bool:
-        from music_links_bot.qstash_auth import verify_qstash_signature
+        from music_links_bot.ops.qstash_auth import verify_qstash_signature
 
         return verify_qstash_signature(
             token, body, expected_path="/api/queue_worker", keys=["k1", "k2"]
@@ -93,7 +93,7 @@ class QStashSignatureTests(unittest.TestCase):
     def test_malformed_or_missing_signatures_are_rejected(self) -> None:
         for token in ("", "a.b", "a.b.c", "not-a-jwt"):
             self.assertFalse(self.verify(token))
-        from music_links_bot.qstash_auth import verify_qstash_signature
+        from music_links_bot.ops.qstash_auth import verify_qstash_signature
 
         self.assertFalse(
             verify_qstash_signature(

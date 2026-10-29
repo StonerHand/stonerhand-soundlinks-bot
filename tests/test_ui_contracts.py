@@ -8,31 +8,31 @@ from unittest.mock import AsyncMock, patch
 
 from telegram import MessageEntity
 
-from music_links_bot.bot import (
+from music_links_bot.chat.bot import (
     _dispatch_menu_action,
 )
-from music_links_bot.bot_actions import action_spec
-from music_links_bot.bot_builder import apply_intro_html
-from music_links_bot.bot_editor import (
-    _draft_intro_limit,
-    _handle_editor_action,
-    _render_track_draft,
-)
-from music_links_bot.bot_lookup_flow import (
-    _consume_pending_input,
-)
-from music_links_bot.bot_pipeline import delivery_kind
-from music_links_bot.bot_runtime import BotRuntime, CallbackAction
-from music_links_bot.bot_storage import store_retry_sources
-from music_links_bot.bot_ui import (
+from music_links_bot.chat.bot_actions import action_spec
+from music_links_bot.chat.bot_ui import (
     build_error_keyboard,
     build_publish_confirmation,
     build_start_keyboard,
 )
-from music_links_bot.crate_view import render_crate
-from music_links_bot.draft_model import CURRENT_DRAFT_VERSION, new_track_draft
-from music_links_bot.models import TrackMatch
-from music_links_bot.publication_view import build_publication_view
+from music_links_bot.chat.crate_view import render_crate
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.editor.bot_builder import apply_intro_html
+from music_links_bot.editor.bot_editor import (
+    _draft_intro_limit,
+    _handle_editor_action,
+    _render_track_draft,
+)
+from music_links_bot.editor.draft_model import CURRENT_DRAFT_VERSION, new_track_draft
+from music_links_bot.lookup.bot_lookup_flow import (
+    _consume_pending_input,
+)
+from music_links_bot.lookup.bot_pipeline import delivery_kind
+from music_links_bot.publishing.publication_view import build_publication_view
+from music_links_bot.state.bot_runtime import BotRuntime, CallbackAction
+from music_links_bot.state.bot_storage import store_retry_sources
 
 
 def _track() -> TrackMatch:
@@ -299,14 +299,15 @@ class EditorFlowContractTests(unittest.IsolatedAsyncioTestCase):
         captured: list[str] = []
 
         async def capture_lookup(_update, _context) -> None:
-            from music_links_bot.bot_lookup_flow import (
+            from music_links_bot.lookup.bot_lookup_flow import (
                 _INPUT_OVERRIDE,
             )
 
             captured.append(str(_INPUT_OVERRIDE.get() or ""))
 
         with patch(
-            "music_links_bot.bot_lookup_flow.track_lookup_message", capture_lookup
+            "music_links_bot.lookup.bot_lookup_flow.track_lookup_message",
+            capture_lookup,
         ):
             self.assertTrue(await _consume_pending_input(update, context))
 

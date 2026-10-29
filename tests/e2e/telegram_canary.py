@@ -14,16 +14,16 @@ from urllib.parse import urlparse
 import httpx
 from telegram import Bot, Message
 
-from music_links_bot.draft_model import new_track_draft
-from music_links_bot.keyboards import _build_link_preview_options
-from music_links_bot.lookup_models import LookupBundle
-from music_links_bot.publication_service import PublicationService
-from music_links_bot.release_hubs import is_universal_release_url
-from music_links_bot.rich_publications import send_rich_publication
-from music_links_bot.rich_rendering import build_rich_collection_html
-from music_links_bot.sharing import render_inline_share_card
-from music_links_bot.soundcloud import SoundCloudClient
-from music_links_bot.spotify import SpotifyClient
+from music_links_bot.cards.keyboards import _build_link_preview_options
+from music_links_bot.cards.release_hubs import is_universal_release_url
+from music_links_bot.cards.sharing import render_inline_share_card
+from music_links_bot.editor.draft_model import new_track_draft
+from music_links_bot.lookup.lookup_models import LookupBundle
+from music_links_bot.providers.soundcloud import SoundCloudClient
+from music_links_bot.providers.spotify import SpotifyClient
+from music_links_bot.publishing.publication_service import PublicationService
+from music_links_bot.publishing.rich_publications import send_rich_publication
+from music_links_bot.publishing.rich_rendering import build_rich_collection_html
 
 SPOTIFY_URLS = (
     "https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT",

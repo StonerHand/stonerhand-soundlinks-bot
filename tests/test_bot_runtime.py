@@ -2,7 +2,7 @@ import asyncio
 import unittest
 from types import SimpleNamespace
 
-from music_links_bot.bot_crate import (
+from music_links_bot.chat.bot_crate import (
     add_many_to_crate,
     add_to_crate,
     load_crate,
@@ -12,14 +12,14 @@ from music_links_bot.bot_crate import (
     restore_crate_item,
     save_crate_title,
 )
-from music_links_bot.bot_progress import (
+from music_links_bot.lookup.bot_progress import (
     adopt_progress_message,
     cancel_progress,
     start_progress,
     take_progress,
     update_progress,
 )
-from music_links_bot.bot_runtime import (
+from music_links_bot.state.bot_runtime import (
     BotRuntime,
     UserSession,
     decode_callback,
@@ -204,7 +204,7 @@ class RuntimeSafetyTests(unittest.IsolatedAsyncioTestCase):
         from telegram import LinkPreviewOptions
         from telegram.error import BadRequest
 
-        from music_links_bot.lookup_transport import _send_card
+        from music_links_bot.lookup.lookup_transport import _send_card
 
         runtime = BotRuntime()
         self.assertIsNone(runtime.metrics_snapshot()["last_failure"])

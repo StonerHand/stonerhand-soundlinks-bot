@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock
 
 from telegram.error import BadRequest, RetryAfter
 
-from music_links_bot.bot import _application_error_handler
-from music_links_bot.bot_runtime import BotRuntime
+from music_links_bot.chat.bot import _application_error_handler
+from music_links_bot.state.bot_runtime import BotRuntime
 
 
 def _raised(error: ValueError) -> ValueError:

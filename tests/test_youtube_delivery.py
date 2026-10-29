@@ -13,9 +13,13 @@ import pytest
 from telegram import LinkPreviewOptions
 from telegram.error import BadRequest, RetryAfter, TimedOut
 
-from music_links_bot.lookup_transport import _send_card
-from music_links_bot.models import VideoMatch
-from music_links_bot.youtube import video_frame_url, video_preview_url, video_still_url
+from music_links_bot.core.models import VideoMatch
+from music_links_bot.lookup.lookup_transport import _send_card
+from music_links_bot.providers.youtube import (
+    video_frame_url,
+    video_preview_url,
+    video_still_url,
+)
 
 VIDEO = "https://www.youtube.com/watch?v=j7K6FC_psGc"
 STILL = "https://i.ytimg.com/vi/j7K6FC_psGc/hqdefault.jpg"
@@ -107,14 +111,14 @@ def test_a_card_refused_without_preview_is_a_real_error():
 def _lookup(message, context):
     from test_bot import UpdateStub
 
-    from music_links_bot.bot_lookup_flow import track_lookup_message
+    from music_links_bot.lookup.bot_lookup_flow import track_lookup_message
 
-    with patch("music_links_bot.bot_stats.record_post"):
+    with patch("music_links_bot.lookup.bot_stats.record_post"):
         asyncio.run(track_lookup_message(UpdateStub(message), context))
 
 
 def test_video_cards_try_the_player_first_and_pause_it_after_a_failure():
-    from music_links_bot.telegram_gateway import (
+    from music_links_bot.tg.telegram_gateway import (
         link_preview_capability,
         record_capability_failure,
     )
@@ -129,14 +133,14 @@ def test_video_cards_try_the_player_first_and_pause_it_after_a_failure():
     assert video_preview_url(video) == STILL
     # One switch turns the player off for good.
     with patch.dict(os.environ, {"YOUTUBE_PLAYER_PREVIEW_ENABLED": "0"}):
-        from music_links_bot.telegram_gateway import reset_capabilities
+        from music_links_bot.tg.telegram_gateway import reset_capabilities
 
         reset_capabilities()
         assert video_preview_url(video) == STILL
 
 
 def test_every_youtube_host_shares_one_player_state():
-    from music_links_bot.telegram_gateway import link_preview_capability
+    from music_links_bot.tg.telegram_gateway import link_preview_capability
 
     keys = {
         link_preview_capability(url)
@@ -163,7 +167,7 @@ def test_the_frame_comes_from_the_video_id_when_youtube_sent_no_still():
 def test_a_player_telegram_refuses_falls_back_to_the_frame():
     from test_bot import ContextStub, PrivateMessageStub
 
-    from music_links_bot.telegram_gateway import (
+    from music_links_bot.tg.telegram_gateway import (
         capability_available,
         link_preview_capability,
     )
@@ -210,7 +214,7 @@ def test_a_progress_line_stuck_on_the_player_becomes_the_frame_card_in_place():
     again with the still. Nothing is deleted and no second card appears."""
     from test_bot import ContextStub, PrivateMessageStub
 
-    from music_links_bot.telegram_gateway import (
+    from music_links_bot.tg.telegram_gateway import (
         capability_available,
         link_preview_capability,
     )
@@ -245,7 +249,7 @@ def test_a_progress_line_stuck_on_the_player_becomes_the_frame_card_in_place():
     )
     message = Message()
     # A slow lookup: the progress line is shown at once.
-    with patch("music_links_bot.bot_lookup_flow.PROGRESS_DELAY_SECONDS", 0):
+    with patch("music_links_bot.lookup.bot_lookup_flow.PROGRESS_DELAY_SECONDS", 0):
         _lookup(message, ContextStub(youtube_client=youtube))
 
     assert len(message.replies) == 1  # the progress line, now the card
@@ -255,13 +259,15 @@ def test_a_progress_line_stuck_on_the_player_becomes_the_frame_card_in_place():
 
 
 def test_an_edit_that_already_landed_counts_as_the_card():
-    from music_links_bot.lookup_transport import reply_with_track
+    from music_links_bot.lookup.lookup_transport import reply_with_track
 
     progress = SimpleNamespace(
         edit_text=AsyncMock(side_effect=BadRequest("Message is not modified"))
     )
     message = SimpleNamespace(chat_id=7, reply_text=AsyncMock())
-    with patch("music_links_bot.lookup_transport.take_progress", return_value=progress):
+    with patch(
+        "music_links_bot.lookup.lookup_transport.take_progress", return_value=progress
+    ):
         sent = asyncio.run(
             reply_with_track(
                 message,
@@ -280,7 +286,7 @@ def test_an_edit_that_already_landed_counts_as_the_card():
 def test_short_flood_control_is_waited_out_once():
     send = AsyncMock(side_effect=[RetryAfter(timedelta(seconds=3)), "sent"])
     with patch(
-        "music_links_bot.lookup_transport.asyncio.sleep", new=AsyncMock()
+        "music_links_bot.lookup.lookup_transport.asyncio.sleep", new=AsyncMock()
     ) as sleep:
         sent = asyncio.run(_send_card(send, link_preview_options=PREVIEW, text="c"))
 
@@ -305,7 +311,7 @@ def test_a_broken_lookup_says_so_and_offers_retry():
     message = Message()
     with (
         patch(
-            "music_links_bot.bot_lookup_flow._deliver_lookup_bundle",
+            "music_links_bot.lookup.bot_lookup_flow._deliver_lookup_bundle",
             new=AsyncMock(side_effect=RuntimeError("boom")),
         ),
         pytest.raises(RuntimeError),

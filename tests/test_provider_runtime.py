@@ -2,10 +2,10 @@ import asyncio
 import unittest
 from unittest.mock import patch
 
-from music_links_bot import bot_lookup
-from music_links_bot.bot_lookup import LookupBundle
-from music_links_bot.models import VideoMatch
-from music_links_bot.provider_runtime import (
+from music_links_bot.core.models import VideoMatch
+from music_links_bot.lookup import bot_lookup
+from music_links_bot.lookup.bot_lookup import LookupBundle
+from music_links_bot.providers.provider_runtime import (
     ProviderOutcome,
     get_cached_lookup,
     lookup_cache_key,

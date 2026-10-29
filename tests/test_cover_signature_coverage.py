@@ -8,12 +8,12 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from music_links_bot.draft_model import new_track_draft
-from music_links_bot.models import TrackMatch
-from music_links_bot.publication_model import MusicPublication
-from music_links_bot.publication_service import PublicationService
-from music_links_bot.publication_view import editor_preview_url
-from music_links_bot.release_presentation import apply_preset
+from music_links_bot.cards.release_presentation import apply_preset
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.editor.draft_model import new_track_draft
+from music_links_bot.publishing.publication_model import MusicPublication
+from music_links_bot.publishing.publication_service import PublicationService
+from music_links_bot.publishing.publication_view import editor_preview_url
 
 ENV = {
     "WEBHOOK_BASE_URL": "https://bot.example",
@@ -112,7 +112,7 @@ def test_editor_card_falls_back_when_branding_is_off():
 
 
 def test_rich_and_song_clip_media_use_the_signed_cover():
-    from music_links_bot.models import VideoMatch
+    from music_links_bot.core.models import VideoMatch
 
     video = VideoMatch(
         title="Clip",
@@ -130,8 +130,8 @@ def test_rich_and_song_clip_media_use_the_signed_cover():
 
 
 def test_song_clip_album_uploads_the_signed_cover():
-    from music_links_bot import mixed_post
-    from music_links_bot.models import VideoMatch
+    from music_links_bot.core.models import VideoMatch
+    from music_links_bot.lookup import mixed_post
 
     bot = SimpleNamespace(
         send_media_group=AsyncMock(return_value=[object(), object()]),
@@ -167,7 +167,7 @@ def test_song_clip_album_uploads_the_signed_cover():
 def test_group_link_card_uses_the_signed_cover():
     from test_bot import ContextStub, ReplaceableMessageStub, UpdateStub
 
-    from music_links_bot.bot_lookup_flow import (
+    from music_links_bot.lookup.bot_lookup_flow import (
         track_lookup_message,
     )
 

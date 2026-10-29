@@ -19,21 +19,21 @@ if str(SRC_PATH) not in sys.path:
 
 from telegram import Update
 
-from music_links_bot.bot_app import (
+from music_links_bot.chat.bot_app import (
     build_application,
     close_application_resources,
 )
-from music_links_bot.config import Settings
-from music_links_bot.http_json import send_json
-from music_links_bot.kvstore import KVUnavailableError
-from music_links_bot.logging_config import quiet_transport_logs
-from music_links_bot.loop_runner import (
+from music_links_bot.core.config import Settings
+from music_links_bot.core.http_json import send_json
+from music_links_bot.ops.logging_config import quiet_transport_logs
+from music_links_bot.ops.loop_runner import (
     run_on_loop,
     start_background_loop,
     stop_background_loop,
 )
-from music_links_bot.update_execution import UpdateExecution, current_execution
-from music_links_bot.webhook_secret import secrets_match
+from music_links_bot.state.kvstore import KVUnavailableError
+from music_links_bot.tg.update_execution import UpdateExecution, current_execution
+from music_links_bot.tg.webhook_secret import secrets_match
 
 LOGGER = logging.getLogger(__name__)
 MAX_UPDATE_BYTES = 1024 * 1024
@@ -335,7 +335,7 @@ def _note_update_finished() -> bool:
 
 def _alert_crash_safely(exc: Exception) -> None:
     try:
-        from music_links_bot.alerts import send_admin_alert
+        from music_links_bot.ops.alerts import send_admin_alert
 
         send_admin_alert(
             f"Webhook update crashed: {type(exc).__name__}. "
@@ -412,7 +412,7 @@ def _read_content_length(raw_value: str | None) -> int | None:
 
 
 def _is_telegram_request_authorized(received_secret: str | None) -> bool:
-    from music_links_bot.webhook_secret import telegram_webhook_secret
+    from music_links_bot.tg.webhook_secret import telegram_webhook_secret
 
     expected_secret = telegram_webhook_secret()
     if not expected_secret:

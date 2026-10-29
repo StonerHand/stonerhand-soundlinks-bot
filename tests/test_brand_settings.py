@@ -2,8 +2,8 @@
 
 import unittest
 
-from music_links_bot import cover_style
-from music_links_bot.brand_settings import (
+from music_links_bot.artwork import cover_style
+from music_links_bot.artwork.brand_settings import (
     BRAND_LABEL_KEY,
     load_brand_label,
     save_brand_label,

@@ -3,13 +3,13 @@ import unittest
 
 from telegram import MessageEntity
 
-from music_links_bot.telegram_text import (
-    format_user_note_html,
-    telegram_text_length,
-)
-from music_links_bot.url_utils import (
+from music_links_bot.core.url_utils import (
     extract_supported_urls,
     strip_supported_urls_with_mapping,
+)
+from music_links_bot.tg.telegram_text import (
+    format_user_note_html,
+    telegram_text_length,
 )
 
 

@@ -7,9 +7,9 @@ from unittest.mock import AsyncMock, patch
 
 from test_release_119_state import RedisModel, ctx, draft, track
 
-from music_links_bot import bot_editor, editor_delivery, editor_screen
-from music_links_bot.bot_runtime import BotRuntime
-from music_links_bot.i18n import get_text
+from music_links_bot.core.i18n import get_text
+from music_links_bot.editor import bot_editor, editor_delivery, editor_screen
+from music_links_bot.state.bot_runtime import BotRuntime
 
 OWNER = 7
 

@@ -7,15 +7,12 @@ from unittest.mock import patch
 
 import httpx
 
-from music_links_bot.formatter import format_title_message
-from music_links_bot.i18n import language_context
-from music_links_bot.keyboards import _build_title_keyboard
-from music_links_bot.models import TitleMatch
-from music_links_bot.publication_contract import (
-    RenderedPublication,
-    validate_rendered_publication,
-)
-from music_links_bot.titles import (
+from music_links_bot.cards.formatter import format_title_message
+from music_links_bot.cards.keyboards import _build_title_keyboard
+from music_links_bot.core.i18n import language_context
+from music_links_bot.core.models import TitleMatch
+from music_links_bot.core.url_utils import extract_supported_urls, netflix_title_id
+from music_links_bot.providers.titles import (
     TitleClient,
     TitleLookupError,
     TitleUnavailableError,
@@ -23,7 +20,10 @@ from music_links_bot.titles import (
     pick_soundtrack,
     pick_trailer,
 )
-from music_links_bot.url_utils import extract_supported_urls, netflix_title_id
+from music_links_bot.publishing.publication_contract import (
+    RenderedPublication,
+    validate_rendered_publication,
+)
 
 SERIES_URL = "https://www.netflix.com/id-en/title/81054853"
 FILM_URL = "https://www.netflix.com/title/80175798"
@@ -283,7 +283,7 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
     async def _lookup(self, client, text: str = SERIES_URL):
         from test_bot import ContextStub, PrivateMessageStub, UpdateStub
 
-        from music_links_bot.bot_lookup_flow import track_lookup_message
+        from music_links_bot.lookup.bot_lookup_flow import track_lookup_message
 
         class NetflixMessage(PrivateMessageStub):
             pass
@@ -292,7 +292,7 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
         message = NetflixMessage()
         context = ContextStub()
         context.application.bot_data["title_client"] = client
-        with patch("music_links_bot.bot_stats.record_post"):
+        with patch("music_links_bot.lookup.bot_stats.record_post"):
             await track_lookup_message(UpdateStub(message), context)
         return message
 
@@ -314,7 +314,7 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
     async def test_a_netflix_link_in_chat_becomes_the_card(self) -> None:
         from test_bot import ContextStub, PrivateMessageStub, UpdateStub
 
-        from music_links_bot.bot_lookup_flow import track_lookup_message
+        from music_links_bot.lookup.bot_lookup_flow import track_lookup_message
 
         class NetflixMessage(PrivateMessageStub):
             text = f"Лучший саундтрек года {SERIES_URL}"
@@ -322,7 +322,7 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
         message = NetflixMessage()
         context = ContextStub()
         context.application.bot_data["title_client"] = _NetflixStub()
-        with patch("music_links_bot.bot_stats.record_post"):
+        with patch("music_links_bot.lookup.bot_stats.record_post"):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -339,7 +339,7 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
     async def test_sharing_a_card_rebuilds_it_inline(self) -> None:
         from test_bot import ContextStub
 
-        from music_links_bot.bot_inline import _build_inline_result
+        from music_links_bot.chat.bot_inline import _build_inline_result
 
         context = ContextStub()
         context.application.bot_data["title_client"] = _NetflixStub()
@@ -393,7 +393,7 @@ def _disney_page(*, seasons: str = "", details: bool = True) -> str:
 
 class MoreServicesTests(unittest.TestCase):
     def test_each_service_link_is_recognised(self) -> None:
-        from music_links_bot.url_utils import streaming_title
+        from music_links_bot.core.url_utils import streaming_title
 
         self.assertEqual(streaming_title(APPLE_SERIES_URL)[0], "appletv")
         self.assertEqual(
@@ -467,7 +467,7 @@ class MoreServicesTests(unittest.TestCase):
                 ),
             ]
         }
-        from music_links_bot.titles import SERVICES
+        from music_links_bot.providers.titles import SERVICES
 
         disney = SERVICES["disney"].channels
 
@@ -536,8 +536,8 @@ class SoundtrackInTelegramTests(unittest.IsolatedAsyncioTestCase):
     async def _start(self, payload: str, chat_type: str = "private"):
         from types import SimpleNamespace
 
-        from music_links_bot import bot_lookup_flow
-        from music_links_bot.release_panel import start_soundtrack
+        from music_links_bot.chat.release_panel import start_soundtrack
+        from music_links_bot.lookup import bot_lookup_flow
 
         seen: list[str | None] = []
 
@@ -552,7 +552,7 @@ class SoundtrackInTelegramTests(unittest.IsolatedAsyncioTestCase):
         return handled, seen
 
     async def test_start_sound_runs_the_normal_album_lookup(self) -> None:
-        from music_links_bot import bot_lookup_flow
+        from music_links_bot.lookup import bot_lookup_flow
 
         handled, seen = await self._start("sound_1711647903")
 
@@ -570,7 +570,7 @@ class SoundtrackInTelegramTests(unittest.IsolatedAsyncioTestCase):
     def test_a_command_is_never_a_post_note(self) -> None:
         from types import SimpleNamespace
 
-        from music_links_bot.bot_stats import build_user_prefix
+        from music_links_bot.lookup.bot_stats import build_user_prefix
 
         message = SimpleNamespace(
             text="/start sound_1711647903", caption=None, entities=(), from_user=None

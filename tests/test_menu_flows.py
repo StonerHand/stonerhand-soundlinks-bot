@@ -7,9 +7,13 @@ from unittest.mock import AsyncMock, patch
 
 from test_release_119_state import RedisModel, ctx
 
-from music_links_bot import bot_menu
-from music_links_bot.bot_runtime import BotRuntime, decode_callback, encode_callback
-from music_links_bot.i18n import get_text
+from music_links_bot.chat import bot_menu
+from music_links_bot.core.i18n import get_text
+from music_links_bot.state.bot_runtime import (
+    BotRuntime,
+    decode_callback,
+    encode_callback,
+)
 
 OWNER = 7
 
@@ -147,7 +151,7 @@ class OwnerSummaryTests(unittest.IsolatedAsyncioTestCase):
         ]
         session = SimpleNamespace(saved_draft_ids=["a", "b"], recent_draft_ids=["c"])
         with patch(
-            "music_links_bot.bot_storage.load_drafts",
+            "music_links_bot.state.bot_storage.load_drafts",
             new=AsyncMock(return_value=drafts),
         ):
             text = await bot_menu.owner_summary(
@@ -161,7 +165,7 @@ class OwnerSummaryTests(unittest.IsolatedAsyncioTestCase):
     async def test_a_storage_failure_hides_the_summary(self) -> None:
         session = SimpleNamespace(saved_draft_ids=["a"], recent_draft_ids=[])
         with patch(
-            "music_links_bot.bot_storage.load_drafts",
+            "music_links_bot.state.bot_storage.load_drafts",
             new=AsyncMock(side_effect=RuntimeError("redis down")),
         ):
             text = await bot_menu.owner_summary(
@@ -171,11 +175,11 @@ class OwnerSummaryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(text, "")
 
     async def test_queue_count_is_zero_for_guests_and_outages(self) -> None:
-        from music_links_bot.publish_queue import QueueStorageError
+        from music_links_bot.publishing.publish_queue import QueueStorageError
 
         self.assertEqual(await bot_menu.queue_count(SimpleNamespace(), False), 0)
         with patch(
-            "music_links_bot.publish_queue.load_jobs",
+            "music_links_bot.publishing.publish_queue.load_jobs",
             new=AsyncMock(side_effect=QueueStorageError("down")),
         ):
             self.assertEqual(await bot_menu.queue_count(SimpleNamespace(), True), 0)

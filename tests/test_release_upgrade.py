@@ -14,36 +14,51 @@ import pytest
 from telegram import Chat, Message, Update, User
 from telegram.ext import Application
 
-from music_links_bot.bot_crate import save_crate, save_crate_title
-from music_links_bot.bot_editor import (
-    _handle_editor_action,
-)
-from music_links_bot.bot_inline import (
-    _build_inline_collection_result,
-    _build_inline_result,
-)
-from music_links_bot.bot_pending import consume_pending_input
-from music_links_bot.bot_preferences import (
-    LocalizedApplication,
-    apply_preferences,
-    dispatch_preferences,
-)
-from music_links_bot.bot_release_settings import tag_code
-from music_links_bot.bot_runtime import BotRuntime, CallbackAction, UserSession
-from music_links_bot.bot_storage import load_draft, store_draft
-from music_links_bot.draft_model import new_track_draft, normalize_track_draft
-from music_links_bot.formatter import (
+from music_links_bot.cards.formatter import (
     format_collection_message,
     format_track_message,
     format_video_message,
 )
-from music_links_bot.keyboards import _build_collection_keyboard, _build_link_keyboard
-from music_links_bot.lookup_models import LookupBundle, SourceStatus
-from music_links_bot.metadata_cleaning import positive_track_count
-from music_links_bot.models import TrackMatch, VideoMatch
-from music_links_bot.publication_budget import visible_length
-from music_links_bot.publication_view import build_publication_view
-from music_links_bot.release_preferences import (
+from music_links_bot.cards.keyboards import (
+    _build_collection_keyboard,
+    _build_link_keyboard,
+)
+from music_links_bot.cards.release_tags import (
+    build_auto_hashtags,
+    build_collection_hashtags,
+    build_mixed_collection_hashtags,
+)
+from music_links_bot.chat.bot_crate import save_crate, save_crate_title
+from music_links_bot.chat.bot_inline import (
+    _build_inline_collection_result,
+    _build_inline_result,
+)
+from music_links_bot.chat.bot_preferences import (
+    LocalizedApplication,
+    apply_preferences,
+    dispatch_preferences,
+)
+from music_links_bot.core.models import TrackMatch, VideoMatch
+from music_links_bot.editor.bot_editor import (
+    _handle_editor_action,
+)
+from music_links_bot.editor.bot_pending import consume_pending_input
+from music_links_bot.editor.bot_release_settings import tag_code
+from music_links_bot.editor.draft_model import new_track_draft, normalize_track_draft
+from music_links_bot.lookup.lookup_models import LookupBundle, SourceStatus
+from music_links_bot.providers.metadata_cleaning import positive_track_count
+from music_links_bot.providers.search import _extract_matching_genre
+from music_links_bot.providers.spotify import parse_spotify_page
+from music_links_bot.providers.track_merge import coalesce_equivalent_tracks
+from music_links_bot.publishing.publication_budget import visible_length
+from music_links_bot.publishing.publication_view import build_publication_view
+from music_links_bot.publishing.rich_publications import (
+    build_rich_collection_html,
+    build_rich_inline_card_html,
+)
+from music_links_bot.state.bot_runtime import BotRuntime, CallbackAction, UserSession
+from music_links_bot.state.bot_storage import load_draft, store_draft
+from music_links_bot.state.release_preferences import (
     PresentationPreferences,
     current_presentation,
     normalize_annotations,
@@ -52,18 +67,6 @@ from music_links_bot.release_preferences import (
     presentation_context,
     release_preference_key,
 )
-from music_links_bot.release_tags import (
-    build_auto_hashtags,
-    build_collection_hashtags,
-    build_mixed_collection_hashtags,
-)
-from music_links_bot.rich_publications import (
-    build_rich_collection_html,
-    build_rich_inline_card_html,
-)
-from music_links_bot.search import _extract_matching_genre
-from music_links_bot.spotify import parse_spotify_page
-from music_links_bot.track_merge import coalesce_equivalent_tracks
 
 
 def track(index=1, **changes):
@@ -367,7 +370,7 @@ class ReleaseSettingsTests(unittest.IsolatedAsyncioTestCase):
         annotations = {release_preference_key(items[0]): {"note": "Первый трек"}}
         results = []
         with patch(
-            "music_links_bot.bot_inline.bot_lookup.resolve_sources",
+            "music_links_bot.chat.bot_inline.bot_lookup.resolve_sources",
             new=AsyncMock(return_value=bundle),
         ):
             for layout in ("column", "compact"):
@@ -392,11 +395,11 @@ class ReleaseSettingsTests(unittest.IsolatedAsyncioTestCase):
         with (
             presentation_context(PresentationPreferences(artwork="native")),
             patch(
-                "music_links_bot.bot_inline.track_lookup._lookup_tracks",
+                "music_links_bot.chat.bot_inline.track_lookup._lookup_tracks",
                 new=AsyncMock(return_value=([item], [])),
             ),
             patch(
-                "music_links_bot.telegram_media_cache.get_cached_file_id",
+                "music_links_bot.artwork.telegram_media_cache.get_cached_file_id",
                 new=AsyncMock(return_value="cached-artwork"),
             ),
         ):
@@ -518,7 +521,10 @@ class ReleaseSettingsTests(unittest.IsolatedAsyncioTestCase):
         )
         with (
             presentation_context(),
-            patch("music_links_bot.bot_pending._restore_crate_screen", new=AsyncMock()),
+            patch(
+                "music_links_bot.editor.bot_pending._restore_crate_screen",
+                new=AsyncMock(),
+            ),
         ):
             assert await consume_pending_input(
                 update, context, retry_lookup=AsyncMock()

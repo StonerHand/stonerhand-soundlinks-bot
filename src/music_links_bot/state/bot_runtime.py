@@ -1,0 +1,1012 @@
+from __future__ import annotations
+
+import asyncio
+import hashlib
+import json
+import logging
+import secrets
+import traceback
+from collections import deque
+from copy import deepcopy
+from dataclasses import asdict, dataclass, field, fields
+from math import ceil
+from pathlib import PurePath
+from time import monotonic, time
+from typing import Any
+
+from music_links_bot.core.constants import MAX_LINKS_PER_MESSAGE
+from music_links_bot.core.errors import (
+    BotErrorCode as _BotErrorCode,
+    BotFlowError as _BotFlowError,
+)
+from music_links_bot.core.url_utils import (
+    cache_key_for_url,
+    is_direct_platform_url,
+    is_supported_music_url,
+)
+from music_links_bot.editor.bot_builder import MAX_INTRO_LENGTH, fit_telegram_html
+from music_links_bot.state.durable_state import (
+    current_state,
+    delete_value,
+    read_json,
+)
+from music_links_bot.state.kvstore import KVStore, KVUnavailableError
+from music_links_bot.state.release_preferences import (
+    normalize_annotations,
+    normalize_release_tags,
+)
+from music_links_bot.state.state_mutations import (
+    UNKNOWN_RAW,
+    StateConflictError,
+    merge_fields,
+    mutate_json_raw,
+)
+
+# Backwards-compatible exports for existing imports and callbacks.
+BotErrorCode = _BotErrorCode
+BotFlowError = _BotFlowError
+
+CALLBACK_VERSION = "v2"
+CALLBACK_TTL_SECONDS = 15 * 60
+ACTION_LOCK_SECONDS = 45
+INTENT_TTL_SECONDS = 4
+RATE_LIMIT_WINDOW_SECONDS = 60
+RATE_LIMIT_MAX_REQUESTS = 12
+ACTIVE_REQUEST_TTL_SECONDS = 5 * 60
+SESSION_TTL_SECONDS = 90 * 24 * 3600
+SESSION_SCHEMA_VERSION = 9
+MAX_RECENT_DRAFTS = 30
+COLLECTION_STATE_VERSION = 2
+MAX_SESSION_TEXT_LENGTH = 2_048
+MAX_COLLECTION_INTRO_HTML_LENGTH = 20_000
+MAX_MEMORY_SESSIONS = 500
+MAX_MEMORY_KEYS = 2_000
+CIRCUIT_FAILURE_THRESHOLD = 3
+CIRCUIT_COOLDOWN_SECONDS = 45
+METRICS_KV_KEY = "runtime:metrics:v1"
+# Transport wrappers every Bot API call passes through: a failure is located
+# at the bot code that made the call, not here.
+_PLUMBING_MODULES = frozenset({"update_execution.py", "telegram_gateway.py"})
+REQUEST_LATENCY_BUCKETS_MS = (250, 500, 1_000, 2_000, 5_000, 10_000, 20_000)
+LOGGER = logging.getLogger(__name__)
+
+
+def detect_action(text: str, source_urls: list[str], *, is_private: bool) -> str:
+    """Classify a free-form update before dispatching expensive work."""
+    normalized = " ".join(text.casefold().split())
+    if len(source_urls) > 1:
+        return "crate"
+    if source_urls:
+        return "resolve"
+    if is_private and normalized in {"помощь", "help", "что ты умеешь", "меню"}:
+        return "help"
+    return "search" if is_private and normalized else "ignore"
+
+
+@dataclass(slots=True, frozen=True)
+class CallbackAction:
+    scope: str
+    action: str
+    payload: str = ""
+    version: str = CALLBACK_VERSION
+
+
+def encode_callback(scope: str, action: str, payload: str = "") -> str:
+    parts = (CALLBACK_VERSION, scope, action, payload)
+    value = "|".join(parts).rstrip("|")
+    if len(value.encode("utf-8")) > 64:
+        raise ValueError("Telegram callback_data exceeds 64 bytes")
+    return value
+
+
+def decode_callback(value: str | None) -> CallbackAction | None:
+    if not value:
+        return None
+
+    parts = value.split("|")
+    if len(parts) >= 3 and parts[0] == CALLBACK_VERSION:
+        return CallbackAction(
+            scope=parts[1],
+            action=parts[2],
+            payload="|".join(parts[3:]),
+        )
+
+    # Compatibility with buttons sent before callback v2 was deployed.
+    if len(parts) == 3 and parts[0] == "ed":
+        return CallbackAction("editor", parts[1], parts[2], version="v1")
+    if value.startswith("menu:"):
+        return CallbackAction("menu", value.split(":", 1)[1], version="v1")
+    return None
+
+
+def _normalize_collection_urls(value: object) -> list[str]:
+    if not isinstance(value, (list, tuple)):
+        return []
+    urls: list[str] = []
+    seen: set[str] = set()
+    for raw_url in value[:MAX_LINKS_PER_MESSAGE]:
+        if not isinstance(raw_url, str):
+            continue
+        url = cache_key_for_url(raw_url.strip())
+        if (
+            not url
+            or url in seen
+            or not is_supported_music_url(url)
+            or not is_direct_platform_url(url)
+        ):
+            continue
+        urls.append(url)
+        seen.add(url)
+    return urls
+
+
+def _normalize_collection_intro_html(value: object) -> str:
+    """Accept only the bounded blockquote produced by ``build_user_prefix``."""
+    if not isinstance(value, str):
+        return ""
+    clean = value.strip()
+    opening = "<blockquote>"
+    closing = "</blockquote>"
+    if (
+        not clean
+        or len(clean) > MAX_COLLECTION_INTRO_HTML_LENGTH
+        or not clean.startswith(opening)
+        or not clean.endswith(closing)
+    ):
+        return ""
+    inner = clean[len(opening) : -len(closing)]
+    fitted = fit_telegram_html(inner, MAX_INTRO_LENGTH).strip()
+    return f"{opening}{fitted}{closing}\n\n" if fitted else ""
+
+
+@dataclass(slots=True)
+class UserSession:
+    user_id: int
+    lang: str = "ru"
+    preferred_lang: str = ""
+    default_preset: str = ""
+    default_hashtags: str = ""
+    collection_layout: str = "auto"
+    collection_grouping: str = "none"
+    default_artwork: str = "clean"
+    release_tags: dict[str, list[str]] = field(default_factory=dict)
+    collection_annotations: dict[str, dict[str, str]] = field(default_factory=dict)
+    onboarding_seen: bool = False
+    welcome_seen: bool = False
+    quick_publish: bool = False
+    last_query: str = ""
+    last_action: dict[str, Any] = field(default_factory=dict)
+    last_collection_urls: list[str] = field(default_factory=list)
+    last_collection_intro_html: str = ""
+    pending_input: dict[str, Any] = field(default_factory=dict)
+    active_draft_id: str = ""
+    recent_draft_ids: list[str] = field(default_factory=list)
+    saved_draft_ids: list[str] = field(default_factory=list)
+    draft_filter: str = "all"
+    draft_query: str = ""
+    home_chat_id: int | None = None
+    home_message_id: int | None = None
+    updated_at: int = field(default_factory=lambda: int(time()))
+    _baseline: dict = field(default_factory=dict, repr=False, compare=False)
+    _exists: bool = field(default=False, repr=False, compare=False)
+    # Exact stored JSON last seen by this request (UNKNOWN_RAW when not read).
+    _raw: object = field(default=UNKNOWN_RAW, repr=False, compare=False)
+
+    def payload(self) -> dict:
+        return {
+            f.name: deepcopy(getattr(self, f.name))
+            for f in fields(self)
+            if not f.name.startswith("_")
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> UserSession | None:
+        try:
+            return cls(
+                user_id=int(payload["user_id"]),
+                lang=str(payload.get("lang") or "ru"),
+                preferred_lang=_choice(payload.get("preferred_lang"), {"ru", "en"}),
+                default_preset=_choice(
+                    payload.get("default_preset"), {"minimal", "cover", "longread"}
+                ),
+                default_hashtags=_choice(
+                    payload.get("default_hashtags"), {"auto", "off"}
+                ),
+                collection_layout=_choice(
+                    payload.get("collection_layout"),
+                    {"auto", "column", "compact", "numbers"},
+                )
+                or "auto",
+                collection_grouping=_choice(
+                    payload.get("collection_grouping"), {"none", "artist", "album"}
+                )
+                or "none",
+                default_artwork=_choice(
+                    payload.get("default_artwork"), {"native", "clean"}
+                )
+                or "clean",
+                release_tags=normalize_release_tags(payload.get("release_tags")),
+                collection_annotations=normalize_annotations(
+                    payload.get("collection_annotations")
+                ),
+                onboarding_seen=bool(payload.get("onboarding_seen")),
+                welcome_seen=bool(payload.get("welcome_seen")),
+                quick_publish=bool(payload.get("quick_publish")),
+                last_query=str(payload.get("last_query") or "")[
+                    :MAX_SESSION_TEXT_LENGTH
+                ],
+                last_action=(
+                    dict(payload["last_action"])
+                    if isinstance(payload.get("last_action"), dict)
+                    else {}
+                ),
+                last_collection_urls=_normalize_collection_urls(
+                    payload.get("last_collection_urls")
+                ),
+                last_collection_intro_html=_normalize_collection_intro_html(
+                    payload.get("last_collection_intro_html")
+                ),
+                pending_input=_normalize_pending_input(payload.get("pending_input")),
+                active_draft_id=str(payload.get("active_draft_id") or "")[:32],
+                recent_draft_ids=[
+                    str(value)[:32]
+                    for value in (
+                        payload.get("recent_draft_ids")
+                        if isinstance(payload.get("recent_draft_ids"), list)
+                        else []
+                    )[:MAX_RECENT_DRAFTS]
+                    if value
+                ],
+                saved_draft_ids=[
+                    str(v)[:32]
+                    for v in (
+                        payload.get("saved_draft_ids")
+                        if isinstance(payload.get("saved_draft_ids"), list)
+                        else []
+                    )
+                    if isinstance(v, str)
+                ][:30],
+                draft_filter=_choice(
+                    payload.get("draft_filter"),
+                    {"all", "draft", "scheduled", "published", "saved"},
+                )
+                or "all",
+                draft_query=str(payload.get("draft_query") or "")[:100],
+                home_chat_id=_optional_int(payload.get("home_chat_id")),
+                home_message_id=_optional_int(payload.get("home_message_id")),
+                updated_at=int(payload.get("updated_at") or time()),
+            )
+        except (KeyError, TypeError, ValueError):
+            return None
+
+
+def _choice(value: object, allowed: set[str]) -> str:
+    return value if isinstance(value, str) and value in allowed else ""
+
+
+def _optional_int(value: object) -> int | None:
+    if value is None or value == "":
+        return None
+    parsed = int(value)
+    return parsed if parsed > 0 else None
+
+
+def _normalize_pending_input(value: object) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    kind = str(value.get("kind") or "")
+    if kind not in {
+        "intro",
+        "hashtags",
+        "crate_title",
+        "crate_note",
+        "crate_section",
+        "schedule",
+        "replace_source",
+        "cover",
+        "template_name",
+        "library_search",
+        "brand_label",
+        "collection_links",
+        "collection_replace",
+    }:
+        return {}
+    result: dict[str, Any] = {"kind": kind}
+    draft_id = str(value.get("draft_id") or "")[:32]
+    if draft_id:
+        result["draft_id"] = draft_id
+    for key in (
+        "editor_chat_id",
+        "editor_message_id",
+        "prompt_message_id",
+        "created_at",
+    ):
+        parsed = _optional_int(value.get(key))
+        if parsed is not None:
+            result[key] = parsed
+    if kind in {"crate_note", "crate_section"}:
+        key = str(value.get("release_key") or "")
+        if len(key) == 24:
+            result["release_key"] = key
+    if "draft_revision" in value:
+        result["draft_revision"] = max(0, int(value.get("draft_revision") or 0))
+    if kind == "collection_replace":
+        result["release_key"] = str(value.get("release_key") or "")[:16]
+    if kind == "replace_source":
+        retry_id = str(value.get("retry_id") or "")[:64]
+        source_index = _optional_int(value.get("source_index"))
+        if retry_id:
+            result["retry_id"] = retry_id
+        if source_index is not None:
+            result["source_index"] = source_index
+    return result
+
+
+@dataclass(slots=True)
+class ProviderDiagnostic:
+    provider: str
+    ok: bool = True
+    latency_ms: int = 0
+    failures: int = 0
+    successes: int = 0
+    total_latency_ms: int = 0
+    partials: int = 0
+    timeouts: int = 0
+    rate_limits: int = 0
+    consecutive_failures: int = 0
+    circuit_open_until: int = 0
+    last_error: str = ""
+    checked_at: int = 0
+
+
+class BotRuntime:
+    """Cross-handler state with confirmed Redis storage or local-only mode."""
+
+    def __init__(self, kv: KVStore | None = None) -> None:
+        self.kv = kv
+        self.sessions: dict[int, UserSession] = {}
+        self.seen_callbacks: dict[str, float] = {}
+        self.action_locks: dict[str, tuple[float, str]] = {}
+        self.recent_intents: dict[str, float] = {}
+        self.request_windows: dict[int, tuple[int, float]] = {}
+        self.request_tokens: dict[int, str] = {}
+        self.active_tasks: dict[int, asyncio.Task[Any]] = {}
+        self.diagnostics: dict[str, ProviderDiagnostic] = {}
+        self.request_latency_buckets = dict.fromkeys(REQUEST_LATENCY_BUCKETS_MS, 0)
+        self.request_latency_overflow = 0
+        self.metrics: dict[str, int] = {
+            "requests": 0,
+            "request_errors": 0,
+            "request_ms_total": 0,
+            "request_ms_max": 0,
+            "cache_hits": 0,
+            "cache_misses": 0,
+            "publications": 0,
+            "publication_errors": 0,
+            "rich_messages": 0,
+            "rich_message_errors": 0,
+            "rich_message_fallbacks": 0,
+            "rate_limited": 0,
+            "funnel_started": 0,
+            "funnel_resolved": 0,
+            "funnel_edited": 0,
+            "funnel_published": 0,
+        }
+        self._metrics_persisted_at = 0.0
+        self.recent_failures: deque[dict[str, Any]] = deque(maxlen=5)
+
+    def session_key(self, user_id: int) -> str:
+        """The key a caller may batch-read and hand back via ``prefetched_raw``."""
+        return f"session:v2:{user_id}"
+
+    async def get_session(
+        self,
+        user_id: int,
+        *,
+        lang: str = "ru",
+        prefetched_raw: object = UNKNOWN_RAW,
+    ) -> UserSession:
+        scope = current_state.get()
+        cache_key = (id(self), user_id)
+        cached = (
+            self.sessions.get(user_id)
+            if self.kv is None
+            else (scope or {}).get(cache_key)
+        )
+        if cached is not None:
+            if lang:
+                cached.lang = lang
+            return cached
+
+        payload = None
+        raw_current: object = UNKNOWN_RAW
+        if self.kv is not None:
+            key = self.session_key(user_id)
+            raw_reader = getattr(self.kv, "get_required", None)
+            if prefetched_raw is not UNKNOWN_RAW or callable(raw_reader):
+                # Keep the exact stored text so the next save can go straight
+                # to compare-and-set instead of re-reading the session.
+                raw_current = (
+                    prefetched_raw
+                    if prefetched_raw is not UNKNOWN_RAW
+                    else await raw_reader(key)
+                )
+                if raw_current is not None and not isinstance(raw_current, str):
+                    raise KVUnavailableError("Redis returned an invalid value")
+                try:
+                    payload = (
+                        json.loads(raw_current) if raw_current is not None else None
+                    )
+                except ValueError as exc:
+                    raise KVUnavailableError("Redis contains invalid JSON") from exc
+            else:
+                # Compatibility with lightweight storage adapters.
+                payload = await read_json(self.kv, key)
+        exists = payload is not None
+        if isinstance(payload, dict) and isinstance(payload.get("session"), dict):
+            payload = payload["session"]
+        session = UserSession.from_dict(payload) if isinstance(payload, dict) else None
+        if session is None:
+            session = UserSession(user_id=user_id, lang=lang)
+        session._baseline = session.payload()
+        session._exists = exists
+        session._raw = raw_current
+        if lang:
+            session.lang = lang
+        self._cap(self.sessions, MAX_MEMORY_SESSIONS)
+        self.sessions[user_id] = session
+        if scope is not None:
+            scope[cache_key] = session
+        return session
+
+    async def save_session(self, session: UserSession) -> None:
+        session.updated_at = int(time())
+        desired = session.payload()
+        if self.kv is not None:
+
+            def merge(payload):
+                if payload is None and session._exists:
+                    raise StateConflictError("Session was deleted or expired")
+                current = (
+                    payload.get("session", payload)
+                    if isinstance(payload, dict)
+                    else session._baseline
+                )
+                data = (
+                    merge_fields(current, session._baseline, desired)
+                    if session._baseline
+                    else desired
+                )
+                return {"v": SESSION_SCHEMA_VERSION, "session": data}
+
+            stored, session._raw = await mutate_json_raw(
+                self.kv,
+                f"session:v2:{session.user_id}",
+                merge,
+                ttl_seconds=SESSION_TTL_SECONDS,
+                expected_raw=session._raw,
+            )
+            for key, value in stored["session"].items():
+                if key in desired:
+                    setattr(session, key, deepcopy(value))
+        session._baseline = session.payload()
+        session._exists = True
+        self._cap(self.sessions, MAX_MEMORY_SESSIONS)
+        self.sessions[session.user_id] = session
+        scope = current_state.get()
+        if scope is not None:
+            scope[(id(self), session.user_id)] = session
+
+    async def remember_action(
+        self, user_id: int, *, kind: str, value: str, lang: str = "ru"
+    ) -> None:
+        session = await self.get_session(user_id, lang=lang)
+        session.last_action = {
+            "kind": kind,
+            "value": value[:MAX_SESSION_TEXT_LENGTH],
+        }
+        if kind == "search":
+            session.last_query = value[:MAX_SESSION_TEXT_LENGTH]
+        await self.save_session(session)
+
+    async def remember_collection(
+        self,
+        user_id: int,
+        *,
+        urls: list[str],
+        intro_html: str = "",
+        lang: str = "ru",
+    ) -> None:
+        """Persist the latest complete collection independently of UI actions."""
+        normalized = _normalize_collection_urls(urls)
+        if len(normalized) < 2:
+            return
+        session = await self.get_session(user_id, lang=lang)
+        session.last_collection_urls = normalized
+        session.last_collection_intro_html = _normalize_collection_intro_html(
+            intro_html
+        )
+        await self.save_session(session)
+        if self.kv is not None:
+            await self.kv.set_json(
+                f"collection:v1:{user_id}",
+                {
+                    "v": COLLECTION_STATE_VERSION,
+                    "urls": normalized,
+                    "intro_html": session.last_collection_intro_html,
+                },
+                ttl_seconds=SESSION_TTL_SECONDS,
+            )
+
+    async def get_collection(
+        self,
+        user_id: int,
+        *,
+        lang: str = "ru",
+    ) -> list[str]:
+        """Load the latest complete collection without session write races."""
+        if self.kv is not None:
+            payload = await self.kv.get_json(f"collection:v1:{user_id}")
+            if isinstance(payload, dict):
+                urls = _normalize_collection_urls(payload.get("urls"))
+                if len(urls) >= 2:
+                    return urls
+        session = await self.get_session(user_id, lang=lang)
+        return list(session.last_collection_urls)
+
+    async def get_collection_intro(
+        self,
+        user_id: int,
+        *,
+        urls: list[str],
+        lang: str = "ru",
+    ) -> str:
+        """Return an intro only for the exact collection it was written for."""
+        normalized = _normalize_collection_urls(urls)
+        if len(normalized) < 2:
+            return ""
+        if self.kv is not None:
+            payload = await self.kv.get_json(f"collection:v1:{user_id}")
+            if (
+                isinstance(payload, dict)
+                and _normalize_collection_urls(payload.get("urls")) == normalized
+            ):
+                intro = _normalize_collection_intro_html(payload.get("intro_html"))
+                if intro:
+                    return intro
+        session = await self.get_session(user_id, lang=lang)
+        if session.last_collection_urls != normalized:
+            return ""
+        return _normalize_collection_intro_html(session.last_collection_intro_html)
+
+    async def claim_callback(self, callback_id: str) -> bool:
+        key = f"callback:v2:{callback_id}"
+        if self.kv is not None:
+            claimed = await self.kv.set(
+                key, "1", ttl_seconds=CALLBACK_TTL_SECONDS, nx=True
+            )
+            if claimed:
+                return True
+            if await self.kv.get(key) is not None:
+                return False
+            # Redis is unavailable rather than occupied; memory fallback keeps
+            # the current instance useful without weakening a live lease.
+        now = monotonic()
+        self._drop_expired(self.seen_callbacks, now)
+        if callback_id in self.seen_callbacks:
+            return False
+        self._cap(self.seen_callbacks, MAX_MEMORY_KEYS)
+        self.seen_callbacks[callback_id] = now + CALLBACK_TTL_SECONDS
+        return True
+
+    async def acquire_action(self, key: str) -> str | None:
+        token = secrets.token_hex(8)
+        redis_key = f"action:v1:{key}"
+        if self.kv is not None:
+            if await self.kv.set(
+                redis_key, token, ttl_seconds=ACTION_LOCK_SECONDS, nx=True
+            ):
+                return token
+            # An unavailable shared lock cannot be replaced with a local one:
+            # another worker may already be sending this publication.
+            return None
+        now = monotonic()
+        for expired_key, (deadline, _owner) in list(self.action_locks.items()):
+            if deadline <= now:
+                self.action_locks.pop(expired_key, None)
+        if key in self.action_locks:
+            return None
+        if len(self.action_locks) >= MAX_MEMORY_KEYS:
+            return None
+        self.action_locks[key] = (now + ACTION_LOCK_SECONDS, token)
+        return token
+
+    async def release_action(self, key: str, token: str) -> None:
+        current = self.action_locks.get(key)
+        if current is not None and current[1] == token:
+            self.action_locks.pop(key, None)
+        if self.kv is not None:
+            await self.kv.delete_if_value(f"action:v1:{key}", token)
+
+    async def claim_intent(
+        self,
+        user_id: int,
+        *,
+        kind: str,
+        value: str = "",
+        ttl_seconds: int = INTENT_TTL_SECONDS,
+    ) -> bool:
+        """Debounce equal user intents across warm instances and Redis.
+
+        Telegram creates a new update for every tap or sent message, so update
+        ID deduplication alone cannot stop an accidental double ``/start`` or
+        two identical lookups. Distinct requests are never blocked.
+        """
+        normalized = " ".join(value.casefold().split())[:1_000]
+        digest = hashlib.sha256(f"{kind}:{normalized}".encode()).hexdigest()[:24]
+        key = f"{user_id}:{digest}"
+        redis_key = f"intent:v1:{key}"
+        ttl = max(1, int(ttl_seconds))
+        now = monotonic()
+        self._drop_expired(self.recent_intents, now)
+        if self.kv is not None:
+            if await self.kv.set(redis_key, "1", ttl_seconds=ttl, nx=True):
+                self._cap(self.recent_intents, MAX_MEMORY_KEYS)
+                self.recent_intents[key] = now + ttl
+                return True
+            if await self.kv.get(redis_key) is not None:
+                return False
+
+        if key in self.recent_intents:
+            return False
+        self._cap(self.recent_intents, MAX_MEMORY_KEYS)
+        self.recent_intents[key] = now + ttl
+        return True
+
+    async def allow_user_request(
+        self,
+        user_id: int,
+        *,
+        max_requests: int = RATE_LIMIT_MAX_REQUESTS,
+        window_seconds: int = RATE_LIMIT_WINDOW_SECONDS,
+    ) -> tuple[bool, int]:
+        """Apply a small per-user fixed window without storing request content."""
+        limit = max(1, int(max_requests))
+        window = max(1, int(window_seconds))
+        wall_now = int(time())
+        retry_after = window - wall_now % window
+        if self.kv is not None:
+            counter = await self.kv.increment_window(
+                f"rate:v1:{user_id}:{wall_now // window}",
+                ttl_seconds=window + 1,
+            )
+            if counter is not None:
+                allowed = counter <= limit
+                if not allowed:
+                    self.metrics["rate_limited"] += 1
+                return allowed, retry_after
+
+        now = monotonic()
+        count, expires_at = self.request_windows.get(user_id, (0, now + window))
+        if expires_at <= now:
+            count, expires_at = 0, now + window
+        count += 1
+        self._cap(self.request_windows, MAX_MEMORY_SESSIONS)
+        self.request_windows[user_id] = (count, expires_at)
+        allowed = count <= limit
+        if not allowed:
+            self.metrics["rate_limited"] += 1
+        return allowed, max(1, int(expires_at - now))
+
+    def register_request(self, user_id: int) -> asyncio.Task[Any] | None:
+        current = asyncio.current_task()
+        previous = self.active_tasks.get(user_id)
+        if previous is not None and previous is not current and not previous.done():
+            previous.cancel()
+        if current is not None:
+            self.active_tasks[user_id] = current
+        return previous
+
+    async def begin_request(self, user_id: int) -> str:
+        """Register a lookup and make it the only current cross-instance request."""
+        self.register_request(user_id)
+        token = secrets.token_hex(12)
+        self.request_tokens[user_id] = token
+        if self.kv is not None:
+            await self.kv.set(
+                f"active-request:v1:{user_id}",
+                token,
+                ttl_seconds=ACTIVE_REQUEST_TTL_SECONDS,
+            )
+        return token
+
+    async def request_is_current(self, user_id: int, token: str) -> bool:
+        if self.kv is not None:
+            stored = await self.kv.get(f"active-request:v1:{user_id}")
+            if stored is not None:
+                return stored == token
+        return self.request_tokens.get(user_id) == token
+
+    def finish_request(self, user_id: int) -> None:
+        current = asyncio.current_task()
+        if self.active_tasks.get(user_id) is current:
+            self.active_tasks.pop(user_id, None)
+
+    def cancel_request(self, user_id: int) -> bool:
+        task = self.active_tasks.get(user_id)
+        if task is None or task is asyncio.current_task() or task.done():
+            return False
+        task.cancel()
+        return True
+
+    async def cancel_request_durable(self, user_id: int) -> bool:
+        cancelled = self.cancel_request(user_id)
+        if self.kv is None:
+            return cancelled
+        key = f"active-request:v1:{user_id}"
+        active = await self.kv.get(key)
+        if active is None:
+            return cancelled
+        marked = await self.kv.set(
+            key,
+            f"cancelled:{secrets.token_hex(6)}",
+            ttl_seconds=ACTIVE_REQUEST_TTL_SECONDS,
+        )
+        return cancelled or marked
+
+    async def finish_request_durable(self, user_id: int) -> None:
+        current = asyncio.current_task()
+        if self.active_tasks.get(user_id) is not current:
+            return
+        token = self.request_tokens.pop(user_id, "")
+        self.finish_request(user_id)
+        if token and self.kv is not None:
+            await self.kv.delete_if_value(f"active-request:v1:{user_id}", token)
+
+    async def forget_session(self, user_id: int) -> None:
+        task = self.active_tasks.get(user_id)
+        current = asyncio.current_task()
+        if task is not None and task is not current and not task.done():
+            task.cancel()
+        self.sessions.pop(user_id, None)
+        scope = current_state.get()
+        if scope is not None:
+            scope.pop((id(self), user_id), None)
+        self.request_windows.pop(user_id, None)
+        self.request_tokens.pop(user_id, None)
+        self.active_tasks.pop(user_id, None)
+        if self.kv is not None:
+            wall_window = int(time()) // RATE_LIMIT_WINDOW_SECONDS
+            await asyncio.gather(
+                delete_value(self.kv, f"session:v2:{user_id}"),
+                delete_value(self.kv, f"session:v1:{user_id}"),
+                delete_value(self.kv, f"collection:v1:{user_id}"),
+                self.kv.delete(f"rate:v1:{user_id}:{wall_window}"),
+                self.kv.delete(f"rate:v1:{user_id}:{wall_window - 1}"),
+                self.kv.delete(f"active-request:v1:{user_id}"),
+            )
+
+    def record_provider(
+        self,
+        provider: str,
+        *,
+        ok: bool,
+        latency_ms: int,
+        error: BaseException | None = None,
+        partial: bool = False,
+    ) -> None:
+        diagnostic = self.diagnostics.setdefault(
+            provider, ProviderDiagnostic(provider=provider)
+        )
+        diagnostic.ok = ok
+        diagnostic.latency_ms = max(0, latency_ms)
+        diagnostic.total_latency_ms += diagnostic.latency_ms
+        diagnostic.checked_at = int(time())
+        error_name = type(error).__name__ if error else ""
+        error_key = f"{error_name} {error or ''}".casefold()
+        if partial:
+            diagnostic.partials += 1
+        if "timeout" in error_key:
+            diagnostic.timeouts += 1
+        if (
+            "ratelimit" in error_key
+            or "too many requests" in error_key
+            or "429" in error_key
+        ):
+            diagnostic.rate_limits += 1
+        if ok:
+            diagnostic.successes += 1
+            diagnostic.consecutive_failures = 0
+            diagnostic.circuit_open_until = 0
+            diagnostic.last_error = ""
+        else:
+            diagnostic.failures += 1
+            diagnostic.consecutive_failures += 1
+            diagnostic.last_error = error_name or "unknown"
+            if diagnostic.consecutive_failures >= CIRCUIT_FAILURE_THRESHOLD:
+                diagnostic.circuit_open_until = (
+                    diagnostic.checked_at + CIRCUIT_COOLDOWN_SECONDS
+                )
+
+    def provider_available(self, provider: str, *, now: int | None = None) -> bool:
+        diagnostic = self.diagnostics.get(provider)
+        if diagnostic is None:
+            return True
+        current = int(time()) if now is None else now
+        return diagnostic.circuit_open_until <= current
+
+    def provider_snapshot(self) -> list[dict[str, Any]]:
+        current = int(time())
+        snapshot: list[dict[str, Any]] = []
+        for item in sorted(self.diagnostics.values(), key=lambda value: value.provider):
+            payload = asdict(item)
+            payload["circuit_open"] = item.circuit_open_until > current
+            requests = item.successes + item.failures
+            payload["requests"] = requests
+            payload["avg_latency_ms"] = (
+                item.total_latency_ms // requests if requests else 0
+            )
+            payload["success_rate_percent"] = (
+                round(item.successes * 100 / requests, 1) if requests else 0.0
+            )
+            snapshot.append(payload)
+        return snapshot
+
+    def record_cache(self, *, hit: bool) -> None:
+        self.metrics["cache_hits" if hit else "cache_misses"] += 1
+
+    def record_request(self, *, latency_ms: int, ok: bool) -> None:
+        latency = max(0, int(latency_ms))
+        self.metrics["requests"] += 1
+        self.metrics["request_ms_total"] += latency
+        self.metrics["request_ms_max"] = max(
+            self.metrics["request_ms_max"],
+            latency,
+        )
+        for upper_bound in REQUEST_LATENCY_BUCKETS_MS:
+            if latency <= upper_bound:
+                self.request_latency_buckets[upper_bound] += 1
+                break
+        else:
+            self.request_latency_overflow += 1
+        if not ok:
+            self.metrics["request_errors"] += 1
+
+    def record_publication(self, *, ok: bool) -> None:
+        self.metrics["publications"] += 1
+        if not ok:
+            self.metrics["publication_errors"] += 1
+        else:
+            self.record_funnel("published")
+
+    def record_funnel(self, stage: str) -> None:
+        key = f"funnel_{stage}"
+        if key in self.metrics:
+            self.metrics[key] += 1
+
+    def record_rich_message(self, *, ok: bool, fallback: bool = False) -> None:
+        """Record Rich Message delivery and automatic classic fallback."""
+        self.metrics["rich_messages"] += 1
+        if not ok:
+            self.metrics["rich_message_errors"] += 1
+        if fallback:
+            self.metrics["rich_message_fallbacks"] += 1
+
+    @property
+    def last_failure(self) -> dict[str, Any] | None:
+        return self.recent_failures[0] if self.recent_failures else None
+
+    def record_failure(self, error: BaseException, *, kind: str = "") -> None:
+        """Keep what broke a request, for /status and the health endpoint.
+
+        Only the update kind, the error class, the bot's own code location,
+        the Bot API method and Telegram's reason are kept: never user text,
+        links or IDs.
+        """
+        frames = [
+            frame
+            for frame in traceback.extract_tb(error.__traceback__)
+            if "music_links_bot" in frame.filename
+            and PurePath(frame.filename).name not in _PLUMBING_MODULES
+        ]
+        where = (
+            f"{PurePath(frames[-1].filename).name}:{frames[-1].lineno} "
+            f"{frames[-1].name}"
+            if frames
+            else ""
+        )
+        from telegram.error import TelegramError
+
+        method = next(
+            (
+                note.removeprefix("telegram method: ")
+                for note in getattr(error, "__notes__", ())
+                if note.startswith("telegram method: ")
+            ),
+            "",
+        )
+        self.recent_failures.appendleft(
+            {
+                "kind": kind,
+                "type": type(error).__name__,
+                "where": where,
+                "method": method,
+                "detail": str(error.message)[:160]
+                if isinstance(error, TelegramError)
+                else "",
+                "at": int(time()),
+            }
+        )
+
+    def metrics_snapshot(self) -> dict[str, Any]:
+        snapshot = dict(self.metrics)
+        requests = snapshot["requests"]
+        snapshot["request_ms_avg"] = (
+            snapshot["request_ms_total"] // requests if requests else 0
+        )
+        target = ceil(requests * 0.95)
+        seen = 0
+        p95 = 0
+        for upper_bound in REQUEST_LATENCY_BUCKETS_MS:
+            seen += self.request_latency_buckets[upper_bound]
+            if target and seen >= target:
+                p95 = upper_bound
+                break
+        if target and not p95:
+            p95 = snapshot["request_ms_max"]
+        snapshot["request_ms_p95"] = p95
+        snapshot["request_latency_overflow"] = self.request_latency_overflow
+        cache_requests = snapshot["cache_hits"] + snapshot["cache_misses"]
+        snapshot["cache_hit_rate_percent"] = (
+            round(snapshot["cache_hits"] * 100 / cache_requests, 1)
+            if cache_requests
+            else 0.0
+        )
+        snapshot["last_failure"] = self.last_failure
+        snapshot["recent_failures"] = list(self.recent_failures)
+        snapshot["metrics_scope"] = "instance"
+        snapshot["updated_at"] = int(time())
+        snapshot["providers"] = {
+            item["provider"]: {
+                "requests": item["requests"],
+                "success_rate_percent": item["success_rate_percent"],
+                "avg_latency_ms": item["avg_latency_ms"],
+                "partials": item["partials"],
+                "timeouts": item["timeouts"],
+                "rate_limits": item["rate_limits"],
+                "consecutive_failures": item["consecutive_failures"],
+                "circuit_open": item["circuit_open"],
+                "last_error": item["last_error"],
+                "checked_at": item["checked_at"],
+            }
+            for item in self.provider_snapshot()
+        }
+        return snapshot
+
+    async def persist_metrics(self, *, force: bool = False) -> None:
+        now = monotonic()
+        if self.kv is None or (not force and now - self._metrics_persisted_at < 30):
+            return
+        self._metrics_persisted_at = now
+        try:
+            await asyncio.wait_for(
+                self.kv.set_json(
+                    METRICS_KV_KEY,
+                    self.metrics_snapshot(),
+                    ttl_seconds=7 * 24 * 3600,
+                ),
+                timeout=0.35,
+            )
+        except Exception:
+            # Metrics must never add visible latency to a user request.
+            LOGGER.debug("Could not persist runtime metrics", exc_info=True)
+
+    @staticmethod
+    def _drop_expired(items: dict[str, float], now: float) -> None:
+        for key in [key for key, expires_at in items.items() if expires_at <= now]:
+            items.pop(key, None)
+
+    @staticmethod
+    def _cap(items: dict[Any, Any], max_size: int) -> None:
+        while len(items) >= max_size:
+            items.pop(next(iter(items)))

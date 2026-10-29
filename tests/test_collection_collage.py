@@ -8,13 +8,13 @@ from urllib.parse import parse_qs, urlparse
 
 from PIL import Image
 
-from music_links_bot.collection_collage import (
+from music_links_bot.artwork.collection_collage import (
     MAX_PREVIEW_URL_LENGTH,
     collection_collage_preview_url,
     compose_collection_collage,
     decode_collage_payload,
 )
-from music_links_bot.models import TrackMatch
+from music_links_bot.core.models import TrackMatch
 
 
 def _image_bytes(color: tuple[int, int, int]) -> bytes:

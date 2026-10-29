@@ -7,11 +7,11 @@ import pytest
 from telegram import InlineKeyboardMarkup
 from telegram.error import BadRequest, TimedOut
 
-from music_links_bot.bot_inline import _inline_article
-from music_links_bot.collection_collage import branded_artwork_preview_url
-from music_links_bot.keyboards import _build_link_preview_options
-from music_links_bot.models import TrackMatch
-from music_links_bot.publication_service import PublicationService
+from music_links_bot.artwork.collection_collage import branded_artwork_preview_url
+from music_links_bot.cards.keyboards import _build_link_preview_options
+from music_links_bot.chat.bot_inline import _inline_article
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.publishing.publication_service import PublicationService
 
 ENV = {
     "WEBHOOK_BASE_URL": "https://bot.example",

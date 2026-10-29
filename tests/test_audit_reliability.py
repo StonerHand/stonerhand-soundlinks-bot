@@ -13,27 +13,29 @@ from telegram.error import BadRequest, NetworkError, TimedOut
 from telegram.ext import Application, TypeHandler
 
 from api import telegram as webhook
-from music_links_bot import ephemeral, mixed_post, publish_queue
-from music_links_bot.bot_preferences import LocalizedApplication
-from music_links_bot.bot_stats import record_delivered
-from music_links_bot.bot_storage import (
+from music_links_bot.chat.bot_preferences import LocalizedApplication
+from music_links_bot.core.constants import STATS_KV_KEY
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.editor.draft_model import new_track_draft
+from music_links_bot.lookup import mixed_post
+from music_links_bot.lookup.bot_stats import record_delivered
+from music_links_bot.ops.loop_runner import start_background_loop, stop_background_loop
+from music_links_bot.publishing import publish_queue
+from music_links_bot.state.bot_storage import (
     load_search_selection,
     store_draft,
     store_retry_sources,
     store_search_selection,
 )
-from music_links_bot.constants import STATS_KV_KEY
-from music_links_bot.draft_model import new_track_draft
-from music_links_bot.kvstore import KVStore, KVUnavailableError
-from music_links_bot.loop_runner import start_background_loop, stop_background_loop
-from music_links_bot.models import TrackMatch
-from music_links_bot.privacy import delete_user_data
-from music_links_bot.update_execution import (
+from music_links_bot.state.kvstore import KVStore, KVUnavailableError
+from music_links_bot.state.privacy import delete_user_data
+from music_links_bot.state.user_state import user_state_scope
+from music_links_bot.tg import ephemeral
+from music_links_bot.tg.update_execution import (
     DeliveryAwareBot,
     UpdateExecution,
     current_execution,
 )
-from music_links_bot.user_state import user_state_scope
 
 
 def track():
@@ -141,7 +143,7 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
     async def test_ephemeral_timeout_is_typed_and_not_public_fallback(self):
         with (
             patch(
-                "music_links_bot.telegram_gateway.httpx.AsyncClient.post",
+                "music_links_bot.tg.telegram_gateway.httpx.AsyncClient.post",
                 AsyncMock(side_effect=httpx.ReadTimeout("lost")),
             ),
             self.assertRaises(NetworkError),
@@ -226,7 +228,7 @@ class WebhookTests(unittest.TestCase):
         app = SimpleNamespace(bot_data={})
         loop, thread = start_background_loop("audit-duplicate")
         try:
-            from music_links_bot.loop_runner import run_on_loop
+            from music_links_bot.ops.loop_runner import run_on_loop
 
             run_on_loop(
                 loop,
@@ -328,7 +330,7 @@ class StorageTests(unittest.IsolatedAsyncioTestCase):
             writer, user_id=7, urls=["https://example.test"]
         )
         reader = context(self.kv)
-        with patch("music_links_bot.privacy.remove_identity"):
+        with patch("music_links_bot.state.privacy.remove_identity"):
             result = await delete_user_data(reader, 7)
         self.assertEqual(result.drafts, 36)
         self.assertIsNone(await self.kv.get("draft:owned0"))
@@ -355,7 +357,7 @@ class StorageTests(unittest.IsolatedAsyncioTestCase):
         old = asyncio.create_task(stale())
         await ready.wait()
         async with user_state_scope(self.kv, 7):
-            with patch("music_links_bot.privacy.remove_identity"):
+            with patch("music_links_bot.state.privacy.remove_identity"):
                 await delete_user_data(context(self.kv), 7)
         resume.set()
         await old
@@ -388,10 +390,10 @@ class StorageTests(unittest.IsolatedAsyncioTestCase):
     async def test_selections_expire_in_memory_and_redis_payload(self):
         for kv in (None, self.kv):
             ctx = context(kv)
-            with patch("music_links_bot.bot_storage.time.time", return_value=100):
+            with patch("music_links_bot.state.bot_storage.time.time", return_value=100):
                 key = await store_search_selection(ctx, user_id=7, query="q", urls=[])
             with patch(
-                "music_links_bot.bot_storage.time.time", return_value=100 + 86400
+                "music_links_bot.state.bot_storage.time.time", return_value=100 + 86400
             ):
                 self.assertIsNone(await load_search_selection(ctx, key))
 
@@ -426,7 +428,7 @@ class StorageTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_polling_worker_processes_due_jobs_and_stops(self):
-        from music_links_bot.polling_worker import run_queue, stop_polling_services
+        from music_links_bot.ops.polling_worker import run_queue, stop_polling_services
 
         ctx = context()
         await publish_queue.add_job(
@@ -440,7 +442,8 @@ class StorageTests(unittest.IsolatedAsyncioTestCase):
 
         ctx.application.bot = ctx.bot
         with patch(
-            "music_links_bot.publication_service.PublicationService.publish", publish
+            "music_links_bot.publishing.publication_service.PublicationService.publish",
+            publish,
         ):
             task = asyncio.create_task(run_queue(ctx.application))
             ctx.application.bot_data["polling_queue_task"] = task

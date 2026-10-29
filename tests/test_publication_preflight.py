@@ -1,7 +1,7 @@
 import unittest
 
-from music_links_bot.models import TrackMatch
-from music_links_bot.publication_preflight import validate_publication
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.publishing.publication_preflight import validate_publication
 
 
 class PublicationPreflightTests(unittest.TestCase):
