@@ -7,9 +7,9 @@ from unittest.mock import AsyncMock, patch
 
 from test_release_119_state import RedisModel, ctx, draft
 
-from music_links_bot.chat.bot_crate import save_crate
 from music_links_bot.core.i18n import get_text
 from music_links_bot.editor import bot_pending
+from music_links_bot.state.bot_crate import save_crate
 from music_links_bot.state.bot_runtime import BotRuntime
 from music_links_bot.state.bot_storage import store_draft
 
@@ -98,7 +98,7 @@ class PendingInputTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_crate_note_is_saved_and_the_crate_comes_back(self) -> None:
         from music_links_bot.core.models import TrackMatch
-        from music_links_bot.state.release_preferences import release_preference_key
+        from music_links_bot.core.release_preferences import release_preference_key
 
         item = {"artist": "Sleep", "title": "Dragonaut"}
         await save_crate(self.context.application.bot_data, USER, [{"item": item}])

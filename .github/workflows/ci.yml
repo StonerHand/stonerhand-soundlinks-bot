@@ -53,6 +53,12 @@ jobs:
           python -m ruff format --check src api tests
           python -m bandit -q -r src api -x tests
 
+      - name: Package layers
+        if: matrix.python-version == '3.12'
+        run: lint-imports
+        env:
+          PYTHONPATH: src
+
       - name: Compile and deployment config
         if: matrix.python-version == '3.12'
         run: |

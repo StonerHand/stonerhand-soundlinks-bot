@@ -6,17 +6,17 @@ from urllib.parse import parse_qs, urljoin, urlparse
 
 import httpx
 
-from music_links_bot.cards.release_hubs import canonical_release_hub_url
 from music_links_bot.core.cache import TTLCache
 from music_links_bot.core.constants import HTTP_HEADERS
+from music_links_bot.core.metadata_cleaning import positive_track_count
 from music_links_bot.core.models import TrackMatch
+from music_links_bot.core.release_metadata import duration_ms
 from music_links_bot.core.url_utils import (
     cache_key_for_url,
     is_direct_platform_url,
     normalize_host,
 )
-from music_links_bot.providers.metadata_cleaning import positive_track_count
-from music_links_bot.providers.release_metadata import duration_ms
+from music_links_bot.providers.release_hubs import canonical_release_hub_url
 
 _RELEASE_PATH = re.compile(r"^/(?:[a-z]{2}/)?(track|album)/(\d+)/?$", re.I)
 _SHORT_HOSTS = {"link.deezer.com", "deezer.page.link"}

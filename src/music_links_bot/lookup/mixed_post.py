@@ -9,13 +9,13 @@ from telegram.error import BadRequest, TelegramError
 
 from music_links_bot.artwork.collection_collage import signed_cover_url
 from music_links_bot.core.models import TrackMatch, VideoMatch
-from music_links_bot.editor.bot_builder import PHOTO_CAPTION_LIMIT, fit_telegram_html
 from music_links_bot.publishing.rich_publications import (
     build_rich_track_video_html,
     rich_api_unavailable,
     rich_messages_enabled,
     send_rich_publication,
 )
+from music_links_bot.tg.telegram_text import PHOTO_CAPTION_LIMIT, fit_telegram_html
 
 LOGGER = logging.getLogger(__name__)
 

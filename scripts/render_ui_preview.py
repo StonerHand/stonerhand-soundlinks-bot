@@ -12,10 +12,19 @@ from zoneinfo import ZoneInfo
 
 from telegram import InlineKeyboardMarkup
 
-from music_links_bot.bot_preferences import preferences_view
-from music_links_bot.bot_recent import render_drafts_view
-from music_links_bot.bot_runtime import UserSession
-from music_links_bot.bot_ui import (
+from music_links_bot.cards.formatter import (
+    format_collection_message,
+    format_track_message,
+    format_video_message,
+)
+from music_links_bot.cards.keyboards import (
+    _build_collection_keyboard,
+    _build_link_keyboard,
+    _build_youtube_keyboard,
+)
+from music_links_bot.chat.bot_preferences import preferences_view
+from music_links_bot.chat.bot_recent import render_drafts_view
+from music_links_bot.chat.bot_ui import (
     build_create_keyboard,
     build_error_keyboard,
     build_home_text,
@@ -29,23 +38,14 @@ from music_links_bot.bot_ui import (
     editor_schedule_rows,
     editor_text_rows,
     editor_tools_rows,
-    render_crate,
 )
-from music_links_bot.bot_workspace import tag_explanation
-from music_links_bot.draft_model import new_track_draft
-from music_links_bot.editor_view import render_track_draft
-from music_links_bot.formatter import (
-    format_collection_message,
-    format_track_message,
-    format_video_message,
-)
-from music_links_bot.i18n import get_text
-from music_links_bot.keyboards import (
-    _build_collection_keyboard,
-    _build_link_keyboard,
-    _build_youtube_keyboard,
-)
-from music_links_bot.models import TrackMatch, VideoMatch
+from music_links_bot.chat.crate_view import render_crate
+from music_links_bot.core.draft_model import new_track_draft
+from music_links_bot.core.i18n import get_text
+from music_links_bot.core.models import TrackMatch, VideoMatch
+from music_links_bot.editor.bot_workspace import tag_explanation
+from music_links_bot.editor.editor_view import render_track_draft
+from music_links_bot.state.bot_runtime import UserSession
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "output/ui-preview"

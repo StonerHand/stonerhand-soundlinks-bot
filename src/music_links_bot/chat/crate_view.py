@@ -6,9 +6,9 @@ from html import escape
 
 from telegram import InlineKeyboardMarkup
 
-from music_links_bot.chat.bot_crate import crate_item_key, crate_revision
 from music_links_bot.core.i18n import get_text
 from music_links_bot.core.models import TrackMatch
+from music_links_bot.state.bot_crate import crate_item_key, crate_revision
 from music_links_bot.state.bot_runtime import encode_callback
 from music_links_bot.tg.telegram_buttons import button
 
@@ -165,7 +165,7 @@ def _item_rows(items: list[dict], selected_index: int | None) -> Rows:
 
 def _selected_rows(items: list[dict], selected_index: int, cb) -> Rows:
     """Move, remove, replace, note and section for the tapped release."""
-    from music_links_bot.state.release_preferences import release_preference_key
+    from music_links_bot.core.release_preferences import release_preference_key
 
     key = crate_item_key(items[selected_index])
     rows: Rows = []

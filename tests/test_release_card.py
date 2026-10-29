@@ -6,9 +6,9 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from music_links_bot.cards.formatter import format_track_message
+from music_links_bot.cards.publication_budget import visible_length
 from music_links_bot.core.i18n import language_context
 from music_links_bot.core.models import TrackMatch
-from music_links_bot.publishing.publication_budget import visible_length
 from music_links_bot.publishing.publication_service import PublicationService
 from music_links_bot.publishing.publication_view import build_publication_view
 

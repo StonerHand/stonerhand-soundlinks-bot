@@ -15,10 +15,10 @@ import httpx
 from telegram import Bot, Message
 
 from music_links_bot.cards.keyboards import _build_link_preview_options
-from music_links_bot.cards.release_hubs import is_universal_release_url
 from music_links_bot.cards.sharing import render_inline_share_card
-from music_links_bot.editor.draft_model import new_track_draft
+from music_links_bot.core.draft_model import new_track_draft
 from music_links_bot.lookup.lookup_models import LookupBundle
+from music_links_bot.providers.release_hubs import is_universal_release_url
 from music_links_bot.providers.soundcloud import SoundCloudClient
 from music_links_bot.providers.spotify import SpotifyClient
 from music_links_bot.publishing.publication_service import PublicationService

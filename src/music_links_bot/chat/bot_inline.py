@@ -35,6 +35,10 @@ from music_links_bot.cards.keyboards import (
     _build_youtube_keyboard,
     _select_preview_url,
 )
+from music_links_bot.cards.publication_contract import (
+    RenderedPublication,
+    require_valid_publication,
+)
 from music_links_bot.cards.sharing import (
     add_share_button,
     build_share_query,
@@ -43,7 +47,6 @@ from music_links_bot.cards.sharing import (
     render_inline_share_card,
     track_share_url,
 )
-from music_links_bot.chat.bot_crate import load_crate, load_crate_title
 from music_links_bot.chat.inline_feedback import remember_results
 from music_links_bot.core.constants import (
     DRAFT_SHARE_PREFIX,
@@ -71,15 +74,12 @@ from music_links_bot.providers.search import (
     find_release_candidates,
     normalize_search_query,
 )
-from music_links_bot.publishing.publication_contract import (
-    RenderedPublication,
-    require_valid_publication,
-)
 from music_links_bot.publishing.rich_publications import (
     RICH_MESSAGE_CAPABILITY,
     rich_api_unavailable,
     rich_messages_enabled,
 )
+from music_links_bot.state.bot_crate import load_crate, load_crate_title
 from music_links_bot.state.inline_storage import (
     load_cached_search,
     load_inline_history,
@@ -507,8 +507,8 @@ async def _answer_inline_draft(
         f"draft:{draft_id}:{draft.get('revision')}".encode()
     ).hexdigest()[:32]
     custom_cover = draft.get("custom_cover_file_id")
-    from music_links_bot.editor.bot_builder import PHOTO_CAPTION_LIMIT
-    from music_links_bot.publishing.publication_budget import visible_length
+    from music_links_bot.cards.publication_budget import visible_length
+    from music_links_bot.tg.telegram_text import PHOTO_CAPTION_LIMIT
 
     if isinstance(custom_cover, str) and visible_length(view.text) <= (
         PHOTO_CAPTION_LIMIT
@@ -758,7 +758,7 @@ async def _build_inline_result(
         share_query=share_query,
         label=share_label,
     )
-    from music_links_bot.state.release_preferences import use_clean_artwork
+    from music_links_bot.core.release_preferences import use_clean_artwork
 
     return _inline_article(
         source_url,
@@ -991,8 +991,8 @@ def _inline_article(
         and not force_classic
     )
     from music_links_bot.artwork.collection_collage import is_generated_artwork_url
-    from music_links_bot.editor.bot_builder import PHOTO_CAPTION_LIMIT
-    from music_links_bot.publishing.publication_budget import visible_length
+    from music_links_bot.cards.publication_budget import visible_length
+    from music_links_bot.tg.telegram_text import PHOTO_CAPTION_LIMIT
 
     generated_preview = is_generated_artwork_url(preview_url)
     branded_inline_photo = feature_enabled(

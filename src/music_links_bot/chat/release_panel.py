@@ -143,16 +143,6 @@ def panel_view(track, *, lang, close=False, edit_url=None):
 SOUNDTRACK_START = re.compile(r"^sound_(\d{1,15})$")
 
 
-def soundtrack_start_url(
-    bot_username: str | None, soundtrack_url: str | None
-) -> str | None:
-    """t.me/<bot>?start=sound_<album id>: the soundtrack opens as a card here."""
-    match = re.fullmatch(r"https://album\.link/i/(\d{1,15})", soundtrack_url or "")
-    if not bot_username or not match:
-        return None
-    return f"https://t.me/{bot_username}?start=sound_{match.group(1)}"
-
-
 async def start_soundtrack(update, context) -> bool:
     """The film card's soundtrack button: build that album's card in the chat."""
     message = update.effective_message

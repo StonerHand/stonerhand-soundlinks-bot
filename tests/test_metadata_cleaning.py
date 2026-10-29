@@ -1,9 +1,9 @@
 import unittest
 
 from music_links_bot.cards.formatter import format_track_message
+from music_links_bot.core.draft_model import normalize_track_draft
+from music_links_bot.core.metadata_cleaning import clean_spotify_metadata_title
 from music_links_bot.core.models import TrackMatch
-from music_links_bot.editor.draft_model import normalize_track_draft
-from music_links_bot.providers.metadata_cleaning import clean_spotify_metadata_title
 
 
 class SpotifyMetadataCleaningTests(unittest.TestCase):

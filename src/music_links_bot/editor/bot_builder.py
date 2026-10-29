@@ -3,21 +3,17 @@ from __future__ import annotations
 import re
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from html import escape, unescape
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from music_links_bot.cards.release_presentation import PRESET_ORDER, apply_preset
 from music_links_bot.core.constants import PLATFORM_LABELS
 from music_links_bot.core.models import TrackMatch
+from music_links_bot.core.release_presentation import PRESET_ORDER, apply_preset
 from music_links_bot.core.text_utils import normalize_hashtag
 from music_links_bot.core.url_utils import is_platform_destination_url
-from music_links_bot.tg.telegram_text import telegram_text_length
+from music_links_bot.tg.telegram_text import (
+    MAX_INTRO_LENGTH,
+)
 
-MESSAGE_TEXT_LIMIT = 4096
-PHOTO_CAPTION_LIMIT = 1024
-# One limit for every user-written note: the editor, the text above a link
-# and the publication budget all read it from here.
-MAX_INTRO_LENGTH = 4_000
 MAX_CRATE_TITLE_LENGTH = 72
 MAX_CUSTOM_TAGS = 5
 MAX_SELECTED_PLATFORMS = 6
@@ -271,98 +267,3 @@ def _timezone(name: str) -> ZoneInfo:
         return ZoneInfo(name)
     except ZoneInfoNotFoundError:
         return ZoneInfo("Europe/Moscow")
-
-
-def fit_telegram_html(text: str, limit: int = MESSAGE_TEXT_LIMIT) -> str:
-    """Fit rendered HTML to Telegram's UTF-16 limit without splitting emoji."""
-    value = str(text or "")
-    if limit <= 0:
-        return ""
-    tags = re.findall(r"</?([A-Za-z][A-Za-z0-9-]*)\b[^>]*>", value)
-    markup_is_well_formed_enough = (
-        value.count("<") == len(tags)
-        and value.count(">") == len(tags)
-        and _balanced_html_tags(value)
-    )
-    plain = unescape(re.sub(r"</?[A-Za-z][^>]*>", "", value))
-    if markup_is_well_formed_enough and telegram_text_length(plain) <= limit:
-        return value
-    if telegram_text_length(plain) <= limit:
-        return escape(plain)
-    suffix = "…"
-    if limit == 1:
-        return suffix
-    if markup_is_well_formed_enough:
-        # Keep bold, italic, quotes and links: cut the visible text and close
-        # whatever tags are still open, instead of flattening the whole post.
-        return _truncate_html(value, limit - telegram_text_length(suffix), suffix)
-    low, high = 0, len(plain)
-    while low < high:
-        middle = (low + high + 1) // 2
-        if telegram_text_length(plain[:middle] + suffix) <= limit:
-            low = middle
-        else:
-            high = middle - 1
-    return escape(plain[:low].rstrip()) + suffix
-
-
-def _truncate_html(value: str, budget: int, suffix: str) -> str:
-    """Cut well-formed Telegram HTML to ``budget`` visible UTF-16 units."""
-    out: list[str] = []
-    open_tags: list[str] = []
-    used = 0
-    for token in re.split(r"(<[^>]+>)", value):
-        if not token:
-            continue
-        if token.startswith("<"):
-            match = re.match(r"<(/?)([A-Za-z][A-Za-z0-9-]*)", token)
-            if match:
-                closing, name = match.groups()
-                if closing:
-                    if open_tags and open_tags[-1] == name.casefold():
-                        open_tags.pop()
-                else:
-                    open_tags.append(name.casefold())
-            out.append(token)
-            continue
-        text = unescape(token)
-        size = telegram_text_length(text)
-        if used + size <= budget:
-            out.append(token)
-            used += size
-            continue
-        if open_tags and open_tags[-1] == "tg-emoji":
-            # A custom emoji is atomic: drop it whole rather than leave "…"
-            # as its content, which Telegram rejects.
-            out.pop()
-            open_tags.pop()
-            out.append(suffix)
-            break
-        low, high = 0, len(text)
-        while low < high:
-            middle = (low + high + 1) // 2
-            if used + telegram_text_length(text[:middle]) <= budget:
-                low = middle
-            else:
-                high = middle - 1
-        out.append(escape(text[:low].rstrip()) + suffix)
-        break
-    else:
-        return value
-    # Drop tags opened after the cut point, then close the ones still open.
-    html = "".join(out)
-    for name in reversed(open_tags):
-        html += f"</{name}>"
-    return re.sub(r"<([A-Za-z][A-Za-z0-9-]*)[^>]*></\1>", "", html)
-
-
-def _balanced_html_tags(value: str) -> bool:
-    stack: list[str] = []
-    for match in re.finditer(r"<(/?)([A-Za-z][A-Za-z0-9-]*)\b[^>]*>", value):
-        closing, name = match.groups()
-        name = name.casefold()
-        if not closing:
-            stack.append(name)
-        elif not stack or stack.pop() != name:
-            return False
-    return not stack

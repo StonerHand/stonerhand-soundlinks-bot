@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import hashlib
 
-from music_links_bot.cards.release_presentation import apply_preset, normalize_preset
 from music_links_bot.core.constants import PLATFORM_LABELS
+from music_links_bot.core.release_presentation import apply_preset, normalize_preset
 from music_links_bot.state.bot_storage import remember_bounded
 from music_links_bot.state.durable_state import (
     delete_value,

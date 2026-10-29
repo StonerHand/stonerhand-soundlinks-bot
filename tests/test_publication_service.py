@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock, Mock, patch
 
 from telegram.error import BadRequest
 
+from music_links_bot.core.draft_model import prepare_publication_draft
 from music_links_bot.core.models import TrackMatch
-from music_links_bot.editor.draft_model import prepare_publication_draft
 from music_links_bot.publishing.publication_service import PublicationService
 
 

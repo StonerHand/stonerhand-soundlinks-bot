@@ -3,12 +3,12 @@ from __future__ import annotations
 import logging
 import time
 
-from music_links_bot.cards.formatter import pick_track_emoji
 from music_links_bot.core.models import TrackMatch
-from music_links_bot.publishing.publication_state import release_fingerprint
+from music_links_bot.core.release_presentation import release_emoji
 from music_links_bot.state.bot_storage import remember_bounded
 from music_links_bot.state.durable_state import delete_value, read_json
 from music_links_bot.state.kvstore import KVStore, KVUnavailableError
+from music_links_bot.state.publication_state import release_fingerprint
 from music_links_bot.state.state_mutations import mutate_json
 
 LOGGER = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ async def record_history(
         "artist": track.artist,
         "title": track.title,
         "kind": track.kind,
-        "emoji": pick_track_emoji(track),
+        "emoji": release_emoji(track),
         "artwork": track.thumbnail_url,
         "source_url": source_url,
         "ts": int(time.time()),

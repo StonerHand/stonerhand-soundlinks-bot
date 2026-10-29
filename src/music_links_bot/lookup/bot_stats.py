@@ -25,10 +25,9 @@ from music_links_bot.core.url_utils import (
     clean_url_token,
     is_supported_music_url,
 )
-from music_links_bot.editor.bot_builder import MAX_INTRO_LENGTH
 from music_links_bot.state.kvstore import KVStore
 from music_links_bot.state.stats import STATS_PATH, record_post
-from music_links_bot.tg.telegram_text import format_user_note_html
+from music_links_bot.tg.telegram_text import MAX_INTRO_LENGTH, format_user_note_html
 
 LOGGER = logging.getLogger(__name__)
 MAX_USER_NOTE_LENGTH = MAX_INTRO_LENGTH

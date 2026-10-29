@@ -6,15 +6,15 @@ import hashlib
 
 from music_links_bot.cards.release_tags import suggested_track_tags, unique_tags
 from music_links_bot.core.i18n import get_text
-from music_links_bot.editor.bot_editor_state import remember_setting_state
-from music_links_bot.publishing.publication_view import resolve_draft_hashtags
-from music_links_bot.state.bot_runtime import BotRuntime
-from music_links_bot.state.release_preferences import (
+from music_links_bot.core.release_preferences import (
     current_presentation,
     preferences_from_session,
     release_preference_key,
     remember_release_tags,
 )
+from music_links_bot.editor.bot_editor_state import remember_setting_state
+from music_links_bot.publishing.publication_view import resolve_draft_hashtags
+from music_links_bot.state.bot_runtime import BotRuntime
 
 
 def tag_code(tag: str) -> str:

@@ -6,18 +6,18 @@ from urllib.parse import urlparse
 
 from telegram import InlineKeyboardMarkup
 
-from music_links_bot.cards.release_hubs import is_universal_release_url
+from music_links_bot.cards.publication_budget import visible_length
 from music_links_bot.core.constants import PLATFORM_LABELS
 from music_links_bot.core.i18n import STRINGS
+from music_links_bot.core.release_metadata import metadata_url
 from music_links_bot.core.url_utils import (
     extract_supported_urls,
     is_direct_platform_url,
     is_platform_destination_url,
     is_supported_music_url,
 )
-from music_links_bot.editor.bot_builder import MESSAGE_TEXT_LIMIT, PHOTO_CAPTION_LIMIT
-from music_links_bot.providers.release_metadata import metadata_url
-from music_links_bot.publishing.publication_budget import visible_length
+from music_links_bot.providers.release_hubs import is_universal_release_url
+from music_links_bot.tg.telegram_text import MESSAGE_TEXT_LIMIT, PHOTO_CAPTION_LIMIT
 
 MAX_INLINE_BUTTONS = 100
 MAX_INLINE_BUTTONS_PER_ROW = 8

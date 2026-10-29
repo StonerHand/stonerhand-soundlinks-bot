@@ -10,6 +10,9 @@ from music_links_bot.chat.bot_menu import dispatch_menu_action
 from music_links_bot.chat.bot_preferences import dispatch_preferences, preferences_view
 from music_links_bot.chat.bot_ui import editor_appearance_rows
 from music_links_bot.core.i18n import STRINGS, language_context
+from music_links_bot.core.release_preferences import (
+    presentation_context,
+)
 from music_links_bot.editor.bot_editor import (
     _handle_editor_action,
 )
@@ -27,9 +30,6 @@ from music_links_bot.state.bot_runtime import (
     decode_callback,
 )
 from music_links_bot.state.bot_storage import load_draft, store_draft
-from music_links_bot.state.release_preferences import (
-    presentation_context,
-)
 from tests.test_ui_refresh import MemoryKV, context_for, draft_for, query_for
 
 

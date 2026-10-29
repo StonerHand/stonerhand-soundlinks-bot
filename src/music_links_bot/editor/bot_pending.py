@@ -17,10 +17,15 @@ from music_links_bot.cards.keyboards import (
     _select_preview_url as select_preview_url,
 )
 from music_links_bot.cards.release_tags import unique_tags
-from music_links_bot.chat.bot_crate import load_crate, save_crate_title
 from music_links_bot.chat.bot_menu import runtime_for, update_lang
 from music_links_bot.core.i18n import get_text
 from music_links_bot.core.models import TrackMatch
+from music_links_bot.core.release_preferences import (
+    current_presentation,
+    normalize_annotations,
+    preferences_from_session,
+    release_preference_key,
+)
 from music_links_bot.core.url_utils import extract_supported_urls, strip_supported_urls
 from music_links_bot.editor.bot_builder import (
     PENDING_INPUT_TTL_SECONDS,
@@ -43,17 +48,12 @@ from music_links_bot.publishing.publish_queue import (
     QueueStorageError,
     add_job,
 )
+from music_links_bot.state.bot_crate import load_crate, save_crate_title
 from music_links_bot.state.bot_runtime import BotRuntime, UserSession
 from music_links_bot.state.bot_storage import (
     load_draft,
     load_retry_sources,
     store_draft,
-)
-from music_links_bot.state.release_preferences import (
-    current_presentation,
-    normalize_annotations,
-    preferences_from_session,
-    release_preference_key,
 )
 from music_links_bot.tg.telegram_text import format_user_note_html, telegram_text_length
 

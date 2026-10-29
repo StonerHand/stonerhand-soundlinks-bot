@@ -10,7 +10,7 @@ from PIL import Image
 
 from api.health import _storage_snapshot, handler, overall_service_ok
 from music_links_bot.artwork.collection_collage import compose_collection_collage
-from music_links_bot.cards.release_hubs import is_universal_release_url
+from music_links_bot.core.draft_model import normalize_track_draft
 from music_links_bot.core.url_utils import (
     apple_music_url_type,
     apple_podcasts_url_type,
@@ -23,7 +23,7 @@ from music_links_bot.core.url_utils import (
     is_youtube_video_url,
     spotify_url_type,
 )
-from music_links_bot.editor.draft_model import normalize_track_draft
+from music_links_bot.providers.release_hubs import is_universal_release_url
 
 
 class ReleaseSafetyTests(unittest.TestCase):

@@ -5,7 +5,6 @@ from html import escape
 
 from telegram import InlineKeyboardMarkup
 
-from music_links_bot.cards.release_presentation import normalize_preset
 from music_links_bot.core.constants import (
     DRAFT_SHARE_PREFIX,
     INLINE_EXAMPLE_QUERY,
@@ -14,6 +13,7 @@ from music_links_bot.core.constants import (
 from music_links_bot.core.human_time import human_datetime
 from music_links_bot.core.i18n import get_text
 from music_links_bot.core.models import TrackMatch
+from music_links_bot.core.release_presentation import normalize_preset
 from music_links_bot.editor.bot_builder import (
     available_platforms,
     schedule_timestamp,
@@ -735,12 +735,12 @@ def editor_intro_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardBut
 
 def editor_hashtag_rows(draft_id: str, draft: dict) -> list[list[InlineKeyboardButton]]:
     """Every tag control on one screen: toggles, own tags, auto/none and pin."""
-    from music_links_bot.editor.bot_release_settings import tag_choices, tag_code
-    from music_links_bot.publishing.publication_view import resolve_draft_hashtags
-    from music_links_bot.state.release_preferences import (
+    from music_links_bot.core.release_preferences import (
         current_presentation,
         release_preference_key,
     )
+    from music_links_bot.editor.bot_release_settings import tag_choices, tag_code
+    from music_links_bot.publishing.publication_view import resolve_draft_hashtags
 
     track = TrackMatch(**draft["item"])
     lang = draft.get("lang") or "ru"

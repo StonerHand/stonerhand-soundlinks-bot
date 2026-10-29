@@ -97,8 +97,8 @@ class FakeQuery:
 
 
 def _published_draft(*, published_at):
+    from music_links_bot.core.draft_model import new_track_draft
     from music_links_bot.core.models import TrackMatch
-    from music_links_bot.editor.draft_model import new_track_draft
 
     draft = new_track_draft(
         TrackMatch(
@@ -257,8 +257,8 @@ def test_owner_publishes_the_collection_to_the_channel():
     import os
     from unittest.mock import patch
 
-    from music_links_bot.chat.bot_crate import crate_revision
     from music_links_bot.chat.bot_crate_handlers import _publish_crate
+    from music_links_bot.state.bot_crate import crate_revision
 
     items = _crate_items()
     sent = SimpleNamespace(message_id=77)
@@ -407,12 +407,10 @@ def test_quick_publish_posts_right_away_with_undo():
             new=AsyncMock(return_value=sent),
         ),
         patch(
-            "music_links_bot.publishing.publication_state.find_posted_record",
+            "music_links_bot.state.publication_state.find_posted_record",
             new=AsyncMock(return_value=None),
         ),
-        patch(
-            "music_links_bot.publishing.publication_state.mark_posted", new=AsyncMock()
-        ),
+        patch("music_links_bot.state.publication_state.mark_posted", new=AsyncMock()),
     ):
         published = asyncio.run(
             try_quick_publish(
@@ -452,7 +450,7 @@ def test_quick_publish_never_reposts_a_release_silently():
     with (
         patch("music_links_bot.editor.editor_delivery._publish_draft", new=publish),
         patch(
-            "music_links_bot.publishing.publication_state.find_posted_record",
+            "music_links_bot.state.publication_state.find_posted_record",
             new=AsyncMock(return_value={"date": "01.01.2026"}),
         ),
     ):

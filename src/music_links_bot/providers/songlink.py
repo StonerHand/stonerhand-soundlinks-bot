@@ -7,9 +7,12 @@ from dataclasses import asdict, fields
 
 import httpx
 
-from music_links_bot.cards.release_hubs import canonical_release_hub_url
 from music_links_bot.core.cache import TTLCache
 from music_links_bot.core.constants import HTTP_HEADERS, PLATFORM_ALIASES
+from music_links_bot.core.metadata_cleaning import (
+    infer_release_format,
+    positive_track_count,
+)
 from music_links_bot.core.models import TrackMatch
 from music_links_bot.core.single_flight import cancel_all, shared
 from music_links_bot.core.url_utils import (
@@ -21,15 +24,12 @@ from music_links_bot.providers.deezer import (
     DeezerLookupError,
     is_deezer_release_url,
 )
-from music_links_bot.providers.metadata_cleaning import (
-    infer_release_format,
-    positive_track_count,
-)
 from music_links_bot.providers.public_release import (
     PublicReleaseClient,
     PublicReleaseError,
     release_identity,
 )
+from music_links_bot.providers.release_hubs import canonical_release_hub_url
 from music_links_bot.providers.spotify import SpotifyClient, SpotifyLookupError
 from music_links_bot.state.kvstore import KVStore
 

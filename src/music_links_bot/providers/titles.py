@@ -13,6 +13,7 @@ from html import unescape
 import httpx
 
 from music_links_bot.core.cache import TTLCache
+from music_links_bot.core.metadata_cleaning import match_key
 from music_links_bot.core.models import TitleMatch
 from music_links_bot.core.single_flight import shared
 from music_links_bot.core.url_utils import (
@@ -20,7 +21,6 @@ from music_links_bot.core.url_utils import (
     is_direct_platform_url,
     streaming_title,
 )
-from music_links_bot.providers.metadata_cleaning import match_key
 
 # Streaming sites and YouTube serve a bare shell to unknown clients, so these
 # pages are requested the way a desktop browser would.

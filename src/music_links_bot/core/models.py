@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from music_links_bot.providers.metadata_cleaning import (
+from music_links_bot.core.metadata_cleaning import (
     clean_spotify_metadata_title,
     infer_release_format,
     positive_track_count,
@@ -36,7 +36,7 @@ class TrackMatch:
                 or self.release_format
             )
         self.track_count = positive_track_count(self.track_count)
-        from music_links_bot.providers.release_metadata import duration_ms, metadata_url
+        from music_links_bot.core.release_metadata import duration_ms, metadata_url
 
         self.album_url = metadata_url(self.album_url, "album")
         self.artist_url = metadata_url(self.artist_url, "artist")

@@ -10,6 +10,11 @@ from test_release_119_state import RedisModel, ctx, draft, track
 from music_links_bot.cards.release_tags import build_collection_hashtags
 from music_links_bot.chat.bot_recent import render_drafts_view
 from music_links_bot.chat.bot_ui import editor_rows, version_editor_keyboard
+from music_links_bot.core.release_preferences import (
+    PresentationPreferences,
+    presentation_context,
+    release_preference_key,
+)
 from music_links_bot.editor.bot_editor_state import (
     reset_original,
     restore_setting_state,
@@ -23,11 +28,6 @@ from music_links_bot.lookup.lookup_models import LookupBundle, SourceStatus
 from music_links_bot.lookup.lookup_recovery import capture_sources, completed_sources
 from music_links_bot.state.bot_runtime import BotRuntime, UserSession
 from music_links_bot.state.bot_storage import load_draft, load_drafts, store_draft
-from music_links_bot.state.release_preferences import (
-    PresentationPreferences,
-    presentation_context,
-    release_preference_key,
-)
 
 
 def query():
@@ -49,8 +49,8 @@ class Release119Journeys(unittest.IsolatedAsyncioTestCase):
     async def test_long_post_keeps_editor_within_telegram_limit_without_changing_intro(
         self,
     ):
+        from music_links_bot.cards.publication_budget import visible_length
         from music_links_bot.editor.editor_view import render_track_draft
-        from music_links_bot.publishing.publication_budget import visible_length
 
         value = draft()
         value["item"].update(title="Long title " * 90, artist="Artist " * 90)

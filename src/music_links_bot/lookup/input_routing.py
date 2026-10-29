@@ -214,8 +214,8 @@ async def deliver_collection_input(message, context, tracks, *, user_id, lang):
     """Return True once an explicitly requested collection edit was handled."""
     from dataclasses import asdict
 
-    from music_links_bot.chat.bot_crate import replace_crate_item
     from music_links_bot.lookup import bot_lookup_flow as bot
+    from music_links_bot.state.bot_crate import replace_crate_item
 
     mode = collection_input.get()
     if not mode or mode == "new":

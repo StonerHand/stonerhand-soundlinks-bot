@@ -26,7 +26,7 @@ from music_links_bot.chat.bot_app import (
 )
 from music_links_bot.core.config import Settings
 from music_links_bot.core.http_json import send_json
-from music_links_bot.ops.logging_config import quiet_transport_logs
+from music_links_bot.core.logging_config import quiet_transport_logs
 from music_links_bot.tg.telegram_updates import ALLOWED_UPDATES
 from music_links_bot.tg.webhook_secret import secrets_match
 

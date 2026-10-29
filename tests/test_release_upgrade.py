@@ -23,12 +23,12 @@ from music_links_bot.cards.keyboards import (
     _build_collection_keyboard,
     _build_link_keyboard,
 )
+from music_links_bot.cards.publication_budget import visible_length
 from music_links_bot.cards.release_tags import (
     build_auto_hashtags,
     build_collection_hashtags,
     build_mixed_collection_hashtags,
 )
-from music_links_bot.chat.bot_crate import save_crate, save_crate_title
 from music_links_bot.chat.bot_inline import (
     _build_inline_collection_result,
     _build_inline_result,
@@ -38,27 +38,10 @@ from music_links_bot.chat.bot_preferences import (
     apply_preferences,
     dispatch_preferences,
 )
+from music_links_bot.core.draft_model import new_track_draft, normalize_track_draft
+from music_links_bot.core.metadata_cleaning import positive_track_count
 from music_links_bot.core.models import TrackMatch, VideoMatch
-from music_links_bot.editor.bot_editor import (
-    _handle_editor_action,
-)
-from music_links_bot.editor.bot_pending import consume_pending_input
-from music_links_bot.editor.bot_release_settings import tag_code
-from music_links_bot.editor.draft_model import new_track_draft, normalize_track_draft
-from music_links_bot.lookup.lookup_models import LookupBundle, SourceStatus
-from music_links_bot.providers.metadata_cleaning import positive_track_count
-from music_links_bot.providers.search import _extract_matching_genre
-from music_links_bot.providers.spotify import parse_spotify_page
-from music_links_bot.providers.track_merge import coalesce_equivalent_tracks
-from music_links_bot.publishing.publication_budget import visible_length
-from music_links_bot.publishing.publication_view import build_publication_view
-from music_links_bot.publishing.rich_publications import (
-    build_rich_collection_html,
-    build_rich_inline_card_html,
-)
-from music_links_bot.state.bot_runtime import BotRuntime, CallbackAction, UserSession
-from music_links_bot.state.bot_storage import load_draft, store_draft
-from music_links_bot.state.release_preferences import (
+from music_links_bot.core.release_preferences import (
     PresentationPreferences,
     current_presentation,
     normalize_annotations,
@@ -67,6 +50,23 @@ from music_links_bot.state.release_preferences import (
     presentation_context,
     release_preference_key,
 )
+from music_links_bot.editor.bot_editor import (
+    _handle_editor_action,
+)
+from music_links_bot.editor.bot_pending import consume_pending_input
+from music_links_bot.editor.bot_release_settings import tag_code
+from music_links_bot.lookup.lookup_models import LookupBundle, SourceStatus
+from music_links_bot.providers.search import _extract_matching_genre
+from music_links_bot.providers.spotify import parse_spotify_page
+from music_links_bot.providers.track_merge import coalesce_equivalent_tracks
+from music_links_bot.publishing.publication_view import build_publication_view
+from music_links_bot.publishing.rich_publications import (
+    build_rich_collection_html,
+    build_rich_inline_card_html,
+)
+from music_links_bot.state.bot_crate import save_crate, save_crate_title
+from music_links_bot.state.bot_runtime import BotRuntime, CallbackAction, UserSession
+from music_links_bot.state.bot_storage import load_draft, store_draft
 
 
 def track(index=1, **changes):

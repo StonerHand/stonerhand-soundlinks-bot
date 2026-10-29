@@ -24,6 +24,7 @@ from music_links_bot.chat.bot_ui import (
     editor_overflow_rows,
     editor_schedule_rows,
 )
+from music_links_bot.core.draft_model import new_track_draft
 from music_links_bot.core.human_time import human_datetime
 from music_links_bot.core.i18n import (
     get_text,
@@ -36,7 +37,6 @@ from music_links_bot.editor.bot_editor import (
     _handle_editor_action,
 )
 from music_links_bot.editor.bot_editor_state import remember_draft
-from music_links_bot.editor.draft_model import new_track_draft
 from music_links_bot.publishing.publish_queue import (
     add_job,
     load_jobs,

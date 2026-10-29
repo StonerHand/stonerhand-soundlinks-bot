@@ -37,6 +37,7 @@ from music_links_bot.cards.keyboards import (
     _build_youtube_keyboard,
     _select_preview_url,
 )
+from music_links_bot.cards.publication_budget import compose_with_intro
 from music_links_bot.cards.sharing import (
     add_share_button,
     build_share_query,
@@ -53,7 +54,6 @@ from music_links_bot.core.models import (
     VideoMatch,
 )
 from music_links_bot.providers.youtube import video_frame_url, video_preview_url
-from music_links_bot.publishing.publication_budget import compose_with_intro
 from music_links_bot.state.bot_runtime import encode_callback
 from music_links_bot.tg.telegram_buttons import button as InlineKeyboardButton
 

@@ -15,8 +15,12 @@ from test_card_details import run_async
 from test_release_card import sample
 
 from music_links_bot.cards.formatter import format_track_message
+from music_links_bot.cards.publication_contract import (
+    RenderedPublication,
+    validate_rendered_publication,
+)
 from music_links_bot.chat.bot_inline import _build_inline_result
-from music_links_bot.editor.draft_model import new_track_draft
+from music_links_bot.core.draft_model import new_track_draft
 from music_links_bot.lookup.bot_lookup_flow import (
     track_lookup_message,
 )
@@ -29,10 +33,6 @@ from music_links_bot.providers.public_release import (
 )
 from music_links_bot.providers.songlink import SonglinkClient
 from music_links_bot.providers.youtube import YouTubeClient
-from music_links_bot.publishing.publication_contract import (
-    RenderedPublication,
-    validate_rendered_publication,
-)
 from music_links_bot.publishing.publication_service import PublicationService
 
 

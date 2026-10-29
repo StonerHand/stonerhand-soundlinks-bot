@@ -9,6 +9,10 @@ import httpx
 
 from music_links_bot.cards.formatter import format_title_message
 from music_links_bot.cards.keyboards import _build_title_keyboard
+from music_links_bot.cards.publication_contract import (
+    RenderedPublication,
+    validate_rendered_publication,
+)
 from music_links_bot.core.i18n import language_context
 from music_links_bot.core.models import TitleMatch
 from music_links_bot.core.url_utils import extract_supported_urls, netflix_title_id
@@ -19,10 +23,6 @@ from music_links_bot.providers.titles import (
     parse_title_page,
     pick_soundtrack,
     pick_trailer,
-)
-from music_links_bot.publishing.publication_contract import (
-    RenderedPublication,
-    validate_rendered_publication,
 )
 
 SERIES_URL = "https://www.netflix.com/id-en/title/81054853"

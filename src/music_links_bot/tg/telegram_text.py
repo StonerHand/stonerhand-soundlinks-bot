@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from html import escape
+import re
+from html import escape, unescape
 from urllib.parse import urlparse
 
 from telegram import MessageEntity
@@ -23,6 +24,11 @@ FORMATTING_ENTITY_TYPES = {
     MessageEntity.CUSTOM_EMOJI,
 }
 SAFE_LINK_SCHEMES = {"http", "https", "tg", "mailto"}
+MESSAGE_TEXT_LIMIT = 4096
+PHOTO_CAPTION_LIMIT = 1024
+# One limit for every user-written note: the editor, the text above a link
+# and the publication budget all read it from here.
+MAX_INTRO_LENGTH = 4_000
 
 
 def telegram_text_length(text: str) -> int:
@@ -262,3 +268,98 @@ def _utf16_offsets(text: str) -> list[int]:
 
 def _utf16_length(text: str) -> int:
     return len(text.encode("utf-16-le")) // 2
+
+
+def fit_telegram_html(text: str, limit: int = MESSAGE_TEXT_LIMIT) -> str:
+    """Fit rendered HTML to Telegram's UTF-16 limit without splitting emoji."""
+    value = str(text or "")
+    if limit <= 0:
+        return ""
+    tags = re.findall(r"</?([A-Za-z][A-Za-z0-9-]*)\b[^>]*>", value)
+    markup_is_well_formed_enough = (
+        value.count("<") == len(tags)
+        and value.count(">") == len(tags)
+        and _balanced_html_tags(value)
+    )
+    plain = unescape(re.sub(r"</?[A-Za-z][^>]*>", "", value))
+    if markup_is_well_formed_enough and telegram_text_length(plain) <= limit:
+        return value
+    if telegram_text_length(plain) <= limit:
+        return escape(plain)
+    suffix = "…"
+    if limit == 1:
+        return suffix
+    if markup_is_well_formed_enough:
+        # Keep bold, italic, quotes and links: cut the visible text and close
+        # whatever tags are still open, instead of flattening the whole post.
+        return _truncate_html(value, limit - telegram_text_length(suffix), suffix)
+    low, high = 0, len(plain)
+    while low < high:
+        middle = (low + high + 1) // 2
+        if telegram_text_length(plain[:middle] + suffix) <= limit:
+            low = middle
+        else:
+            high = middle - 1
+    return escape(plain[:low].rstrip()) + suffix
+
+
+def _truncate_html(value: str, budget: int, suffix: str) -> str:
+    """Cut well-formed Telegram HTML to ``budget`` visible UTF-16 units."""
+    out: list[str] = []
+    open_tags: list[str] = []
+    used = 0
+    for token in re.split(r"(<[^>]+>)", value):
+        if not token:
+            continue
+        if token.startswith("<"):
+            match = re.match(r"<(/?)([A-Za-z][A-Za-z0-9-]*)", token)
+            if match:
+                closing, name = match.groups()
+                if closing:
+                    if open_tags and open_tags[-1] == name.casefold():
+                        open_tags.pop()
+                else:
+                    open_tags.append(name.casefold())
+            out.append(token)
+            continue
+        text = unescape(token)
+        size = telegram_text_length(text)
+        if used + size <= budget:
+            out.append(token)
+            used += size
+            continue
+        if open_tags and open_tags[-1] == "tg-emoji":
+            # A custom emoji is atomic: drop it whole rather than leave "…"
+            # as its content, which Telegram rejects.
+            out.pop()
+            open_tags.pop()
+            out.append(suffix)
+            break
+        low, high = 0, len(text)
+        while low < high:
+            middle = (low + high + 1) // 2
+            if used + telegram_text_length(text[:middle]) <= budget:
+                low = middle
+            else:
+                high = middle - 1
+        out.append(escape(text[:low].rstrip()) + suffix)
+        break
+    else:
+        return value
+    # Drop tags opened after the cut point, then close the ones still open.
+    html = "".join(out)
+    for name in reversed(open_tags):
+        html += f"</{name}>"
+    return re.sub(r"<([A-Za-z][A-Za-z0-9-]*)[^>]*></\1>", "", html)
+
+
+def _balanced_html_tags(value: str) -> bool:
+    stack: list[str] = []
+    for match in re.finditer(r"<(/?)([A-Za-z][A-Za-z0-9-]*)\b[^>]*>", value):
+        closing, name = match.groups()
+        name = name.casefold()
+        if not closing:
+            stack.append(name)
+        elif not stack or stack.pop() != name:
+            return False
+    return not stack

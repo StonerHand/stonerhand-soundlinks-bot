@@ -13,7 +13,6 @@ from telegram.constants import ParseMode
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
-from music_links_bot.chat.bot_actions import action_spec
 from music_links_bot.chat.bot_crate_handlers import (
     dispatch_crate_action as _dispatch_crate_action,
 )
@@ -45,6 +44,7 @@ from music_links_bot.state.bot_storage import (
     load_retry_sources as _load_retry_sources,
     load_search_selection as _load_search_selection,
 )
+from music_links_bot.tg.bot_actions import action_spec
 
 LOGGER = logging.getLogger(__name__)
 

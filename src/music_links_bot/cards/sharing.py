@@ -27,16 +27,16 @@ from music_links_bot.cards.keyboards import (
     _build_youtube_collection_keyboard,
     _select_preview_url,
 )
+from music_links_bot.cards.publication_budget import compose_with_intro
+from music_links_bot.cards.publication_contract import (
+    RenderedPublication,
+    require_valid_publication,
+)
 from music_links_bot.core.models import TrackMatch
 from music_links_bot.core.url_utils import (
     cache_key_for_url,
     direct_platform_links,
     is_supported_music_url,
-)
-from music_links_bot.publishing.publication_budget import compose_with_intro
-from music_links_bot.publishing.publication_contract import (
-    RenderedPublication,
-    require_valid_publication,
 )
 from music_links_bot.tg.telegram_buttons import (
     button as InlineKeyboardButton,

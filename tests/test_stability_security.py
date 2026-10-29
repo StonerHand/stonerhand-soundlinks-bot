@@ -21,6 +21,7 @@ from music_links_bot.artwork.branding import (
     compose_cover,
 )
 from music_links_bot.artwork.collection_collage import decode_collage_payload
+from music_links_bot.core.draft_model import new_track_draft
 from music_links_bot.core.models import TrackMatch
 from music_links_bot.editor.bot_editor import (
     EditorActionRequest,
@@ -28,7 +29,6 @@ from music_links_bot.editor.bot_editor import (
     _run_locked_editor_action,
 )
 from music_links_bot.editor.bot_pending import consume_pending_input
-from music_links_bot.editor.draft_model import new_track_draft
 from music_links_bot.publishing.bot_queue import dispatch_queue_action, render_queue
 from music_links_bot.publishing.chat_access import check_publish_access
 from music_links_bot.state.bot_runtime import BotRuntime, CallbackAction
