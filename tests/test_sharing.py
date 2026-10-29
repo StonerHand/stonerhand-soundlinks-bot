@@ -5,10 +5,8 @@ from urllib.parse import parse_qs, urlparse
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-from music_links_bot.bot_lookup import LookupBundle
-from music_links_bot.collection_collage import decode_collage_payload
-from music_links_bot.models import TrackMatch
-from music_links_bot.sharing import (
+from music_links_bot.artwork.collection_collage import decode_collage_payload
+from music_links_bot.cards.sharing import (
     MAX_SHARE_QUERY_LENGTH,
     add_share_button,
     build_crate_share_query,
@@ -20,6 +18,8 @@ from music_links_bot.sharing import (
     render_inline_share_card,
     track_share_url,
 )
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.lookup.bot_lookup import LookupBundle
 
 
 class SharingTests(unittest.TestCase):

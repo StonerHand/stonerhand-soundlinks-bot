@@ -4,8 +4,8 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-from music_links_bot.bot_runtime import decode_callback
-from music_links_bot.bot_workspace import handle_workspace_action
+from music_links_bot.editor.bot_workspace import handle_workspace_action
+from music_links_bot.state.bot_runtime import decode_callback
 
 OWNER = 1
 
@@ -37,9 +37,12 @@ class DeliveryRetryTests(unittest.IsolatedAsyncioTestCase):
         self.edit = AsyncMock()
         self.run = AsyncMock()
         for target, new in (
-            ("music_links_bot.delivery_receipts.load_delivery", load_delivery),
-            ("music_links_bot.editor_screen._edit_editor_message", self.edit),
-            ("music_links_bot.bot_editor._run_locked_editor_action", self.run),
+            (
+                "music_links_bot.publishing.delivery_receipts.load_delivery",
+                load_delivery,
+            ),
+            ("music_links_bot.editor.editor_screen._edit_editor_message", self.edit),
+            ("music_links_bot.editor.bot_editor._run_locked_editor_action", self.run),
         ):
             patcher = patch(target, new=new)
             patcher.start()

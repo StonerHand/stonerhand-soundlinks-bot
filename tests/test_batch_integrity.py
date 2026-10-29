@@ -7,21 +7,21 @@ from unittest.mock import AsyncMock, patch
 
 from telegram import MessageEntity
 
-from music_links_bot import bot_lookup, track_lookup
-from music_links_bot.bot_lookup import (
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.lookup import bot_lookup, track_lookup
+from music_links_bot.lookup.bot_lookup import (
     LookupBundle,
     SourceStatus,
     _send_youtube_result,
 )
-from music_links_bot.bot_lookup_flow import (
+from music_links_bot.lookup.bot_lookup_flow import (
     _deliver_lookup_bundle,
     _send_track_matches,
 )
-from music_links_bot.bot_pipeline import LookupRequest
-from music_links_bot.bot_runtime import BotRuntime
-from music_links_bot.bot_stats import build_user_prefix, message_source_urls
-from music_links_bot.models import TrackMatch
-from music_links_bot.provider_runtime import ProviderOutcome
+from music_links_bot.lookup.bot_pipeline import LookupRequest
+from music_links_bot.lookup.bot_stats import build_user_prefix, message_source_urls
+from music_links_bot.providers.provider_runtime import ProviderOutcome
+from music_links_bot.state.bot_runtime import BotRuntime
 
 
 class _UnusedSoundCloud:
@@ -332,7 +332,7 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with patch(
-            "music_links_bot.bot_lookup_flow._send_track_result", new=AsyncMock()
+            "music_links_bot.lookup.bot_lookup_flow._send_track_result", new=AsyncMock()
         ) as sender:
             await _send_track_matches(
                 message,
@@ -373,7 +373,7 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with patch(
-            "music_links_bot.bot_lookup_flow._send_track_result", new=AsyncMock()
+            "music_links_bot.lookup.bot_lookup_flow._send_track_result", new=AsyncMock()
         ) as sender:
             await _send_track_matches(
                 message,
@@ -480,10 +480,11 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch(
-                "music_links_bot.bot_lookup_flow._send_track_matches", new=AsyncMock()
+                "music_links_bot.lookup.bot_lookup_flow._send_track_matches",
+                new=AsyncMock(),
             ) as send,
             patch(
-                "music_links_bot.bot_lookup_flow._send_partial_lookup_status",
+                "music_links_bot.lookup.bot_lookup_flow._send_partial_lookup_status",
                 new=AsyncMock(),
             ) as status,
         ):
@@ -542,10 +543,11 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch(
-                "music_links_bot.bot_lookup_flow._send_track_matches", new=AsyncMock()
+                "music_links_bot.lookup.bot_lookup_flow._send_track_matches",
+                new=AsyncMock(),
             ),
             patch(
-                "music_links_bot.bot_lookup_flow._send_partial_lookup_status",
+                "music_links_bot.lookup.bot_lookup_flow._send_partial_lookup_status",
                 new=AsyncMock(),
             ),
         ):
@@ -607,7 +609,8 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with patch(
-            "music_links_bot.bot_lookup_flow._send_track_matches", new=AsyncMock()
+            "music_links_bot.lookup.bot_lookup_flow._send_track_matches",
+            new=AsyncMock(),
         ) as send:
             await _deliver_lookup_bundle(
                 message,
@@ -648,11 +651,12 @@ class BatchIntegrityTests(unittest.IsolatedAsyncioTestCase):
         collage_url = "https://bot.example/api/collage?p=fixture&s=signature"
         with (
             patch(
-                "music_links_bot.collection_plan.collection_collage_preview_url",
+                "music_links_bot.cards.collection_plan.collection_collage_preview_url",
                 return_value=collage_url,
             ),
             patch(
-                "music_links_bot.bot_lookup_flow._send_track_result", new=AsyncMock()
+                "music_links_bot.lookup.bot_lookup_flow._send_track_result",
+                new=AsyncMock(),
             ) as send,
         ):
             await _send_track_matches(

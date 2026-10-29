@@ -1,7 +1,7 @@
 import unittest
 from types import SimpleNamespace
 
-from music_links_bot.channel_templates import (
+from music_links_bot.publishing.channel_templates import (
     apply_channel_template,
     apply_template,
     load_channel_template,

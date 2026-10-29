@@ -1,7 +1,7 @@
 import asyncio
 import unittest
 
-from music_links_bot.lazy_client import LazyAsyncClient
+from music_links_bot.core.lazy_client import LazyAsyncClient
 
 
 class _Client:

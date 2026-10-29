@@ -7,8 +7,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 
-from music_links_bot import alerts, bot_admin
-from music_links_bot.artist import ArtistClient, ArtistLookupError
+from music_links_bot.chat import bot_admin
+from music_links_bot.ops import alerts
+from music_links_bot.providers.artist import ArtistClient, ArtistLookupError
 
 ARTIST_URL = "https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb"
 METRICS = {
@@ -233,7 +234,7 @@ class SoundCloudClientTests(unittest.IsolatedAsyncioTestCase):
     URL = "https://soundcloud.com/stoner-hand/ethan-kath-dj-set"
 
     async def _client(self, handler):
-        from music_links_bot.soundcloud import SoundCloudClient
+        from music_links_bot.providers.soundcloud import SoundCloudClient
 
         client = SoundCloudClient()
         await client.aclose()
@@ -269,7 +270,7 @@ class SoundCloudClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(calls), 1)
 
     async def test_bad_answers_and_foreign_links_are_lookup_errors(self) -> None:
-        from music_links_bot.soundcloud import SoundCloudLookupError
+        from music_links_bot.providers.soundcloud import SoundCloudLookupError
 
         broken = await self._client(lambda request: httpx.Response(500))
         for url in ("https://example.com/track", self.URL):
@@ -277,7 +278,7 @@ class SoundCloudClientTests(unittest.IsolatedAsyncioTestCase):
                 await broken.lookup_track(url)
 
     def test_titles_without_an_author_are_guessed_both_ways(self) -> None:
-        from music_links_bot.soundcloud import parse_soundcloud_metadata
+        from music_links_bot.providers.soundcloud import parse_soundcloud_metadata
 
         by = parse_soundcloud_metadata(self.URL, {"title": "Song by Band"})
         dash = parse_soundcloud_metadata(self.URL, {"title": "Band - Song"})

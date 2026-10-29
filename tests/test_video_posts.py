@@ -10,8 +10,8 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 from PIL import Image
 
-from music_links_bot.models import TrackMatch, VideoMatch
-from music_links_bot.video_kinds import video_kind, video_kind_labels
+from music_links_bot.cards.video_kinds import video_kind, video_kind_labels
+from music_links_bot.core.models import TrackMatch, VideoMatch
 
 ENV = {"WEBHOOK_BASE_URL": "https://bot.example", "BOT_TOKEN": "1:x"}
 
@@ -60,8 +60,8 @@ def test_duplicate_kinds_get_numbers():
 
 
 def test_song_with_clips_is_one_post_with_named_buttons():
-    from music_links_bot.formatter import format_mixed_collection_message
-    from music_links_bot.keyboards import _build_mixed_collection_keyboard
+    from music_links_bot.cards.formatter import format_mixed_collection_message
+    from music_links_bot.cards.keyboards import _build_mixed_collection_keyboard
 
     videos = [
         clip("Dragonaut (Official Video)", "a"),
@@ -81,7 +81,7 @@ def test_song_with_clips_is_one_post_with_named_buttons():
 
 
 def test_video_collage_url_is_signed_with_its_mode():
-    from music_links_bot.collection_collage import (
+    from music_links_bot.artwork.collection_collage import (
         MIX_MODE,
         VIDEO_MODE,
         decode_collage_payload,
@@ -114,7 +114,7 @@ def _jpeg(size, color):
 
 
 def test_collage_trims_letterbox_and_badges_video_frames():
-    from music_links_bot.collection_collage import compose_collection_collage
+    from music_links_bot.artwork.collection_collage import compose_collection_collage
 
     cover = _jpeg((600, 600), (200, 40, 40))
     # A 4:3 YouTube thumbnail: black bars around a green 16:9 frame.
@@ -138,7 +138,7 @@ def test_collage_trims_letterbox_and_badges_video_frames():
 
 
 def test_song_with_clips_goes_out_as_one_post_with_the_collage():
-    from music_links_bot.lookup_delivery import send_mixed_result
+    from music_links_bot.lookup.lookup_delivery import send_mixed_result
 
     send_track_result = AsyncMock()
     send_pair = AsyncMock(return_value=True)
@@ -170,7 +170,7 @@ def test_song_with_clips_goes_out_as_one_post_with_the_collage():
 
 
 def test_several_videos_show_a_frame_collage_instead_of_one_player():
-    from music_links_bot.lookup_delivery import send_youtube_result
+    from music_links_bot.lookup.lookup_delivery import send_youtube_result
 
     send_track_result = AsyncMock()
     with patch.dict(os.environ, ENV):
@@ -194,7 +194,7 @@ def test_several_videos_show_a_frame_collage_instead_of_one_player():
 
 def test_collage_endpoint_draws_play_badges_for_the_signed_mode():
     from api.collage import handler
-    from music_links_bot.collection_collage import video_collage_preview_url
+    from music_links_bot.artwork.collection_collage import video_collage_preview_url
 
     cover = _jpeg((300, 300), (200, 40, 40))
     frame = _jpeg((480, 270), (40, 40, 200))
@@ -236,12 +236,12 @@ def test_collage_endpoint_draws_play_badges_for_the_signed_mode():
 
 
 def test_several_songs_and_clips_share_one_collage_with_badges_only_on_frames():
-    from music_links_bot.collection_collage import (
+    from music_links_bot.artwork.collection_collage import (
         collage_play_flags,
         decode_collage_payload,
         media_collage_preview_url,
     )
-    from music_links_bot.lookup_delivery import send_mixed_result
+    from music_links_bot.lookup.lookup_delivery import send_mixed_result
 
     second = TrackMatch(
         artist="The Growlers",
@@ -292,7 +292,7 @@ def test_several_songs_and_clips_share_one_collage_with_badges_only_on_frames():
 
 
 def test_collage_with_only_songs_never_uses_the_media_mode():
-    from music_links_bot.collection_collage import media_collage_preview_url
+    from music_links_bot.artwork.collection_collage import media_collage_preview_url
 
     with patch.dict(os.environ, ENV):
         assert media_collage_preview_url([TRACK, TRACK], []) is None
@@ -300,7 +300,7 @@ def test_collage_with_only_songs_never_uses_the_media_mode():
 
 def test_six_songs_and_clips_still_get_a_collage_with_frames():
     """Six songs used to fill every tile, so the mixed collage was dropped."""
-    from music_links_bot.collection_collage import media_collage_preview_url
+    from music_links_bot.artwork.collection_collage import media_collage_preview_url
 
     songs = [
         TrackMatch(
@@ -320,11 +320,11 @@ def test_six_songs_and_clips_still_get_a_collage_with_frames():
 
 
 def test_video_kinds_and_pair_heading_are_translated():
-    from music_links_bot.formatter import (
+    from music_links_bot.cards.formatter import (
         format_track_videos_message,
         format_video_message,
     )
-    from music_links_bot.i18n import preferred_language
+    from music_links_bot.core.i18n import preferred_language
 
     token = preferred_language.set("en")
     try:

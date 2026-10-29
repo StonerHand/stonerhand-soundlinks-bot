@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from music_links_bot.loop_runner import (
+from music_links_bot.ops.loop_runner import (
     run_on_loop,
     start_background_loop,
     stop_background_loop,

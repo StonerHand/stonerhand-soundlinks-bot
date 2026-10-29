@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import unittest
 
-from music_links_bot.logging_config import quiet_transport_logs
+from music_links_bot.ops.logging_config import quiet_transport_logs
 
 
 class LoggingConfigTests(unittest.TestCase):

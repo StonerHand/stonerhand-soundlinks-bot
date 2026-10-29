@@ -7,10 +7,10 @@ from unittest.mock import AsyncMock
 
 from telegram.error import TelegramError
 
-from music_links_bot.bot_progress import progress_text
-from music_links_bot.i18n import get_text
-from music_links_bot.message_effects import CELEBRATE, celebrate
-from music_links_bot.reactions import should_react
+from music_links_bot.core.i18n import get_text
+from music_links_bot.lookup.bot_progress import progress_text
+from music_links_bot.tg.message_effects import CELEBRATE, celebrate
+from music_links_bot.tg.reactions import should_react
 
 
 class ProgressTextTests(unittest.TestCase):
@@ -95,8 +95,8 @@ class EditorPublishCelebrationTests(unittest.IsolatedAsyncioTestCase):
     async def test_publishing_from_the_editor_ends_with_confetti(self) -> None:
         from test_release_119_state import RedisModel, ctx, draft, track
 
-        from music_links_bot import editor_delivery as bot_editor
-        from music_links_bot.bot_runtime import BotRuntime
+        from music_links_bot.editor import editor_delivery as bot_editor
+        from music_links_bot.state.bot_runtime import BotRuntime
 
         context = ctx(RedisModel())
         context.bot = SimpleNamespace(
@@ -163,7 +163,7 @@ class LookupRoundTripTests(unittest.IsolatedAsyncioTestCase):
             UpdateStub,
         )
 
-        from music_links_bot.bot_lookup_flow import track_lookup_message
+        from music_links_bot.lookup.bot_lookup_flow import track_lookup_message
 
         edits: list[str] = []
         original = EditableReplyStub.edit_text
@@ -175,10 +175,10 @@ class LookupRoundTripTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateSpotifyTrackMessageStub()
         with (
             unittest.mock.patch.object(EditableReplyStub, "edit_text", counting),
-            unittest.mock.patch("music_links_bot.bot_stats.record_post"),
+            unittest.mock.patch("music_links_bot.lookup.bot_stats.record_post"),
             # A slow lookup: the progress line is shown at once.
             unittest.mock.patch(
-                "music_links_bot.bot_lookup_flow.PROGRESS_DELAY_SECONDS", 0
+                "music_links_bot.lookup.bot_lookup_flow.PROGRESS_DELAY_SECONDS", 0
             ),
         ):
             await track_lookup_message(UpdateStub(message), ContextStub())
@@ -191,7 +191,7 @@ class LookupRoundTripTests(unittest.IsolatedAsyncioTestCase):
 
 
 def test_a_stale_selection_still_shows_the_crate_hint() -> None:
-    from music_links_bot.crate_view import render_crate
+    from music_links_bot.chat.crate_view import render_crate
 
     items = [{"item": {"artist": "Kyuss", "title": "Gardenia", "links": {}}}]
     text, _ = render_crate(items, lang="ru", selected_index=5)
@@ -208,7 +208,7 @@ class ScheduledNoticeTests(unittest.IsolatedAsyncioTestCase):
         }
 
     async def test_the_author_gets_a_link_to_the_scheduled_post(self) -> None:
-        from music_links_bot.publish_queue import _celebrate_job
+        from music_links_bot.publishing.publish_queue import _celebrate_job
 
         send = AsyncMock()
         context = SimpleNamespace(bot=SimpleNamespace(send_message=send))
@@ -224,7 +224,7 @@ class ScheduledNoticeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(url, "https://t.me/stonerhand/9")
 
     async def test_group_drafts_and_failures_stay_quiet(self) -> None:
-        from music_links_bot.publish_queue import _celebrate_job
+        from music_links_bot.publishing.publish_queue import _celebrate_job
 
         send = AsyncMock(side_effect=TelegramError("blocked"))
         context = SimpleNamespace(bot=SimpleNamespace(send_message=send))
@@ -238,11 +238,11 @@ class ScheduledNoticeTests(unittest.IsolatedAsyncioTestCase):
 
 class ProviderErrorTextTests(unittest.IsolatedAsyncioTestCase):
     async def _text(self, provider: str | None) -> str:
-        from music_links_bot.bot_error_handlers import (
+        from music_links_bot.chat.bot_error_handlers import (
             WorkflowHooks,
             _reply_with_flow_error,
         )
-        from music_links_bot.bot_runtime import BotErrorCode, BotFlowError
+        from music_links_bot.state.bot_runtime import BotErrorCode, BotFlowError
 
         message = SimpleNamespace(chat_id=7, reply_text=AsyncMock())
         hooks = WorkflowHooks(
@@ -277,7 +277,7 @@ class ProviderErrorTextTests(unittest.IsolatedAsyncioTestCase):
 
 class ErrorDeliveryTests(unittest.IsolatedAsyncioTestCase):
     def _hooks(self, *, placeholder=None, ephemeral=False, delivered=True):
-        from music_links_bot.bot_error_handlers import WorkflowHooks
+        from music_links_bot.chat.bot_error_handlers import WorkflowHooks
 
         return WorkflowHooks(
             build_error_keyboard=lambda *args, **kwargs: "keyboard",
@@ -301,7 +301,7 @@ class ErrorDeliveryTests(unittest.IsolatedAsyncioTestCase):
         return SimpleNamespace(bot=SimpleNamespace(username="StonerHandBot", token="t"))
 
     async def test_the_progress_message_turns_into_the_error(self) -> None:
-        from music_links_bot.bot_error_handlers import _reply_with_error
+        from music_links_bot.chat.bot_error_handlers import _reply_with_error
 
         placeholder = SimpleNamespace(edit_text=AsyncMock())
         message = self._message()
@@ -314,7 +314,7 @@ class ErrorDeliveryTests(unittest.IsolatedAsyncioTestCase):
         message.reply_text.assert_not_awaited()
 
     async def test_an_uneditable_progress_message_is_replaced(self) -> None:
-        from music_links_bot.bot_error_handlers import _reply_with_error
+        from music_links_bot.chat.bot_error_handlers import _reply_with_error
 
         placeholder = SimpleNamespace(
             edit_text=AsyncMock(side_effect=TelegramError("gone"))
@@ -328,7 +328,7 @@ class ErrorDeliveryTests(unittest.IsolatedAsyncioTestCase):
         message.reply_text.assert_awaited_once_with("oops", reply_markup="keyboard")
 
     async def test_group_errors_go_privately_to_the_sender(self) -> None:
-        from music_links_bot.bot_error_handlers import _try_ephemeral_error
+        from music_links_bot.chat.bot_error_handlers import _try_ephemeral_error
 
         placeholder = object()
         hooks = self._hooks(placeholder=placeholder, ephemeral=True)
@@ -342,7 +342,7 @@ class ErrorDeliveryTests(unittest.IsolatedAsyncioTestCase):
         hooks.try_delete_message.assert_awaited_once_with(placeholder)
 
     async def test_private_chats_and_refusals_fall_back_to_a_reply(self) -> None:
-        from music_links_bot.bot_error_handlers import _try_ephemeral_error
+        from music_links_bot.chat.bot_error_handlers import _try_ephemeral_error
 
         private = await _try_ephemeral_error(
             self._message(),

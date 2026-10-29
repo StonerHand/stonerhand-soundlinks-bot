@@ -6,11 +6,11 @@ from unittest.mock import AsyncMock
 import httpx
 import pytest
 
-from music_links_bot.models import TrackMatch
-from music_links_bot.public_release import PublicReleaseRegionUnavailable
-from music_links_bot.songlink import SonglinkError, SonglinkLookupError
-from music_links_bot.soundcloud import SoundCloudLookupError
-from music_links_bot.track_lookup import _attempt_source, _source_outcome
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.lookup.track_lookup import _attempt_source, _source_outcome
+from music_links_bot.providers.public_release import PublicReleaseRegionUnavailable
+from music_links_bot.providers.songlink import SonglinkError, SonglinkLookupError
+from music_links_bot.providers.soundcloud import SoundCloudLookupError
 
 SPOTIFY_ALBUM = "https://open.spotify.com/album/abc"
 DEEZER_ALBUM = "https://www.deezer.com/album/1"

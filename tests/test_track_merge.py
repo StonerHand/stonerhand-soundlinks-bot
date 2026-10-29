@@ -1,5 +1,5 @@
-from music_links_bot.models import TrackMatch
-from music_links_bot.track_merge import coalesce_equivalent_tracks
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.providers.track_merge import coalesce_equivalent_tracks
 
 
 def test_same_release_from_multiple_services_becomes_one_card() -> None:

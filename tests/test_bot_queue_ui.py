@@ -1,7 +1,7 @@
 import unittest
 from types import SimpleNamespace
 
-from music_links_bot.bot_queue import render_queue
+from music_links_bot.publishing.bot_queue import render_queue
 
 
 class BotQueueUiTests(unittest.IsolatedAsyncioTestCase):

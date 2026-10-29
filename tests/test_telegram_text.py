@@ -6,7 +6,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from telegram import MessageEntity
 
-from music_links_bot.telegram_text import format_user_note_html
+from music_links_bot.tg.telegram_text import format_user_note_html
 
 
 def utf16_offset(text: str, index: int) -> int:

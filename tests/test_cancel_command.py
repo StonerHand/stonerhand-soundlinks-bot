@@ -7,9 +7,9 @@ from unittest.mock import AsyncMock
 
 from test_release_119_state import RedisModel, ctx
 
-from music_links_bot.bot_menu import cancel_command
-from music_links_bot.bot_runtime import BotRuntime
-from music_links_bot.i18n import get_text
+from music_links_bot.chat.bot_menu import cancel_command
+from music_links_bot.core.i18n import get_text
+from music_links_bot.state.bot_runtime import BotRuntime
 
 
 class CancelCommandTests(unittest.IsolatedAsyncioTestCase):
@@ -66,8 +66,8 @@ class PrivacyScreenTests(unittest.IsolatedAsyncioTestCase):
     async def _tap(self, action: str, result=None):
         from unittest.mock import patch
 
-        from music_links_bot import bot_menu
-        from music_links_bot.bot_runtime import decode_callback, encode_callback
+        from music_links_bot.chat import bot_menu
+        from music_links_bot.state.bot_runtime import decode_callback, encode_callback
 
         query = SimpleNamespace(
             from_user=SimpleNamespace(id=7, language_code="ru"),
@@ -92,7 +92,7 @@ class PrivacyScreenTests(unittest.IsolatedAsyncioTestCase):
         deleted.assert_not_awaited()
 
     async def test_confirmed_deletion_reports_what_was_removed(self) -> None:
-        from music_links_bot.privacy import DeletionResult
+        from music_links_bot.state.privacy import DeletionResult
 
         text, deleted = await self._tap(
             "delete", DeletionResult(drafts=3, scheduled_posts=1, queue_available=False)

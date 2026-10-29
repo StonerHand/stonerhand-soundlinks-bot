@@ -7,7 +7,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
-from music_links_bot.bot_crate import (
+from music_links_bot.chat.bot_crate import (
     add_to_crate,
     clear_crate_items,
     crate_item_key,
@@ -18,18 +18,18 @@ from music_links_bot.bot_crate import (
     replace_crate_item,
     restore_crate_items,
 )
-from music_links_bot.bot_runtime import BotRuntime
-from music_links_bot.bot_storage import load_draft, load_drafts, store_draft
-from music_links_bot.delivery_receipts import (
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.editor.draft_model import new_track_draft
+from music_links_bot.publishing.delivery_receipts import (
     DeliveryBlockedError,
     begin_delivery,
     finish_delivery,
     load_delivery,
 )
-from music_links_bot.draft_model import new_track_draft
-from music_links_bot.kvstore import KVUnavailableError
-from music_links_bot.models import TrackMatch
-from music_links_bot.state_mutations import StateConflictError
+from music_links_bot.state.bot_runtime import BotRuntime
+from music_links_bot.state.bot_storage import load_draft, load_drafts, store_draft
+from music_links_bot.state.kvstore import KVUnavailableError
+from music_links_bot.state.state_mutations import StateConflictError
 
 
 class RedisModel:
@@ -326,14 +326,14 @@ class Release119StateTests(unittest.IsolatedAsyncioTestCase):
     async def test_no_telegram_send_if_intent_cannot_be_persisted(self):
         from unittest.mock import patch
 
-        from music_links_bot.editor_delivery import (
+        from music_links_bot.editor.editor_delivery import (
             _deliver_draft,
         )
 
         kv = RedisModel()
         kv.available = False
         sender = AsyncMock()
-        with patch("music_links_bot.editor_delivery.PublicationService", sender):
+        with patch("music_links_bot.editor.editor_delivery.PublicationService", sender):
             with self.assertRaises(KVUnavailableError):
                 await _deliver_draft(
                     ctx(kv), {"editor_draft_id": "d"}, target=7, channel_style=False

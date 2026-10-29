@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from telegram.error import BadRequest, Forbidden, RetryAfter, TelegramError
 
-from music_links_bot.telegram_gateway import (
+from music_links_bot.tg.telegram_gateway import (
     TelegramApiGateway,
     _telegram_api_error,
     feature_enabled,

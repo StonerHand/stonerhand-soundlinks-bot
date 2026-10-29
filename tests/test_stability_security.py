@@ -15,20 +15,24 @@ from telegram.error import BadRequest, NetworkError
 from api.queue_worker import is_authorized
 from api.set_webhook import _is_authorized
 from api.telegram import _is_telegram_request_authorized
-from music_links_bot.bot_editor import (
+from music_links_bot.artwork.branding import (
+    _fetch_bytes,
+    build_branded_cover,
+    compose_cover,
+)
+from music_links_bot.artwork.collection_collage import decode_collage_payload
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.editor.bot_editor import (
     EditorActionRequest,
     _handle_editor_action,
     _run_locked_editor_action,
 )
-from music_links_bot.bot_pending import consume_pending_input
-from music_links_bot.bot_queue import dispatch_queue_action, render_queue
-from music_links_bot.bot_runtime import BotRuntime, CallbackAction
-from music_links_bot.branding import _fetch_bytes, build_branded_cover, compose_cover
-from music_links_bot.chat_access import check_publish_access
-from music_links_bot.collection_collage import decode_collage_payload
-from music_links_bot.draft_model import new_track_draft
-from music_links_bot.models import TrackMatch
-from music_links_bot.webhook_secret import secrets_match
+from music_links_bot.editor.bot_pending import consume_pending_input
+from music_links_bot.editor.draft_model import new_track_draft
+from music_links_bot.publishing.bot_queue import dispatch_queue_action, render_queue
+from music_links_bot.publishing.chat_access import check_publish_access
+from music_links_bot.state.bot_runtime import BotRuntime, CallbackAction
+from music_links_bot.tg.webhook_secret import secrets_match
 
 
 def _draft():
@@ -108,7 +112,7 @@ class BrandingSafetyTests(unittest.IsolatedAsyncioTestCase):
             )
         )
         async with httpx.AsyncClient(transport=transport) as client:
-            with patch("music_links_bot.branding.MAX_BRANDING_BYTES", 100_000):
+            with patch("music_links_bot.artwork.branding.MAX_BRANDING_BYTES", 100_000):
                 result = await _fetch_bytes(client, "https://images.example/cover")
         self.assertIsNone(result)
         self.assertLessEqual(stream.read, 2)
@@ -145,8 +149,10 @@ class BrandingSafetyTests(unittest.IsolatedAsyncioTestCase):
                 finished.append(True)
 
         with (
-            patch("music_links_bot.branding._fetch_bytes", side_effect=slow_fetch),
-            patch("music_links_bot.branding.BRANDING_FETCH_SECONDS", 0.01),
+            patch(
+                "music_links_bot.artwork.branding._fetch_bytes", side_effect=slow_fetch
+            ),
+            patch("music_links_bot.artwork.branding.BRANDING_FETCH_SECONDS", 0.01),
         ):
             self.assertIsNone(
                 await build_branded_cover("https://i.scdn.co/image/a", label="test")
@@ -199,7 +205,7 @@ class EditorSafetyTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(query.answer.await_args.kwargs["show_alert"])
             query.edit_message_text.assert_not_awaited()
         with patch(
-            "music_links_bot.bot_editor._handle_editor_lifecycle",
+            "music_links_bot.editor.bot_editor._handle_editor_lifecycle",
             AsyncMock(return_value=True),
         ) as restore:
             await _handle_editor_action(_query(), context, "du", "d1")
@@ -263,9 +269,9 @@ class EditorSafetyTests(unittest.IsolatedAsyncioTestCase):
             for action in ("pc", "x")
         ]
         with (
-            patch("music_links_bot.bot_editor._show_action_busy", AsyncMock()),
+            patch("music_links_bot.editor.bot_editor._show_action_busy", AsyncMock()),
             patch(
-                "music_links_bot.bot_editor._run_primary_editor_action",
+                "music_links_bot.editor.bot_editor._run_primary_editor_action",
                 AsyncMock(side_effect=send),
             ) as sender,
         ):
@@ -290,7 +296,7 @@ class EditorSafetyTests(unittest.IsolatedAsyncioTestCase):
             TrackMatch(**_draft()["item"]),
         )
         with patch(
-            "music_links_bot.bot_editor._show_action_busy",
+            "music_links_bot.editor.bot_editor._show_action_busy",
             AsyncMock(side_effect=asyncio.CancelledError),
         ):
             with self.assertRaises(asyncio.CancelledError):
@@ -299,9 +305,9 @@ class EditorSafetyTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_expired_owner_cannot_release_a_new_action_lock(self):
         runtime = BotRuntime()
-        with patch("music_links_bot.bot_runtime.monotonic", return_value=100):
+        with patch("music_links_bot.state.bot_runtime.monotonic", return_value=100):
             old = await runtime.acquire_action("publish")
-        with patch("music_links_bot.bot_runtime.monotonic", return_value=1000):
+        with patch("music_links_bot.state.bot_runtime.monotonic", return_value=1000):
             new = await runtime.acquire_action("publish")
             self.assertIsNotNone(new)
             await runtime.release_action("publish", old)
@@ -311,7 +317,7 @@ class EditorSafetyTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_full_lock_table_does_not_evict_an_active_publication(self):
         runtime = BotRuntime()
-        with patch("music_links_bot.bot_runtime.MAX_MEMORY_KEYS", 1):
+        with patch("music_links_bot.state.bot_runtime.MAX_MEMORY_KEYS", 1):
             token = await runtime.acquire_action("first")
             self.assertIsNone(await runtime.acquire_action("second"))
             self.assertIsNone(await runtime.acquire_action("first"))
@@ -367,7 +373,7 @@ class QueueInteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             context.application.bot_data["publish_queue"][0]["status"], "pending"
         )
-        with patch("music_links_bot.bot_queue.time.time", return_value=42):
+        with patch("music_links_bot.publishing.bot_queue.time.time", return_value=42):
             await dispatch_queue_action(
                 query, context, CallbackAction("queue", "retry_confirm", "0:job1")
             )

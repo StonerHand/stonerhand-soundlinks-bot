@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, Mock, patch
 
 from telegram.error import BadRequest
 
-from music_links_bot.draft_model import prepare_publication_draft
-from music_links_bot.models import TrackMatch
-from music_links_bot.publication_service import PublicationService
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.editor.draft_model import prepare_publication_draft
+from music_links_bot.publishing.publication_service import PublicationService
 
 
 class PublicationServiceTests(unittest.IsolatedAsyncioTestCase):

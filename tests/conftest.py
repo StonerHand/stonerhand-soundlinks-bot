@@ -3,7 +3,7 @@ known to work: one test's simulated outage must not leak into the next."""
 
 import pytest
 
-from music_links_bot.telegram_gateway import reset_capabilities
+from music_links_bot.tg.telegram_gateway import reset_capabilities
 
 
 @pytest.fixture(autouse=True)

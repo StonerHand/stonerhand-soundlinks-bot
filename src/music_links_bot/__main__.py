@@ -3,10 +3,10 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from music_links_bot.bot_app import build_application
-from music_links_bot.config import Settings
-from music_links_bot.logging_config import quiet_transport_logs
-from music_links_bot.telegram_updates import ALLOWED_UPDATES
+from music_links_bot.chat.bot_app import build_application
+from music_links_bot.core.config import Settings
+from music_links_bot.ops.logging_config import quiet_transport_logs
+from music_links_bot.tg.telegram_updates import ALLOWED_UPDATES
 
 
 def main() -> None:
@@ -21,7 +21,7 @@ def main() -> None:
     quiet_transport_logs()
 
     application = build_application(settings)
-    from music_links_bot.polling_worker import (
+    from music_links_bot.ops.polling_worker import (
         start_polling_services,
         stop_polling_services,
     )

@@ -3,7 +3,13 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from html import unescape
 
-from music_links_bot.bot_builder import (
+from music_links_bot.chat.bot_ui import (
+    build_create_keyboard,
+    build_start_keyboard,
+    editor_hashtag_rows,
+)
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.editor.bot_builder import (
     BuilderScreen,
     active_card_label,
     builder_screen,
@@ -19,14 +25,8 @@ from music_links_bot.bot_builder import (
     toggle_platform,
     use_auto_tags,
 )
-from music_links_bot.bot_runtime import UserSession
-from music_links_bot.bot_ui import (
-    build_create_keyboard,
-    build_start_keyboard,
-    editor_hashtag_rows,
-)
-from music_links_bot.models import TrackMatch
-from music_links_bot.telegram_text import telegram_text_length
+from music_links_bot.state.bot_runtime import UserSession
+from music_links_bot.tg.telegram_text import telegram_text_length
 
 
 class BuilderJourneyTests(unittest.TestCase):

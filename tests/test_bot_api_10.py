@@ -4,14 +4,14 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-from music_links_bot.bot_app import GROUP_BOT_COMMANDS, GROUP_BOT_COMMANDS_EN
-from music_links_bot.bot_menu import channel_command, help_command
-from music_links_bot.bot_preferences import preferences_view
-from music_links_bot.bot_runtime import UserSession
-from music_links_bot.bot_ui import editor_appearance_rows
-from music_links_bot.draft_model import new_track_draft
-from music_links_bot.human_time import local_time_html
-from music_links_bot.models import TrackMatch
+from music_links_bot.chat.bot_app import GROUP_BOT_COMMANDS, GROUP_BOT_COMMANDS_EN
+from music_links_bot.chat.bot_menu import channel_command, help_command
+from music_links_bot.chat.bot_preferences import preferences_view
+from music_links_bot.chat.bot_ui import editor_appearance_rows
+from music_links_bot.core.human_time import local_time_html
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.editor.draft_model import new_track_draft
+from music_links_bot.state.bot_runtime import UserSession
 
 
 def _buttons(keyboard) -> list[dict]:
@@ -81,7 +81,7 @@ class PrivateGroupReplyTests(unittest.IsolatedAsyncioTestCase):
     async def test_help_in_a_group_is_seen_only_by_the_sender(self) -> None:
         update, context = _group_update("/help")
         with patch(
-            "music_links_bot.ephemeral.send_ephemeral_message",
+            "music_links_bot.tg.ephemeral.send_ephemeral_message",
             new=AsyncMock(return_value=True),
         ) as send:
             await help_command(update, context)
@@ -95,11 +95,11 @@ class PrivateGroupReplyTests(unittest.IsolatedAsyncioTestCase):
         access = SimpleNamespace(checked=True, allowed=True, can_delete=True)
         with (
             patch(
-                "music_links_bot.chat_access.check_publish_access",
+                "music_links_bot.publishing.chat_access.check_publish_access",
                 new=AsyncMock(return_value=access),
             ),
             patch(
-                "music_links_bot.ephemeral.send_ephemeral_message",
+                "music_links_bot.tg.ephemeral.send_ephemeral_message",
                 new=AsyncMock(return_value=True),
             ) as send,
         ):
@@ -114,11 +114,11 @@ class PrivateGroupReplyTests(unittest.IsolatedAsyncioTestCase):
         access = SimpleNamespace(checked=True, allowed=True, can_delete=True)
         with (
             patch(
-                "music_links_bot.chat_access.check_publish_access",
+                "music_links_bot.publishing.chat_access.check_publish_access",
                 new=AsyncMock(return_value=access),
             ),
             patch(
-                "music_links_bot.ephemeral.send_ephemeral_message",
+                "music_links_bot.tg.ephemeral.send_ephemeral_message",
                 new=AsyncMock(return_value=False),
             ),
         ):

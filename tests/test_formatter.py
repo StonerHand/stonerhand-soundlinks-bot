@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from music_links_bot.formatter import (
+from music_links_bot.cards.formatter import (
     format_artist_collection_message,
     format_artist_message,
     format_collection_message,
@@ -19,7 +19,7 @@ from music_links_bot.formatter import (
     genre_hashtags,
     prepend_user_html,
 )
-from music_links_bot.models import (
+from music_links_bot.core.models import (
     ArtistMatch,
     PlaylistMatch,
     RadioMatch,
@@ -37,7 +37,7 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(genre_hashtags(None), [])
 
     def test_track_hashtags_include_genre(self) -> None:
-        from music_links_bot.formatter import build_auto_hashtags
+        from music_links_bot.cards.formatter import build_auto_hashtags
 
         track = TrackMatch(
             title="Paranoid",
@@ -49,7 +49,7 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(build_auto_hashtags(track), "#stonerhand #track #heavymetal")
 
     def test_unverified_genre_falls_back_to_structural_tags(self) -> None:
-        from music_links_bot.formatter import build_auto_hashtags
+        from music_links_bot.cards.formatter import build_auto_hashtags
 
         track = TrackMatch(
             title="Don't Reach For Me",

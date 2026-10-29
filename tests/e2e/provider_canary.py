@@ -5,19 +5,19 @@ from __future__ import annotations
 import asyncio
 import sys
 
-from music_links_bot.apple_radio import AppleRadioClient
-from music_links_bot.musicbrainz import MusicBrainzClient
-from music_links_bot.nts import NTSClient
-from music_links_bot.playlist import PlaylistClient
-from music_links_bot.search import SearchClient
-from music_links_bot.songlink import SonglinkClient
-from music_links_bot.soundcloud import SoundCloudClient
-from music_links_bot.spotify import SpotifyClient, SpotifyLookupError
-from music_links_bot.titles import TitleClient
-from music_links_bot.track_lookup import (
+from music_links_bot.lookup.track_lookup import (
     _lookup_tracks,
 )
-from music_links_bot.youtube import YouTubeClient
+from music_links_bot.providers.apple_radio import AppleRadioClient
+from music_links_bot.providers.musicbrainz import MusicBrainzClient
+from music_links_bot.providers.nts import NTSClient
+from music_links_bot.providers.playlist import PlaylistClient
+from music_links_bot.providers.search import SearchClient
+from music_links_bot.providers.songlink import SonglinkClient
+from music_links_bot.providers.soundcloud import SoundCloudClient
+from music_links_bot.providers.spotify import SpotifyClient, SpotifyLookupError
+from music_links_bot.providers.titles import TitleClient
+from music_links_bot.providers.youtube import YouTubeClient
 
 SPOTIFY_TRACK = "https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT"
 SPOTIFY_REMOVED_ALBUM = "https://open.spotify.com/album/42dcDuItUH0Ed4QU4umdq6"

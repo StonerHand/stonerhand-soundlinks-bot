@@ -58,7 +58,7 @@ class VercelWebhookTests(unittest.TestCase):
             self.assertFalse(_is_telegram_request_authorized("wrong"))
 
     def test_webhook_secret_is_derived_from_bot_token_when_unset(self) -> None:
-        from music_links_bot.webhook_secret import telegram_webhook_secret
+        from music_links_bot.tg.webhook_secret import telegram_webhook_secret
 
         with patch.dict(os.environ, {"BOT_TOKEN": "123:abc"}, clear=True):
             derived = telegram_webhook_secret()
@@ -77,7 +77,7 @@ class VercelWebhookTests(unittest.TestCase):
             self.assertEqual(telegram_webhook_secret(), "explicit")
 
     def test_set_webhook_registers_derived_secret(self) -> None:
-        from music_links_bot.webhook_secret import telegram_webhook_secret
+        from music_links_bot.tg.webhook_secret import telegram_webhook_secret
 
         with patch.dict(os.environ, {"BOT_TOKEN": "123:abc"}, clear=True):
             self.assertEqual(_telegram_webhook_secret(), telegram_webhook_secret())
@@ -139,7 +139,7 @@ class VercelWebhookTests(unittest.TestCase):
         )
 
     def test_english_command_scope_uses_english_descriptions(self) -> None:
-        from music_links_bot.bot_app import PUBLIC_BOT_COMMANDS_EN
+        from music_links_bot.chat.bot_app import PUBLIC_BOT_COMMANDS_EN
 
         command_url = _telegram_set_commands_url(
             "bot-token",

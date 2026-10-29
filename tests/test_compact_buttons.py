@@ -1,12 +1,12 @@
 """Post buttons: a lone provider beside the blue hub; optional number keypad."""
 
-from music_links_bot.keyboards import (
+from music_links_bot.cards.keyboards import (
     _build_collection_keyboard,
     _build_link_keyboard,
     _build_mixed_collection_keyboard,
 )
-from music_links_bot.models import TrackMatch, VideoMatch
-from music_links_bot.release_preferences import (
+from music_links_bot.core.models import TrackMatch, VideoMatch
+from music_links_bot.state.release_preferences import (
     PresentationPreferences,
     presentation_context,
 )
@@ -82,7 +82,7 @@ def test_default_collection_buttons_keep_titles() -> None:
 
 
 def test_video_buttons_keep_only_the_song_name() -> None:
-    from music_links_bot.keyboards import _short_video_title
+    from music_links_bot.cards.keyboards import _short_video_title
 
     assert _short_video_title("ПОЕХАЛИ – Зарплата / POEXXXALI – Payday") == "Зарплата"
     assert _short_video_title("Sleep - Dragonaut (Official Video)") == "Dragonaut"
@@ -90,7 +90,7 @@ def test_video_buttons_keep_only_the_song_name() -> None:
 
 
 def test_long_titles_are_cut_to_fit_two_columns() -> None:
-    from music_links_bot.keyboards import _collection_label
+    from music_links_bot.cards.keyboards import _collection_label
 
     assert (
         _collection_label(8, "Взаимно Познакомиться", "📺")

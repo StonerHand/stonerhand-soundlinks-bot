@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 
 import httpx
 
-from music_links_bot.spotify import (
+from music_links_bot.providers.spotify import (
     SpotifyClient,
     SpotifyLookupError,
     parse_spotify_embed,
@@ -360,7 +360,9 @@ class SpotifyCallToActionTitleTests(unittest.TestCase):
         self.assertEqual(album.title, "Mad Flowers")
 
     def test_a_release_really_named_listen_to_keeps_its_name(self) -> None:
-        from music_links_bot.metadata_cleaning import clean_spotify_metadata_title
+        from music_links_bot.providers.metadata_cleaning import (
+            clean_spotify_metadata_title,
+        )
 
         self.assertEqual(
             clean_spotify_metadata_title("Listen to the Music"), "Listen to the Music"

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from music_links_bot.release_hubs import (
+from music_links_bot.cards.release_hubs import (
     canonical_release_hub_url,
     is_universal_release_url,
     resolve_release_hub_url,

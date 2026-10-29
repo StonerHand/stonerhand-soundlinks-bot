@@ -1,7 +1,7 @@
 import unittest
 from types import SimpleNamespace
 
-from music_links_bot.bot_recent import render_drafts_view
+from music_links_bot.chat.bot_recent import render_drafts_view
 
 
 class RecentNavigationTests(unittest.IsolatedAsyncioTestCase):

@@ -1,0 +1,481 @@
+from __future__ import annotations
+
+import asyncio
+import logging
+from dataclasses import dataclass
+from urllib.parse import parse_qs, urlparse
+
+import httpx
+
+from music_links_bot.cards.release_hubs import canonical_release_hub_url
+from music_links_bot.core.cache import TTLCache
+from music_links_bot.core.constants import HTTP_USER_AGENT
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.core.single_flight import cancel_all, forget
+from music_links_bot.core.url_utils import cache_key_for_url, normalize_host
+from music_links_bot.providers.metadata_cleaning import match_key, positive_track_count
+from music_links_bot.providers.musicbrainz import (
+    MusicBrainzClient,
+    MusicBrainzLookupError,
+)
+from music_links_bot.providers.release_metadata import (
+    apple_album_url,
+    duration_ms,
+    metadata_url,
+)
+
+LOGGER = logging.getLogger(__name__)
+MIN_QUERY_LENGTH = 2
+MAX_QUERY_LENGTH = 120
+MAX_CANDIDATES = 3
+GENRE_SEARCH_LIMIT = 12
+SPOTIFY_ENRICHMENT_TIMEOUT_SECONDS = 5.0
+
+
+class SearchLookupError(RuntimeError):
+    """Raised when a text query cannot be resolved to a release URL."""
+
+
+@dataclass(slots=True)
+class SearchCandidate:
+    url: str
+    title: str
+    artist: str
+    artwork_url: str | None = None
+    preview_url: str | None = None
+    album: str | None = None
+    year: str | None = None
+    kind: str | None = None
+    album_url: str | None = None
+    artist_url: str | None = None
+    duration_ms: int | None = None
+    track_count: int | None = None
+
+
+async def find_release_candidates(client: object, query: str) -> list[SearchCandidate]:
+    """Up to a few matches for ``query``; one-URL clients give a single match."""
+    if hasattr(client, "search_release_candidates"):
+        return await client.search_release_candidates(query)
+    url = await client.search_release_url(query)  # type: ignore[attr-defined]
+    return [SearchCandidate(url=url, title=query, artist="")]
+
+
+class SearchClient:
+    """Resolves free-text queries to streaming URLs via the iTunes Search API.
+
+    The API is public and keyless. Returned Apple Music URLs normally continue
+    through Song.link; verified iTunes metadata remains a single-platform
+    fallback when the universal resolver is unavailable.
+    """
+
+    def __init__(
+        self,
+        *,
+        timeout: float = 6.0,
+        country: str = "US",
+        musicbrainz_client: MusicBrainzClient | None = None,
+    ) -> None:
+        self._country = country
+        self._client = httpx.AsyncClient(
+            base_url="https://itunes.apple.com",
+            headers={"User-Agent": HTTP_USER_AGENT},
+            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
+            timeout=httpx.Timeout(timeout, connect=3.0),
+        )
+        self._cache: TTLCache[list[SearchCandidate]] = TTLCache(ttl_seconds=6 * 3600)
+        self._miss_cache: TTLCache[bool] = TTLCache(ttl_seconds=10 * 60)
+        self._genre_cache: TTLCache[str] = TTLCache(ttl_seconds=24 * 3600)
+        self._preview_cache: TTLCache[str] = TTLCache(ttl_seconds=24 * 3600)
+        self._candidate_cache: TTLCache[SearchCandidate] = TTLCache(
+            ttl_seconds=6 * 3600
+        )
+        self._inflight: dict[str, asyncio.Task[list[SearchCandidate]]] = {}
+        self._details_cache: TTLCache[SearchCandidate] = TTLCache(ttl_seconds=6 * 3600)
+        self._subscribers: dict[asyncio.Task, int] = {}
+        self._musicbrainz_client = musicbrainz_client or MusicBrainzClient(
+            timeout=min(timeout, 4.0)
+        )
+        self._owns_musicbrainz_client = musicbrainz_client is None
+
+    async def aclose(self) -> None:
+        await cancel_all(self._inflight)
+        await self._client.aclose()
+        if self._owns_musicbrainz_client:
+            await self._musicbrainz_client.aclose()
+
+    async def search_release_url(self, query: str) -> str:
+        candidates = await self.search_release_candidates(query)
+        return candidates[0].url
+
+    async def lookup_release_fallback(self, source_url: str) -> TrackMatch | None:
+        """Build a verified Apple Music card when Song.link cannot resolve it.
+
+        Search results already carry enough provider metadata for a complete
+        single-platform post.  A direct Apple URL may arrive in a later
+        serverless invocation, so a cache miss is repaired through the keyless
+        iTunes lookup endpoint instead of depending on process memory.
+        """
+        cache_key = cache_key_for_url(source_url)
+        candidate = self._candidate_cache.get(cache_key)
+        if candidate is None:
+            candidate = await self._lookup_apple_candidate(source_url)
+        if candidate is None:
+            return None
+        if candidate.kind == "album" and candidate.duration_ms is None:
+            candidate = await self.lookup_release_metadata(source_url) or candidate
+
+        kind = "album" if candidate.kind == "album" else "song"
+        links = {"appleMusic": candidate.url}
+        page_url = None
+        try:
+            spotify_url = await asyncio.wait_for(
+                self._musicbrainz_client.lookup_spotify_release(
+                    candidate.artist,
+                    candidate.title,
+                    kind=kind,
+                ),
+                timeout=SPOTIFY_ENRICHMENT_TIMEOUT_SECONDS,
+            )
+        except (TimeoutError, MusicBrainzLookupError):
+            LOGGER.debug(
+                "Exact Spotify relation lookup failed for %s — %s",
+                candidate.artist,
+                candidate.title,
+                exc_info=True,
+            )
+        else:
+            if spotify_url:
+                links["spotify"] = spotify_url
+                page_url = canonical_release_hub_url(
+                    spotify_url,
+                    release_kind=kind,
+                )
+        return TrackMatch(
+            title=candidate.title,
+            artist=candidate.artist,
+            links=links,
+            page_url=page_url,
+            release_year=candidate.year,
+            kind=kind,
+            album_title=candidate.album if kind == "song" else None,
+            thumbnail_url=_large_artwork_url(candidate.artwork_url),
+            album_url=candidate.album_url,
+            artist_url=candidate.artist_url,
+            duration_ms=candidate.duration_ms,
+            track_count=candidate.track_count if kind == "album" else None,
+        )
+
+    async def lookup_release_metadata(self, source_url: str) -> SearchCandidate | None:
+        key = cache_key_for_url(source_url)
+        cached = self._details_cache.get(key)
+        if cached is not None:
+            return cached
+        try:
+            candidate = await asyncio.wait_for(
+                self._lookup_apple_candidate(source_url, include_tracks=True),
+                timeout=1.25,
+            )
+        except TimeoutError:
+            return None
+        if candidate is not None:
+            self._details_cache.set(key, candidate)
+        return candidate
+
+    async def lookup_genre(self, artist: str, title: str) -> str | None:
+        """Return a genre only for an exact artist/release match.
+
+        iTunes search is relevance-ranked and can put an unrelated release
+        first when punctuation changes (for example ``Don't`` vs ``Don’t``).
+        A wrong genre is worse than no genre tag, so enrichment is accepted
+        only after both the artist and track/collection title match.
+        Empty cache entries mark safe misses and avoid repeated lookups.
+        """
+        query = normalize_search_query(f"{artist} {title}")
+        if query is None:
+            return None
+
+        cache_key = query.casefold()
+        cached_genre = self._genre_cache.get(cache_key)
+        if cached_genre is not None:
+            return cached_genre or None
+
+        try:
+            response = await self._client.get(
+                "/search",
+                params={
+                    "term": query,
+                    "media": "music",
+                    "entity": "song,album",
+                    "limit": GENRE_SEARCH_LIMIT,
+                    "country": self._country,
+                },
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except (httpx.HTTPError, ValueError):
+            LOGGER.debug("Genre lookup failed for %s", query, exc_info=True)
+            return None
+
+        genre = _extract_matching_genre(payload, artist=artist, title=title)
+        self._genre_cache.set(cache_key, genre or "")
+        return genre
+
+    async def search_release_candidates(self, query: str) -> list[SearchCandidate]:
+        normalized_query = normalize_search_query(query)
+        if normalized_query is None:
+            raise SearchLookupError("Query is too short to search.")
+
+        cache_key = normalized_query.casefold()
+        cached_candidates = self._cache.get(cache_key)
+        if cached_candidates is not None:
+            return cached_candidates
+        if self._miss_cache.get(cache_key):
+            raise SearchLookupError("No release matched the query.")
+
+        pending = self._inflight.get(cache_key)
+        if pending is None:
+            task = asyncio.create_task(
+                self._search_and_cache(normalized_query, cache_key)
+            )
+            self._inflight[cache_key] = task
+            task.add_done_callback(
+                lambda completed: forget(self._inflight, cache_key, completed)
+            )
+        else:
+            task = pending
+        self._subscribers[task] = self._subscribers.get(task, 0) + 1
+        try:
+            return await asyncio.shield(task)
+        finally:
+            self._subscribers[task] -= 1
+            if self._subscribers[task] == 0:
+                self._subscribers.pop(task, None)
+                if not task.done():
+                    if self._inflight.get(cache_key) is task:
+                        self._inflight.pop(cache_key, None)
+                    task.cancel()
+                    await asyncio.gather(task, return_exceptions=True)
+            if task.done():
+                forget(self._inflight, cache_key, task)
+
+    async def _search_and_cache(
+        self,
+        normalized_query: str,
+        cache_key: str,
+    ) -> list[SearchCandidate]:
+
+        try:
+            response = await self._client.get(
+                "/search",
+                params={
+                    "term": normalized_query,
+                    "media": "music",
+                    "entity": "song,album",
+                    "limit": 8,
+                    "country": self._country,
+                },
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            raise SearchLookupError("Music search is unavailable right now.") from exc
+
+        candidates = _extract_release_candidates(payload)
+        if not candidates:
+            self._miss_cache.set(cache_key, True)
+            raise SearchLookupError("No release matched the query.")
+
+        self._cache.set(cache_key, candidates)
+        self._remember_candidates(candidates)
+        return candidates
+
+    def _remember_candidates(self, candidates: list[SearchCandidate]) -> None:
+        for candidate in candidates:
+            self._candidate_cache.set(cache_key_for_url(candidate.url), candidate)
+
+    async def _lookup_apple_candidate(
+        self, source_url: str, *, include_tracks: bool = False
+    ) -> SearchCandidate | None:
+        item_id = _apple_item_id(source_url)
+        if item_id is None:
+            return None
+        params = {"id": item_id, "country": self._country}
+        if include_tracks:
+            params.update(entity="song", limit="200")
+        try:
+            response = await self._client.get(
+                "/lookup",
+                params=params,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            # ID lookups must not accidentally accept a related track/artist.
+            candidates = [
+                c
+                for c in _extract_release_candidates(payload)
+                if _apple_item_id(c.url) == item_id
+            ]
+        except (httpx.HTTPError, ValueError):
+            LOGGER.debug("Apple Music metadata fallback failed", exc_info=True)
+            return None
+        candidate = candidates[0] if candidates else None
+        if candidate is not None and candidate.kind == "album" and include_tracks:
+            candidate.duration_ms = _complete_album_duration(
+                payload, item_id, candidate.track_count
+            )
+        self._remember_candidates(candidates)
+        return candidate
+
+
+def normalize_search_query(query: str) -> str | None:
+    normalized = " ".join(query.split()).strip()
+    if len(normalized) < MIN_QUERY_LENGTH or normalized.startswith("/"):
+        return None
+
+    return normalized[:MAX_QUERY_LENGTH]
+
+
+def _apple_item_id(source_url: str) -> str | None:
+    parsed = urlparse(source_url)
+    if normalize_host(parsed.hostname) != "music.apple.com":
+        return None
+    query_id = (parse_qs(parsed.query).get("i") or [""])[0]
+    path_id = next(
+        (part for part in reversed(parsed.path.split("/")) if part.isdigit()),
+        "",
+    )
+    item_id = query_id or path_id
+    return item_id if item_id.isdigit() else None
+
+
+def _large_artwork_url(value: str | None) -> str | None:
+    if not value:
+        return None
+    return value.replace("100x100bb", "1200x1200bb").replace("60x60bb", "1200x1200bb")
+
+
+def _extract_matching_genre(
+    payload: object,
+    *,
+    artist: str,
+    title: str,
+) -> str | None:
+    if not isinstance(payload, dict):
+        return None
+
+    results = payload.get("results")
+    if not isinstance(results, list):
+        return None
+
+    artist_key = match_key(artist)
+    title_key = match_key(title)
+    if not artist_key or not title_key:
+        return None
+
+    matches = {}
+    from music_links_bot.cards.release_tags import genre_hashtags
+
+    for result in results:
+        if not isinstance(result, dict):
+            continue
+        if match_key(result.get("artistName")) != artist_key:
+            continue
+        candidate_titles = (
+            result.get("trackName"),
+            result.get("collectionName"),
+        )
+        if title_key not in {
+            key for value in candidate_titles if (key := match_key(value))
+        }:
+            continue
+        genre = result.get("primaryGenreName")
+        if isinstance(genre, str) and genre.strip():
+            normalized = tuple(sorted(genre_hashtags(genre)))
+            if normalized:
+                matches[normalized] = genre.strip()
+
+    return next(iter(matches.values())) if len(matches) == 1 else None
+
+
+def _extract_release_candidates(payload: object) -> list[SearchCandidate]:
+    if not isinstance(payload, dict):
+        return []
+
+    results = payload.get("results")
+    if not isinstance(results, list):
+        return []
+
+    candidates: list[SearchCandidate] = []
+    seen_urls: set[str] = set()
+    for result in results:
+        if not isinstance(result, dict):
+            continue
+
+        url = None
+        for field in ("trackViewUrl", "collectionViewUrl"):
+            value = result.get(field)
+            if isinstance(value, str) and value.startswith("http"):
+                url = value
+                break
+
+        if url is None or url in seen_urls:
+            continue
+
+        seen_urls.add(url)
+        artwork = result.get("artworkUrl100") or result.get("artworkUrl60")
+        preview = result.get("previewUrl")
+        candidates.append(
+            SearchCandidate(
+                url=url,
+                title=str(
+                    result.get("trackName") or result.get("collectionName") or ""
+                ),
+                artist=str(result.get("artistName") or ""),
+                artwork_url=artwork if isinstance(artwork, str) else None,
+                preview_url=preview if isinstance(preview, str) else None,
+                album=(
+                    str(result["collectionName"])
+                    if result.get("trackName") and result.get("collectionName")
+                    else None
+                ),
+                year=(
+                    str(result["releaseDate"])[:4]
+                    if str(result.get("releaseDate") or "")[:4].isdigit()
+                    else None
+                ),
+                kind=(
+                    "album"
+                    if result.get("wrapperType") == "collection"
+                    else str(result.get("kind") or "track")
+                ),
+                album_url=apple_album_url(
+                    result.get("collectionViewUrl"), result.get("collectionId")
+                ),
+                artist_url=metadata_url(result.get("artistViewUrl"), "artist"),
+                duration_ms=duration_ms(result.get("trackTimeMillis")),
+                track_count=positive_track_count(result.get("trackCount")),
+            )
+        )
+        if len(candidates) >= MAX_CANDIDATES:
+            break
+
+    return candidates
+
+
+def _complete_album_duration(
+    payload: object, item_id: str, expected: int | None
+) -> int | None:
+    if not isinstance(payload, dict) or not expected:
+        return None
+    tracks = [
+        r
+        for r in payload.get("results", [])
+        if isinstance(r, dict)
+        and r.get("wrapperType") == "track"
+        and str(r.get("collectionId")) == item_id
+    ]
+    durations = [duration_ms(r.get("trackTimeMillis")) for r in tracks]
+    identities = {str(r["trackId"]) for r in tracks if r.get("trackId")}
+    if len(tracks) == expected and len(identities) == expected and all(durations):
+        return duration_ms(sum(durations))
+    return None

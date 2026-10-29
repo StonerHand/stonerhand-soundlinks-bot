@@ -5,19 +5,19 @@ from unittest.mock import AsyncMock
 import httpx
 from test_bot import ContextStub, PrivateMessageStub, UpdateStub
 
-from music_links_bot.apple_radio import (
+from music_links_bot.cards.formatter import format_radio_message
+from music_links_bot.chat.bot_inline import _build_inline_result
+from music_links_bot.core.url_utils import is_apple_music_radio_url
+from music_links_bot.lookup.bot_lookup import resolve_sources
+from music_links_bot.lookup.bot_lookup_flow import (
+    track_lookup_message,
+)
+from music_links_bot.providers.apple_radio import (
     AppleRadioClient,
     AppleRadioLookupError,
     parse_apple_radio,
 )
-from music_links_bot.bot_inline import _build_inline_result
-from music_links_bot.bot_lookup import resolve_sources
-from music_links_bot.bot_lookup_flow import (
-    track_lookup_message,
-)
-from music_links_bot.formatter import format_radio_message
-from music_links_bot.provider_registry import DEFAULT_PROVIDER_REGISTRY
-from music_links_bot.url_utils import is_apple_music_radio_url
+from music_links_bot.providers.provider_registry import DEFAULT_PROVIDER_REGISTRY
 
 URL = "https://music.apple.com/tr/curator/the-alligator-hour/993270307"
 # The public page's actual title metadata; no episode descriptions are copied.

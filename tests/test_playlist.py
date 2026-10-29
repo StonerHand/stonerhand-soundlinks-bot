@@ -8,7 +8,7 @@ import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from music_links_bot.playlist import (
+from music_links_bot.providers.playlist import (
     MAX_PLAYLIST_IMPORT_TRACKS,
     PlaylistClient,
     PlaylistLookupError,
@@ -84,7 +84,7 @@ class PlaylistClientTests(unittest.IsolatedAsyncioTestCase):
         self.addAsyncCleanup(client.aclose)
 
         with patch(
-            "music_links_bot.playlist.PLAYLIST_IMPORT_TIMEOUT_SECONDS",
+            "music_links_bot.providers.playlist.PLAYLIST_IMPORT_TIMEOUT_SECONDS",
             0.001,
         ):
             playlist = await client.lookup_playlist(source_url)

@@ -22,8 +22,8 @@ def main() -> None:
         if module.name != "__main__":
             importlib.import_module(f"music_links_bot.{module.name}")
 
-    from music_links_bot.i18n import validate_catalog
-    from music_links_bot.release_smoke import build_release_smoke_report
+    from music_links_bot.core.i18n import validate_catalog
+    from music_links_bot.ops.release_smoke import build_release_smoke_report
 
     assert validate_catalog() == ()
     assert build_release_smoke_report()["ok"]

@@ -1,0 +1,82 @@
+from __future__ import annotations
+
+from typing import Final
+
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.providers.metadata_cleaning import clean_spotify_metadata_title
+
+PRESET_ORDER: Final = ("minimal", "cover", "longread")
+LEGACY_PRESET_ALIASES: Final = {
+    "clean": "cover",
+    "editorial": "minimal",
+    "poster": "cover",
+}
+PRESET_PROFILES: Final = {
+    "minimal": {
+        "large_preview": False,
+        "as_photo": False,
+        "publication_mode": "card",
+    },
+    "cover": {
+        "large_preview": True,
+        "as_photo": False,
+        "publication_mode": "card",
+    },
+    "longread": {
+        "large_preview": True,
+        "as_photo": False,
+        "publication_mode": "longread",
+    },
+}
+
+
+def release_emoji(track: TrackMatch) -> str:
+    if track.kind == "video":
+        return "📺"
+    if track.kind == "podcast":
+        return "🎙️"
+    if track.kind == "album":
+        return "💿"
+    return "🎧"
+
+
+def compact_release_title(value: str) -> str:
+    """Hide provider presentation suffixes without changing stored metadata."""
+    return clean_spotify_metadata_title(value)
+
+
+def shared_collection_artist(tracks: list[TrackMatch]) -> str | None:
+    """Return the display artist when every collection item uses the same one."""
+    if len(tracks) < 2:
+        return None
+    artists = [track.artist.strip() for track in tracks]
+    if not all(artists):
+        return None
+    return artists[0] if len({artist.casefold() for artist in artists}) == 1 else None
+
+
+def normalize_preset(value: object, draft: dict | None = None) -> str:
+    raw = str(value or "").casefold()
+    if raw in PRESET_ORDER:
+        return raw
+    if draft and draft.get("publication_mode") == "longread":
+        return "longread"
+    if raw in LEGACY_PRESET_ALIASES:
+        return LEGACY_PRESET_ALIASES[raw]
+    if draft and not draft.get("large_preview", True):
+        return "minimal"
+    return "cover"
+
+
+def apply_preset(draft: dict, value: object) -> str:
+    preset = normalize_preset(value, draft)
+    draft["preset"] = preset
+    draft.update(PRESET_PROFILES[preset])
+    if preset == "cover":
+        item = draft.get("item") or {}
+        draft["as_photo"] = bool(
+            item.get("kind", "song") in {"song", "album"}
+            and (draft.get("custom_cover_file_id") or item.get("thumbnail_url"))
+            and not draft.get("collection_items")
+        )
+    return preset

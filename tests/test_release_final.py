@@ -7,13 +7,13 @@ import httpx
 from telegram import InlineQuery, Update, User
 from telegram.ext import Application
 
-from music_links_bot.bot_crate import add_to_crate, load_crate, save_crate
-from music_links_bot.bot_runtime import BotRuntime
-from music_links_bot.bot_storage import delete_draft, load_draft, store_draft
-from music_links_bot.draft_model import new_track_draft
-from music_links_bot.durable_state import state_scope
-from music_links_bot.kvstore import KVStore, KVUnavailableError
-from music_links_bot.models import TrackMatch
+from music_links_bot.chat.bot_crate import add_to_crate, load_crate, save_crate
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.editor.draft_model import new_track_draft
+from music_links_bot.state.bot_runtime import BotRuntime
+from music_links_bot.state.bot_storage import delete_draft, load_draft, store_draft
+from music_links_bot.state.durable_state import state_scope
+from music_links_bot.state.kvstore import KVStore, KVUnavailableError
 
 
 class SharedStore:
@@ -67,7 +67,7 @@ def draft():
 
 class FinalReleaseStateTests(unittest.IsolatedAsyncioTestCase):
     async def test_full_crate_does_not_claim_an_eleventh_release_was_added(self):
-        from music_links_bot.editor_delivery import (
+        from music_links_bot.editor.editor_delivery import (
             _add_editor_item_to_crate,
         )
 
@@ -86,7 +86,7 @@ class FinalReleaseStateTests(unittest.IsolatedAsyncioTestCase):
             lang="ru",
         )
         with patch(
-            "music_links_bot.editor_delivery._restore_editor_card",
+            "music_links_bot.editor.editor_delivery._restore_editor_card",
             new_callable=AsyncMock,
         ):
             await _add_editor_item_to_crate(request)
@@ -96,7 +96,7 @@ class FinalReleaseStateTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(request.query.answer.await_args.kwargs["show_alert"])
 
     async def test_storage_failure_answers_inline_query_without_stale_results(self):
-        from music_links_bot.bot import (
+        from music_links_bot.chat.bot import (
             _application_error_handler,
         )
 
@@ -140,7 +140,7 @@ class FinalReleaseStateTests(unittest.IsolatedAsyncioTestCase):
             await load_draft(worker, "card")
 
     async def test_failed_initial_session_read_does_not_run_the_action(self):
-        from music_links_bot.bot_preferences import LocalizedApplication
+        from music_links_bot.chat.bot_preferences import LocalizedApplication
 
         kv = SharedStore()
         kv.available = False
@@ -166,7 +166,7 @@ class FinalReleaseStateTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(error.await_args.kwargs["error"], KVUnavailableError)
 
     async def test_untrusted_artwork_does_not_start_an_http_request(self):
-        from music_links_bot.branding import build_branded_cover
+        from music_links_bot.artwork.branding import build_branded_cover
 
         for url in (
             "http://127.0.0.1/cover",
@@ -176,7 +176,7 @@ class FinalReleaseStateTests(unittest.IsolatedAsyncioTestCase):
         ):
             with (
                 self.subTest(url=url),
-                patch("music_links_bot.branding.httpx.AsyncClient") as client,
+                patch("music_links_bot.artwork.branding.httpx.AsyncClient") as client,
             ):
                 self.assertIsNone(await build_branded_cover(url, label="test"))
                 client.assert_not_called()

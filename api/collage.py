@@ -17,8 +17,8 @@ SRC_PATH = PROJECT_ROOT / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
-from music_links_bot.branding import compose_cover
-from music_links_bot.collection_collage import (
+from music_links_bot.artwork.branding import compose_cover
+from music_links_bot.artwork.collection_collage import (
     FRAME_MODE,
     MAX_ARTWORK_BYTES,
     VIDEO_MODE,
@@ -27,14 +27,14 @@ from music_links_bot.collection_collage import (
     compose_frame,
     decode_collage_payload,
 )
-from music_links_bot.constants import HTTP_USER_AGENT
-from music_links_bot.cover_style import (
+from music_links_bot.artwork.cover_style import (
     MAX_BRAND_LABEL_LENGTH,
     brand_label,
     photo_branding_enabled,
     signature_cache_key,
 )
-from music_links_bot.http_json import send_json
+from music_links_bot.core.constants import HTTP_USER_AGENT
+from music_links_bot.core.http_json import send_json
 
 FETCH_TIMEOUT_SECONDS = 6
 _HTTP_CLIENT = httpx.Client(

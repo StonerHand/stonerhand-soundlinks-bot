@@ -6,11 +6,11 @@ from http.server import BaseHTTPRequestHandler
 from types import SimpleNamespace
 
 from api.telegram import _ensure_application
-from music_links_bot.http_json import send_json
-from music_links_bot.loop_runner import run_on_loop
-from music_links_bot.publish_queue import QueueStorageError, process_due_jobs
-from music_links_bot.qstash_auth import verify_qstash_signature
-from music_links_bot.webhook_secret import queue_worker_secret, secrets_match
+from music_links_bot.core.http_json import send_json
+from music_links_bot.ops.loop_runner import run_on_loop
+from music_links_bot.ops.qstash_auth import verify_qstash_signature
+from music_links_bot.publishing.publish_queue import QueueStorageError, process_due_jobs
+from music_links_bot.tg.webhook_secret import queue_worker_secret, secrets_match
 
 LOGGER = logging.getLogger(__name__)
 QUEUE_TICK_TIMEOUT_SECONDS = 20
@@ -64,7 +64,7 @@ class handler(BaseHTTPRequestHandler):
             kv = getattr(application, "bot_data", {}).get("kv_store")
             if kv is not None:
                 # Scheduled posts carry the owner's current cover label too.
-                from music_links_bot.brand_settings import load_brand_label
+                from music_links_bot.artwork.brand_settings import load_brand_label
 
                 run_on_loop(loop, load_brand_label(kv), timeout=5)
             published = run_on_loop(

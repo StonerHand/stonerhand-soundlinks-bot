@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from music_links_bot.url_utils import (
+from music_links_bot.core.url_utils import (
     apple_music_url_type,
     apple_podcasts_url_type,
     cache_key_for_url,

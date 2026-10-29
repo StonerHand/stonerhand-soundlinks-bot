@@ -4,8 +4,8 @@ from unittest.mock import patch
 
 from telegram import InlineKeyboardMarkup
 
-from music_links_bot.rich_publications import rich_button_rows_html
-from music_links_bot.telegram_buttons import (
+from music_links_bot.publishing.rich_publications import rich_button_rows_html
+from music_links_bot.tg.telegram_buttons import (
     ButtonIcon,
     ButtonTone,
     button,

@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, urlparse
 
 from PIL import Image
 
-from music_links_bot.collection_collage import (
+from music_links_bot.artwork.collection_collage import (
     FRAME_MODE,
     FRAME_SIZE,
     MAX_ARTWORK_BYTES,
@@ -19,7 +19,7 @@ from music_links_bot.collection_collage import (
     compose_frame,
     decode_collage_payload,
 )
-from music_links_bot.models import TitleMatch
+from music_links_bot.core.models import TitleMatch
 
 ENV = {"WEBHOOK_BASE_URL": "https://bot.example", "BOT_TOKEN": "1:x"}
 HERO = "https://occ-0-1.1.nflxso.net/dnm/api/v6/x/hero.jpg?r=dab"
@@ -99,7 +99,7 @@ def test_a_square_or_tall_still_is_cropped_to_the_screen_shape():
 def test_broken_or_oversized_stills_are_refused():
     assert compose_frame(b"not an image") is None
     assert compose_frame(b"x" * (MAX_ARTWORK_BYTES + 1)) is None
-    with patch("music_links_bot.collection_collage.MAX_ARTWORK_PIXELS", 100):
+    with patch("music_links_bot.artwork.collection_collage.MAX_ARTWORK_PIXELS", 100):
         assert compose_frame(_jpeg((20, 20), (1, 2, 3))) is None
 
 
@@ -156,8 +156,8 @@ def test_an_unreadable_still_falls_back_to_the_original_image():
 def test_a_video_collage_that_lost_frames_stays_a_square_cover():
     """Only a one-video card is a wide frame; a collage whose other frames
     failed to download is still the usual square signed cover."""
-    from music_links_bot.collection_collage import video_collage_preview_url
-    from music_links_bot.models import VideoMatch
+    from music_links_bot.artwork.collection_collage import video_collage_preview_url
+    from music_links_bot.core.models import VideoMatch
 
     videos = [
         VideoMatch(
@@ -191,7 +191,7 @@ def _title() -> TitleMatch:
 
 
 def _send_card(env: dict[str, str]) -> str:
-    from music_links_bot.lookup_delivery import send_title_result
+    from music_links_bot.lookup.lookup_delivery import send_title_result
 
     send = AsyncMock()
     with patch.dict(os.environ, env):
@@ -222,7 +222,7 @@ def test_a_shared_card_previews_the_signed_still_and_lists_the_plain_one():
     from test_bot import ContextStub
     from test_titles import SERIES_URL, _NetflixStub
 
-    from music_links_bot.bot_inline import _build_inline_result
+    from music_links_bot.chat.bot_inline import _build_inline_result
 
     context = ContextStub()
     context.application.bot_data["title_client"] = _NetflixStub()

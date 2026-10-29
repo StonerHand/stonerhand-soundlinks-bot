@@ -14,26 +14,26 @@ from test_bot import (
 from test_card_details import run_async
 from test_release_card import sample
 
-from music_links_bot.bot_inline import _build_inline_result
-from music_links_bot.bot_lookup_flow import (
+from music_links_bot.cards.formatter import format_track_message
+from music_links_bot.chat.bot_inline import _build_inline_result
+from music_links_bot.editor.draft_model import new_track_draft
+from music_links_bot.lookup.bot_lookup_flow import (
     track_lookup_message,
 )
-from music_links_bot.deezer import DeezerClient, DeezerLookupError
-from music_links_bot.draft_model import new_track_draft
-from music_links_bot.formatter import format_track_message
-from music_links_bot.public_release import (
+from music_links_bot.providers.deezer import DeezerClient, DeezerLookupError
+from music_links_bot.providers.public_release import (
     PublicReleaseClient,
     PublicReleaseError,
     PublicReleaseRegionUnavailable,
     parse_public_release,
 )
-from music_links_bot.publication_contract import (
+from music_links_bot.providers.songlink import SonglinkClient
+from music_links_bot.providers.youtube import YouTubeClient
+from music_links_bot.publishing.publication_contract import (
     RenderedPublication,
     validate_rendered_publication,
 )
-from music_links_bot.publication_service import PublicationService
-from music_links_bot.songlink import SonglinkClient
-from music_links_bot.youtube import YouTubeClient
+from music_links_bot.publishing.publication_service import PublicationService
 
 
 @run_async
@@ -62,9 +62,11 @@ async def test_direct_channel_link_uses_branded_photo_and_preserves_source_on_fa
         )
     )
     with (
-        patch("music_links_bot.branding.photo_branding_enabled", return_value=True),
         patch(
-            "music_links_bot.branding.build_branded_cover",
+            "music_links_bot.artwork.branding.photo_branding_enabled", return_value=True
+        ),
+        patch(
+            "music_links_bot.artwork.branding.build_branded_cover",
             new=AsyncMock(return_value=b"BRANDED"),
         ) as brand,
     ):

@@ -12,7 +12,7 @@ from api.health import (
     overall_service_ok,
     release_info,
 )
-from music_links_bot.alerts import alert_dedup_digest
+from music_links_bot.ops.alerts import alert_dedup_digest
 
 
 class WebhookEvaluationTests(unittest.TestCase):
@@ -220,7 +220,7 @@ class AlertHelperTests(unittest.TestCase):
         import os
         from unittest.mock import patch
 
-        from music_links_bot.alerts import send_admin_alert
+        from music_links_bot.ops.alerts import send_admin_alert
 
         with patch.dict(os.environ, {}, clear=True):
             self.assertFalse(send_admin_alert("boom"))

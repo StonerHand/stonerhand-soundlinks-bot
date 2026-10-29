@@ -4,31 +4,31 @@ import asyncio
 import unittest
 from types import SimpleNamespace
 
-from music_links_bot.bot_lookup import LookupBundle, SourceStatus
-from music_links_bot.bot_lookup_flow import (
-    _send_partial_lookup_status,
-)
-from music_links_bot.bot_runtime import BotRuntime
-from music_links_bot.bot_storage import load_retry_sources
-from music_links_bot.chat_access import check_publish_access
-from music_links_bot.editor_delivery import (
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.editor.editor_delivery import (
     _duplicate_post_keyboard,
 )
-from music_links_bot.inline_storage import (
+from music_links_bot.lookup.bot_lookup import LookupBundle, SourceStatus
+from music_links_bot.lookup.bot_lookup_flow import (
+    _send_partial_lookup_status,
+)
+from music_links_bot.providers.provider_registry import DEFAULT_PROVIDER_REGISTRY
+from music_links_bot.providers.provider_runtime import (
+    ProviderTask,
+    run_provider_tasks_detailed,
+)
+from music_links_bot.publishing.chat_access import check_publish_access
+from music_links_bot.publishing.publication_state import (
+    find_posted_record,
+    mark_posted,
+)
+from music_links_bot.state.bot_runtime import BotRuntime
+from music_links_bot.state.bot_storage import load_retry_sources
+from music_links_bot.state.inline_storage import (
     load_cached_search,
     load_inline_history,
     remember_inline_urls,
     store_cached_search,
-)
-from music_links_bot.models import TrackMatch
-from music_links_bot.provider_registry import DEFAULT_PROVIDER_REGISTRY
-from music_links_bot.provider_runtime import (
-    ProviderTask,
-    run_provider_tasks_detailed,
-)
-from music_links_bot.publication_state import (
-    find_posted_record,
-    mark_posted,
 )
 
 
@@ -125,7 +125,7 @@ class _MemoryKV:
 
 class PublicationStateTests(unittest.IsolatedAsyncioTestCase):
     def test_duplicate_identity_separates_kind_source_and_channel(self) -> None:
-        from music_links_bot.publication_state import publication_key
+        from music_links_bot.publishing.publication_state import publication_key
 
         context = SimpleNamespace(application=SimpleNamespace(bot_data={}))
         song = TrackMatch(

@@ -5,12 +5,12 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from music_links_bot.formatter import format_track_message
-from music_links_bot.i18n import language_context
-from music_links_bot.models import TrackMatch
-from music_links_bot.publication_budget import visible_length
-from music_links_bot.publication_service import PublicationService
-from music_links_bot.publication_view import build_publication_view
+from music_links_bot.cards.formatter import format_track_message
+from music_links_bot.core.i18n import language_context
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.publishing.publication_budget import visible_length
+from music_links_bot.publishing.publication_service import PublicationService
+from music_links_bot.publishing.publication_view import build_publication_view
 
 
 def sample(**overrides):
@@ -103,11 +103,11 @@ class TestNativeDelivery(IsolatedAsyncioTestCase):
         }
         with (
             patch(
-                "music_links_bot.rich_publications.rich_messages_enabled",
+                "music_links_bot.publishing.rich_publications.rich_messages_enabled",
                 return_value=True,
             ),
             patch(
-                "music_links_bot.rich_publications.send_rich_publication",
+                "music_links_bot.publishing.rich_publications.send_rich_publication",
                 new=AsyncMock(),
             ) as rich,
         ):
@@ -132,11 +132,11 @@ class TestNativeDelivery(IsolatedAsyncioTestCase):
         service = PublicationService(context, channel_username="stonerhand")
         with (
             patch(
-                "music_links_bot.rich_publications.rich_messages_enabled",
+                "music_links_bot.publishing.rich_publications.rich_messages_enabled",
                 return_value=True,
             ),
             patch(
-                "music_links_bot.rich_publications.send_rich_publication",
+                "music_links_bot.publishing.rich_publications.send_rich_publication",
                 new=AsyncMock(),
             ) as rich,
         ):

@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from music_links_bot.cache import TTLCache
+from music_links_bot.core.cache import TTLCache
 
 
 class TTLCacheTests(unittest.TestCase):

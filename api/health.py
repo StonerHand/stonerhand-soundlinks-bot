@@ -17,8 +17,8 @@ if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
 from music_links_bot import __version__
-from music_links_bot.http_json import send_json
-from music_links_bot.logging_config import quiet_transport_logs
+from music_links_bot.core.http_json import send_json
+from music_links_bot.ops.logging_config import quiet_transport_logs
 
 LOGGER = logging.getLogger(__name__)
 quiet_transport_logs()
@@ -219,9 +219,9 @@ def _storage_snapshot() -> tuple[dict, dict, dict]:
     """Read Redis health, queue and metrics through one client and event loop."""
     import asyncio
 
-    from music_links_bot.bot_runtime import METRICS_KV_KEY
-    from music_links_bot.kvstore import KVStore
-    from music_links_bot.publish_queue import QUEUE_KV_KEY, QUEUE_TICK_KV_KEY
+    from music_links_bot.publishing.publish_queue import QUEUE_KV_KEY, QUEUE_TICK_KV_KEY
+    from music_links_bot.state.bot_runtime import METRICS_KV_KEY
+    from music_links_bot.state.kvstore import KVStore
 
     kv = KVStore.from_env()
     if kv is None:

@@ -8,18 +8,21 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 
-from music_links_bot import branding
-from music_links_bot.bot_queue import render_queue
-from music_links_bot.collection_plan import build_collection_plan, collection_issues
-from music_links_bot.models import TrackMatch
-from music_links_bot.operation_metrics import latency_summary, record_duration
-from music_links_bot.provider_errors import provider_failure_reason
-from music_links_bot.public_release import (
+from music_links_bot.artwork import branding
+from music_links_bot.cards.collection_plan import (
+    build_collection_plan,
+    collection_issues,
+)
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.core.shared_http import close_shared_clients, shared_client
+from music_links_bot.ops.operation_metrics import latency_summary, record_duration
+from music_links_bot.providers.provider_errors import provider_failure_reason
+from music_links_bot.providers.public_release import (
     PublicReleaseError,
     PublicReleaseRegionUnavailable,
 )
-from music_links_bot.publication_service import PublicationService
-from music_links_bot.shared_http import close_shared_clients, shared_client
+from music_links_bot.publishing.bot_queue import render_queue
+from music_links_bot.publishing.publication_service import PublicationService
 
 
 def track():
@@ -137,7 +140,7 @@ class Release121AsyncTests(IsolatedAsyncioTestCase):
         self.assertEqual(builder.await_count, 3)
 
     async def test_photo_file_cache_expires_in_memory(self):
-        from music_links_bot.telegram_media_cache import (
+        from music_links_bot.artwork.telegram_media_cache import (
             MEDIA_CACHE_TTL_SECONDS,
             get_cached_file_id,
             remember_photo_file_id,
@@ -146,12 +149,13 @@ class Release121AsyncTests(IsolatedAsyncioTestCase):
         context = SimpleNamespace(application=SimpleNamespace(bot_data={}))
         photo = SimpleNamespace(photo=[SimpleNamespace(file_id="file")])
         with patch(
-            "music_links_bot.telegram_media_cache.time.monotonic", return_value=100
+            "music_links_bot.artwork.telegram_media_cache.time.monotonic",
+            return_value=100,
         ):
             await remember_photo_file_id(context, "cover", photo)
             self.assertEqual(await get_cached_file_id(context, "cover"), "file")
         with patch(
-            "music_links_bot.telegram_media_cache.time.monotonic",
+            "music_links_bot.artwork.telegram_media_cache.time.monotonic",
             return_value=101 + MEDIA_CACHE_TTL_SECONDS,
         ):
             self.assertIsNone(await get_cached_file_id(context, "cover"))
@@ -177,9 +181,10 @@ class Release121AsyncTests(IsolatedAsyncioTestCase):
         context = SimpleNamespace(application=SimpleNamespace(bot_data={}))
         with (
             patch(
-                "music_links_bot.bot_queue.load_jobs", new=AsyncMock(return_value=[job])
+                "music_links_bot.publishing.bot_queue.load_jobs",
+                new=AsyncMock(return_value=[job]),
             ),
-            patch("music_links_bot.bot_queue.time.time", return_value=2200),
+            patch("music_links_bot.publishing.bot_queue.time.time", return_value=2200),
         ):
             text, keyboard = await render_queue(context, lang="ru")
         self.assertIn("20 мин", text)
@@ -214,7 +219,7 @@ def test_collection_plan_keeps_order_intro_and_escapes_titles():
         ),
     ]
     with patch(
-        "music_links_bot.collection_plan.collection_collage_preview_url",
+        "music_links_bot.cards.collection_plan.collection_collage_preview_url",
         return_value="https://example.com/collage",
     ):
         plan = build_collection_plan(tracks, title="Collection", intro_html="My intro")

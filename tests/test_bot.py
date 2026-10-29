@@ -17,59 +17,7 @@ from telegram.ext import CommandHandler
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from music_links_bot.artist import ArtistLookupError
-from music_links_bot.bot_admin import id_command, stats_command, status_command
-from music_links_bot.bot_app import (
-    BOT_DESCRIPTIONS,
-    BOT_SHORT_DESCRIPTIONS,
-    PUBLIC_BOT_COMMANDS,
-    build_application,
-    sync_application_commands,
-)
-from music_links_bot.bot_crate_handlers import crate_command
-from music_links_bot.bot_editor import (
-    _delete_confirmation_keyboard,
-)
-from music_links_bot.bot_inline import (
-    _build_inline_collection_result,
-    _build_inline_result,
-)
-from music_links_bot.bot_lookup import (
-    _lookup_artists,
-    _lookup_nts_radios,
-    _lookup_playlists,
-    _lookup_youtube_videos,
-    _strip_bot_mention,
-)
-from music_links_bot.bot_lookup_flow import (
-    _build_error_keyboard,
-    _send_track_result,
-    track_lookup_message,
-)
-from music_links_bot.bot_menu import (
-    channel_command,
-    guide_command,
-    help_command,
-    menu_text as _menu_text,
-    platforms_command,
-    start_command,
-)
-from music_links_bot.bot_runtime import BotRuntime
-from music_links_bot.bot_stats import message_text as _message_text
-from music_links_bot.bot_storage import (
-    MAX_MEMORY_DRAFTS,
-    store_draft as _store_draft,
-)
-from music_links_bot.bot_ui import (
-    build_home_text as _build_home_text,
-    build_onboarding_keyboard as _build_onboarding_keyboard,
-    build_section_keyboard as _build_section_keyboard,
-    build_start_keyboard as _build_start_keyboard,
-)
-from music_links_bot.config import Settings
-from music_links_bot.crate_view import render_crate as _render_bot_crate
-from music_links_bot.i18n import get_text
-from music_links_bot.keyboards import (
+from music_links_bot.cards.keyboards import (
     _build_artist_keyboard,
     _build_collection_keyboard,
     _build_link_keyboard,
@@ -81,37 +29,89 @@ from music_links_bot.keyboards import (
     _should_include_channel_button,
     _should_include_hashtags,
 )
-from music_links_bot.lookup_models import LookupBundle, SourceStatus
-from music_links_bot.models import (
+from music_links_bot.cards.sharing import (
+    add_share_button,
+    build_share_query,
+    parse_share_query,
+)
+from music_links_bot.chat.bot_admin import id_command, stats_command, status_command
+from music_links_bot.chat.bot_app import (
+    BOT_DESCRIPTIONS,
+    BOT_SHORT_DESCRIPTIONS,
+    PUBLIC_BOT_COMMANDS,
+    build_application,
+    sync_application_commands,
+)
+from music_links_bot.chat.bot_crate_handlers import crate_command
+from music_links_bot.chat.bot_inline import (
+    _build_inline_collection_result,
+    _build_inline_result,
+)
+from music_links_bot.chat.bot_menu import (
+    channel_command,
+    guide_command,
+    help_command,
+    menu_text as _menu_text,
+    platforms_command,
+    start_command,
+)
+from music_links_bot.chat.bot_ui import (
+    build_home_text as _build_home_text,
+    build_onboarding_keyboard as _build_onboarding_keyboard,
+    build_section_keyboard as _build_section_keyboard,
+    build_start_keyboard as _build_start_keyboard,
+)
+from music_links_bot.chat.crate_view import render_crate as _render_bot_crate
+from music_links_bot.core.config import Settings
+from music_links_bot.core.i18n import get_text
+from music_links_bot.core.models import (
     ArtistMatch,
     PlaylistMatch,
     RadioMatch,
     TrackMatch,
     VideoMatch,
 )
-from music_links_bot.nts import NTSLookupError
-from music_links_bot.playlist import PlaylistLookupError
-from music_links_bot.publication_state import (
-    release_fingerprint as _release_fingerprint,
+from music_links_bot.editor.bot_editor import (
+    _delete_confirmation_keyboard,
 )
-from music_links_bot.release_preferences import (
-    PresentationPreferences,
-    presentation_context,
+from music_links_bot.lookup.bot_lookup import (
+    _lookup_artists,
+    _lookup_nts_radios,
+    _lookup_playlists,
+    _lookup_youtube_videos,
+    _strip_bot_mention,
 )
-from music_links_bot.search import SearchCandidate, SearchLookupError
-from music_links_bot.sharing import (
-    add_share_button,
-    build_share_query,
-    parse_share_query,
+from music_links_bot.lookup.bot_lookup_flow import (
+    _build_error_keyboard,
+    _send_track_result,
+    track_lookup_message,
 )
-from music_links_bot.songlink import SonglinkError, SonglinkLookupError
-from music_links_bot.soundcloud import SoundCloudLookupError
-from music_links_bot.telegram_gateway import reset_capabilities
-from music_links_bot.track_lookup import (
+from music_links_bot.lookup.bot_stats import message_text as _message_text
+from music_links_bot.lookup.lookup_models import LookupBundle, SourceStatus
+from music_links_bot.lookup.track_lookup import (
     _build_podcast_fallback,
     _lookup_tracks,
 )
-from music_links_bot.youtube import YouTubeLookupError
+from music_links_bot.providers.artist import ArtistLookupError
+from music_links_bot.providers.nts import NTSLookupError
+from music_links_bot.providers.playlist import PlaylistLookupError
+from music_links_bot.providers.search import SearchCandidate, SearchLookupError
+from music_links_bot.providers.songlink import SonglinkError, SonglinkLookupError
+from music_links_bot.providers.soundcloud import SoundCloudLookupError
+from music_links_bot.providers.youtube import YouTubeLookupError
+from music_links_bot.publishing.publication_state import (
+    release_fingerprint as _release_fingerprint,
+)
+from music_links_bot.state.bot_runtime import BotRuntime
+from music_links_bot.state.bot_storage import (
+    MAX_MEMORY_DRAFTS,
+    store_draft as _store_draft,
+)
+from music_links_bot.state.release_preferences import (
+    PresentationPreferences,
+    presentation_context,
+)
+from music_links_bot.tg.telegram_gateway import reset_capabilities
 
 
 class FailingLookupClient:
@@ -1508,7 +1508,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         with (
             presentation_context(PresentationPreferences(artwork="clean")),
             patch(
-                "music_links_bot.telegram_media_cache.get_cached_file_id",
+                "music_links_bot.artwork.telegram_media_cache.get_cached_file_id",
                 AsyncMock(return_value="telegram-cover-file-id"),
             ) as load_media,
         ):
@@ -1524,7 +1524,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         load_media.assert_not_awaited()
 
     async def test_inline_handler_retries_classic_when_rich_is_rejected(self) -> None:
-        from music_links_bot.bot_inline import inline_query_handler
+        from music_links_bot.chat.bot_inline import inline_query_handler
 
         class InlineQueryStub:
             query = "https://open.spotify.com/track/abc"
@@ -1551,7 +1551,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         reset_capabilities()
         try:
             with patch(
-                "music_links_bot.bot_inline._build_inline_result",
+                "music_links_bot.chat.bot_inline._build_inline_result",
                 AsyncMock(side_effect=[rich, classic]),
             ):
                 await inline_query_handler(update, ContextStub())
@@ -1604,7 +1604,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(any(button.switch_inline_query for button in buttons))
 
     async def test_inline_channel_handler_disables_cross_chat_cache(self) -> None:
-        from music_links_bot.bot_inline import inline_query_handler
+        from music_links_bot.chat.bot_inline import inline_query_handler
 
         class InlineQueryStub:
             query = "https://open.spotify.com/track/abc"
@@ -1689,7 +1689,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         }
 
         with patch(
-            "music_links_bot.bot_inline.bot_lookup.resolve_sources",
+            "music_links_bot.chat.bot_inline.bot_lookup.resolve_sources",
             AsyncMock(return_value=partial),
         ):
             result = await _build_inline_collection_result(
@@ -1771,7 +1771,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Подборка · 2 релиза", result.input_message_content.message_text)
 
     async def test_inline_share_handler_returns_one_collection_card(self) -> None:
-        from music_links_bot.bot_inline import inline_query_handler
+        from music_links_bot.chat.bot_inline import inline_query_handler
 
         class InlineQueryStub:
             query = "sh|tabc|tdef"
@@ -1800,7 +1800,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(inline_query.answer_kwargs[0]["is_personal"])
 
     async def test_partial_inline_collection_is_never_selectable(self) -> None:
-        from music_links_bot.bot_inline import inline_query_handler
+        from music_links_bot.chat.bot_inline import inline_query_handler
 
         class InlineQueryStub:
             query = "sh|tabc|tdef"
@@ -1819,7 +1819,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         partial = type("InlineResult", (), {"title": "⚠️ Подборка · 1 из 2"})()
 
         with patch(
-            "music_links_bot.bot_inline._build_inline_collection_result",
+            "music_links_bot.chat.bot_inline._build_inline_collection_result",
             AsyncMock(return_value=partial),
         ):
             await inline_query_handler(update, ContextStub())
@@ -1832,7 +1832,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_inline_direct_urls_return_one_collection_card(self) -> None:
-        from music_links_bot.bot_inline import inline_query_handler
+        from music_links_bot.chat.bot_inline import inline_query_handler
 
         class InlineQueryStub:
             query = (
@@ -1864,7 +1864,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
     async def test_inline_truncated_url_list_is_never_published_as_partial(
         self,
     ) -> None:
-        from music_links_bot.bot_inline import inline_query_handler
+        from music_links_bot.chat.bot_inline import inline_query_handler
 
         urls = [
             "https://open.spotify.com/track/4x53Xb3mAbSOzAq1h9YbuU?si=afbd167d4f8d4cea",
@@ -1889,7 +1889,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         update = type("InlineUpdateStub", (), {"inline_query": inline_query})()
 
         with patch(
-            "music_links_bot.bot_inline._build_inline_collection_result",
+            "music_links_bot.chat.bot_inline._build_inline_collection_result",
             AsyncMock(),
         ) as build_result:
             await inline_query_handler(update, ContextStub())
@@ -1904,8 +1904,8 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
     async def test_inline_truncated_url_list_recovers_last_private_collection(
         self,
     ) -> None:
-        from music_links_bot.bot_inline import inline_query_handler
-        from music_links_bot.bot_runtime import BotRuntime
+        from music_links_bot.chat.bot_inline import inline_query_handler
+        from music_links_bot.state.bot_runtime import BotRuntime
 
         urls = [
             "https://open.spotify.com/track/4x53Xb3mAbSOzAq1h9YbuU?si=afbd167d4f8d4cea",
@@ -1944,7 +1944,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         update = type("InlineUpdateStub", (), {"inline_query": inline_query})()
 
         with patch(
-            "music_links_bot.bot_inline._build_inline_collection_result",
+            "music_links_bot.chat.bot_inline._build_inline_collection_result",
             AsyncMock(return_value=complete),
         ) as build_result:
             await inline_query_handler(update, context)
@@ -1956,8 +1956,8 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
     async def test_inline_collection_recovery_survives_a_later_user_action(
         self,
     ) -> None:
-        from music_links_bot.bot_inline import inline_query_handler
-        from music_links_bot.bot_runtime import BotRuntime
+        from music_links_bot.chat.bot_inline import inline_query_handler
+        from music_links_bot.state.bot_runtime import BotRuntime
 
         urls = [
             "https://open.spotify.com/track/4x53Xb3mAbSOzAq1h9YbuU?si=first",
@@ -1998,7 +1998,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         update = type("InlineUpdateStub", (), {"inline_query": inline_query})()
 
         with patch(
-            "music_links_bot.bot_inline._build_inline_collection_result",
+            "music_links_bot.chat.bot_inline._build_inline_collection_result",
             AsyncMock(return_value=complete),
         ) as build_result:
             await inline_query_handler(update, context)
@@ -2009,8 +2009,8 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
     async def test_inline_collection_recovery_never_uses_another_users_state(
         self,
     ) -> None:
-        from music_links_bot.bot_inline import inline_query_handler
-        from music_links_bot.bot_runtime import BotRuntime
+        from music_links_bot.chat.bot_inline import inline_query_handler
+        from music_links_bot.state.bot_runtime import BotRuntime
 
         urls = [
             f"https://open.spotify.com/track/{index:022d}?si={'x' * 20}"
@@ -2038,7 +2038,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         inline_query = InlineQueryStub()
         update = type("InlineUpdateStub", (), {"inline_query": inline_query})()
         with patch(
-            "music_links_bot.bot_inline._build_inline_collection_result",
+            "music_links_bot.chat.bot_inline._build_inline_collection_result",
             AsyncMock(),
         ) as build_result:
             await inline_query_handler(update, context)
@@ -2058,7 +2058,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(keyboard[0][0].text, "📺 Смотреть на YouTube")
 
     async def test_inline_text_search_offers_multiple_results(self) -> None:
-        from music_links_bot.bot_inline import inline_query_handler
+        from music_links_bot.chat.bot_inline import inline_query_handler
 
         class InlineQueryStub:
             query = "youth code"
@@ -2089,7 +2089,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
     async def test_empty_inline_query_shows_one_live_example_and_search_cta(
         self,
     ) -> None:
-        from music_links_bot.bot_inline import inline_query_handler
+        from music_links_bot.chat.bot_inline import inline_query_handler
 
         class InlineQueryStub:
             query = ""
@@ -2108,7 +2108,7 @@ class InlineModeTests(unittest.IsolatedAsyncioTestCase):
         context = ContextStub(search_client=SuccessfulSearchClientStub())
 
         with patch(
-            "music_links_bot.bot_inline.load_inline_history",
+            "music_links_bot.chat.bot_inline.load_inline_history",
             AsyncMock(return_value=[]),
         ):
             await inline_query_handler(update, context)
@@ -2173,7 +2173,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         bot.token = "token123"
 
         with patch(
-            "music_links_bot.lookup_transport.send_ephemeral_message",
+            "music_links_bot.lookup.lookup_transport.send_ephemeral_message",
             AsyncMock(return_value=True),
         ) as ephemeral:
             await _send_track_result(
@@ -2199,7 +2199,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict(os.environ, {"EPHEMERAL_GROUP_CARDS": "1"}),
             patch(
-                "music_links_bot.lookup_transport.send_ephemeral_message",
+                "music_links_bot.lookup.lookup_transport.send_ephemeral_message",
                 AsyncMock(return_value=True),
             ) as ephemeral,
         ):
@@ -2272,7 +2272,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
                 clear=False,
             ),
             env_patch(
-                "music_links_bot.lookup_transport.send_ephemeral_message",
+                "music_links_bot.lookup.lookup_transport.send_ephemeral_message",
                 fake_send,
             ),
         ):
@@ -2303,7 +2303,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
                 clear=False,
             ),
             env_patch(
-                "music_links_bot.lookup_transport.send_ephemeral_message",
+                "music_links_bot.lookup.lookup_transport.send_ephemeral_message",
                 fake_send,
             ),
         ):
@@ -2358,7 +2358,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateSpotifyTrackMessageStub()
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_post"):
+        with patch("music_links_bot.lookup.bot_stats.record_post"):
             await track_lookup_message(UpdateStub(message), context)
             await track_lookup_message(UpdateStub(message), context)
 
@@ -2366,14 +2366,14 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_failed_progress_edit_is_deleted_before_fallback_reply(self) -> None:
         # A slow lookup: the progress line is shown at once.
-        slow = patch("music_links_bot.bot_lookup_flow.PROGRESS_DELAY_SECONDS", 0)
+        slow = patch("music_links_bot.lookup.bot_lookup_flow.PROGRESS_DELAY_SECONDS", 0)
         slow.start()
         self.addCleanup(slow.stop)
         message = PrivateSpotifyTrackMessageStub()
         message.reply_edit_error = BadRequest("message cannot be edited")
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_post"):
+        with patch("music_links_bot.lookup.bot_stats.record_post"):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(message.replies[0], "<deleted>")
@@ -2490,7 +2490,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = MentionMessageStub()
         context = ContextStub(search_client=search_client)
 
-        with patch("music_links_bot.bot_stats.record_post"):
+        with patch("music_links_bot.lookup.bot_stats.record_post"):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(search_client.queries, ["paranoid"])
@@ -2499,7 +2499,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateMessageStub()
         context = ContextStub(search_client=SuccessfulSearchClientStub())
 
-        with patch("music_links_bot.bot_stats.record_post"):
+        with patch("music_links_bot.lookup.bot_stats.record_post"):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -2523,7 +2523,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateSpotifyTrackMessageStub()
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_post"):
+        with patch("music_links_bot.lookup.bot_stats.record_post"):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -2636,7 +2636,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateSpotifyCollectionMessageStub()
         context = ContextStub(songlink_client=DistinctLookupClient())
         with patch(
-            "music_links_bot.bot_lookup_flow._add_track_drafts_to_crate",
+            "music_links_bot.lookup.bot_lookup_flow._add_track_drafts_to_crate",
             AsyncMock(return_value=([], 0)),
         ):
             await track_lookup_message(UpdateStub(message), context)
@@ -2649,7 +2649,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateYouTubeMessageStub()
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_post") as record_videos:
+        with patch("music_links_bot.lookup.bot_stats.record_post") as record_videos:
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -2672,7 +2672,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateNTSMessageStub()
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_post") as record_radios:
+        with patch("music_links_bot.lookup.bot_stats.record_post") as record_radios:
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -2692,7 +2692,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateSpotifyTrackMessageStub()
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_post") as record_matches:
+        with patch("music_links_bot.lookup.bot_stats.record_post") as record_matches:
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -2722,7 +2722,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = AlbumWithIntroMessage()
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_post"):
+        with patch("music_links_bot.lookup.bot_stats.record_post"):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -2746,7 +2746,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = HiddenSourceMessage()
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_post"):
+        with patch("music_links_bot.lookup.bot_stats.record_post"):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -2758,7 +2758,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateSoundCloudMessageStub()
         context = ContextStub(songlink_client=FailingLookupClient())
 
-        with patch("music_links_bot.bot_stats.record_post") as record_matches:
+        with patch("music_links_bot.lookup.bot_stats.record_post") as record_matches:
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -2779,7 +2779,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateSpotifyPlaylistMessageStub()
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_post") as record_playlists:
+        with patch("music_links_bot.lookup.bot_stats.record_post") as record_playlists:
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -2812,7 +2812,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.object(PlaylistClientStub, "lookup_playlist", with_tracks),
-            patch("music_links_bot.bot_stats.record_post"),
+            patch("music_links_bot.lookup.bot_stats.record_post"),
         ):
             await track_lookup_message(UpdateStub(message), context)
 
@@ -2829,7 +2829,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateApplePlaylistMessageStub()
         context = ContextStub(playlist_client=ApplePlaylistClientStub())
 
-        with patch("music_links_bot.bot_stats.record_post") as record_playlists:
+        with patch("music_links_bot.lookup.bot_stats.record_post") as record_playlists:
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -2844,7 +2844,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateSpotifyArtistMessageStub()
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_post") as record_artists:
+        with patch("music_links_bot.lookup.bot_stats.record_post") as record_artists:
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -2865,13 +2865,13 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_mixed_music_and_youtube_links_use_collection_post(self) -> None:
         # A slow lookup: the progress line is shown at once.
-        slow = patch("music_links_bot.bot_lookup_flow.PROGRESS_DELAY_SECONDS", 0)
+        slow = patch("music_links_bot.lookup.bot_lookup_flow.PROGRESS_DELAY_SECONDS", 0)
         slow.start()
         self.addCleanup(slow.stop)
         message = PrivateMixedMessageStub()
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_post") as record_mixed:
+        with patch("music_links_bot.lookup.bot_stats.record_post") as record_mixed:
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(message.replies, ["<deleted>"])
@@ -2896,7 +2896,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateMixedPlaylistMessageStub()
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_post") as record_mixed:
+        with patch("music_links_bot.lookup.bot_stats.record_post") as record_mixed:
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -2919,7 +2919,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         message = PrivateMixedNTSMessageStub()
         context = ContextStub()
 
-        with patch("music_links_bot.bot_stats.record_post") as record_mixed:
+        with patch("music_links_bot.lookup.bot_stats.record_post") as record_mixed:
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
@@ -3133,7 +3133,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
 
         search = SlowGenreSearchStub()
         with patch(
-            "music_links_bot.track_lookup._RELEASE_ENRICHMENT_TIMEOUT_SECONDS",
+            "music_links_bot.lookup.track_lookup._RELEASE_ENRICHMENT_TIMEOUT_SECONDS",
             0.001,
         ):
             tracks, _ = await _lookup_tracks(

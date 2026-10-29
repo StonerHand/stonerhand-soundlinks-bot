@@ -4,7 +4,7 @@ cancels the lookup that is still running for the same person."""
 import asyncio
 from unittest.mock import patch
 
-from music_links_bot.models import VideoMatch
+from music_links_bot.core.models import VideoMatch
 
 FIRST = "https://www.youtube.com/watch?v=aaaaaaaaaaa"
 SECOND = "https://www.youtube.com/watch?v=bbbbbbbbbbb"
@@ -20,7 +20,7 @@ class _SlowFirstVideo:
 async def _both():
     from test_bot import ContextStub, PrivateMessageStub, UpdateStub
 
-    from music_links_bot.bot_lookup_flow import track_lookup_message
+    from music_links_bot.lookup.bot_lookup_flow import track_lookup_message
 
     class First(PrivateMessageStub):
         text = FIRST
@@ -30,7 +30,7 @@ async def _both():
 
     context = ContextStub(youtube_client=_SlowFirstVideo())
     first, second = First(), Second()
-    with patch("music_links_bot.bot_stats.record_post"):
+    with patch("music_links_bot.lookup.bot_stats.record_post"):
         running = asyncio.create_task(track_lookup_message(UpdateStub(first), context))
         await asyncio.sleep(0.05)
         await track_lookup_message(UpdateStub(second), context)

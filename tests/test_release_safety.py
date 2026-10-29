@@ -9,10 +9,9 @@ from unittest.mock import AsyncMock, Mock, patch
 from PIL import Image
 
 from api.health import _storage_snapshot, handler, overall_service_ok
-from music_links_bot.collection_collage import compose_collection_collage
-from music_links_bot.draft_model import normalize_track_draft
-from music_links_bot.release_hubs import is_universal_release_url
-from music_links_bot.url_utils import (
+from music_links_bot.artwork.collection_collage import compose_collection_collage
+from music_links_bot.cards.release_hubs import is_universal_release_url
+from music_links_bot.core.url_utils import (
     apple_music_url_type,
     apple_podcasts_url_type,
     cache_key_for_url,
@@ -24,6 +23,7 @@ from music_links_bot.url_utils import (
     is_youtube_video_url,
     spotify_url_type,
 )
+from music_links_bot.editor.draft_model import normalize_track_draft
 
 
 class ReleaseSafetyTests(unittest.TestCase):
@@ -65,7 +65,9 @@ class ReleaseSafetyTests(unittest.TestCase):
             get_json=AsyncMock(return_value=None),
             aclose=AsyncMock(),
         )
-        with patch("music_links_bot.kvstore.KVStore.from_env", return_value=store):
+        with patch(
+            "music_links_bot.state.kvstore.KVStore.from_env", return_value=store
+        ):
             redis, queue, _ = _storage_snapshot()
         self.assertTrue(redis["ok"])
         self.assertFalse(queue["worker_stale"])
@@ -79,7 +81,9 @@ class ReleaseSafetyTests(unittest.TestCase):
             get_json=AsyncMock(return_value=None),
             aclose=AsyncMock(),
         )
-        with patch("music_links_bot.kvstore.KVStore.from_env", return_value=store):
+        with patch(
+            "music_links_bot.state.kvstore.KVStore.from_env", return_value=store
+        ):
             redis, _, _ = _storage_snapshot()
         self.assertFalse(redis["ok"])
 
@@ -152,8 +156,10 @@ class ReleaseSafetyTests(unittest.TestCase):
             self.assertIsNone(compose_collection_collage([], size=size, gap=gap))
 
     def test_collage_signature_rejects_untrusted_artwork_host(self):
-        from music_links_bot.collection_collage import collection_collage_preview_url
-        from music_links_bot.models import TrackMatch
+        from music_links_bot.artwork.collection_collage import (
+            collection_collage_preview_url,
+        )
+        from music_links_bot.core.models import TrackMatch
 
         tracks = [
             TrackMatch(
@@ -184,7 +190,9 @@ class ReleaseSafetyTests(unittest.TestCase):
 
     def test_collage_limits_total_bytes_before_opening_any_image(self):
         with (
-            patch("music_links_bot.collection_collage.MAX_TOTAL_ARTWORK_BYTES", 4),
+            patch(
+                "music_links_bot.artwork.collection_collage.MAX_TOTAL_ARTWORK_BYTES", 4
+            ),
             patch("PIL.Image.open") as opener,
         ):
             self.assertIsNone(compose_collection_collage([b"123", b"456"]))

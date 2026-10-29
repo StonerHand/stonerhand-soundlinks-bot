@@ -10,8 +10,8 @@ SRC_PATH = PROJECT_ROOT / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
-from music_links_bot.http_json import send_json
-from music_links_bot.release_smoke import build_release_smoke_report
+from music_links_bot.core.http_json import send_json
+from music_links_bot.ops.release_smoke import build_release_smoke_report
 
 
 class handler(BaseHTTPRequestHandler):
