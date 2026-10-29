@@ -6,7 +6,6 @@ import asyncio
 import hashlib
 import logging
 
-from music_links_bot.cards.release_hubs import canonical_release_hub_url
 from music_links_bot.core.models import (
     TrackMatch,
 )
@@ -24,6 +23,7 @@ from music_links_bot.lookup.lookup_models import (
     SourceStatus,
     item_label as _item_label,
 )
+from music_links_bot.providers.release_hubs import canonical_release_hub_url
 from music_links_bot.providers.search import SearchClient
 from music_links_bot.providers.songlink import (
     SonglinkClient,
@@ -372,7 +372,7 @@ async def _fill_genres(search_client: SearchClient, tracks: list[TrackMatch]) ->
 
 
 async def _fill_release_metadata(client, search_client, tracks):
-    from music_links_bot.providers.release_metadata import duration_ms, metadata_url
+    from music_links_bot.core.release_metadata import duration_ms, metadata_url
     from music_links_bot.providers.search import SearchCandidate
 
     async def fill(track):

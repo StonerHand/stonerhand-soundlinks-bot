@@ -17,13 +17,13 @@ from music_links_bot.cards.keyboards import (
     _build_collection_keyboard,
     _select_preview_url,
 )
+from music_links_bot.cards.publication_budget import compose_with_intro
 from music_links_bot.core.i18n import get_text
 from music_links_bot.core.models import TrackMatch
 from music_links_bot.core.url_utils import (
     cache_key_for_url,
     is_platform_destination_url,
 )
-from music_links_bot.publishing.publication_budget import compose_with_intro
 
 
 @dataclass(frozen=True, slots=True)

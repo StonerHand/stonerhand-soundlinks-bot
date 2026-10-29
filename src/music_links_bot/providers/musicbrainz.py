@@ -8,9 +8,9 @@ import httpx
 
 from music_links_bot.core.cache import TTLCache
 from music_links_bot.core.constants import HTTP_USER_AGENT
+from music_links_bot.core.metadata_cleaning import match_key
 from music_links_bot.core.single_flight import cancel_all, shared
 from music_links_bot.core.url_utils import cache_key_for_url, spotify_url_type
-from music_links_bot.providers.metadata_cleaning import match_key
 
 MUSICBRAINZ_CACHE_TTL_SECONDS = 7 * 24 * 3600
 MUSICBRAINZ_MISS_TTL_SECONDS = 6 * 3600

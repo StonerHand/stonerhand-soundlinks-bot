@@ -1,1 +1,1 @@
-"""The conversation around it: the application and update dispatcher, commands and menus, settings, the collection (crate), inline mode, library, admin, error handling, release panels."""
+"""The conversation around it: the application and update dispatcher, commands and menus, settings, the collection screens, inline mode, library, admin, error handling, release panels, deleting a user's data."""

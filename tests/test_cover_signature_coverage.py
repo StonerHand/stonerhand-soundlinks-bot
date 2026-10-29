@@ -8,9 +8,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from music_links_bot.cards.release_presentation import apply_preset
+from music_links_bot.core.draft_model import new_track_draft
 from music_links_bot.core.models import TrackMatch
-from music_links_bot.editor.draft_model import new_track_draft
+from music_links_bot.core.release_presentation import apply_preset
 from music_links_bot.publishing.publication_model import MusicPublication
 from music_links_bot.publishing.publication_service import PublicationService
 from music_links_bot.publishing.publication_view import editor_preview_url

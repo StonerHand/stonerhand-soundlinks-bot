@@ -71,6 +71,10 @@ from music_links_bot.core.models import (
     TrackMatch,
     VideoMatch,
 )
+from music_links_bot.core.release_preferences import (
+    PresentationPreferences,
+    presentation_context,
+)
 from music_links_bot.editor.bot_editor import (
     _delete_confirmation_keyboard,
 )
@@ -99,17 +103,13 @@ from music_links_bot.providers.search import SearchCandidate, SearchLookupError
 from music_links_bot.providers.songlink import SonglinkError, SonglinkLookupError
 from music_links_bot.providers.soundcloud import SoundCloudLookupError
 from music_links_bot.providers.youtube import YouTubeLookupError
-from music_links_bot.publishing.publication_state import (
-    release_fingerprint as _release_fingerprint,
-)
 from music_links_bot.state.bot_runtime import BotRuntime
 from music_links_bot.state.bot_storage import (
     MAX_MEMORY_DRAFTS,
     store_draft as _store_draft,
 )
-from music_links_bot.state.release_preferences import (
-    PresentationPreferences,
-    presentation_context,
+from music_links_bot.state.publication_state import (
+    release_fingerprint as _release_fingerprint,
 )
 from music_links_bot.tg.telegram_gateway import reset_capabilities
 

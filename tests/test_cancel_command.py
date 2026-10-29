@@ -92,7 +92,7 @@ class PrivacyScreenTests(unittest.IsolatedAsyncioTestCase):
         deleted.assert_not_awaited()
 
     async def test_confirmed_deletion_reports_what_was_removed(self) -> None:
-        from music_links_bot.state.privacy import DeletionResult
+        from music_links_bot.chat.privacy import DeletionResult
 
         text, deleted = await self._tap(
             "delete", DeletionResult(drafts=3, scheduled_posts=1, queue_available=False)

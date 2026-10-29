@@ -5,7 +5,7 @@ import secrets
 import time
 from copy import deepcopy
 
-from music_links_bot.editor.draft_model import normalize_track_draft
+from music_links_bot.core.draft_model import normalize_track_draft
 from music_links_bot.state.durable_state import delete_value, read_json
 from music_links_bot.state.kvstore import KVStore
 from music_links_bot.state.state_mutations import (
@@ -52,7 +52,7 @@ async def store_draft(context, draft_id: str, draft: dict) -> None:
         draft = dict(normalized)
     draft["editor_draft_id"] = draft_id
     if "original_state" not in draft and not draft.get("revision"):
-        from music_links_bot.editor.bot_editor_state import setting_snapshot
+        from music_links_bot.core.draft_model import setting_snapshot
 
         draft["original_state"] = setting_snapshot(draft)
     kv: KVStore | None = context.application.bot_data.get("kv_store")

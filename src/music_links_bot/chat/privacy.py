@@ -4,7 +4,6 @@ import asyncio
 import re
 from dataclasses import dataclass
 
-from music_links_bot.chat.bot_crate import clear_crate, load_crate
 from music_links_bot.core.constants import STATS_KV_KEY
 from music_links_bot.publishing.channel_templates import clear_channel_template
 from music_links_bot.publishing.publication_presets import clear_presets
@@ -13,6 +12,7 @@ from music_links_bot.publishing.publish_queue import (
     QueueStorageError,
     remove_user_jobs,
 )
+from music_links_bot.state.bot_crate import clear_crate, load_crate
 from music_links_bot.state.bot_history import clear_history
 from music_links_bot.state.bot_runtime import BotRuntime
 from music_links_bot.state.bot_storage import delete_draft

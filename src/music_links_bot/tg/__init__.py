@@ -1,1 +1,1 @@
-"""Telegram plumbing: the raw Bot API gateway, buttons, HTML text, messages, updates, delivery tracking, ephemeral replies, effects, reactions, webhook secret."""
+"""Telegram plumbing: the raw Bot API gateway, buttons and the callback action registry, HTML text and its length limits, messages, updates, delivery tracking, ephemeral replies, effects, reactions, webhook secret."""

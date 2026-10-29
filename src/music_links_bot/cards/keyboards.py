@@ -11,10 +11,6 @@ from telegram import (
 )
 from telegram.ext import ContextTypes
 
-from music_links_bot.cards.release_hubs import resolve_release_hub_url
-from music_links_bot.cards.release_presentation import (
-    compact_release_title,
-)
 from music_links_bot.core.constants import CHANNEL_USERNAME, PLATFORM_LABELS
 from music_links_bot.core.i18n import get_text, resolve_lang
 from music_links_bot.core.models import (
@@ -25,11 +21,15 @@ from music_links_bot.core.models import (
     TrackMatch,
     VideoMatch,
 )
+from music_links_bot.core.release_preferences import current_presentation
+from music_links_bot.core.release_presentation import (
+    compact_release_title,
+)
 from music_links_bot.core.url_utils import (
     cache_key_for_url,
     is_platform_destination_url,
 )
-from music_links_bot.state.release_preferences import current_presentation
+from music_links_bot.providers.release_hubs import resolve_release_hub_url
 from music_links_bot.tg.telegram_buttons import (
     ButtonTone,
     button as InlineKeyboardButton,
@@ -310,8 +310,6 @@ def _build_title_keyboard(
     With the bot's username the soundtrack opens as a card in this bot, where
     it can be edited and published; without it, as an album.link page.
     """
-    from music_links_bot.chat.release_panel import soundtrack_start_url
-
     soundtrack = (
         soundtrack_start_url(bot_username, title.soundtrack_url) or title.soundtrack_url
     )
@@ -741,3 +739,13 @@ def _get_platform_order(context: ContextTypes.DEFAULT_TYPE | None) -> tuple[str,
         return platform_order
 
     return DEFAULT_PLATFORM_ORDER
+
+
+def soundtrack_start_url(
+    bot_username: str | None, soundtrack_url: str | None
+) -> str | None:
+    """t.me/<bot>?start=sound_<album id>: the soundtrack opens as a card here."""
+    match = re.fullmatch(r"https://album\.link/i/(\d{1,15})", soundtrack_url or "")
+    if not bot_username or not match:
+        return None
+    return f"https://t.me/{bot_username}?start=sound_{match.group(1)}"

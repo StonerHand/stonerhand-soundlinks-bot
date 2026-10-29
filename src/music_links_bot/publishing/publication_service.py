@@ -7,20 +7,20 @@ from telegram import Message
 from telegram.constants import ParseMode
 from telegram.error import BadRequest, Forbidden, RetryAfter, TelegramError
 
+from music_links_bot.cards.publication_contract import require_valid_publication
+from music_links_bot.core.draft_model import prepare_publication_draft
 from music_links_bot.core.models import TrackMatch
-from music_links_bot.editor.bot_builder import (
-    MESSAGE_TEXT_LIMIT,
-    PHOTO_CAPTION_LIMIT,
-    fit_telegram_html,
-)
-from music_links_bot.editor.draft_model import prepare_publication_draft
 from music_links_bot.publishing.channel_templates import save_channel_template
 from music_links_bot.publishing.chat_access import PublishAccess, check_publish_access
-from music_links_bot.publishing.publication_contract import require_valid_publication
 from music_links_bot.publishing.publication_preflight import validate_publication
 from music_links_bot.publishing.publication_view import (
     build_publication_view,
     publication_contract_from_view,
+)
+from music_links_bot.tg.telegram_text import (
+    MESSAGE_TEXT_LIMIT,
+    PHOTO_CAPTION_LIMIT,
+    fit_telegram_html,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -217,7 +217,7 @@ class PublicationService:
             return sent
 
         from music_links_bot.artwork.collection_collage import is_generated_artwork_url
-        from music_links_bot.publishing.publication_budget import (
+        from music_links_bot.cards.publication_budget import (
             sends_as_photo,
             visible_length,
         )

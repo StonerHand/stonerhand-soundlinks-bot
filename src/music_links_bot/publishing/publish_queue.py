@@ -8,7 +8,7 @@ from collections.abc import Callable
 from typing import Any
 
 from music_links_bot.core.constants import channel_target
-from music_links_bot.editor.draft_model import prepare_publication_draft
+from music_links_bot.core.draft_model import prepare_publication_draft
 from music_links_bot.state.kvstore import KVStore, KVUnavailableError
 
 LOGGER = logging.getLogger(__name__)
@@ -455,7 +455,7 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
     blind duplicate when Telegram accepted a request before the worker died.
     """
     from music_links_bot.publishing.publication_service import PublicationService
-    from music_links_bot.publishing.publication_state import mark_posted
+    from music_links_bot.state.publication_state import mark_posted
 
     fixed_now = int(now) if now is not None else None
 
@@ -489,7 +489,7 @@ async def process_due_jobs(context, *, now: int | None = None) -> int:
         if not claimed:
             break
         job = claimed[0]
-        from music_links_bot.ops.operation_metrics import record_duration
+        from music_links_bot.core.operation_metrics import record_duration
 
         record_duration(
             context.application.bot_data,
@@ -595,7 +595,7 @@ async def _celebrate_job(context, draft: dict, delivered, target) -> None:
     from telegram.constants import ParseMode
 
     from music_links_bot.core.i18n import get_text
-    from music_links_bot.publishing.publication_state import _message_url
+    from music_links_bot.state.publication_state import _message_url
     from music_links_bot.tg.message_effects import send_with_effect
     from music_links_bot.tg.telegram_buttons import button
 

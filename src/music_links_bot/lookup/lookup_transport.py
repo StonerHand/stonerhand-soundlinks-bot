@@ -15,15 +15,14 @@ from music_links_bot.cards.keyboards import (
     _build_link_preview_options,
     _select_preview_url,
 )
-from music_links_bot.cards.sharing import make_channel_safe_keyboard
-from music_links_bot.core.models import TrackMatch, VideoMatch
-from music_links_bot.editor.bot_builder import fit_telegram_html
-from music_links_bot.lookup.bot_progress import take_progress
-from music_links_bot.lookup.mixed_post import send_track_video_album
-from music_links_bot.publishing.publication_contract import (
+from music_links_bot.cards.publication_contract import (
     RenderedPublication,
     require_valid_publication,
 )
+from music_links_bot.cards.sharing import make_channel_safe_keyboard
+from music_links_bot.core.models import TrackMatch, VideoMatch
+from music_links_bot.lookup.bot_progress import take_progress
+from music_links_bot.lookup.mixed_post import send_track_video_album
 from music_links_bot.tg.ephemeral import (
     ephemeral_card_receiver,
     send_ephemeral_message,
@@ -33,6 +32,7 @@ from music_links_bot.tg.telegram_gateway import (
     record_capability_failure,
 )
 from music_links_bot.tg.telegram_messages import delete_message_safely
+from music_links_bot.tg.telegram_text import fit_telegram_html
 
 LOGGER = logging.getLogger(__name__)
 # Telegram builds a link preview before it answers. A YouTube player can take

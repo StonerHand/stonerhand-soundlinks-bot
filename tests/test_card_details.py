@@ -18,14 +18,18 @@ from music_links_bot.cards.formatter import (
 )
 from music_links_bot.chat.bot_inline import _build_inline_result
 from music_links_bot.chat.bot_preferences import apply_preferences
+from music_links_bot.core.draft_model import new_track_draft, normalize_track_draft
 from music_links_bot.core.i18n import language_context
 from music_links_bot.core.models import PlaylistMatch, VideoMatch
-from music_links_bot.editor.draft_model import new_track_draft, normalize_track_draft
+from music_links_bot.core.release_metadata import duration_label, metadata_url
+from music_links_bot.core.release_preferences import (
+    PresentationPreferences,
+    presentation_context,
+)
 from music_links_bot.lookup.track_lookup import (
     _fill_release_metadata,
     _lookup_tracks,
 )
-from music_links_bot.providers.release_metadata import duration_label, metadata_url
 from music_links_bot.providers.search import (
     SearchClient,
     _complete_album_duration,
@@ -38,10 +42,6 @@ from music_links_bot.providers.spotify import (
 )
 from music_links_bot.publishing.publication_service import PublicationService
 from music_links_bot.state.bot_runtime import UserSession
-from music_links_bot.state.release_preferences import (
-    PresentationPreferences,
-    presentation_context,
-)
 
 TRACK = "https://open.spotify.com/track/dig"
 ALBUM = "https://open.spotify.com/album/unified"

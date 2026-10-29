@@ -512,7 +512,7 @@ def build_rich_collection_html(
     header, _, body = body.partition("\n\n")
     # <h1> already holds the title. When the classic heading names the shared
     # artist instead ("🎶 <b>Blur</b>"), keep that artist above the list.
-    from music_links_bot.cards.release_presentation import shared_collection_artist
+    from music_links_bot.core.release_presentation import shared_collection_artist
 
     artist = shared_collection_artist(tracks)
     named = header.split("\n", 1)[0].removeprefix("🎶 ")

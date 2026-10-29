@@ -9,7 +9,14 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from music_links_bot.cards.sharing import add_share_button, build_crate_share_query
-from music_links_bot.chat.bot_crate import (
+from music_links_bot.chat.bot_menu import runtime_for, safe_edit, update_lang
+from music_links_bot.chat.crate_view import render_crate
+from music_links_bot.core.constants import channel_target
+from music_links_bot.core.i18n import get_text, resolve_lang
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.core.release_preferences import release_preference_key
+from music_links_bot.lookup.input_routing import input_prompt_markup
+from music_links_bot.state.bot_crate import (
     clear_crate_items,
     item_index,
     load_crate,
@@ -19,15 +26,8 @@ from music_links_bot.chat.bot_crate import (
     restore_crate_item,
     restore_crate_items,
 )
-from music_links_bot.chat.bot_menu import runtime_for, safe_edit, update_lang
-from music_links_bot.chat.crate_view import render_crate
-from music_links_bot.core.constants import channel_target
-from music_links_bot.core.i18n import get_text, resolve_lang
-from music_links_bot.core.models import TrackMatch
-from music_links_bot.lookup.input_routing import input_prompt_markup
 from music_links_bot.state.bot_runtime import CallbackAction, encode_callback
 from music_links_bot.state.bot_storage import remember_bounded
-from music_links_bot.state.release_preferences import release_preference_key
 from music_links_bot.tg.telegram_buttons import button as InlineKeyboardButton
 
 CRATE_UNDO_SECONDS = 15
@@ -347,12 +347,12 @@ async def _publish_crate(
         collection_issues,
     )
     from music_links_bot.cards.keyboards import _build_link_preview_options
-    from music_links_bot.cards.sharing import make_channel_safe_keyboard
-    from music_links_bot.chat.bot_crate import crate_revision
-    from music_links_bot.publishing.publication_contract import (
+    from music_links_bot.cards.publication_contract import (
         RenderedPublication,
         require_valid_publication,
     )
+    from music_links_bot.cards.sharing import make_channel_safe_keyboard
+    from music_links_bot.state.bot_crate import crate_revision
 
     if not is_publisher(context, user_id):
         await query.answer(get_text(lang, "ed_admin_only"), show_alert=True)
@@ -401,7 +401,7 @@ async def _publish_crate(
         await query.answer(get_text(lang, "ed_publish_failed"), show_alert=True)
         return
     await query.answer(get_text(lang, "ed_published_toast"))
-    from music_links_bot.publishing.publication_state import _message_url
+    from music_links_bot.state.publication_state import _message_url
 
     url = _message_url(target, getattr(sent, "message_id", None))
     rows = []

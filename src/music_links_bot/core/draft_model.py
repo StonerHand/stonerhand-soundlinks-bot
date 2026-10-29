@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 import time
+from copy import deepcopy
 from dataclasses import asdict, dataclass
 from typing import Any, TypedDict, cast
 
-from music_links_bot.cards.release_presentation import normalize_preset
 from music_links_bot.core.constants import PLATFORM_LABELS
+from music_links_bot.core.metadata_cleaning import clean_spotify_metadata_title
 from music_links_bot.core.models import TrackMatch
+from music_links_bot.core.release_presentation import normalize_preset
 from music_links_bot.core.url_utils import (
     canonical_platform_key,
     is_direct_platform_url,
     is_platform_destination_url,
 )
-from music_links_bot.providers.metadata_cleaning import clean_spotify_metadata_title
 
 CURRENT_DRAFT_VERSION = 5
 MAX_TRACK_FIELD_LENGTH = 512
@@ -74,11 +75,11 @@ def _normalize_track_item(value: dict) -> DraftTrackItem:
         clean = str(raw).strip()[:limit]
         if clean:
             item[key] = clean
-    from music_links_bot.providers.metadata_cleaning import positive_track_count
+    from music_links_bot.core.metadata_cleaning import positive_track_count
 
     if count := positive_track_count(value.get("track_count")):
         item["track_count"] = count
-    from music_links_bot.providers.release_metadata import duration_ms, metadata_url
+    from music_links_bot.core.release_metadata import duration_ms, metadata_url
 
     for key, kind in (("album_url", "album"), ("artist_url", "artist")):
         if url := metadata_url(value.get(key), kind):
@@ -207,7 +208,7 @@ def new_track_draft(
     can_publish: bool = False,
     search_query: str = "",
 ) -> TrackDraft:
-    from music_links_bot.state.release_preferences import use_clean_artwork
+    from music_links_bot.core.release_preferences import use_clean_artwork
 
     return {
         "v": CURRENT_DRAFT_VERSION,
@@ -313,3 +314,24 @@ def normalize_track_draft(value: object) -> TrackDraft | None:
     else:
         draft.pop("undo_stack", None)
     return cast(TrackDraft, draft)
+
+
+EDITABLE_FIELDS = (
+    "prefix",
+    "quote",
+    "hashtags",
+    "custom_tags",
+    "tag_options",
+    "platforms",
+    "preset",
+    "large_preview",
+    "as_photo",
+    "publication_mode",
+    "delivery_mode",
+    "custom_cover_file_id",
+    "custom_cover_unique_id",
+)
+
+
+def setting_snapshot(draft: dict) -> dict:
+    return {key: deepcopy(draft.get(key)) for key in EDITABLE_FIELDS}

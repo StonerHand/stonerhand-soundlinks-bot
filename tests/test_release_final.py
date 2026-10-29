@@ -7,9 +7,9 @@ import httpx
 from telegram import InlineQuery, Update, User
 from telegram.ext import Application
 
-from music_links_bot.chat.bot_crate import add_to_crate, load_crate, save_crate
+from music_links_bot.core.draft_model import new_track_draft
 from music_links_bot.core.models import TrackMatch
-from music_links_bot.editor.draft_model import new_track_draft
+from music_links_bot.state.bot_crate import add_to_crate, load_crate, save_crate
 from music_links_bot.state.bot_runtime import BotRuntime
 from music_links_bot.state.bot_storage import delete_draft, load_draft, store_draft
 from music_links_bot.state.durable_state import state_scope

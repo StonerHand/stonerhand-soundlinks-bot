@@ -19,28 +19,28 @@ from music_links_bot.core.errors import (
     BotErrorCode as _BotErrorCode,
     BotFlowError as _BotFlowError,
 )
+from music_links_bot.core.release_preferences import (
+    normalize_annotations,
+    normalize_release_tags,
+)
 from music_links_bot.core.url_utils import (
     cache_key_for_url,
     is_direct_platform_url,
     is_supported_music_url,
 )
-from music_links_bot.editor.bot_builder import MAX_INTRO_LENGTH, fit_telegram_html
 from music_links_bot.state.durable_state import (
     current_state,
     delete_value,
     read_json,
 )
 from music_links_bot.state.kvstore import KVStore, KVUnavailableError
-from music_links_bot.state.release_preferences import (
-    normalize_annotations,
-    normalize_release_tags,
-)
 from music_links_bot.state.state_mutations import (
     UNKNOWN_RAW,
     StateConflictError,
     merge_fields,
     mutate_json_raw,
 )
+from music_links_bot.tg.telegram_text import MAX_INTRO_LENGTH, fit_telegram_html
 
 # Backwards-compatible exports for existing imports and callbacks.
 BotErrorCode = _BotErrorCode

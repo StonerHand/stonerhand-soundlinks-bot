@@ -4,10 +4,10 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from music_links_bot.chat.bot_crate import add_to_crate, load_crate
+from music_links_bot.chat.privacy import delete_user_data
 from music_links_bot.publishing.publish_queue import add_job, load_jobs
+from music_links_bot.state.bot_crate import add_to_crate, load_crate
 from music_links_bot.state.bot_runtime import BotRuntime
-from music_links_bot.state.privacy import delete_user_data
 
 
 def _draft(user_id: int, title: str) -> dict:
@@ -55,7 +55,7 @@ class PrivacyTests(unittest.IsolatedAsyncioTestCase):
         await add_job(context, _draft(7, "Dragonaut"), 1000)
         await add_job(context, _draft(8, "Flood"), 2000)
 
-        with patch("music_links_bot.state.privacy.remove_identity") as remove_identity:
+        with patch("music_links_bot.chat.privacy.remove_identity") as remove_identity:
             result = await delete_user_data(context, 7)
 
         self.assertEqual(result.drafts, 1)

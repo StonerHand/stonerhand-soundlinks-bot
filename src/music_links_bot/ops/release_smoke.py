@@ -16,6 +16,10 @@ from music_links_bot.cards.keyboards import (
     _build_collection_keyboard,
     _build_link_keyboard,
 )
+from music_links_bot.cards.publication_contract import (
+    RenderedPublication,
+    validate_rendered_publication,
+)
 from music_links_bot.cards.sharing import (
     add_share_button,
     collection_result_title,
@@ -31,15 +35,11 @@ from music_links_bot.chat.bot_ui import (
 )
 from music_links_bot.core.i18n import get_text
 from music_links_bot.core.models import TrackMatch
-from music_links_bot.publishing.publication_contract import (
-    RenderedPublication,
-    validate_rendered_publication,
-)
-from music_links_bot.publishing.rich_publications import build_rich_card_html
-from music_links_bot.state.release_preferences import (
+from music_links_bot.core.release_preferences import (
     PresentationPreferences,
     presentation_context,
 )
+from music_links_bot.publishing.rich_publications import build_rich_card_html
 from music_links_bot.tg.telegram_buttons import button as InlineKeyboardButton
 
 _TAG_RE = re.compile(r"<[^>]*>")

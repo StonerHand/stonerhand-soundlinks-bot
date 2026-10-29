@@ -5,11 +5,11 @@ from zoneinfo import ZoneInfo
 
 from music_links_bot.cards.formatter import format_collection_message
 from music_links_bot.cards.keyboards import _collection_label, _short_video_title
+from music_links_bot.cards.publication_budget import sends_as_photo
 from music_links_bot.core.human_time import parse_human_datetime
 from music_links_bot.core.models import TrackMatch
-from music_links_bot.editor.bot_builder import fit_telegram_html
-from music_links_bot.publishing.publication_budget import sends_as_photo
 from music_links_bot.publishing.rich_rendering import build_rich_collection_html
+from music_links_bot.tg.telegram_text import fit_telegram_html
 
 
 def _tracks(*pairs: tuple[str, str]) -> list[TrackMatch]:
@@ -104,7 +104,7 @@ def test_every_schedule_form_is_read_in_the_bot_time_zone() -> None:
 
 def test_the_intro_quote_is_always_shown_in_full() -> None:
     """The owner wants every reader to see the whole text: never folded."""
-    from music_links_bot.publishing.publication_budget import compose_with_intro
+    from music_links_bot.cards.publication_budget import compose_with_intro
 
     body = "<b>HMLTD — Listen to FANGS</b>\n\n💿 Альбом · 2026"
     long = (

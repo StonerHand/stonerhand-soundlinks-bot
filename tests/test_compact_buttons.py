@@ -6,7 +6,7 @@ from music_links_bot.cards.keyboards import (
     _build_mixed_collection_keyboard,
 )
 from music_links_bot.core.models import TrackMatch, VideoMatch
-from music_links_bot.state.release_preferences import (
+from music_links_bot.core.release_preferences import (
     PresentationPreferences,
     presentation_context,
 )

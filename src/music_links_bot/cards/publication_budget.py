@@ -4,13 +4,13 @@ import re
 from dataclasses import dataclass
 from html import unescape
 
-from music_links_bot.editor.bot_builder import (
+from music_links_bot.tg.telegram_text import (
     MAX_INTRO_LENGTH,
     MESSAGE_TEXT_LIMIT,
     PHOTO_CAPTION_LIMIT,
     fit_telegram_html,
+    telegram_text_length,
 )
-from music_links_bot.tg.telegram_text import telegram_text_length
 
 INTRO_HARD_LIMIT = MAX_INTRO_LENGTH
 _BLOCKQUOTE_OPEN = "<blockquote>"

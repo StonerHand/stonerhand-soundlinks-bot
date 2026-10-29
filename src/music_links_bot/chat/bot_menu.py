@@ -15,7 +15,6 @@ from telegram.error import BadRequest, Forbidden, TelegramError
 from telegram.ext import ContextTypes
 
 from music_links_bot.chat.bot_admin import stats_text
-from music_links_bot.chat.bot_crate import load_crate
 from music_links_bot.chat.bot_preferences import preferences_view
 from music_links_bot.chat.bot_recent import render_drafts_view, render_search_view
 from music_links_bot.chat.bot_ui import (
@@ -26,10 +25,12 @@ from music_links_bot.chat.bot_ui import (
     build_section_keyboard,
     build_start_keyboard,
 )
+from music_links_bot.chat.privacy import delete_user_data
 from music_links_bot.core.constants import channel_target
 from music_links_bot.core.i18n import get_text, resolve_lang
 from music_links_bot.editor.bot_builder import active_card_label
 from music_links_bot.lookup.input_routing import input_prompt_markup
+from music_links_bot.state.bot_crate import load_crate
 from music_links_bot.state.bot_runtime import (
     BotRuntime,
     CallbackAction,
@@ -37,7 +38,6 @@ from music_links_bot.state.bot_runtime import (
     encode_callback,
 )
 from music_links_bot.state.bot_storage import load_draft
-from music_links_bot.state.privacy import delete_user_data
 from music_links_bot.tg.telegram_buttons import button as InlineKeyboardButton
 
 LOGGER = logging.getLogger(__name__)

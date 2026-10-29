@@ -7,22 +7,22 @@ from urllib.parse import parse_qs, urlparse
 
 import httpx
 
-from music_links_bot.cards.release_hubs import canonical_release_hub_url
 from music_links_bot.core.cache import TTLCache
 from music_links_bot.core.constants import HTTP_USER_AGENT
+from music_links_bot.core.metadata_cleaning import match_key, positive_track_count
 from music_links_bot.core.models import TrackMatch
-from music_links_bot.core.single_flight import cancel_all, forget
-from music_links_bot.core.url_utils import cache_key_for_url, normalize_host
-from music_links_bot.providers.metadata_cleaning import match_key, positive_track_count
-from music_links_bot.providers.musicbrainz import (
-    MusicBrainzClient,
-    MusicBrainzLookupError,
-)
-from music_links_bot.providers.release_metadata import (
+from music_links_bot.core.release_metadata import (
     apple_album_url,
     duration_ms,
     metadata_url,
 )
+from music_links_bot.core.single_flight import cancel_all, forget
+from music_links_bot.core.url_utils import cache_key_for_url, normalize_host
+from music_links_bot.providers.musicbrainz import (
+    MusicBrainzClient,
+    MusicBrainzLookupError,
+)
+from music_links_bot.providers.release_hubs import canonical_release_hub_url
 
 LOGGER = logging.getLogger(__name__)
 MIN_QUERY_LENGTH = 2
@@ -373,7 +373,7 @@ def _extract_matching_genre(
         return None
 
     matches = {}
-    from music_links_bot.cards.release_tags import genre_hashtags
+    from music_links_bot.core.text_utils import genre_hashtags
 
     for result in results:
         if not isinstance(result, dict):

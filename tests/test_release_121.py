@@ -14,8 +14,8 @@ from music_links_bot.cards.collection_plan import (
     collection_issues,
 )
 from music_links_bot.core.models import TrackMatch
+from music_links_bot.core.operation_metrics import latency_summary, record_duration
 from music_links_bot.core.shared_http import close_shared_clients, shared_client
-from music_links_bot.ops.operation_metrics import latency_summary, record_duration
 from music_links_bot.providers.provider_errors import provider_failure_reason
 from music_links_bot.providers.public_release import (
     PublicReleaseError,

@@ -106,7 +106,7 @@ async def _send_track_video_pair_result(*args, **kwargs) -> bool:
 async def resolve_sources(bot_data: dict, source_urls: list[str]) -> LookupBundle:
     from time import monotonic
 
-    from music_links_bot.ops.operation_metrics import record_duration
+    from music_links_bot.core.operation_metrics import record_duration
 
     started = monotonic()
     try:

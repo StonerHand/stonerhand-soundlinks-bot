@@ -25,7 +25,7 @@ from music_links_bot.chat.bot_app import (
 )
 from music_links_bot.core.config import Settings
 from music_links_bot.core.http_json import send_json
-from music_links_bot.ops.logging_config import quiet_transport_logs
+from music_links_bot.core.logging_config import quiet_transport_logs
 from music_links_bot.ops.loop_runner import (
     run_on_loop,
     start_background_loop,

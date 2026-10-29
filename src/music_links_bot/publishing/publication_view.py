@@ -6,14 +6,14 @@ from telegram import InlineKeyboardMarkup
 
 from music_links_bot.cards.formatter import build_auto_hashtags, format_track_message
 from music_links_bot.cards.keyboards import _build_link_keyboard, _select_preview_url
-from music_links_bot.core.constants import PLATFORM_LABELS
-from music_links_bot.core.models import TrackMatch
-from music_links_bot.core.text_utils import normalize_hashtag
-from music_links_bot.publishing.publication_budget import (
+from music_links_bot.cards.publication_budget import (
     IntroBudget,
     compose_with_intro,
 )
-from music_links_bot.publishing.publication_contract import RenderedPublication
+from music_links_bot.cards.publication_contract import RenderedPublication
+from music_links_bot.core.constants import PLATFORM_LABELS
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.core.text_utils import normalize_hashtag
 
 
 @dataclass(slots=True, frozen=True)
@@ -37,7 +37,7 @@ def publication_contract_from_view(
     view: PublicationPlan,
     track: TrackMatch,
 ) -> RenderedPublication:
-    from music_links_bot.publishing.publication_budget import sends_as_photo
+    from music_links_bot.cards.publication_budget import sends_as_photo
 
     mode = "classic"
     if sends_as_photo(

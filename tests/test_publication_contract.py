@@ -2,7 +2,7 @@ import unittest
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-from music_links_bot.publishing.publication_contract import (
+from music_links_bot.cards.publication_contract import (
     RenderedPublication,
     validate_rendered_publication,
 )

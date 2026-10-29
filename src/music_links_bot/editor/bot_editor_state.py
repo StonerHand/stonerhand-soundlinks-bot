@@ -3,14 +3,15 @@ from __future__ import annotations
 import time
 from copy import deepcopy
 
-from music_links_bot.cards.release_presentation import (
+from music_links_bot.core.constants import PLATFORM_LABELS
+from music_links_bot.core.draft_model import EDITABLE_FIELDS
+from music_links_bot.core.i18n import get_text
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.core.release_presentation import (
     PRESET_ORDER,
     apply_preset,
     normalize_preset,
 )
-from music_links_bot.core.constants import PLATFORM_LABELS
-from music_links_bot.core.i18n import get_text
-from music_links_bot.core.models import TrackMatch
 from music_links_bot.core.url_utils import is_platform_destination_url
 from music_links_bot.editor.bot_builder import (
     remove_intro,
@@ -24,25 +25,6 @@ from music_links_bot.state.bot_runtime import MAX_RECENT_DRAFTS
 
 UNDO_SETTING_SECONDS = 300
 MAX_UNDO_STEPS = 5
-_EDITABLE_FIELDS = (
-    "prefix",
-    "quote",
-    "hashtags",
-    "custom_tags",
-    "tag_options",
-    "platforms",
-    "preset",
-    "large_preview",
-    "as_photo",
-    "publication_mode",
-    "delivery_mode",
-    "custom_cover_file_id",
-    "custom_cover_unique_id",
-)
-
-
-def setting_snapshot(draft: dict) -> dict:
-    return {key: deepcopy(draft.get(key)) for key in _EDITABLE_FIELDS}
 
 
 def reset_original(draft: dict) -> bool:
@@ -50,7 +32,7 @@ def reset_original(draft: dict) -> bool:
     if not isinstance(original, dict):
         return False
     remember_setting_state(draft)
-    for key in _EDITABLE_FIELDS:
+    for key in EDITABLE_FIELDS:
         if original.get(key) is None:
             draft.pop(key, None)
         else:
@@ -63,7 +45,7 @@ def remember_setting_state(draft: dict) -> None:
         "expires_at": int(time.time()) + UNDO_SETTING_SECONDS,
         "values": {
             key: deepcopy(draft[key]) if key in draft else None
-            for key in _EDITABLE_FIELDS
+            for key in EDITABLE_FIELDS
         },
     }
     stack = [
@@ -95,7 +77,7 @@ def restore_setting_state(draft: dict, *, now: int | None = None) -> bool:
     if not isinstance(values, dict):
         draft.pop("undo_state", None)
         return False
-    for key in _EDITABLE_FIELDS:
+    for key in EDITABLE_FIELDS:
         value = values.get(key)
         if value is None:
             draft.pop(key, None)

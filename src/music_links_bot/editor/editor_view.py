@@ -5,6 +5,7 @@ from typing import Any
 
 from telegram import InlineKeyboardMarkup
 
+from music_links_bot.cards.publication_budget import visible_length
 from music_links_bot.cards.sharing import (
     add_share_button,
     build_share_query,
@@ -13,11 +14,10 @@ from music_links_bot.cards.sharing import (
 from music_links_bot.chat.bot_ui import editor_rows, version_editor_keyboard
 from music_links_bot.core.i18n import get_text, resolve_lang
 from music_links_bot.core.models import TrackMatch
-from music_links_bot.editor.bot_builder import MESSAGE_TEXT_LIMIT, fit_telegram_html
 from music_links_bot.editor.bot_editor_state import draft_status
-from music_links_bot.publishing.publication_budget import visible_length
 from music_links_bot.publishing.publication_preflight import validate_publication
 from music_links_bot.publishing.publication_view import build_publication_view
+from music_links_bot.tg.telegram_text import MESSAGE_TEXT_LIMIT, fit_telegram_html
 
 
 def render_track_draft(

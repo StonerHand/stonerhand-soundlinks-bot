@@ -18,7 +18,7 @@ if str(SRC_PATH) not in sys.path:
 
 from music_links_bot import __version__
 from music_links_bot.core.http_json import send_json
-from music_links_bot.ops.logging_config import quiet_transport_logs
+from music_links_bot.core.logging_config import quiet_transport_logs
 
 LOGGER = logging.getLogger(__name__)
 quiet_transport_logs()

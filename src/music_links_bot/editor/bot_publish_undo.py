@@ -37,7 +37,7 @@ async def handle_unpublish(request) -> bool:
         return False
     from music_links_bot.editor.editor_view import render_track_draft
     from music_links_bot.publishing.delivery_receipts import forget_delivery
-    from music_links_bot.publishing.publication_state import forget_posted
+    from music_links_bot.state.publication_state import forget_posted
 
     draft = request.draft
     if not can_undo_publish(draft):

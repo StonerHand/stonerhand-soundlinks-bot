@@ -12,12 +12,12 @@ import httpx
 from music_links_bot.core.cache import TTLCache
 from music_links_bot.core.constants import HTTP_HEADERS
 from music_links_bot.core.models import TrackMatch
+from music_links_bot.core.release_metadata import duration_ms
 from music_links_bot.core.url_utils import (
     cache_key_for_url,
     is_direct_platform_url,
     normalize_host,
 )
-from music_links_bot.providers.release_metadata import duration_ms
 
 
 class PublicReleaseError(RuntimeError):

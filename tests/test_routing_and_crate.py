@@ -5,9 +5,9 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from music_links_bot.chat import bot
-from music_links_bot.chat.bot_crate import crate_item_key, load_crate, save_crate
 from music_links_bot.chat.bot_crate_handlers import dispatch_crate_action
 from music_links_bot.core.i18n import get_text
+from music_links_bot.state.bot_crate import crate_item_key, load_crate, save_crate
 from music_links_bot.state.bot_runtime import decode_callback, encode_callback
 
 
@@ -248,7 +248,7 @@ class CrateActionTests(unittest.IsolatedAsyncioTestCase):
 
     def _key(self, title: str) -> str:
         from music_links_bot.core.models import TrackMatch
-        from music_links_bot.state.release_preferences import release_preference_key
+        from music_links_bot.core.release_preferences import release_preference_key
 
         entry = next(e for e in self.items if e["item"]["title"] == title)
         return release_preference_key(TrackMatch(**{"links": {}, **entry["item"]}))
@@ -287,7 +287,7 @@ class CrateActionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.edits[-1][0], get_text("ru", "crate_more_title"))
 
     async def test_clear_asks_first_then_empties_and_can_be_undone(self) -> None:
-        from music_links_bot.chat.bot_crate import crate_revision
+        from music_links_bot.state.bot_crate import crate_revision
 
         await self._act("clear")
         self.assertEqual(self.edits[-1][0], get_text("ru", "crate_clear_confirm"))

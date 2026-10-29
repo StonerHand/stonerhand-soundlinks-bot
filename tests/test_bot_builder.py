@@ -13,7 +13,6 @@ from music_links_bot.editor.bot_builder import (
     BuilderScreen,
     active_card_label,
     builder_screen,
-    fit_telegram_html,
     normalize_crate_title,
     parse_custom_tags,
     parse_schedule_datetime,
@@ -26,7 +25,7 @@ from music_links_bot.editor.bot_builder import (
     use_auto_tags,
 )
 from music_links_bot.state.bot_runtime import UserSession
-from music_links_bot.tg.telegram_text import telegram_text_length
+from music_links_bot.tg.telegram_text import fit_telegram_html, telegram_text_length
 
 
 class BuilderJourneyTests(unittest.TestCase):

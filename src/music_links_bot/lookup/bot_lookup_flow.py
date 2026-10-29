@@ -38,11 +38,6 @@ from music_links_bot.cards.sharing import (
     make_channel_safe_keyboard,
     track_share_url,
 )
-from music_links_bot.chat.bot_crate import (
-    add_many_to_crate,
-    crate_contains_item,
-    load_crate,
-)
 from music_links_bot.chat.bot_menu import (
     MENU_HELP,
     reply_with_menu as _reply_with_menu,
@@ -58,6 +53,7 @@ from music_links_bot.core.constants import (
     MAX_LINKS_PER_MESSAGE,
     channel_target,
 )
+from music_links_bot.core.draft_model import new_track_draft
 from music_links_bot.core.i18n import get_text
 from music_links_bot.core.models import (
     TrackMatch,
@@ -72,7 +68,6 @@ from music_links_bot.editor.bot_editor_state import (
 from music_links_bot.editor.bot_pending import (
     consume_pending_input as _consume_pending_input_impl,
 )
-from music_links_bot.editor.draft_model import new_track_draft
 from music_links_bot.editor.editor_view import (
     render_track_draft as _render_track_draft,
 )
@@ -116,6 +111,11 @@ from music_links_bot.publishing.channel_templates import (
 from music_links_bot.publishing.chat_access import check_publish_access
 from music_links_bot.publishing.publication_service import PublicationService
 from music_links_bot.publishing.publication_view import editor_preview_url
+from music_links_bot.state.bot_crate import (
+    add_many_to_crate,
+    crate_contains_item,
+    load_crate,
+)
 from music_links_bot.state.bot_history import record_history as _record_recent_item
 from music_links_bot.state.bot_runtime import (
     BotErrorCode,
@@ -710,7 +710,7 @@ async def _send_track_matches(
                 label=get_text(lang, "share_post"),
             )
         from music_links_bot.chat.release_panel import add_release_panel
-        from music_links_bot.state.release_preferences import use_clean_artwork
+        from music_links_bot.core.release_preferences import use_clean_artwork
 
         keyboard = await add_release_panel(keyboard, context, track, lang=lang)
         await _send_track_result(

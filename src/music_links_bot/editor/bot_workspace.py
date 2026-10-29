@@ -7,17 +7,18 @@ from html import escape
 
 from telegram import InlineKeyboardMarkup
 
-from music_links_bot.cards.release_tags import genre_hashtags, release_type
+from music_links_bot.cards.release_tags import release_type
 from music_links_bot.core.constants import channel_target
 from music_links_bot.core.i18n import get_text
+from music_links_bot.core.release_preferences import (
+    current_presentation,
+    release_preference_key,
+)
+from music_links_bot.core.text_utils import genre_hashtags
 from music_links_bot.editor.bot_editor_state import reset_original
 from music_links_bot.publishing.publication_view import resolve_draft_hashtags
 from music_links_bot.state.bot_runtime import encode_callback
 from music_links_bot.state.bot_storage import load_drafts, store_draft, valid_state_id
-from music_links_bot.state.release_preferences import (
-    current_presentation,
-    release_preference_key,
-)
 from music_links_bot.tg.telegram_buttons import button
 
 

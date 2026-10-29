@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Final
 
+from music_links_bot.core.metadata_cleaning import clean_spotify_metadata_title
 from music_links_bot.core.models import TrackMatch
-from music_links_bot.providers.metadata_cleaning import clean_spotify_metadata_title
 
 PRESET_ORDER: Final = ("minimal", "cover", "longread")
 LEGACY_PRESET_ALIASES: Final = {

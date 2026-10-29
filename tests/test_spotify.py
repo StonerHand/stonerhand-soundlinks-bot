@@ -360,7 +360,7 @@ class SpotifyCallToActionTitleTests(unittest.TestCase):
         self.assertEqual(album.title, "Mad Flowers")
 
     def test_a_release_really_named_listen_to_keeps_its_name(self) -> None:
-        from music_links_bot.providers.metadata_cleaning import (
+        from music_links_bot.core.metadata_cleaning import (
             clean_spotify_metadata_title,
         )
 

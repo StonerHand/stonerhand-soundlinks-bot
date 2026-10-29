@@ -5,7 +5,7 @@ import logging
 
 from music_links_bot.chat.bot_app import build_application
 from music_links_bot.core.config import Settings
-from music_links_bot.ops.logging_config import quiet_transport_logs
+from music_links_bot.core.logging_config import quiet_transport_logs
 from music_links_bot.tg.telegram_updates import ALLOWED_UPDATES
 
 

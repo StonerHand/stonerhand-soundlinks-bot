@@ -1,11 +1,11 @@
 import unittest
 
-from music_links_bot.core.models import TrackMatch
-from music_links_bot.editor.draft_model import (
+from music_links_bot.core.draft_model import (
     CURRENT_DRAFT_VERSION,
     normalize_track_draft,
     prepare_publication_draft,
 )
+from music_links_bot.core.models import TrackMatch
 from music_links_bot.lookup.bot_progress import adopt_progress_message, update_progress
 from music_links_bot.state.bot_runtime import BotRuntime
 

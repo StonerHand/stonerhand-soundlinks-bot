@@ -3,7 +3,6 @@ from __future__ import annotations
 from telegram import InlineKeyboardMarkup, Update
 from telegram.ext import Application
 
-from music_links_bot.cards.release_presentation import apply_preset
 from music_links_bot.core.i18n import (
     get_text,
     language_context,
@@ -11,16 +10,17 @@ from music_links_bot.core.i18n import (
     resolve_lang,
 )
 from music_links_bot.core.models import TrackMatch
-from music_links_bot.lookup.input_routing import input_prompt_markup
-from music_links_bot.state.bot_runtime import BotRuntime, UserSession, encode_callback
-from music_links_bot.state.durable_state import state_scope
-from music_links_bot.state.kvstore import KVUnavailableError
-from music_links_bot.state.release_preferences import (
+from music_links_bot.core.release_preferences import (
     current_presentation,
     preferences_from_session,
     presentation_context,
     release_preference_key,
 )
+from music_links_bot.core.release_presentation import apply_preset
+from music_links_bot.lookup.input_routing import input_prompt_markup
+from music_links_bot.state.bot_runtime import BotRuntime, UserSession, encode_callback
+from music_links_bot.state.durable_state import state_scope
+from music_links_bot.state.kvstore import KVUnavailableError
 from music_links_bot.tg.telegram_buttons import button, disabled_button
 
 

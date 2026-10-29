@@ -42,7 +42,7 @@ from music_links_bot.chat.inline_feedback import chosen_inline_result_handler
 from music_links_bot.chat.release_panel import release_panel_callback
 from music_links_bot.core.config import Settings
 from music_links_bot.core.lazy_client import LazyAsyncClient
-from music_links_bot.ops.logging_config import quiet_transport_logs
+from music_links_bot.core.logging_config import quiet_transport_logs
 from music_links_bot.state.bot_runtime import BotRuntime
 from music_links_bot.state.kvstore import KVStore
 

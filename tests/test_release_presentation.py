@@ -1,12 +1,12 @@
 import unittest
 
-from music_links_bot.cards.release_presentation import (
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.core.release_presentation import (
     apply_preset,
     compact_release_title,
     normalize_preset,
     shared_collection_artist,
 )
-from music_links_bot.core.models import TrackMatch
 
 
 class ReleasePresentationTests(unittest.TestCase):

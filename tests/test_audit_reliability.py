@@ -14,9 +14,10 @@ from telegram.ext import Application, TypeHandler
 
 from api import telegram as webhook
 from music_links_bot.chat.bot_preferences import LocalizedApplication
+from music_links_bot.chat.privacy import delete_user_data
 from music_links_bot.core.constants import STATS_KV_KEY
+from music_links_bot.core.draft_model import new_track_draft
 from music_links_bot.core.models import TrackMatch
-from music_links_bot.editor.draft_model import new_track_draft
 from music_links_bot.lookup import mixed_post
 from music_links_bot.lookup.bot_stats import record_delivered
 from music_links_bot.ops.loop_runner import start_background_loop, stop_background_loop
@@ -28,7 +29,6 @@ from music_links_bot.state.bot_storage import (
     store_search_selection,
 )
 from music_links_bot.state.kvstore import KVStore, KVUnavailableError
-from music_links_bot.state.privacy import delete_user_data
 from music_links_bot.state.user_state import user_state_scope
 from music_links_bot.tg import ephemeral
 from music_links_bot.tg.update_execution import (
@@ -330,7 +330,7 @@ class StorageTests(unittest.IsolatedAsyncioTestCase):
             writer, user_id=7, urls=["https://example.test"]
         )
         reader = context(self.kv)
-        with patch("music_links_bot.state.privacy.remove_identity"):
+        with patch("music_links_bot.chat.privacy.remove_identity"):
             result = await delete_user_data(reader, 7)
         self.assertEqual(result.drafts, 36)
         self.assertIsNone(await self.kv.get("draft:owned0"))
@@ -357,7 +357,7 @@ class StorageTests(unittest.IsolatedAsyncioTestCase):
         old = asyncio.create_task(stale())
         await ready.wait()
         async with user_state_scope(self.kv, 7):
-            with patch("music_links_bot.state.privacy.remove_identity"):
+            with patch("music_links_bot.chat.privacy.remove_identity"):
                 await delete_user_data(context(self.kv), 7)
         resume.set()
         await old

@@ -6,9 +6,9 @@ import httpx
 
 from music_links_bot.core.cache import TTLCache
 from music_links_bot.core.constants import HTTP_HEADERS
+from music_links_bot.core.metadata_cleaning import clean_spotify_metadata_title
 from music_links_bot.core.models import ArtistMatch
 from music_links_bot.core.url_utils import cache_key_for_url, is_spotify_artist_url
-from music_links_bot.providers.metadata_cleaning import clean_spotify_metadata_title
 
 
 class ArtistLookupError(RuntimeError):

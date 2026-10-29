@@ -5,9 +5,9 @@ from html import escape
 
 from music_links_bot.artwork.collection_collage import signed_cover_url
 from music_links_bot.cards.formatter import release_details
-from music_links_bot.cards.release_presentation import compact_release_title
 from music_links_bot.core.i18n import resolve_lang
 from music_links_bot.core.models import TrackMatch, VideoMatch
+from music_links_bot.core.release_presentation import compact_release_title
 
 
 @dataclass(slots=True, frozen=True)

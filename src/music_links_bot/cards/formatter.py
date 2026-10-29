@@ -4,16 +4,10 @@ import re
 from collections.abc import Sequence
 from html import escape, unescape
 
-from music_links_bot.cards.release_presentation import (
-    compact_release_title,
-    release_emoji,
-    shared_collection_artist,
-)
 from music_links_bot.cards.release_tags import (
     build_auto_hashtags as build_auto_hashtags,
     build_collection_hashtags as build_collection_hashtags,
     build_mixed_collection_hashtags as build_mixed_collection_hashtags,
-    genre_hashtags as _genre_hashtags,
     release_type,
 )
 from music_links_bot.core.i18n import resolve_lang
@@ -25,17 +19,22 @@ from music_links_bot.core.models import (
     TrackMatch,
     VideoMatch,
 )
-from music_links_bot.editor.bot_builder import fit_telegram_html
-from music_links_bot.providers.release_metadata import (
+from music_links_bot.core.release_metadata import (
     duration_label,
     duration_ms,
     metadata_url,
 )
-from music_links_bot.state.release_preferences import (
+from music_links_bot.core.release_preferences import (
     current_presentation,
     release_preference_key,
 )
-from music_links_bot.tg.telegram_text import telegram_text_length
+from music_links_bot.core.release_presentation import (
+    compact_release_title,
+    release_emoji,
+    shared_collection_artist,
+)
+from music_links_bot.core.text_utils import genre_hashtags as _genre_hashtags
+from music_links_bot.tg.telegram_text import fit_telegram_html, telegram_text_length
 
 MAX_METADATA_TEXT_LENGTH = 180
 MAX_COLLECTION_TEXT_LENGTH = 96

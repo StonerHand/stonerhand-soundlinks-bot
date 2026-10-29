@@ -21,9 +21,6 @@ from music_links_bot.core.i18n import get_text
 from music_links_bot.core.models import (
     TrackMatch,
 )
-from music_links_bot.editor.bot_builder import (
-    fit_telegram_html,
-)
 from music_links_bot.editor.editor_view import (
     render_track_draft as _render_track_draft,
 )
@@ -36,6 +33,7 @@ from music_links_bot.tg.telegram_buttons import (
     callback_button,
     disabled_button,
 )
+from music_links_bot.tg.telegram_text import fit_telegram_html
 
 LOGGER = logging.getLogger(__name__)
 

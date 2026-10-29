@@ -8,9 +8,9 @@ from music_links_bot.chat.bot_app import GROUP_BOT_COMMANDS, GROUP_BOT_COMMANDS_
 from music_links_bot.chat.bot_menu import channel_command, help_command
 from music_links_bot.chat.bot_preferences import preferences_view
 from music_links_bot.chat.bot_ui import editor_appearance_rows
+from music_links_bot.core.draft_model import new_track_draft
 from music_links_bot.core.human_time import local_time_html
 from music_links_bot.core.models import TrackMatch
-from music_links_bot.editor.draft_model import new_track_draft
 from music_links_bot.state.bot_runtime import UserSession
 
 

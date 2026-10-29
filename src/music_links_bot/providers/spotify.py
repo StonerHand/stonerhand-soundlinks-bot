@@ -8,21 +8,21 @@ from html.parser import HTMLParser
 
 import httpx
 
-from music_links_bot.cards.release_hubs import canonical_release_hub_url
 from music_links_bot.core.cache import TTLCache
 from music_links_bot.core.constants import HTTP_USER_AGENT
-from music_links_bot.core.models import TrackMatch
-from music_links_bot.core.url_utils import cache_key_for_url, spotify_url_type
-from music_links_bot.providers.metadata_cleaning import (
+from music_links_bot.core.metadata_cleaning import (
     clean_spotify_metadata_title,
     infer_release_format,
     positive_track_count,
 )
-from music_links_bot.providers.release_metadata import (
+from music_links_bot.core.models import TrackMatch
+from music_links_bot.core.release_metadata import (
     duration_ms,
     metadata_url,
     spotify_entity_url,
 )
+from music_links_bot.core.url_utils import cache_key_for_url, spotify_url_type
+from music_links_bot.providers.release_hubs import canonical_release_hub_url
 
 SPOTIFY_EMBED_BASE_URL = "https://open.spotify.com/embed"
 SPOTIFY_OEMBED_URL = "https://open.spotify.com/oembed"

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stonerhand-soundlinks-bot"
-version = "2.18.1"
+version = "2.18.2"
 description = "Telegram-native music publishing bot with universal release cards, collections, scheduling and channel delivery."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -38,6 +38,7 @@ dev = [
   "bandit==1.9.4",
   "coverage==7.17.0",
   "fakeredis[lua]==2.40.0",
+  "import-linter==2.15",
   "mypy==2.4.0",
   "pip-audit==2.10.1",
   "pytest==9.2.0",
@@ -94,26 +95,49 @@ fail_under = 85
 show_missing = true
 skip_covered = true
 
+[tool.importlinter]
+root_package = "music_links_bot"
+
+# The package map lives in docs/ARCHITECTURE.ru.md («Структура кода»).
+# A package may import only from the layers below it. The three scenario
+# packages on one line call each other (a lookup opens the editor, the editor
+# re-runs a lookup, both return to menus); nothing below may call them.
+[[tool.importlinter.contracts]]
+name = "Packages import only from the layers below"
+type = "layers"
+containers = ["music_links_bot"]
+layers = [
+  "ops",
+  "lookup : editor : chat",
+  "publishing",
+  "cards",
+  "providers",
+  "artwork",
+  "state",
+  "tg",
+  "core",
+]
+
 [tool.mypy]
 python_version = "3.11"
 files = [
-  "src/music_links_bot/editor/draft_model.py",
+  "src/music_links_bot/core/draft_model.py",
   "src/music_links_bot/state/bot_storage.py",
   "src/music_links_bot/publishing/publication_view.py",
   "src/music_links_bot/publishing/publication_preflight.py",
   "src/music_links_bot/cards/collection_plan.py",
   "src/music_links_bot/providers/provider_errors.py",
-  "src/music_links_bot/ops/operation_metrics.py",
+  "src/music_links_bot/core/operation_metrics.py",
   "src/music_links_bot/core/url_utils.py",
   "src/music_links_bot/artwork/collection_collage.py",
-  "src/music_links_bot/publishing/publication_contract.py",
-  "src/music_links_bot/publishing/publication_state.py",
+  "src/music_links_bot/cards/publication_contract.py",
+  "src/music_links_bot/state/publication_state.py",
   "src/music_links_bot/state/kvstore.py",
   "src/music_links_bot/state/state_mutations.py",
   "src/music_links_bot/state/durable_state.py",
   "src/music_links_bot/state/user_state.py",
   "src/music_links_bot/state/bot_history.py",
-  "src/music_links_bot/chat/bot_crate.py",
+  "src/music_links_bot/state/bot_crate.py",
   "src/music_links_bot/publishing/channel_templates.py",
   "src/music_links_bot/chat/bot_preferences.py",
   "src/music_links_bot/lookup/bot_stats.py",
@@ -139,7 +163,7 @@ files = [
   "src/music_links_bot/artwork/cover_style.py",
   "src/music_links_bot/cards/keyboards.py",
   "src/music_links_bot/cards/formatter.py",
-  "src/music_links_bot/providers/metadata_cleaning.py",
+  "src/music_links_bot/core/metadata_cleaning.py",
   "src/music_links_bot/lookup/bot_lookup.py",
   "src/music_links_bot/chat/bot_inline.py",
   "src/music_links_bot/chat/crate_view.py",
@@ -160,7 +184,7 @@ files = [
   "src/music_links_bot/chat/bot_crate_handlers.py",
   "src/music_links_bot/chat/bot_menu.py",
   "src/music_links_bot/state/stats.py",
-  "src/music_links_bot/cards/release_hubs.py",
+  "src/music_links_bot/providers/release_hubs.py",
   "src/music_links_bot/providers/youtube.py",
   "src/music_links_bot/lookup/lookup_transport.py",
   "src/music_links_bot/lookup/bot_progress.py",
