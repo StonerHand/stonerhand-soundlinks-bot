@@ -14,7 +14,7 @@ class _SlowFirstVideo:
     async def lookup_video(self, url):
         if url == FIRST:
             await asyncio.Event().wait()  # never answers
-        return VideoMatch(title="Second video", author="A", url=url)
+        return VideoMatch(title="Second video", author="Second channel", url=url)
 
 
 async def _both():
@@ -42,6 +42,6 @@ async def _both():
 def test_a_newer_link_cancels_the_lookup_still_running():
     first, second, context = asyncio.run(_both())
 
-    assert any("Second video" in reply for reply in second.replies)
-    assert not any("Second video" in reply for reply in first.replies)
+    assert any("Second channel" in reply for reply in second.replies)
+    assert not any("Second channel" in reply for reply in first.replies)
     assert context.application.bot_data["runtime"].active_tasks == {}

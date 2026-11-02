@@ -802,11 +802,11 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(rows[0][0].text, "1 · Transitions")
+        self.assertEqual(rows[0][0].text, "1 · Youth Code — Transitions")
         self.assertEqual(rows[0][0].url, "https://song.link/track-1")
-        self.assertEqual(rows[0][1].text, "2 · Camp Orchestra")
-        self.assertEqual(rows[0][1].url, "https://song.link/track-2")
-        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[1][0].text, "2 · Show Me The Body — Camp Orchestra")
+        self.assertEqual(rows[1][0].url, "https://song.link/track-2")
+        self.assertEqual(len(rows), 2)
 
     def test_same_artist_collection_uses_column_and_preserves_versions(self) -> None:
         keyboard = _build_collection_keyboard(
@@ -826,11 +826,14 @@ class BotKeyboardTests(unittest.TestCase):
             ]
         )
 
+        # One artist: the buttons name only the releases, in full.
         rows = keyboard.inline_keyboard
-        self.assertEqual(len(rows), 1)
         self.assertEqual(
-            [button.text for row in rows for button in row],
-            ["1 · There's No Other…", "2 · Fool - 2012 Rema…"],
+            [[button.text for button in row] for row in rows],
+            [
+                ["1 · There's No Other Way - 2012 Remaster"],
+                ["2 · Fool - 2012 Remaster"],
+            ],
         )
 
     def test_collection_repairs_stale_apple_hub_to_direct_provider(self) -> None:
@@ -858,10 +861,10 @@ class BotKeyboardTests(unittest.TestCase):
             button.text for row in keyboard.inline_keyboard for button in row
         ]
         self.assertEqual(button_texts, ["🎧 Слушать трек", "🟢 Spotify"])
-        # One provider shares the hub row instead of adding a second bar.
-        self.assertEqual(len(keyboard.inline_keyboard), 1)
+        # The hub is the main action, alone on its row; the service is under it.
+        self.assertEqual(len(keyboard.inline_keyboard), 2)
         self.assertEqual(keyboard.inline_keyboard[0][0].style, "primary")
-        self.assertIsNone(keyboard.inline_keyboard[0][1].style)
+        self.assertIsNone(keyboard.inline_keyboard[1][0].style)
 
     def test_release_keyboard_uses_two_columns(self) -> None:
         keyboard = _build_link_keyboard(
@@ -918,11 +921,11 @@ class BotKeyboardTests(unittest.TestCase):
         )
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(len(rows), 1)
+        self.assertEqual(len(rows), 2)
         self.assertEqual(rows[0][0].text, "🎧 Слушать трек")
         self.assertEqual(rows[0][0].url, "https://song.link/s/1")
-        self.assertEqual(rows[0][1].text, "🟢 Spotify")
-        self.assertEqual(rows[0][1].url, "https://open.spotify.com/track/1?si=tracking")
+        self.assertEqual(rows[1][0].text, "🟢 Spotify")
+        self.assertEqual(rows[1][0].url, "https://open.spotify.com/track/1?si=tracking")
 
     def test_apple_only_fallback_does_not_show_false_universal_action(self) -> None:
         keyboard = _build_link_keyboard(
@@ -1010,7 +1013,7 @@ class BotKeyboardTests(unittest.TestCase):
         button_texts = [
             button.text for row in keyboard.inline_keyboard for button in row
         ]
-        self.assertEqual(button_texts, ["1 · Transitions"])
+        self.assertEqual(button_texts, ["1 · Youth Code — Transitions"])
         self.assertFalse(keyboard.inline_keyboard[0][0].api_kwargs)
 
     def test_youtube_keyboard_can_hide_channel_button(self) -> None:
@@ -1395,9 +1398,9 @@ class BotKeyboardTests(unittest.TestCase):
             ]
         )
 
-        # The post lists the full title; the button keeps a short one.
+        # The post lists the full title; the button cuts a very long one.
         button_text = keyboard.inline_keyboard[0][0].text
-        self.assertEqual(button_text, "1 · A Very Long Trac…")
+        self.assertEqual(button_text, "1 · A Very Long Artist Name For The Same Rea…")
         self.assertEqual(len(keyboard.inline_keyboard[0]), 1)
 
     def test_spotify_episode_fallback_builds_podcast_match(self) -> None:
@@ -2653,7 +2656,8 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
             await track_lookup_message(UpdateStub(message), context)
 
         self.assertEqual(len(message.replies), 1)
-        self.assertIn("<b>SANSAE Live Session Vol.3 - Melon</b>", message.replies[0])
+        # YouTube's player preview shows the title; the text does not repeat it.
+        self.assertNotIn("SANSAE Live Session Vol.3 - Melon", message.replies[0])
         self.assertIn("YouTube · SANSAE", message.replies[0])
         self.assertIn("#stonerhand #video", message.replies[0])
         # Private chats show an editable loading placeholder instead of a
@@ -2934,7 +2938,7 @@ class BotLookupTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("#stonerhand #collection #radio #video", message.replies[0])
         keyboard = message.reply_kwargs[0]["reply_markup"].inline_keyboard
         self.assertEqual(
-            [b.text for b in keyboard[0]], ["1 · Dark Energy w/ G…", "🎤 2 · Melon"]
+            [b.text for b in keyboard[0]], ["1 · Dark Energy w/ Guest", "🎤 2 · Melon"]
         )
         record_mixed.assert_called_once()
 

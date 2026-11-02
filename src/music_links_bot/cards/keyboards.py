@@ -24,6 +24,7 @@ from music_links_bot.core.models import (
 from music_links_bot.core.release_preferences import current_presentation
 from music_links_bot.core.release_presentation import (
     compact_release_title,
+    shared_collection_artist,
 )
 from music_links_bot.core.url_utils import (
     cache_key_for_url,
@@ -193,22 +194,20 @@ def _build_link_keyboard(
                 style="primary" if not buttons and not release_hub_url else None,
             )
         )
-    # The universal release hub is the canonical destination, so it comes
-    # first. A single provider shortcut shares its row instead of adding a
-    # second full-width bar; two or three get their own row underneath.
+    # The universal release hub is the canonical destination: the main
+    # action, alone on the first row. The services go underneath.
     rows: list[list[InlineKeyboardButton]] = []
     if release_hub_url:
-        hub = _url_button(
-            _release_hub_button_label(release_kind, release_format, context),
-            url=release_hub_url,
-            # The hub is the main action and the only accented button.
-            style="primary",
+        rows.append(
+            [
+                _url_button(
+                    _release_hub_button_label(release_kind, release_format, context),
+                    url=release_hub_url,
+                    # The hub is the main action and the only accented button.
+                    style="primary",
+                )
+            ]
         )
-        if len(buttons) == 1:
-            return _keyboard_with_optional_channel(
-                [[hub, buttons[0]]], include_channel_button
-            )
-        rows.append([hub])
     rows.extend(_button_rows(buttons, per_row=3 if short else 2))
 
     return _keyboard_with_optional_channel(rows, include_channel_button)
@@ -259,6 +258,7 @@ def _build_collection_keyboard(
         available.append((index, track, destination))
 
     buttons: list[InlineKeyboardButton] = []
+    shared_artist = shared_collection_artist(tracks)
 
     for index, track, destination in available:
         if is_track_video_pair:
@@ -268,9 +268,7 @@ def _build_collection_keyboard(
                 else _label("btn_listen_song")
             )
         else:
-            # The post lists "Artist — Title"; the button needs only the title,
-            # which keeps it short enough for two columns.
-            text = _collection_label(index, compact_release_title(track.title))
+            text = _collection_label(index, _track_item_name(track, shared_artist))
         buttons.append(
             _url_button(
                 text=text,
@@ -492,6 +490,7 @@ def _build_mixed_collection_keyboard(
             tracks[0], videos, include_channel_button=include_channel_button
         )
     buttons: list[InlineKeyboardButton] = []
+    shared_artist = shared_collection_artist(tracks)
     for track in tracks:
         destination = resolve_release_hub_url(
             track.page_url,
@@ -501,7 +500,9 @@ def _build_mixed_collection_keyboard(
         if destination:
             buttons.append(
                 _item_button(
-                    len(buttons) + 1, compact_release_title(track.title), destination
+                    len(buttons) + 1,
+                    _track_item_name(track, shared_artist),
+                    destination,
                 )
             )
     for item in (*playlists, *artists, *radios):
@@ -551,6 +552,9 @@ def _label(key: str) -> str:
 
 
 MAX_COLLECTION_BUTTON_TITLE = 16
+# "Auto" and "One column" give a long name its own row, so it can say more.
+MAX_WIDE_COLLECTION_BUTTON_TITLE = 40
+WIDE_COLLECTION_LAYOUTS = frozenset({"auto", "column"})
 _VIDEO_TITLE_NOISE = re.compile(
     r"\s*[(\[][^)\]]*\b(?:official|video|клип|audio|lyrics?|visuali[sz]er|mv|m/v)\b"
     r"[^)\]]*[)\]]",
@@ -572,14 +576,34 @@ def _short_video_title(title: str) -> str:
     return _VIDEO_TITLE_NOISE.sub("", name).strip() or first.strip()
 
 
+def _wide_collection_buttons() -> bool:
+    return current_presentation.get().layout in WIDE_COLLECTION_LAYOUTS
+
+
+def _track_item_name(track: TrackMatch, shared_artist: str | None) -> str:
+    """ "DIIV — ZIRP!" on a wide button; just the title on a compact one or
+    when every item is by the same artist."""
+    title = compact_release_title(track.title)
+    artist = " ".join(track.artist.split())
+    if artist and not shared_artist and _wide_collection_buttons():
+        return f"{artist} — {title}"
+    return title
+
+
 def _collection_label(index: int, title: str, icon: str = "") -> str:
-    """ "3 · Зарплата": short enough for two buttons per row.
+    """ "3 · Зарплата". Compact layouts keep it short enough for two buttons
+    per row; "Auto" and "One column" allow a longer name on its own row.
 
     The post list carries the full title, so long names end in "…".
     """
     name = " ".join(str(title or "").split())
-    if len(name) > MAX_COLLECTION_BUTTON_TITLE:
-        cut = name[:MAX_COLLECTION_BUTTON_TITLE]
+    limit = (
+        MAX_WIDE_COLLECTION_BUTTON_TITLE
+        if _wide_collection_buttons()
+        else MAX_COLLECTION_BUTTON_TITLE
+    )
+    if len(name) > limit:
+        cut = name[:limit]
         # Never end on half an emoji sequence or a lone accent.
         while cut and (
             cut[-1] in _DANGLING or unicodedata.category(cut[-1]) in {"Mn", "Me"}

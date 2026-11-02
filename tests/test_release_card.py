@@ -47,6 +47,23 @@ def test_album_metadata_is_escaped_and_does_not_change_type_tags():
     assert text.endswith("#stonerhand #track")
 
 
+@pytest.mark.parametrize(
+    "album",
+    ["Lost In The Night", "lost in the  night", "Lost In The Night - Single"],
+)
+def test_a_single_does_not_repeat_its_own_name_as_the_album(album):
+    text = format_track_message(sample(title="Lost In The Night", album_title=album))
+    assert text == (
+        "<b>From This Point On — Lost In The Night</b>\n\n"
+        "🎧 Трек · 2026\n\n#stonerhand #track"
+    )
+
+
+def test_a_song_from_a_differently_named_album_keeps_the_line():
+    text = format_track_message(sample(title="Lightyears", album_title="Lightyears II"))
+    assert "💿 Из альбома «Lightyears II»" in text
+
+
 def test_album_card_does_not_repeat_membership_and_keeps_verified_counts():
     text = format_track_message(sample(kind="album", track_count=12))
     assert text.startswith(

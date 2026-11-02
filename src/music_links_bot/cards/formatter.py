@@ -81,7 +81,13 @@ def format_release_heading(track: TrackMatch) -> str:
     if details:
         lines.append(f"{release_emoji(track)} {escape(details)}")
     # Album membership is provider metadata, never inferred from the song title.
-    if track.kind == "song" and track.album_title:
+    # A single's "album" carries the song's own name: the line would only
+    # repeat the heading.
+    if (
+        track.kind == "song"
+        and track.album_title
+        and not _same_release_name(track.album_title, track.title)
+    ):
         album = _display_text(track.album_title)
         if album:
             label = "From the album" if resolve_lang(None) == "en" else "Из альбома"
@@ -90,6 +96,17 @@ def format_release_heading(track: TrackMatch) -> str:
             )
     # A blank line keeps the title apart from the details under it.
     return "\n\n".join(filter(None, (heading, "\n".join(lines))))
+
+
+def _same_release_name(album: str, title: str) -> bool:
+    """ "Lightyears - Single" and "Lightyears" name the same release."""
+
+    def key(value: str) -> str:
+        value = compact_release_title(value)
+        value = re.sub(r"\s+[-–—]\s+(?:single|ep)\s*$", "", value, flags=re.I)
+        return " ".join(value.split()).casefold()
+
+    return bool(key(title)) and key(album) == key(title)
 
 
 def _metadata_link(label: str, url: str | None, kind: str) -> str:
@@ -110,7 +127,11 @@ def format_track_message(
     )
 
 
-def format_video_message(video: VideoMatch, *, include_hashtags: bool = True) -> str:
+def format_video_message(
+    video: VideoMatch, *, include_hashtags: bool = True, title: bool = True
+) -> str:
+    """The video card. ``title=False`` is for a card under YouTube's own
+    player preview, which already shows the title above the text."""
     from music_links_bot.cards.video_kinds import video_kind, video_kind_label
 
     kind = video_kind(video)
@@ -122,11 +143,9 @@ def format_video_message(video: VideoMatch, *, include_hashtags: bool = True) ->
     details = [label, "YouTube"]
     if video.author.strip():
         details.append(_display_text(video.author))
-    lines = [
-        f"<b>{_display_text(video.title)}</b>",
-        "",
-        f"{video_kind_emoji(video)} " + " · ".join(details),
-    ]
+    lines = [f"{video_kind_emoji(video)} " + " · ".join(details)]
+    if title:
+        lines[:0] = [f"<b>{_display_text(video.title)}</b>", ""]
     return _with_hashtags(
         lines, "#stonerhand #video", include_hashtags=include_hashtags
     )

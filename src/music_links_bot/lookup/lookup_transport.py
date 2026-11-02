@@ -61,20 +61,22 @@ async def send_track_result(
     source_urls: tuple[str, ...] = (),
     content_kind: str = "track",
     fallback_preview_url: str | None = None,
+    fallback_text: str | None = None,
 ) -> None:
     text = fit_telegram_html(text)
     if message.chat.type in {"group", "supergroup", "channel"}:
         if message.chat.type == "channel":
             reply_markup = make_channel_safe_keyboard(reply_markup)
-        _validate_transport_contract(
-            text,
-            reply_markup=reply_markup,
-            preview_url=preview_url,
-            found_count=found_count,
-            requested_count=requested_count,
-            source_urls=source_urls,
-            content_kind=content_kind,
-        )
+        for card_text in filter(None, (text, fallback_text)):
+            _validate_transport_contract(
+                card_text,
+                reply_markup=reply_markup,
+                preview_url=preview_url,
+                found_count=found_count,
+                requested_count=requested_count,
+                source_urls=source_urls,
+                content_kind=content_kind,
+            )
         preview_options = _build_link_preview_options(
             preview_url,
             prefer_large_media=prefer_large_preview,
@@ -85,7 +87,8 @@ async def send_track_result(
                 getattr(bot, "token", None),
                 message.chat_id,
                 receiver,
-                text,
+                # One attempt, no plainer retry: keep the full text.
+                fit_telegram_html(fallback_text) if fallback_text else text,
                 parse_mode=ParseMode.HTML,
                 reply_markup=reply_markup,
                 link_preview_options=preview_options,
@@ -98,6 +101,7 @@ async def send_track_result(
             bot.send_message,
             link_preview_options=preview_options,
             fallback_preview_url=fallback_preview_url,
+            fallback_text=fallback_text,
             chat_id=message.chat_id,
             text=text,
             parse_mode=ParseMode.HTML,
@@ -117,6 +121,7 @@ async def send_track_result(
         source_urls=source_urls,
         content_kind=content_kind,
         fallback_preview_url=fallback_preview_url,
+        fallback_text=fallback_text,
     )
 
 
@@ -207,17 +212,19 @@ async def reply_with_track(
     source_urls: tuple[str, ...] = (),
     content_kind: str = "track",
     fallback_preview_url: str | None = None,
+    fallback_text: str | None = None,
 ) -> Message:
     text = fit_telegram_html(text)
-    _validate_transport_contract(
-        text,
-        reply_markup=reply_markup,
-        preview_url=preview_url,
-        found_count=found_count,
-        requested_count=requested_count,
-        source_urls=source_urls,
-        content_kind=content_kind,
-    )
+    for card_text in filter(None, (text, fallback_text)):
+        _validate_transport_contract(
+            card_text,
+            reply_markup=reply_markup,
+            preview_url=preview_url,
+            found_count=found_count,
+            requested_count=requested_count,
+            source_urls=source_urls,
+            content_kind=content_kind,
+        )
     link_preview_options = _build_link_preview_options(
         preview_url,
         prefer_large_media=prefer_large_preview,
@@ -233,6 +240,7 @@ async def reply_with_track(
                 placeholder.edit_text,
                 link_preview_options=link_preview_options,
                 fallback_preview_url=fallback_preview_url,
+                fallback_text=fallback_text,
                 idempotent=True,
                 text=text,
                 parse_mode=ParseMode.HTML,
@@ -249,6 +257,7 @@ async def reply_with_track(
         message.reply_text,
         link_preview_options=link_preview_options,
         fallback_preview_url=fallback_preview_url,
+        fallback_text=fallback_text,
         text=text,
         parse_mode=ParseMode.HTML,
         reply_markup=reply_markup,
@@ -260,11 +269,15 @@ async def _send_card(
     *,
     link_preview_options: LinkPreviewOptions,
     fallback_preview_url: str | None = None,
+    fallback_text: str | None = None,
     idempotent: bool = False,
     **message: Any,
 ) -> Any:
     """Send or edit a card; if Telegram cannot build its preview, try a
     plainer one: the still image, then no preview at all.
+
+    ``fallback_text`` replaces the text on those plainer tries: a card under
+    YouTube's player leaves the title to the player and needs it back.
 
     A refusal (BadRequest) means nothing was sent, so a plainer retry is safe.
     A timeout is ambiguous: an edit can be repeated, but a new message may
@@ -281,10 +294,18 @@ async def _send_card(
                 fallback_preview_url, prefer_large_media=True
             )
             attempts.append((still, _STILL_READ_TIMEOUT_SECONDS))
-    for options, read_timeout in attempts:
+    plainer = (
+        {**message, "text": fit_telegram_html(fallback_text)}
+        if fallback_text
+        else message
+    )
+    for attempt, (options, read_timeout) in enumerate(attempts):
         try:
             return await _flood_safe(
-                send, link_preview_options=options, read_timeout=read_timeout, **message
+                send,
+                link_preview_options=options,
+                read_timeout=read_timeout,
+                **(message if attempt == 0 else plainer),
             )
         except (BadRequest, TimedOut) as exc:
             LOGGER.warning(
@@ -300,7 +321,7 @@ async def _send_card(
             if isinstance(exc, TimedOut) and not idempotent:
                 raise
     return await _flood_safe(
-        send, link_preview_options=LinkPreviewOptions(is_disabled=True), **message
+        send, link_preview_options=LinkPreviewOptions(is_disabled=True), **plainer
     )
 
 

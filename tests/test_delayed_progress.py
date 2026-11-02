@@ -49,7 +49,7 @@ def test_a_fast_result_shows_no_progress_line_at_all():
     message = _lookup(wait=0)
 
     assert len(message.replies) == 1
-    assert "iOS 27.2" in message.replies[0]
+    assert "ProTech" in message.replies[0]
     assert not any("🔎" in reply for reply in message.replies)
 
 
@@ -58,7 +58,7 @@ def test_a_slow_result_shows_progress_and_turns_it_into_the_card():
 
     # One message: the progress line, edited into the card.
     assert len(message.replies) == 1
-    assert "iOS 27.2" in message.replies[0]
+    assert "ProTech" in message.replies[0]
 
 
 def _incoming(sent):
