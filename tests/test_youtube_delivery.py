@@ -39,6 +39,65 @@ def test_a_refused_preview_still_delivers_the_card_bare():
     assert second.kwargs["text"] == "card"
 
 
+def test_plainer_tries_get_the_full_text_back():
+    """The player shows the title; the still and the bare card do not."""
+    send = AsyncMock(side_effect=[BadRequest("Wrong web page url"), TimedOut(), "sent"])
+
+    sent = asyncio.run(
+        _send_card(
+            send,
+            link_preview_options=PREVIEW,
+            fallback_preview_url=STILL,
+            fallback_text="<b>Title</b>\n\ndetails",
+            idempotent=True,
+            text="details",
+        )
+    )
+
+    assert sent == "sent"
+    player, still, bare = (call.kwargs for call in send.await_args_list)
+    assert player["text"] == "details"
+    assert still["text"] == bare["text"] == "<b>Title</b>\n\ndetails"
+    assert still["link_preview_options"].url == STILL
+    assert bare["link_preview_options"].is_disabled
+
+
+def test_under_the_player_the_card_leaves_the_title_to_youtube():
+    from test_bot import ContextStub, PrivateMessageStub
+
+    class Message(PrivateMessageStub):
+        text = VIDEO
+
+    youtube = AsyncMock()
+    youtube.lookup_video.return_value = VideoMatch(
+        title="Danzig - Mother 93 Live", author="Danzig", url=VIDEO, thumbnail_url=STILL
+    )
+    message = Message()
+    _lookup(message, ContextStub(youtube_client=youtube))
+
+    assert message.reply_kwargs[-1]["link_preview_options"].url == VIDEO
+    assert "Mother 93 Live" not in message.replies[-1]
+    assert "YouTube · Danzig" in message.replies[-1]
+
+
+def test_without_the_player_the_card_keeps_its_title():
+    from test_bot import ContextStub, PrivateMessageStub
+
+    class Message(PrivateMessageStub):
+        text = VIDEO
+
+    youtube = AsyncMock()
+    youtube.lookup_video.return_value = VideoMatch(
+        title="Danzig - Mother 93 Live", author="Danzig", url=VIDEO, thumbnail_url=STILL
+    )
+    message = Message()
+    with patch.dict(os.environ, {"YOUTUBE_PLAYER_PREVIEW_ENABLED": "0"}):
+        _lookup(message, ContextStub(youtube_client=youtube))
+
+    assert message.reply_kwargs[-1]["link_preview_options"].url != VIDEO
+    assert "<b>Danzig - Mother 93 Live</b>" in message.replies[-1]
+
+
 def test_a_slow_preview_edit_is_repeated_with_the_still_image():
     send = AsyncMock(side_effect=[TimedOut(), "sent"])
 

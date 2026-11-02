@@ -28,14 +28,14 @@ def _texts(keyboard) -> list[list[str]]:
     return [[button.text for button in row] for row in keyboard.inline_keyboard]
 
 
-def test_one_provider_shares_the_row_with_the_blue_hub() -> None:
+def test_one_provider_goes_under_the_blue_hub() -> None:
     keyboard = _build_link_keyboard(
         {"spotify": "https://open.spotify.com/track/1"},
         release_page_url="https://song.link/s/1",
     )
 
-    assert _texts(keyboard) == [["🎧 Слушать трек", "🟢 Spotify"]]
-    hub, spotify = keyboard.inline_keyboard[0]
+    assert _texts(keyboard) == [["🎧 Слушать трек"], ["🟢 Spotify"]]
+    (hub,), (spotify,) = keyboard.inline_keyboard
     assert hub.style == "primary" and spotify.style is None
 
 
@@ -89,12 +89,42 @@ def test_video_buttons_keep_only_the_song_name() -> None:
     assert _short_video_title("POEXXXALI 3") == "POEXXXALI 3"
 
 
-def test_long_titles_are_cut_to_fit_two_columns() -> None:
+def test_compact_titles_are_cut_to_fit_two_columns() -> None:
     from music_links_bot.cards.keyboards import _collection_label
 
-    assert (
-        _collection_label(8, "Взаимно Познакомиться", "📺")
-        == "📺 8 · Взаимно Познаком…"
-    )
-    assert _collection_label(1, "Заложник Ритма - Демо") == "1 · Заложник Ритма…"
-    assert _collection_label(2, "Котик") == "2 · Котик"
+    with presentation_context(PresentationPreferences(layout="compact")):
+        assert (
+            _collection_label(8, "Взаимно Познакомиться", "📺")
+            == "📺 8 · Взаимно Познаком…"
+        )
+        assert _collection_label(1, "Заложник Ритма - Демо") == "1 · Заложник Ритма…"
+        assert _collection_label(2, "Котик") == "2 · Котик"
+
+
+def test_wide_layouts_name_the_artist_and_keep_long_titles() -> None:
+    tracks = [
+        TrackMatch(
+            title="Surface, Echo & Sound",
+            artist="Editors",
+            links={"spotify": "https://open.spotify.com/album/1"},
+            page_url="https://song.link/s/1",
+            kind="album",
+        ),
+        TrackMatch(
+            title="ZIRP!",
+            artist="DIIV",
+            links={"spotify": "https://open.spotify.com/album/2"},
+            page_url="https://song.link/s/2",
+            kind="album",
+        ),
+    ]
+    for layout in ("auto", "column"):
+        with presentation_context(PresentationPreferences(layout=layout)):
+            assert _texts(_build_collection_keyboard(tracks)) == [
+                ["1 · Editors — Surface, Echo & Sound"],
+                ["2 · DIIV — ZIRP!"],
+            ]
+    with presentation_context(PresentationPreferences(layout="compact")):
+        assert _texts(_build_collection_keyboard(tracks)) == [
+            ["1 · Surface, Echo &…", "2 · ZIRP!"]
+        ]

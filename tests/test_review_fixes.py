@@ -44,7 +44,13 @@ def test_one_rule_decides_photo_or_message() -> None:
 
 
 def test_button_titles_never_end_on_half_an_emoji() -> None:
-    label = _collection_label(1, "Hello world fam👨‍👩‍👧 song")
+    from music_links_bot.core.release_preferences import (
+        PresentationPreferences,
+        presentation_context,
+    )
+
+    with presentation_context(PresentationPreferences(layout="compact")):
+        label = _collection_label(1, "Hello world fam👨‍👩‍👧 song")
 
     assert "‍…" not in label
     assert label.endswith("…")

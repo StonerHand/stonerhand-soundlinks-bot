@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
+from functools import partial
 from typing import Any
 
 from telegram import Bot, InlineKeyboardMarkup, Message
@@ -128,6 +129,9 @@ class _Cards:
     # fall back to when Telegram cannot build that preview.
     preview: Callable[[Any], str] | None = None
     still: Callable[[Any], str | None] | None = None
+    # The card text under the item's own player preview, which already shows
+    # the title; the full text comes back if the card falls back to the still.
+    under_player: Callable[..., str] | None = None
 
 
 _VIDEO_CARDS = _Cards(
@@ -139,6 +143,7 @@ _VIDEO_CARDS = _Cards(
     collage=video_collage_preview_url,
     preview=video_preview_url,
     still=video_frame_url,
+    under_player=partial(format_video_message, title=False),
 )
 _RADIO_CARDS = _Cards(
     "radio",
@@ -194,13 +199,17 @@ async def _send_cards(
                 [*[list(row) for row in keyboard.inline_keyboard], extra_single_row]
             )
         body = cards.message(items[0], include_hashtags=include_hashtags)
+        preview_url = cards.preview(items[0]) if cards.preview else urls[0]
         delivery = {
-            "preview_url": cards.preview(items[0]) if cards.preview else urls[0],
+            "preview_url": preview_url,
             "source_urls": (urls[0],),
             "content_kind": cards.kind,
         }
         if cards.still and (still := cards.still(items[0])):
             delivery["fallback_preview_url"] = still
+            if cards.under_player and preview_url == urls[0]:
+                delivery["fallback_text"] = _with_user_intro(user_prefix, body)
+                body = cards.under_player(items[0], include_hashtags=include_hashtags)
     else:
         keyboard = cards.collection_keyboard(
             items, include_channel_button=include_channel_button
