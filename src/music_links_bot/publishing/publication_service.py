@@ -26,6 +26,32 @@ from music_links_bot.tg.telegram_text import (
 LOGGER = logging.getLogger(__name__)
 
 
+async def warm_cover(
+    context, artwork_url: str | None, *, channel_username: str
+) -> None:
+    """Fetch and sign a release cover ahead of the photo post that will use it.
+
+    It fills the caches _send_photo reads: a cover Telegram already has is
+    found by its file id, a new one is downloaded and signed once.
+    """
+    from music_links_bot.artwork.branding import (
+        brand_label,
+        brand_logo_url,
+        branded_cover_key,
+        build_branded_cover,
+        photo_branding_enabled,
+    )
+    from music_links_bot.artwork.telegram_media_cache import get_cached_file_id
+
+    if not artwork_url or not photo_branding_enabled():
+        return
+    label = brand_label(f"@{channel_username.lstrip('@')}")
+    logo_url = brand_logo_url()
+    key = branded_cover_key(artwork_url, label=label, logo_url=logo_url)
+    if not await get_cached_file_id(context, key):
+        await build_branded_cover(artwork_url, label=label, logo_url=logo_url)
+
+
 class PublicationService:
     """One Telegram delivery pipeline shared by the bot and queue."""
 

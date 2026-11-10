@@ -16,6 +16,7 @@ from music_links_bot.core.url_utils import (
     is_soundcloud_url,
     spotify_url_type,
 )
+from music_links_bot.lookup.head_start import start_cover
 from music_links_bot.lookup.lookup_control import (
     observe_source,
 )
@@ -319,6 +320,7 @@ async def _lookup_tracks_detailed(
     # Strip any legacy synthetic links before the result reaches cache or UI.
     for track in tracks:
         track.links = direct_platform_links(track.links)
+        start_cover(track)
     if search_client is not None and tracks:
         try:
             # Only enrichment completed before rendering can affect this card.

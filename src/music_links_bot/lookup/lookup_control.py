@@ -9,6 +9,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING
 
+from music_links_bot.core.background import run_behind
 from music_links_bot.lookup.lookup_models import LookupBundle
 from music_links_bot.lookup.lookup_recovery import capture_sources, completed_sources
 
@@ -102,11 +103,17 @@ async def search_control(bot_data, message):
         if registry.get(control.key) is control:
             registry.pop(control.key, None)
         if kv is not None:
-            await published(control)
-            await asyncio.gather(
-                kv.delete_if_value(control.key, control.nonce),
-                kv.delete_if_value(control.key, "stopped:" + control.nonce),
-            )
+            # The lookup is over and the card is next: removing the key runs
+            # beside it. A key left behind only expires later.
+            run_behind(bot_data, _forget(kv, control), what="Lookup control cleanup")
+
+
+async def _forget(kv, control: SearchControl) -> None:
+    await published(control)
+    await asyncio.gather(
+        kv.delete_if_value(control.key, control.nonce),
+        kv.delete_if_value(control.key, "stopped:" + control.nonce),
+    )
 
 
 async def published(control: SearchControl | None) -> None:

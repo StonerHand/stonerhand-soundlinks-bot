@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, fields
 
 import httpx
@@ -57,11 +57,14 @@ class SonglinkClient:
         timeout: float = 8.0,
         kv: KVStore | None = None,
         spotify_client: SpotifyClient | None = None,
+        on_identified: Callable[[TrackMatch], None] | None = None,
     ) -> None:
         self._user_countries = user_countries
         self._api_key = api_key
         self._kv = kv
-        self._spotify_client = spotify_client or SpotifyClient(timeout=timeout)
+        self._spotify_client = spotify_client or SpotifyClient(
+            timeout=timeout, on_identified=on_identified
+        )
         self._owns_spotify_client = spotify_client is None
         self._deezer_client = DeezerClient(timeout=timeout)
         self._public_release_client = PublicReleaseClient(timeout=timeout)
