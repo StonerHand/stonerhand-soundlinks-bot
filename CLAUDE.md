@@ -26,6 +26,7 @@ Rules:
 - The layer order is an import-linter contract in `pyproject.toml`; `lint-imports` runs in CI. If a lower package needs something from a higher one, move that code down instead of importing upwards.
 - After moving code between packages run `python scripts/package_map.py --write` (it redraws the map in `docs/ARCHITECTURE.ru.md`; `tests/test_package_map.py` fails while it is stale).
 - New code goes into the package whose description fits. A new external service is a new module in `providers/`.
+- After changing a card's text or buttons run `python scripts/readme_previews.py` (needs Google Chrome): it redraws the README screens from the bot's real output. `tests/test_readme_previews.py` fails while they are stale.
 
 ## Checks before a PR
 
