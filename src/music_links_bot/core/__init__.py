@@ -1,1 +1,1 @@
-"""Shared foundation with no Telegram calls: settings, constants, models (releases, presentation presets and preferences, the draft), metadata cleanup, errors, i18n, URLs, text and time helpers, caches, HTTP pools, metrics, log setup."""
+"""Shared foundation with no Telegram calls: settings, constants, models (releases, presentation presets and preferences, the draft), metadata cleanup, errors, i18n, URLs, text and time helpers, caches, HTTP pools, metrics, log setup, background work."""

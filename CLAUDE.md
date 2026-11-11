@@ -44,7 +44,7 @@ Anything that changes how messages are sent, edited or deleted must also be repl
 - inline mode;
 - draft → Publish.
 
-Use a fake Telegram transport and a fakeredis-backed Upstash (`tests/test_audit_reliability.RedisREST`).
+`scripts/replay_chats.py` does this: real providers, a fake Telegram transport and a fakeredis-backed Upstash. It prints the Bot API calls of every scenario (`--full` for texts and buttons, `publish_flow` for draft → Publish, `--refuse-player` for a YouTube player Telegram rejects). `--timeline --redis-ms 25` shows every Redis command and provider request with its timing: use it before and after a change that should make the bot faster.
 
 ## Behaviour that must not regress
 

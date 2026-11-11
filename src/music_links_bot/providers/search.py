@@ -16,7 +16,7 @@ from music_links_bot.core.release_metadata import (
     duration_ms,
     metadata_url,
 )
-from music_links_bot.core.single_flight import cancel_all, forget
+from music_links_bot.core.single_flight import cancel_all, forget, shared
 from music_links_bot.core.url_utils import cache_key_for_url, normalize_host
 from music_links_bot.providers.musicbrainz import (
     MusicBrainzClient,
@@ -90,6 +90,7 @@ class SearchClient:
             ttl_seconds=6 * 3600
         )
         self._inflight: dict[str, asyncio.Task[list[SearchCandidate]]] = {}
+        self._genre_inflight: dict[str, asyncio.Task[str | None]] = {}
         self._details_cache: TTLCache[SearchCandidate] = TTLCache(ttl_seconds=6 * 3600)
         self._subscribers: dict[asyncio.Task, int] = {}
         self._musicbrainz_client = musicbrainz_client or MusicBrainzClient(
@@ -99,6 +100,7 @@ class SearchClient:
 
     async def aclose(self) -> None:
         await cancel_all(self._inflight)
+        await cancel_all(self._genre_inflight)
         await self._client.aclose()
         if self._owns_musicbrainz_client:
             await self._musicbrainz_client.aclose()
@@ -199,6 +201,45 @@ class SearchClient:
         if cached_genre is not None:
             return cached_genre or None
 
+        # warm_genre may have asked already: join that request.
+        try:
+            return await shared(
+                self._genre_inflight,
+                cache_key,
+                lambda: self._fetch_genre(query, cache_key, artist, title),
+            )
+        except asyncio.CancelledError:
+            # The lookup gave up on the genre. The request must not outlive
+            # it: left running, it could hang across a frozen instance.
+            pending = self._genre_inflight.get(cache_key)
+            if pending is not None:
+                pending.cancel()
+            raise
+
+    def warm_genre(self, artist: str, title: str) -> None:
+        """Start the genre lookup without waiting for it.
+
+        A release is named before its other details arrive; lookup_genre
+        later finds this request running or its answer cached.
+        """
+        query = normalize_search_query(f"{artist} {title}")
+        if query is None:
+            return
+        cache_key = query.casefold()
+        if (
+            self._genre_cache.get(cache_key) is not None
+            or cache_key in self._genre_inflight
+        ):
+            return
+        task = asyncio.create_task(self._fetch_genre(query, cache_key, artist, title))
+        self._genre_inflight[cache_key] = task
+        task.add_done_callback(
+            lambda done: forget(self._genre_inflight, cache_key, done)
+        )
+
+    async def _fetch_genre(
+        self, query: str, cache_key: str, artist: str, title: str
+    ) -> str | None:
         try:
             response = await self._client.get(
                 "/search",

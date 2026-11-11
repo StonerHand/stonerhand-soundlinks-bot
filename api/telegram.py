@@ -23,6 +23,7 @@ from music_links_bot.chat.bot_app import (
     build_application,
     close_application_resources,
 )
+from music_links_bot.core.background import background_finished
 from music_links_bot.core.config import Settings
 from music_links_bot.core.http_json import send_json
 from music_links_bot.core.logging_config import quiet_transport_logs
@@ -219,11 +220,16 @@ def _process_claimed_update(
 async def _dispatch_update(application, update, execution):
     token = current_execution.set(execution)
     try:
-        processor = getattr(application, "update_processor", None)
-        if processor is None:
-            await application.process_update(update)
-        else:
-            await processor.process_update(update, application.process_update(update))
+        # The instance may be frozen once this update is answered: the work
+        # its handlers left running beside the reply finishes first.
+        async with background_finished():
+            processor = getattr(application, "update_processor", None)
+            if processor is None:
+                await application.process_update(update)
+            else:
+                await processor.process_update(
+                    update, application.process_update(update)
+                )
     finally:
         current_execution.reset(token)
 

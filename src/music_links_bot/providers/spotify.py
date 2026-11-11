@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from html.parser import HTMLParser
 
 import httpx
 
+from music_links_bot.core.background import quiet
 from music_links_bot.core.cache import TTLCache
 from music_links_bot.core.constants import HTTP_USER_AGENT
 from music_links_bot.core.metadata_cleaning import (
@@ -24,6 +26,7 @@ from music_links_bot.core.release_metadata import (
 from music_links_bot.core.url_utils import cache_key_for_url, spotify_url_type
 from music_links_bot.providers.release_hubs import canonical_release_hub_url
 
+LOGGER = logging.getLogger(__name__)
 SPOTIFY_EMBED_BASE_URL = "https://open.spotify.com/embed"
 SPOTIFY_OEMBED_URL = "https://open.spotify.com/oembed"
 
@@ -111,7 +114,12 @@ class SpotifyClient:
     disappearing when the aggregator cannot resolve it.
     """
 
-    def __init__(self, *, timeout: float = 6.0) -> None:
+    def __init__(
+        self,
+        *,
+        timeout: float = 6.0,
+        on_identified: Callable[[TrackMatch], None] | None = None,
+    ) -> None:
         self._client = httpx.AsyncClient(
             follow_redirects=True,
             headers={"User-Agent": HTTP_USER_AGENT},
@@ -119,6 +127,11 @@ class SpotifyClient:
             timeout=httpx.Timeout(timeout, connect=3.0),
         )
         self._cache: TTLCache[TrackMatch] = TTLCache(ttl_seconds=24 * 3600)
+        # Called as soon as the page names the release, before its slower
+        # details arrive: the caller can start work that needs only the name
+        # or the cover.
+        self._on_identified = on_identified
+        self._named_by_page: set[str] = set()
 
     async def aclose(self) -> None:
         await self._client.aclose()
@@ -133,10 +146,39 @@ class SpotifyClient:
         if cached is not None:
             return cached
 
-        clean_url = cache_key_for_url(source_url)
+        # An album needs its embed either way: for the duration when the page
+        # parses, as the second source when it does not. Both are requested
+        # at once instead of one after the other.
+        embed = (
+            asyncio.create_task(self._fetch_embed(source_url, kind))
+            if kind == "album"
+            else None
+        )
+        if embed is not None:
+            embed.add_done_callback(quiet)
+            if self._on_identified is not None:
+                # A slow page must not hold the head start back: the embed
+                # names the album too, and often sooner.
+                embed.add_done_callback(
+                    lambda done: self._announce_from_embed(source_url, cache_key, done)
+                )
+        try:
+            return await self._lookup_release(source_url, kind, cache_key, embed)
+        finally:
+            self._named_by_page.discard(cache_key)
+            if embed is not None and not embed.done():
+                embed.cancel()
+
+    async def _lookup_release(
+        self,
+        source_url: str,
+        kind: str,
+        cache_key: str,
+        embed: asyncio.Task[str] | None,
+    ) -> TrackMatch:
         page_error: SpotifyLookupError | None = None
         try:
-            response = await self._client.get(clean_url)
+            response = await self._client.get(cache_key)
             response.raise_for_status()
             match = parse_spotify_page(source_url, response.text)
         except (httpx.HTTPError, SpotifyLookupError) as exc:
@@ -146,7 +188,9 @@ class SpotifyClient:
                 else SpotifyLookupError("Spotify public metadata is unavailable.")
             )
         else:
-            await self._complete_metadata(match)
+            self._named_by_page.add(cache_key)
+            self._announce(match)
+            await self._complete_metadata(match, embed)
             self._cache.set(cache_key, match)
             return match
 
@@ -154,9 +198,8 @@ class SpotifyClient:
         # changes its rendered pages and embed state on different schedules.
         embed_error: SpotifyLookupError | None = None
         try:
-            response = await self._client.get(_spotify_embed_url(source_url, kind))
-            response.raise_for_status()
-            match = parse_spotify_embed(source_url, response.text)
+            html = await (embed or self._fetch_embed(source_url, kind))
+            match = parse_spotify_embed(source_url, html)
         except (httpx.HTTPError, SpotifyLookupError) as exc:
             embed_error = (
                 exc
@@ -175,7 +218,7 @@ class SpotifyClient:
         try:
             response = await self._client.get(
                 SPOTIFY_OEMBED_URL,
-                params={"url": clean_url},
+                params={"url": cache_key},
             )
             response.raise_for_status()
             match = parse_spotify_oembed(source_url, response.json())
@@ -186,7 +229,36 @@ class SpotifyClient:
         self._cache.set(cache_key, match)
         return match
 
-    async def _complete_metadata(self, match: TrackMatch) -> None:
+    async def _fetch_embed(self, source_url: str, kind: str) -> str:
+        response = await self._client.get(_spotify_embed_url(source_url, kind))
+        response.raise_for_status()
+        return response.text
+
+    def _announce_from_embed(
+        self, source_url: str, cache_key: str, embed: asyncio.Task[str]
+    ) -> None:
+        if (
+            cache_key in self._named_by_page
+            or embed.cancelled()
+            or embed.exception() is not None
+        ):
+            return
+        try:
+            self._announce(parse_spotify_embed(source_url, embed.result()))
+        except SpotifyLookupError:
+            pass
+
+    def _announce(self, match: TrackMatch) -> None:
+        if self._on_identified is None:
+            return
+        try:
+            self._on_identified(match)
+        except Exception:  # A head start must never lose a release.
+            LOGGER.debug("Early work for an identified release failed", exc_info=True)
+
+    async def _complete_metadata(
+        self, match: TrackMatch, embed: asyncio.Task[str] | None = None
+    ) -> None:
         async def complete():
             if match.kind == "song" and match.album_url and not match.album_title:
                 album = self._cache.get(cache_key_for_url(match.album_url))
@@ -201,10 +273,9 @@ class SpotifyClient:
                 and match.track_count
             ):
                 url = match.links["spotify"]
-                response = await self._client.get(_spotify_embed_url(url, "album"))
-                response.raise_for_status()
+                html = await (embed or self._fetch_embed(url, "album"))
                 details = parse_spotify_embed(
-                    url, response.text, expected_count=match.track_count
+                    url, html, expected_count=match.track_count
                 )
                 match.duration_ms = details.duration_ms
                 match.artist_url = match.artist_url or details.artist_url

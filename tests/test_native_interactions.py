@@ -29,6 +29,7 @@ from music_links_bot.chat.release_panel import (
     release_panel_callback,
     start_release_panel,
 )
+from music_links_bot.core.background import finish_background
 from music_links_bot.core.models import TrackMatch
 from music_links_bot.lookup import bot_lookup
 from music_links_bot.lookup.bot_progress import (
@@ -207,6 +208,8 @@ class StopTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(LookupStopped):
                 await asyncio.wait_for(task, 2)
             self.assertTrue(cancelled.is_set())
+        # The key is removed beside the card, not in front of it.
+        await finish_background(data)
         self.assertNotIn(control.key, store.data)
 
     async def test_stop_keeps_completed_source_and_cancels_unneeded_provider(self):

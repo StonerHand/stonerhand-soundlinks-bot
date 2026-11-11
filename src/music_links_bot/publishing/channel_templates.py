@@ -97,7 +97,10 @@ def apply_template(draft: dict, template: dict) -> bool:
 
 
 async def apply_channel_template(context, target: int | str, draft: dict) -> None:
-    template = await load_channel_template(context, target)
+    apply_loaded_template(draft, await load_channel_template(context, target))
+
+
+def apply_loaded_template(draft: dict, template: dict) -> None:
     draft["last_template"] = dict(template)
     applied = apply_template(draft, template)
     draft["channel_template_applied"] = applied

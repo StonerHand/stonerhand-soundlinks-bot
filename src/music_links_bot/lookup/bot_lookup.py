@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable, Coroutine
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from telegram import Bot, Message
 from telegram.ext import ContextTypes
 
+from music_links_bot.core.background import run_behind
 from music_links_bot.core.i18n import get_text
 from music_links_bot.core.models import (
     ArtistMatch,
@@ -380,36 +381,23 @@ async def _resolve_sources_uncached(
     bundle = _ensure_source_accounting(bundle, source_urls)
     complete = bundle.is_complete_for(source_urls)
     if bundle.item_count and complete:
-        _write_behind(
-            bot_data, set_cached_lookup(bot_data, source_urls, _bundle_to_cache(bundle))
+        # A cache write must not hold the card back: it finishes right after.
+        run_behind(
+            bot_data,
+            set_cached_lookup(bot_data, source_urls, _bundle_to_cache(bundle)),
+            what="Lookup cache write",
         )
     elif (
         not bundle.item_count
         and bundle.statuses
         and all(status.state == "not_found" for status in bundle.statuses)
     ):
-        _write_behind(
+        run_behind(
             bot_data,
             set_cached_negative_lookup(bot_data, source_urls, _bundle_to_cache(bundle)),
+            what="Lookup cache write",
         )
     return bundle
-
-
-def _write_behind(bot_data: dict, write: Coroutine[Any, Any, None]) -> None:
-    """A cache write must not hold the card back: it finishes right after.
-    The set keeps every write referenced until done; shutdown awaits them."""
-    pending: set[asyncio.Task[None]] = bot_data.setdefault("cache_writes", set())
-    task = asyncio.create_task(write)
-    pending.add(task)
-
-    def done(finished: asyncio.Task[None]) -> None:
-        pending.discard(finished)
-        if not finished.cancelled() and finished.exception() is not None:
-            LOGGER.warning(
-                "Lookup cache write failed: %s", type(finished.exception()).__name__
-            )
-
-    task.add_done_callback(done)
 
 
 def _outcome_value(outcomes: dict, provider: str, fallback):

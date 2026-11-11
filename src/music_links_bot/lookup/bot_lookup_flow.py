@@ -6,7 +6,7 @@ import asyncio
 import contextvars
 import logging
 import secrets
-from collections.abc import Awaitable, Coroutine
+from collections.abc import Awaitable, Callable, Coroutine
 from dataclasses import asdict
 from typing import Any, TypeVar
 
@@ -48,6 +48,7 @@ from music_links_bot.chat.bot_preferences import apply_preferences
 from music_links_bot.chat.bot_ui import (
     build_error_keyboard as _build_error_keyboard_view,
 )
+from music_links_bot.core.background import quiet, run_behind
 from music_links_bot.core.constants import (
     CHANNEL_USERNAME,
     MAX_LINKS_PER_MESSAGE,
@@ -99,6 +100,7 @@ from music_links_bot.lookup.bot_stats import (
     message_text as _message_text,
     record_delivered as _record_delivered,
 )
+from music_links_bot.lookup.head_start import cover_head_start
 from music_links_bot.lookup.lookup_transport import (
     reply_with_track as _reply_with_track,
     send_track_result as _send_track_result,
@@ -106,10 +108,14 @@ from music_links_bot.lookup.lookup_transport import (
 )
 from music_links_bot.providers.track_merge import coalesce_equivalent_tracks
 from music_links_bot.publishing.channel_templates import (
-    apply_channel_template,
+    apply_loaded_template,
+    load_channel_template,
 )
 from music_links_bot.publishing.chat_access import check_publish_access
-from music_links_bot.publishing.publication_service import PublicationService
+from music_links_bot.publishing.publication_service import (
+    PublicationService,
+    warm_cover,
+)
 from music_links_bot.publishing.publication_view import editor_preview_url
 from music_links_bot.state.bot_crate import (
     add_many_to_crate,
@@ -180,14 +186,21 @@ async def _send_track_draft(
         search_query=search_query or "",
         can_publish=(admin_chat_id is not None and user_id == admin_chat_id),
     )
-    await apply_channel_template(context, f"user:{user_id}", draft)
+    # Each of these is a Redis round trip in front of the card, and none
+    # depends on another: they go together.
+    bot_data = context.application.bot_data
+    targets = [f"user:{user_id}"]
     if draft["can_publish"]:
-        target = channel_target(context.application.bot_data)
-        await apply_channel_template(context, target, draft)
+        targets.append(channel_target(bot_data))
+    *templates, crate_items = await asyncio.gather(
+        *(load_channel_template(context, target) for target in targets),
+        load_crate(bot_data, user_id),
+    )
+    for template in templates:
+        apply_loaded_template(draft, template)
 
     session = await _runtime(context).get_session(user_id, lang=lang)
     apply_preferences(draft, session)
-    crate_items = await load_crate(context.application.bot_data, user_id)
     draft["in_crate"] = crate_contains_item(crate_items, draft["item"])
     draft["crate_count"] = len(crate_items)
 
@@ -211,6 +224,14 @@ async def _send_track_draft(
         source_urls=tuple(track.links.values()),
         content_kind=track.kind,
     )
+    if draft["can_publish"] and draft.get("as_photo"):
+        # The owner's next tap is usually Publish, and that photo needs the
+        # signed cover: it is prepared while they read the card.
+        run_behind(
+            bot_data,
+            warm_cover(context, track.thumbnail_url, channel_username=CHANNEL_USERNAME),
+            what="Cover head start",
+        )
     session = await _runtime(context).get_session(user_id, lang=lang)
     _remember_session_draft(session, draft_id)
     await _runtime(context).save_session(session)
@@ -947,6 +968,23 @@ async def _ensure_channel_publish_access(
     return False
 
 
+def _channel_cover_head_start(context) -> Callable[[TrackMatch], None]:
+    started: set[str] = set()
+
+    def start(track: TrackMatch) -> None:
+        url = track.thumbnail_url
+        if not url or url in started:
+            return
+        started.add(url)
+        run_behind(
+            context.application.bot_data,
+            warm_cover(context, url, channel_username=CHANNEL_USERNAME),
+            what="Cover head start",
+        )
+
+    return start
+
+
 async def _start_lookup_progress(
     message: Message,
     context: ContextTypes.DEFAULT_TYPE,
@@ -1049,12 +1087,34 @@ async def _run_admitted_lookup(message, context, request, request_token) -> bool
             # only a slow search can be overtaken by a newer message. The
             # check before delivery still covers every path.
             await _ensure_current_lookup(context, request, request_token)
-        if not await _ensure_channel_publish_access(message, context):
-            return None
-        await _start_lookup_progress(message, context, request)
-        return await _bot_lookup.resolve_sources(
-            context.application.bot_data, request.source_urls
+        in_channel = message.chat.type == "channel"
+        # The rights check is a Telegram round trip of its own: the lookup
+        # starts beside it instead of after it.
+        access = (
+            asyncio.create_task(_ensure_channel_publish_access(message, context))
+            if in_channel
+            else None
         )
+        if access is not None:
+            access.add_done_callback(quiet)
+        # One link in a channel becomes a photo post: its cover is fetched
+        # and signed while the rest of the lookup finishes.
+        cover = (
+            cover_head_start.set(_channel_cover_head_start(context))
+            if in_channel and len(request.source_urls) == 1
+            else None
+        )
+        try:
+            await _start_lookup_progress(message, context, request)
+            bundle = await _bot_lookup.resolve_sources(
+                context.application.bot_data, request.source_urls
+            )
+            return bundle if access is None or await access else None
+        finally:
+            if cover is not None:
+                cover_head_start.reset(cover)
+            if access is not None and not access.done():
+                access.cancel()
 
     try:
         if request.is_private:

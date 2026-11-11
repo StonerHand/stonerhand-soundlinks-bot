@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from functools import partial
 
 from telegram import (
     BotCommand,
@@ -40,6 +41,7 @@ from music_links_bot.chat.bot_native import native_update_handler
 from music_links_bot.chat.bot_preferences import LocalizedApplication
 from music_links_bot.chat.inline_feedback import chosen_inline_result_handler
 from music_links_bot.chat.release_panel import release_panel_callback
+from music_links_bot.core.background import finish_background
 from music_links_bot.core.config import Settings
 from music_links_bot.core.lazy_client import LazyAsyncClient
 from music_links_bot.core.logging_config import quiet_transport_logs
@@ -117,6 +119,7 @@ def build_application(settings: Settings) -> Application:
     from music_links_bot.chat import bot as handlers
     from music_links_bot.editor.bot_editor import editor_callback
     from music_links_bot.lookup.bot_lookup_flow import track_lookup_message
+    from music_links_bot.lookup.head_start import release_identified
     from music_links_bot.providers.apple_radio import AppleRadioClient
     from music_links_bot.providers.artist import ArtistClient
     from music_links_bot.providers.nts import NTSClient
@@ -145,6 +148,7 @@ def build_application(settings: Settings) -> Application:
                     user_countries=settings.songlink_user_countries,
                     api_key=settings.songlink_api_key,
                     kv=kv_store,
+                    on_identified=partial(release_identified, application.bot_data),
                 )
             ),
             "youtube_client": LazyAsyncClient(YouTubeClient),
@@ -271,10 +275,8 @@ async def close_application_resources(application: Application) -> None:
     from music_links_bot.artwork.branding import close_cover_resources
     from music_links_bot.core.shared_http import close_shared_clients
 
-    # Lookup cache writes finish after their cards; let them land first.
-    pending = list(application.bot_data.get("cache_writes", ()))
-    if pending:
-        await asyncio.gather(*pending, return_exceptions=True)
+    # Cache writes and cleanup finish after their cards; let them land first.
+    await finish_background(application.bot_data)
     await close_cover_resources()
     await close_shared_clients()
     client_keys = (
