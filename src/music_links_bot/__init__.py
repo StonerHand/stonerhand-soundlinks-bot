@@ -1,3 +1,3 @@
 """Music Links Telegram Bot."""
 
-__version__ = "2.18.5"
+__version__ = "2.18.6"

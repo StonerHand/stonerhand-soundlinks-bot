@@ -20,14 +20,15 @@
 
 - 🔗 **Any link or query** — Spotify, Apple Music, YouTube, SoundCloud, Deezer, Tidal, Bandcamp, Yandex Music, NTS, Netflix, Apple TV+, Disney+, or just `artist — track`.
 - 🖼 **Posts with artwork** — signed cover, title, year, length, smart tags and buttons for every platform.
-- 🎶 **Collections** — up to 10 tracks, albums and videos in one post: a shared collage, a `01 · Artist — Title` list and short buttons.
+- 🎶 **Collections** — up to 10 tracks, albums and videos in one post: a shared collage, a `01 · Artist — Title` list and buttons named after the releases.
 - 🎬 **Song + videos** — a track with its music videos, live and lyric videos in one post.
 - 🍿 **Netflix, Apple TV+ and Disney+ films and series** — a title link becomes a card with a still, seasons or year, genre and "Watch on …", "Trailer" and "Soundtrack" buttons; the soundtrack opens as an album card right in the bot.
 - ✏️ **In-chat editor** — your own text, tags, look and buttons; every input prompt has "✕ Cancel".
 - 📝 **Your text, uncut** — a quote above the card of up to ~3,900 characters with bold, italic and links, always shown in full. A long post goes out as a message with the cover large on top.
 - 📣 **Channel publishing** — now, on a schedule ("tomorrow 18:30") or in one tap; 2 minutes to undo. Every reader sees times in their own time zone.
 - 👥 **Groups and channels** — make the bot an admin and a posted link turns into a finished post; `/channel` checks the rights. In groups `/help` and `/channel` answer only you.
-- 🎉 **A lively chat** — 👀 → 🔥 reactions on your link, a progress bar with music-themed status lines, confetti on publish and a note when a scheduled post goes out.
+- ⏱ **Fast** — a track or album link becomes a post in about a second: platforms, genre and artwork are requested at once.
+- 🎉 **A lively chat** — 👀 → 🔥 reactions on your link, a music-themed search line when the answer takes longer than a second, 🎉 on publish and a note when a scheduled post goes out.
 - ⚡ **Inline mode** — `@StonerHandBot artist — track` in any chat.
 - 🌍 **Russian and English** — follows your Telegram language or the one set in settings.
 
@@ -48,6 +49,6 @@ cp .env.example .env   # set BOT_TOKEN
 python -m music_links_bot
 ```
 
-Production runs on Vercel (webhook) with Upstash Redis for state and Upstash QStash for scheduled posts. The full guide is in Russian: [SETUP.ru.md](SETUP.ru.md), [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
+Production runs on Vercel (webhook) with Upstash Redis for state and Upstash QStash for scheduled posts. The code is split into 11 packages that depend on each other top-down only; CI runs 1,300+ tests on Python 3.11–3.14 with types, lint, security, the layer order and a dependency audit. The screens above are drawn from the bot's real texts and buttons (`scripts/readme_previews.py`), and a test keeps them current. The full guide is in Russian: [SETUP.ru.md](SETUP.ru.md), [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md).
 
 [MIT](../LICENSE) © StonerHand
