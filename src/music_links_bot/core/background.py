@@ -4,11 +4,17 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Coroutine
+from collections.abc import AsyncIterator, Coroutine
+from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from typing import Any
 
 LOGGER = logging.getLogger(__name__)
 _TASKS_KEY = "background_tasks"
+UPDATE_GRACE_SECONDS = 5.0
+_update_tasks: ContextVar[list[asyncio.Task[Any]] | None] = ContextVar(
+    "update_background_tasks", default=None
+)
 
 
 def run_behind(bot_data: dict, work: Coroutine[Any, Any, Any], *, what: str) -> None:
@@ -20,6 +26,9 @@ def run_behind(bot_data: dict, work: Coroutine[Any, Any, Any], *, what: str) -> 
     pending: set[asyncio.Task[Any]] = bot_data.setdefault(_TASKS_KEY, set())
     task = asyncio.create_task(work)
     pending.add(task)
+    of_this_update = _update_tasks.get()
+    if of_this_update is not None:
+        of_this_update.append(task)
 
     def done(finished: asyncio.Task[Any]) -> None:
         pending.discard(finished)
@@ -27,6 +36,27 @@ def run_behind(bot_data: dict, work: Coroutine[Any, Any, Any], *, what: str) -> 
             LOGGER.warning("%s failed: %s", what, type(finished.exception()).__name__)
 
     task.add_done_callback(done)
+
+
+@asynccontextmanager
+async def background_finished(
+    grace: float = UPDATE_GRACE_SECONDS,
+) -> AsyncIterator[None]:
+    """What one update started with run_behind lands before that update ends.
+
+    A serverless instance may be frozen the moment it answers. A request cut
+    in half there would resume only with the next update, and whoever needed
+    its answer would wait on a dead connection.
+    """
+    started: list[asyncio.Task[Any]] = []
+    token = _update_tasks.set(started)
+    try:
+        yield
+    finally:
+        _update_tasks.reset(token)
+        unfinished = [task for task in started if not task.done()]
+        if unfinished:
+            await asyncio.wait(unfinished, timeout=grace)
 
 
 async def finish_background(bot_data: dict) -> None:

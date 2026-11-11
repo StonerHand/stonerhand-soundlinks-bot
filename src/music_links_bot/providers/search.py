@@ -202,11 +202,19 @@ class SearchClient:
             return cached_genre or None
 
         # warm_genre may have asked already: join that request.
-        return await shared(
-            self._genre_inflight,
-            cache_key,
-            lambda: self._fetch_genre(query, cache_key, artist, title),
-        )
+        try:
+            return await shared(
+                self._genre_inflight,
+                cache_key,
+                lambda: self._fetch_genre(query, cache_key, artist, title),
+            )
+        except asyncio.CancelledError:
+            # The lookup gave up on the genre. The request must not outlive
+            # it: left running, it could hang across a frozen instance.
+            pending = self._genre_inflight.get(cache_key)
+            if pending is not None:
+                pending.cancel()
+            raise
 
     def warm_genre(self, artist: str, title: str) -> None:
         """Start the genre lookup without waiting for it.

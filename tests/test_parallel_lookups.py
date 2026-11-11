@@ -344,3 +344,93 @@ def test_an_owners_photo_draft_prepares_its_cover_for_publishing():
     assert owner.await_args.args[1] == "https://i.scdn.co/image/cover"
     # Someone who cannot publish gets no cover prepared.
     assert asyncio.run(run(123)).await_count == 0
+
+
+def test_background_work_of_an_update_lands_before_the_update_ends():
+    from music_links_bot.core.background import background_finished, run_behind
+
+    async def run():
+        data: dict = {}
+        landed = []
+
+        async def write():
+            await asyncio.sleep(0.02)
+            landed.append("cache")
+
+        async def hang():
+            await asyncio.Event().wait()
+
+        async with background_finished():
+            run_behind(data, write(), what="Cache write")
+            assert landed == []  # the reply does not wait for it
+        finished_in_time = list(landed)
+        # A stuck task holds the update only for the grace period.
+        async with background_finished(grace=0.01):
+            run_behind(data, hang(), what="Stuck work")
+        for task in data["background_tasks"]:
+            task.cancel()
+        return finished_in_time
+
+    assert asyncio.run(run()) == ["cache"]
+
+
+def test_a_genre_request_does_not_outlive_the_lookup_that_gave_up_on_it():
+    async def run():
+        cancelled = asyncio.Event()
+
+        async def respond(request):
+            try:
+                await asyncio.Event().wait()  # iTunes never answers
+            finally:
+                cancelled.set()
+
+        client = SearchClient()
+        await client._client.aclose()
+        client._client = httpx.AsyncClient(
+            base_url="https://itunes.apple.com",
+            transport=httpx.MockTransport(respond),
+        )
+        try:
+            client.warm_genre("Pitbull", "Global Warming")
+            try:
+                await asyncio.wait_for(
+                    client.lookup_genre("Pitbull", "Global Warming"), timeout=0.05
+                )
+            except TimeoutError:
+                pass
+            await asyncio.wait_for(cancelled.wait(), timeout=1)
+            # The cancelled request leaves the table once its callbacks ran.
+            await asyncio.gather(
+                *client._genre_inflight.values(), return_exceptions=True
+            )
+            await asyncio.sleep(0)
+            return dict(client._genre_inflight)
+        finally:
+            await client.aclose()
+
+    assert asyncio.run(run()) == {}
+
+
+def test_the_webhook_answers_only_after_an_updates_background_work_landed():
+    from types import SimpleNamespace
+
+    from api import telegram as webhook
+    from music_links_bot.core.background import run_behind
+    from music_links_bot.tg.update_execution import UpdateExecution
+
+    async def run():
+        data: dict = {}
+        landed = []
+
+        async def prepare_cover():
+            await asyncio.sleep(0.02)
+            landed.append("cover")
+
+        async def process_update(_update):
+            run_behind(data, prepare_cover(), what="Cover head start")
+
+        application = SimpleNamespace(process_update=process_update, bot_data=data)
+        await webhook._dispatch_update(application, object(), UpdateExecution())
+        return landed
+
+    assert asyncio.run(run()) == ["cover"]
